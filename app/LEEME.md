@@ -63,9 +63,9 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/` Panel | listo |
 | `/ventas` | listo |
 | `/caja` | listo |
-| `/clientes` | pendiente |
+| `/clientes` | listo |
 | `/comisiones` | listo |
-| `/servicios` | pendiente |
+| `/servicios` | listo |
 
 ## Lo que falta
 

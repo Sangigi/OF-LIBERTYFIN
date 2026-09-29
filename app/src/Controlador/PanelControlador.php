@@ -33,7 +33,7 @@ final class PanelControlador
         Plantilla::pagina('panel/index', [
             'titulo'    => 'Panel',
             'icono'     => 'panel',
-            'subtitulo' => self::rotulo($desde, $hasta),
+            'subtitulo' => Fechas::rotulo($desde, $hasta),
             'saludo'    => self::saludo(),
             'resumen'   => $resumen,
             'avance'    => Dinero::pct($cobrado, $vendido),
@@ -97,12 +97,4 @@ final class PanelControlador
         return $m . $n;
     }
 
-    private static function rotulo($d, $h)
-    {
-        $m = ['','enero','febrero','marzo','abril','mayo','junio','julio',
-              'agosto','septiembre','octubre','noviembre','diciembre'];
-        $a = strtotime($d); $b = strtotime($h);
-        if (date('Y-m', $a) === date('Y-m', $b)) return ucfirst($m[(int)date('n',$a)]) . ' ' . date('Y',$a);
-        return ucfirst($m[(int)date('n',$a)]) . ' — ' . $m[(int)date('n',$b)] . ' ' . date('Y',$b);
-    }
 }

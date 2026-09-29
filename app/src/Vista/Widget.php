@@ -221,6 +221,34 @@ final class Widget
         echo '</div>';
     }
 
+
+    /**
+     * Barra segmentada. Para repartos donde importa la proporción y el
+     * orden, como la antigüedad de un saldo.
+     * $partes = [['rotulo'=>..,'monto'=>..,'color'=>..], ...]
+     */
+    public static function segmentos(array $partes, $alto = 34)
+    {
+        $tot = 0; foreach ($partes as $p) $tot += (float)$p['monto'];
+        if ($tot <= 0) return;
+        echo '<div class="lf-seg" style="height:' . $alto . 'px">';
+        foreach ($partes as $p) {
+            if ((float)$p['monto'] <= 0) continue;
+            $pct = (float)$p['monto'] / $tot * 100;
+            echo '<span style="flex:' . round($pct, 3) . ';background:' . $p['color'] . '"'
+               . ' title="' . Plantilla::e($p['rotulo']) . ' · ' . Dinero::pesos($p['monto']) . '"></span>';
+        }
+        echo '</div><div class="lf-legend" style="margin-top:16px">';
+        foreach ($partes as $p) {
+            if ((float)$p['monto'] <= 0) continue;
+            echo '<div><i class="lf-dot" style="background:' . $p['color'] . '"></i>'
+               . '<span class="nb">' . Plantilla::e($p['rotulo']) . '</span>'
+               . '<span class="vb">' . Dinero::pesos($p['monto']) . '</span>'
+               . '<span class="pb">' . round((float)$p['monto'] / $tot * 100) . '%</span></div>';
+        }
+        echo '</div>';
+    }
+
     /** Etiqueta de estado de una venta. */
     public static function estado($saldo, $estado = '')
     {

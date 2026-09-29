@@ -28,7 +28,7 @@ final class ComisionesControlador
         Plantilla::pagina('comisiones/index', [
             'titulo'     => 'Comisiones',
             'icono'      => 'comi',
-            'subtitulo'  => self::rotulo($desde, $hasta),
+            'subtitulo'  => Fechas::rotulo($desde, $hasta),
             'resumen'    => $repo->resumen($desde, $hasta),
             'equipo'     => $repo->porColaborador($desde, $hasta),
             'areas'      => $repo->porArea($desde, $hasta),
@@ -74,12 +74,4 @@ final class ComisionesControlador
         header('Location: /comisiones'); exit;
     }
 
-    private static function rotulo($d, $h)
-    {
-        $m = ['','enero','febrero','marzo','abril','mayo','junio','julio',
-              'agosto','septiembre','octubre','noviembre','diciembre'];
-        $a = strtotime($d); $b = strtotime($h);
-        if (date('Y-m', $a) === date('Y-m', $b)) return ucfirst($m[(int)date('n',$a)]) . ' ' . date('Y',$a);
-        return ucfirst($m[(int)date('n',$a)]) . ' — ' . $m[(int)date('n',$b)] . ' ' . date('Y',$b);
-    }
 }

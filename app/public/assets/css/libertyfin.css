@@ -1000,3 +1000,12 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-legend .nb{flex:1;color:var(--lf-tinta-2)}
 .lf-legend .vb{font-family:var(--lf-mono);font-weight:700;font-size:12.5px}
 .lf-legend .pb{font-family:var(--lf-mono);font-size:11px;color:var(--lf-tinta-4);min-width:38px;text-align:right}
+
+
+/* ══════════════════════════════════════════════════════
+   19 · BARRA SEGMENTADA
+   ══════════════════════════════════════════════════════ */
+.lf-seg{display:flex;gap:2px;border-radius:var(--lf-r-pill);overflow:hidden}
+.lf-seg > span{display:block;transition:flex .3s}
+.lf-seg > span:first-child{border-radius:var(--lf-r-pill) 0 0 var(--lf-r-pill)}
+.lf-seg > span:last-child{border-radius:0 var(--lf-r-pill) var(--lf-r-pill) 0}

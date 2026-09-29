@@ -44,7 +44,7 @@ final class VentasControlador
         Plantilla::pagina('ventas/index', [
             'titulo'   => 'Ventas',
             'icono'    => 'venta',
-            'subtitulo'=> self::rotulo($desde, $hasta) . ' · ' . number_format($total) . ' ventas',
+            'subtitulo'=> Fechas::rotulo($desde, $hasta) . ' · ' . number_format($total) . ' ventas',
             'resumen'  => $resumen,
             'ventas'   => $ventas,
             'saldos'   => $saldos,
@@ -58,12 +58,4 @@ final class VentasControlador
         ]);
     }
 
-    private static function rotulo($d, $h)
-    {
-        $m = ['','enero','febrero','marzo','abril','mayo','junio','julio',
-              'agosto','septiembre','octubre','noviembre','diciembre'];
-        $a = strtotime($d); $b = strtotime($h);
-        if (date('Y-m', $a) === date('Y-m', $b)) return ucfirst($m[(int)date('n', $a)]) . ' ' . date('Y', $a);
-        return $m[(int)date('n', $a)] . ' — ' . $m[(int)date('n', $b)] . ' ' . date('Y', $b);
-    }
 }
