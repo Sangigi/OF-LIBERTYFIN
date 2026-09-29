@@ -1,0 +1,12 @@
+<?php
+// Copiar como config/config.php y llenar. Este archivo NUNCA va al repo.
+// Vive fuera de public/, así que no es alcanzable por web aunque falle .htaccess.
+return [
+    'bd' => [
+        'host'    => 'localhost',
+        'usuario' => '',
+        'clave'   => '',
+        'principal' => 'juanc141_ventas',
+    ],
+    'depurar' => false,   // true solo en local
+];
