@@ -46,7 +46,9 @@ final class ServicioRepo extends Repo
     public function catalogo($desde, $hasta, $buscar = '', $limite = 40)
     {
         list($a, $b) = $this->rango($desde, $hasta);
-        $w = ['p.activo = 1']; $p = [$a, $b, $a, $b];
+        // Solo DOS fechas: las del subquery de ventas. El WHERE exterior
+        // filtra por p.activo, que no lleva marcador.
+        $w = ['p.activo = 1']; $p = [$a, $b];
         if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
                               $l = '%' . $buscar . '%'; $p[] = $l; $p[] = $l; }
         return $this->todos("
