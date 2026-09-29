@@ -56,9 +56,32 @@ Y una línea en `public/index.php`:
 $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 ```
 
+## Pantallas
+
+| Ruta | Estado |
+|---|---|
+| `/` Panel | listo |
+| `/ventas` | listo |
+| `/caja` | pendiente |
+| `/clientes` | pendiente |
+| `/comisiones` | pendiente |
+| `/servicios` | pendiente |
+
 ## Lo que falta
 
 - Login propio (hoy toma la sesión del sistema viejo)
-- Panel, Caja, Clientes, Comisiones, Servicios
 - Detalle de venta
 - Protección CSRF en los formularios que escriban
+
+## Nota sobre el puntaje de salud del panel
+
+No es el porcentaje cobrado. Son dos cosas: cuánto se ha cobrado y qué tan
+parado está lo que falta. Una empresa al 70% cobrado con todo fresco está
+mejor que otra al 85% con la mitad sin moverse hace tres meses.
+
+    salud = %cobrado x (1 - rancio x 0.35)
+
+donde `rancio` es la fracción del saldo que lleva más de 30 días sin un solo
+abono. El factor 0.35 es una decisión, no una verdad: castiga el saldo viejo
+sin que domine la cifra. Si quieres otro peso, está en
+`PanelControlador::salud()`, una sola línea.

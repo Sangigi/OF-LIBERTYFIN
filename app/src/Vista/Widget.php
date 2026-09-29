@@ -88,6 +88,78 @@ final class Widget
         echo '</div>';
     }
 
+
+    /** Marcador circular. Para puntajes, no para dinero. */
+    public static function marcador($pct, $rotulo = '', $r = 48, $grosor = 9)
+    {
+        $pct = max(0, min(100, (float)$pct));
+        $c   = 2 * M_PI * $r;
+        $d   = $r + $grosor / 2 + 2;
+        $lado = $d * 2;
+        echo '<div class="lf-ring" style="width:' . $lado . 'px;height:' . $lado . 'px">'
+           . '<svg width="' . $lado . '" height="' . $lado . '" viewBox="0 0 ' . $lado . ' ' . $lado . '">'
+           . '<circle class="bg" r="' . $r . '" cx="' . $d . '" cy="' . $d . '" stroke-width="' . $grosor . '"/>'
+           . '<circle class="fg" r="' . $r . '" cx="' . $d . '" cy="' . $d . '" stroke-width="' . $grosor . '"'
+           . ' stroke-dasharray="' . round($c * $pct / 100, 1) . ' ' . round($c, 1) . '"/>'
+           . '</svg><div class="mid"><b>' . round($pct) . '</b>'
+           . ($rotulo ? '<small>' . Plantilla::e($rotulo) . '</small>' : '') . '</div></div>';
+    }
+
+    /**
+     * Dos curvas suaves superpuestas. La separación entre ellas ES el dato:
+     * lo vendido que todavía no se cobra.
+     */
+    public static function curvas(array $series, array $rotulos, $ancho = 560, $alto = 180)
+    {
+        $todos = [];
+        foreach ($series as $s) foreach ($s['datos'] as $v) $todos[] = (float)$v;
+        if (count($todos) < 2) return;
+        $lo = min($todos); $hi = max($todos); $r = ($hi - $lo) ?: 1;
+        $pad = 16;
+
+        $trazo = function (array $d) use ($ancho, $alto, $pad, $lo, $r) {
+            $n = count($d); $pts = [];
+            foreach ($d as $i => $v) {
+                $pts[] = [$pad + $i * (($ancho - 2 * $pad) / max(1, $n - 1)),
+                          $alto - $pad - ((float)$v - $lo) / $r * ($alto - 2 * $pad)];
+            }
+            $s = sprintf('M%.1f %.1f', $pts[0][0], $pts[0][1]);
+            for ($i = 0; $i < count($pts) - 1; $i++) {
+                $p0 = $i > 0 ? $pts[$i-1] : $pts[$i];
+                $p1 = $pts[$i]; $p2 = $pts[$i+1];
+                $p3 = isset($pts[$i+2]) ? $pts[$i+2] : $p2;
+                $s .= sprintf(' C%.1f %.1f, %.1f %.1f, %.1f %.1f',
+                    $p1[0] + ($p2[0]-$p0[0])/6, $p1[1] + ($p2[1]-$p0[1])/6,
+                    $p2[0] - ($p3[0]-$p1[0])/6, $p2[1] - ($p3[1]-$p1[1])/6,
+                    $p2[0], $p2[1]);
+            }
+            return [$s, $pts];
+        };
+
+        echo '<svg class="lf-curva" viewBox="0 0 ' . $ancho . ' ' . $alto . '" preserveAspectRatio="none">';
+        for ($k = 1; $k < 4; $k++)
+            echo '<line class="gl" x1="0" y1="' . ($alto*$k/4) . '" x2="' . $ancho . '" y2="' . ($alto*$k/4) . '"/>';
+        $primero = true;
+        foreach ($series as $s) {
+            list($d, $pts) = $trazo($s['datos']);
+            if ($primero) {
+                echo '<path class="ar" d="' . $d . sprintf(' L%.1f %d L%.1f %d Z',
+                     end($pts)[0], $alto - 6, $pts[0][0], $alto - 6) . '"/>';
+            }
+            echo '<path class="' . ($primero ? 'l1' : 'l2') . '" d="' . $d . '"/>';
+            $primero = false;
+        }
+        foreach ($series as $j => $s) {
+            list($d, $pts) = $trazo($s['datos']);
+            foreach ($pts as $i => $pt) {
+                $t = isset($rotulos[$i]) ? $rotulos[$i] : '';
+                echo '<circle class="' . ($j ? 'p2' : 'p1') . '" cx="' . round($pt[0],1) . '" cy="' . round($pt[1],1)
+                   . '" r="' . ($j ? 3.4 : 4.6) . '"><title>' . Plantilla::e($t . ' · ' . Dinero::pesos($s['datos'][$i])) . '</title></circle>';
+            }
+        }
+        echo '</svg>';
+    }
+
     /** Etiqueta de estado de una venta. */
     public static function estado($saldo, $estado = '')
     {

@@ -29,16 +29,12 @@ session_start();
 // ── Sesión ──
 // Mientras se migra el login, se toma la sesión del sistema anterior.
 if (empty($_SESSION['logged_in']) || empty($_SESSION['empresa_db'])) {
-    $loginViejo = $cfg['login_url'] ?? 'https://libertyfin.com.mx/Login';   // ej. https://tu-sistema-viejo.com/login.php
-    if ($loginViejo !== '') { header('Location: ' . $loginViejo); exit; }
-    http_response_code(401);
-    echo 'Sin sesión. Entra primero al sistema anterior.';
-    exit;
+    header('Location: /login'); exit;
 }
 
 // ── Rutas ──
 $r = new Router();
-$r->get('/',        ['LibertyFin\Controlador\VentasControlador', 'index']); // provisional
+$r->get('/',        ['LibertyFin\Controlador\PanelControlador',  'index']);
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 
 $destino = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
