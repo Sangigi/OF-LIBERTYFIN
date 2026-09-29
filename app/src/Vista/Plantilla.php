@@ -20,6 +20,15 @@ final class Plantilla
         include self::$base . '/' . $nombre . '.php';
     }
 
+    /**
+     * Render de una página dentro del layout.
+     *
+     * EXTR_SKIP a propósito: si la plantilla ya definió una variable con
+     * ese nombre, no se pisa. Y al revés, una plantilla que redefina una
+     * variable del controlador rompe silenciosamente lo que venía en ella
+     * (pasó con $gastos, que era una lista y quedó convertida en float).
+     * Por eso las plantillas usan nombres distintos para sus locales.
+     */
     public static function pagina($nombre, array $datos = [], $layout = 'layout')
     {
         extract($datos, EXTR_SKIP);

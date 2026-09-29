@@ -67,12 +67,38 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/comisiones` | listo |
 | `/servicios` | listo |
 | `/ventas/{id}` detalle | listo |
+| `/login` | listo |
 
 ## Lo que falta
 
-- Login propio (hoy toma la sesión del sistema viejo)
 - Corte de caja
 - Asignar comisiones desde el detalle de venta
+- Restablecer contraseña
+
+## Ingreso
+
+Ya no depende del sistema anterior: tiene su propio login.
+
+**El índice de usuarios.** El login viejo abría una conexión a la base de
+CADA empresa buscando al usuario; con cinco empresas son cinco conexiones
+por intento, incluso fallido. Aquí se guarda en la base principal una tabla
+`usuarios_indice` que dice en qué empresa vive cada quien: la primera vez se
+busca recorriendo, de ahí en adelante es una consulta. Si el índice queda
+viejo o no se pudo crear, vuelve a recorrer y nadie se queda fuera.
+
+**Mismo mensaje y mismo tiempo** si el usuario no existe o si la contraseña
+está mal. Distinguirlos regala una lista de usuarios válidos, y la diferencia
+de milisegundos también.
+
+**Cinco intentos y quince minutos** de espera.
+
+**La sesión se regenera al entrar**, y la cookie va `httponly` y `samesite=Lax`.
+
+**La IP no echa a nadie.** En México cambia sola al saltar de wifi a datos;
+se anota en el log y se sigue. El navegador sí tiene que ser el mismo.
+
+**Un solo portero.** `public/index.php` decide en una línea quién pasa, en vez
+de repetir la comprobación al inicio de cada archivo.
 
 ## El detalle de venta
 

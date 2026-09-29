@@ -10,10 +10,11 @@ $v       = $venta;
 $total   = (float)$v['total'];
 $cobrado = (float)$v['cobrado'];
 $saldo   = (float)$v['saldo'];
-$gastos  = (float)$v['gastos'];
+$gastoTotal = (float)$v['gastos'];   // el monto
+// OJO: $gastos (sin sufijo) es la LISTA que manda el controlador. No pisarla.
 $avance  = D::pct($cobrado, $total);
 $base    = (float)$v['subtotal'] - (float)$v['descuento'];
-$neto    = $base - $gastos;
+$neto    = $base - $gastoTotal;
 $sumAsig = 0; $sumDev = 0;
 foreach ($comisiones as $c) { $sumAsig += (float)$c['asignada']; $sumDev += (float)$c['devengada']; }
 $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
@@ -49,7 +50,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     <div class="lf-tile g"><?= W::icono('baja','19px') ?></div>
     <div class="stat-value"><?= D::pesos($neto) ?></div>
     <div class="stat-label">Neto comisionable</div>
-    <div class="stat-meta">base <?= D::corto($base) ?> − gastos <?= D::corto($gastos) ?></div>
+    <div class="stat-meta">base <?= D::corto($base) ?> − gastos <?= D::corto($gastoTotal) ?></div>
   </div>
   <div class="stat-card">
     <div class="lf-tile l"><?= W::icono('pct','19px') ?></div>
@@ -65,7 +66,8 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     <section class="card">
       <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <span>Cobranza</span>
-        <span class="badge bg-secondary"><?= count(array_filter($pagos, function($p){ return !$p['cancelado']; })) ?> pagos</span>
+        <?php $vivos = count(array_filter($pagos, function($p){ return !$p['cancelado']; })); ?>
+        <span class="badge bg-secondary"><?= $vivos ?> pago<?= $vivos == 1 ? '' : 's' ?></span>
       </header>
       <div class="table-responsive lf-cards" style="padding:0 12px 6px">
         <table class="table table-hover">
@@ -235,14 +237,14 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
       </div>
     </section>
 
-    <?php if ($gastos_lista = $gastos): ?>
+    <?php if ($gastos): ?>
     <section class="card">
       <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
         <span>Gastos de operación</span>
         <span class="badge bg-warning"><?= D::pesos($v['gastos']) ?></span>
       </header>
       <div class="card-body" style="font-size:13px">
-        <?php foreach ($gastos_lista as $g): ?>
+        <?php foreach ($gastos as $g): ?>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0">
             <span style="color:var(--lf-tinta-2)"><?= P::e($g['concepto']) ?></span>
             <b class="lf-mono"><?= D::pesos($g['monto']) ?></b>

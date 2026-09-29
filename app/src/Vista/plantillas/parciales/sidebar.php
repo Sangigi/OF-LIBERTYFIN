@@ -31,7 +31,9 @@ $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
   <div class="lf-pie">
     <div class="lf-ucard">
       <span class="lf-av"><?= P::e($ini) ?></span>
-      <span style="flex:1"><b><?= P::e($u) ?></b><small><?= P::e($_SESSION['usuario_rol'] ?? '') ?></small></span>
+      <span style="flex:1;min-width:0"><b><?= P::e($u) ?></b><small><?= P::e($_SESSION['usuario_rol'] ?? '') ?></small></span>
+      <a href="/salir" class="lf-btn-ghost" title="Cerrar sesión" style="flex-shrink:0">
+        <?= W::icono('baja','15px') ?></a>
     </div>
   </div>
 </aside>

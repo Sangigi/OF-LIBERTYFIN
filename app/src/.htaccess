@@ -1,0 +1,8 @@
+# Si esta carpeta quedó dentro del DocumentRoot, nada de aquí es alcanzable.
+# Lo correcto es que app/ viva un nivel ARRIBA de public_html, pero esto
+# cubre el caso de un hosting que no deje mover el DocumentRoot.
+Require all denied
+<IfModule !mod_authz_core.c>
+    Order deny,allow
+    Deny from all
+</IfModule>
