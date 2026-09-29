@@ -29,7 +29,11 @@ session_start();
 // ── Sesión ──
 // Mientras se migra el login, se toma la sesión del sistema anterior.
 if (empty($_SESSION['logged_in']) || empty($_SESSION['empresa_db'])) {
-    header('Location: /login'); exit;
+    $loginViejo = $cfg['login_url'] ?? '';   // ej. https://tu-sistema-viejo.com/login.php
+    if ($loginViejo !== '') { header('Location: ' . $loginViejo); exit; }
+    http_response_code(401);
+    echo 'Sin sesión. Entra primero al sistema anterior.';
+    exit;
 }
 
 // ── Rutas ──
