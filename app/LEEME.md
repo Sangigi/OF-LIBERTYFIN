@@ -66,12 +66,30 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/clientes` | listo |
 | `/comisiones` | listo |
 | `/servicios` | listo |
+| `/ventas/{id}` detalle | listo |
 
 ## Lo que falta
 
 - Login propio (hoy toma la sesión del sistema viejo)
-- Detalle de venta
 - Corte de caja
+- Asignar comisiones desde el detalle de venta
+
+## El detalle de venta
+
+Es donde aterriza todo lo que se corrigió a mano durante la migración:
+pagos, gastos, IVA y comisiones en una sola pantalla.
+
+Dos reglas que el sistema anterior no respetaba siempre:
+
+**No se puede abonar más que el saldo.** `RegistrarPago::abonar()` lo impide.
+Eso fue lo que dejó a Izol Nieto con un pago de $864.69 sobre una venta de
+$745.42.
+
+**Después de tocar un pago se resincronizan las comisiones, siempre.**
+`SincronizarComisiones` recalcula desde el dominio, no desde una copia de la
+fórmula. Cancelar un pago devuelve las comisiones a su sitio solo.
+
+Los pagos cancelados no se borran: quedan tachados, con su motivo y la fecha.
 
 ## Las dos métricas de comisión
 
