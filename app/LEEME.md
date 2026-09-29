@@ -62,7 +62,7 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 |---|---|
 | `/` Panel | listo |
 | `/ventas` | listo |
-| `/caja` | pendiente |
+| `/caja` | listo |
 | `/clientes` | pendiente |
 | `/comisiones` | pendiente |
 | `/servicios` | pendiente |
@@ -71,7 +71,21 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 
 - Login propio (hoy toma la sesión del sistema viejo)
 - Detalle de venta
-- Protección CSRF en los formularios que escriban
+- Corte de caja
+
+## Seguridad de la caja
+
+Tres cosas que el `caja.php` viejo no hacía:
+
+**Los precios se releen de la base.** El formulario solo manda `{id, cantidad}`.
+Si el precio viniera del navegador, cualquiera con las herramientas de
+desarrollo podría cobrarse un servicio de $26,000 en $1.
+
+**Token contra envíos falsificados.** Sin el token de sesión, el POST se rechaza.
+
+**El anticipo no puede superar el total.** `Ticket::validarAnticipo()` lo impide.
+Eso es exactamente lo que dejó a Izol Nieto con un pago de $864.69 sobre una
+venta de $745.42.
 
 ## Nota sobre el puntaje de salud del panel
 

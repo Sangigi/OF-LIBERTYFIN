@@ -65,11 +65,14 @@ final class Widget
         }
         $d  = 'M' . implode(' L', $pts);
         $ar = $d . " L{$ancho} {$alto} L0 {$alto} Z";
+        // El área rellena puede estirarse sin problema; el trazo no, por eso
+        // lleva vector-effect y se queda en su grosor real.
         echo '<svg class="lf-spark" viewBox="0 0 ' . $ancho . ' ' . $alto . '" preserveAspectRatio="none">'
            . '<defs><linearGradient id="lfGrad" x1="0" y1="0" x2="0" y2="1">'
            . '<stop offset="0%" stop-color="currentColor" stop-opacity=".26"/>'
            . '<stop offset="100%" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs>'
-           . '<path class="ar" d="' . $ar . '"/><path class="ln" d="' . $d . '"/></svg>';
+           . '<path class="ar" d="' . $ar . '"/>'
+           . '<path class="ln" vector-effect="non-scaling-stroke" d="' . $d . '"/></svg>';
     }
 
     /** Gráfica de barras apiladas: cobrado y pendiente por mes. */
@@ -136,7 +139,10 @@ final class Widget
             return [$s, $pts];
         };
 
-        echo '<svg class="lf-curva" viewBox="0 0 ' . $ancho . ' ' . $alto . '" preserveAspectRatio="none">';
+        // Sin preserveAspectRatio="none": estirar el viewBox al ancho real
+        // deforma trazos y convierte los puntos en elipses. Escalado uniforme
+        // y el alto lo pone el propio viewBox.
+        echo '<svg class="lf-curva" viewBox="0 0 ' . $ancho . ' ' . $alto . '">';
         for ($k = 1; $k < 4; $k++)
             echo '<line class="gl" x1="0" y1="' . ($alto*$k/4) . '" x2="' . $ancho . '" y2="' . ($alto*$k/4) . '"/>';
         $primero = true;

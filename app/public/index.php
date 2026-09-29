@@ -36,6 +36,9 @@ if (empty($_SESSION['logged_in']) || empty($_SESSION['empresa_db'])) {
 $r = new Router();
 $r->get('/',        ['LibertyFin\Controlador\PanelControlador',  'index']);
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
+$r->get('/caja',    ['LibertyFin\Controlador\CajaControlador',   'index']);
+$r->get('/caja/clientes', ['LibertyFin\Controlador\CajaControlador', 'clientes']);
+$r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
 
 $destino = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 
