@@ -981,3 +981,22 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-sugerencias button:hover{background:var(--lf-brand-glow)}
 .lf-sugerencias b{display:block;font-size:13px;font-weight:600}
 .lf-sugerencias small{font-size:11px;color:var(--lf-tinta-4)}
+
+
+/* ══════════════════════════════════════════════════════
+   18 · DONA Y LEYENDA
+   ══════════════════════════════════════════════════════ */
+.lf-dona-fila{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.lf-donut{position:relative;flex-shrink:0}
+.lf-donut svg{transform:rotate(-90deg);display:block}
+.lf-donut circle{fill:none;transition:stroke-width .18s}
+.lf-donut circle:hover{stroke-width:21}
+.lf-donut .mid{position:absolute;inset:0;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;pointer-events:none}
+.lf-donut .mid b{font-family:var(--lf-mono);font-size:19px;font-weight:700;letter-spacing:-.6px;line-height:1}
+.lf-donut .mid small{font-size:10.5px;color:var(--lf-tinta-4);margin-top:3px}
+.lf-legend{flex:1;min-width:170px;display:flex;flex-direction:column;gap:9px}
+.lf-legend > div{display:flex;align-items:center;gap:9px;font-size:12.5px}
+.lf-legend .nb{flex:1;color:var(--lf-tinta-2)}
+.lf-legend .vb{font-family:var(--lf-mono);font-weight:700;font-size:12.5px}
+.lf-legend .pb{font-family:var(--lf-mono);font-size:11px;color:var(--lf-tinta-4);min-width:38px;text-align:right}

@@ -166,6 +166,61 @@ final class Widget
         echo '</svg>';
     }
 
+
+    /**
+     * Dona. $partes = [['rotulo'=>..,'monto'=>..], ...]
+     * Los colores salen de una paleta fija para que la misma área tenga
+     * siempre el mismo color entre pantallas.
+     */
+    public static function dona(array $partes, $centro = '', $bajo = '', $r = 54, $grosor = 17)
+    {
+        $tot = 0; foreach ($partes as $p) $tot += (float)$p['monto'];
+        if ($tot <= 0) return;
+        $paleta = ['#27ae60', '#5cc987', '#7fc241', '#2c3e50', '#c6d2cc', '#a8b5af'];
+        $c    = 2 * M_PI * $r;
+        $lado = ($r + $grosor / 2 + 2) * 2;
+        $cen  = $lado / 2;
+        $off  = 0;
+
+        echo '<div class="lf-dona-fila"><div class="lf-donut" style="width:' . $lado . 'px;height:' . $lado . 'px">'
+           . '<svg width="' . $lado . '" height="' . $lado . '" viewBox="0 0 ' . $lado . ' ' . $lado . '">';
+        foreach ($partes as $i => $p) {
+            $l = $c * ((float)$p['monto'] / $tot);
+            echo '<circle r="' . $r . '" cx="' . $cen . '" cy="' . $cen . '" stroke-width="' . $grosor . '"'
+               . ' stroke="' . $paleta[$i % count($paleta)] . '"'
+               . ' stroke-dasharray="' . round($l, 2) . ' ' . round($c - $l, 2) . '"'
+               . ' stroke-dashoffset="' . round(-$off, 2) . '">'
+               . '<title>' . Plantilla::e($p['rotulo']) . ' · ' . Dinero::pesos($p['monto']) . '</title></circle>';
+            $off += $l;
+        }
+        echo '</svg><div class="mid">'
+           . ($centro ? '<b>' . Plantilla::e($centro) . '</b>' : '')
+           . ($bajo ? '<small>' . Plantilla::e($bajo) . '</small>' : '')
+           . '</div></div><div class="lf-legend">';
+        foreach ($partes as $i => $p) {
+            echo '<div><i class="lf-dot" style="background:' . $paleta[$i % count($paleta)] . '"></i>'
+               . '<span class="nb">' . Plantilla::e($p['rotulo']) . '</span>'
+               . '<span class="vb">' . Dinero::corto($p['monto']) . '</span>'
+               . '<span class="pb">' . round((float)$p['monto'] / $tot * 100, 1) . '%</span></div>';
+        }
+        echo '</div></div>';
+    }
+
+    /** Barras horizontales. $filas = [['rotulo'=>..,'monto'=>..], ...] */
+    public static function barrasH(array $filas)
+    {
+        $max = 0.01; foreach ($filas as $f) $max = max($max, (float)$f['monto']);
+        $paleta = ['#27ae60', '#5cc987', '#7fc241', '#2c3e50', '#c6d2cc', '#a8b5af'];
+        echo '<div class="lf-bars">';
+        foreach ($filas as $i => $f) {
+            echo '<div class="r"><span>' . Plantilla::e($f['rotulo']) . '</span>'
+               . '<span class="tr"><i style="--w:' . round((float)$f['monto'] / $max * 100, 1) . '%;'
+               . 'background:' . $paleta[$i % count($paleta)] . '"></i></span>'
+               . '<b>' . Dinero::corto($f['monto']) . '</b></div>';
+        }
+        echo '</div>';
+    }
+
     /** Etiqueta de estado de una venta. */
     public static function estado($saldo, $estado = '')
     {

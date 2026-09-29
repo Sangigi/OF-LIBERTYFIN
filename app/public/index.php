@@ -39,6 +39,8 @@ $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 $r->get('/caja',    ['LibertyFin\Controlador\CajaControlador',   'index']);
 $r->get('/caja/clientes', ['LibertyFin\Controlador\CajaControlador', 'clientes']);
 $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
+$r->get('/comisiones', ['LibertyFin\Controlador\ComisionesControlador', 'index']);
+$r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
 
 $destino = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 

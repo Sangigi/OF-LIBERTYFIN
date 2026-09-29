@@ -64,7 +64,7 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/ventas` | listo |
 | `/caja` | listo |
 | `/clientes` | pendiente |
-| `/comisiones` | pendiente |
+| `/comisiones` | listo |
 | `/servicios` | pendiente |
 
 ## Lo que falta
@@ -72,6 +72,20 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 - Login propio (hoy toma la sesión del sistema viejo)
 - Detalle de venta
 - Corte de caja
+
+## Las dos métricas de comisión
+
+La pantalla de Comisiones separa dos cifras que no son la misma:
+
+- **Total generado** · todo lo que la venta produjo, tenga dueño o no
+- **Por pagar** · solo lo que se le puede depositar a una persona
+
+La diferencia son los renglones a nombre de **POR ASIGNAR**: el Excel los
+cuenta porque la venta sí los generó, pero nadie confirmó quién vendió.
+
+Cuando aparece el nombre, se asigna desde la misma pantalla con un desplegable.
+Solo cambia el dueño: el monto, la base y el devengado ya están calculados y
+no se recalculan. Requiere rol de administrador.
 
 ## Seguridad de la caja
 
