@@ -456,7 +456,7 @@ small,.small{font-size:12px}
 input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-variant-numeric:tabular-nums}
 
 
-/* ════════════════════════�����═════════════════════════════
+/* ══════════════════════════════════════════════════════
    9 · ALERTAS
    ══════════════════════════════════════════════════════ */
 .alert{
@@ -541,7 +541,7 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .breadcrumb-item + .breadcrumb-item::before{color:var(--lf-tinta-4)}
 
 
-/* ════════════════════════��═���═══════════════════════════
+/* ══════════════════════════════════════════════════════
    11 · MODALES, DESPLEGABLES Y AVISOS
    ══════════════════════════════════════════════════════ */
 .modal-content{background:var(--lf-sup);border:1px solid var(--lf-linea);
@@ -1063,70 +1063,3 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 :root[data-theme="dark"] .lf-tp .ci{color:#5fd48f}
 :root[data-theme="dark"] .lf-curva .ar{fill:rgba(39,174,96,.16)}
 :root[data-theme="dark"] .lf-seg > span{opacity:.88}
-
-/* ══════════════════════════════════════════════════════
-   AJUSTES DE CONSISTENCIA · LIBERTYFIN
-   ══════════════════════════════════════════════════════ */
-/* Sidebar: el menú y el usuario forman una sola columna desplazable. */
-.sidebar,.app-sidebar,.side-nav{height:100dvh;min-height:100dvh;overflow-y:auto;display:flex;flex-direction:column}
-.sidebar nav,.app-sidebar nav,.side-nav nav{flex:0 0 auto}
-.sidebar .account,.sidebar .user-panel,.sidebar .logout,.app-sidebar .account,.app-sidebar .logout{position:static;margin-top:18px}
-/* Grillas y tarjetas con una altura consistente. */
-.stats-grid,.metrics-grid,.services-grid,.service-grid{align-items:stretch}
-.stats-grid > *, .metrics-grid > *, .services-grid > *, .service-grid > *{height:100%}
-.service-card,.services-grid .card,.service-grid .card{min-height:178px;height:100%;display:flex;flex-direction:column;justify-content:center}
-/* Paginación compatible con Bootstrap y con botones propios. */
-.pagination{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin:20px 0 4px}
-.pagination .page-link{min-width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;border-radius:var(--lf-r-sm);border:1px solid var(--lf-linea);background:var(--lf-sup);color:var(--lf-tinta-2)}
-.pagination .page-item.active .page-link,.pagination button.active{background:var(--lf-brand);border-color:var(--lf-brand);color:#fff}
-/* Login alineado al mismo sistema visual, sin alterar su composición original. */
-.lf-acceso{width:min(100%,396px)}
-.lf-acceso form,.lf-acceso .form-group{width:100%}
-.lf-acceso .form-control,.lf-acceso input:not([type="checkbox"]):not([type="radio"]){width:100%;min-height:42px}
-.lf-acceso .lf-ojo{right:4px}
-@media(max-width:768px){.sidebar,.app-sidebar,.side-nav{height:auto;min-height:0}.lf-acceso{width:100%}}
-
-/* Ajustes finales de layout: solo CSS, sin depender de JavaScript. */
-[class*="sidebar"], [class*="side-bar"], [class*="sidenav"] {
-  height: 100vh;
-  min-height: 100vh;
-  overflow-y: auto;
-  align-self: flex-start;
-}
-[class*="sidebar"] nav, [class*="side-bar"] nav, [class*="sidenav"] nav {
-  flex: 0 0 auto;
-}
-[class*="sidebar"] [class*="user"], [class*="sidebar"] [class*="profile"], [class*="sidebar"] [class*="logout"],
-[class*="side-bar"] [class*="user"], [class*="side-bar"] [class*="profile"], [class*="side-bar"] [class*="logout"] {
-  position: static;
-  margin-top: 18px;
-}
-[class*="grid"], [class*="cards"], [class*="services"] {
-  align-items: stretch;
-}
-[class*="grid"] > *, [class*="cards"] > *, [class*="services"] > * {
-  min-height: 0;
-  height: 100%;
-}
-[class*="service-card"], [class*="service_card"], [class*="service-item"] {
-  min-height: 178px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-[class*="pagination"], nav[aria-label*="pagin" i] {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 6px;
-  margin: 20px 0 4px;
-}
-[class*="pagination"] button, [class*="pagination"] a, nav[aria-label*="pagin" i] button, nav[aria-label*="pagin" i] a {
-  min-width: 36px;
-  min-height: 36px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
