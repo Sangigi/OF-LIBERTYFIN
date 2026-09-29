@@ -52,7 +52,8 @@ final class ServicioRepo extends Repo
         if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
                               $l = '%' . $buscar . '%'; $p[] = $l; $p[] = $l; }
         return $this->todos("
-            SELECT p.id, p.codigo, p.nombre, p.precio,
+            SELECT p.id, p.codigo, p.nombre,
+                   COALESCE(NULLIF(p.subprecio,0), p.precio) AS precio,
                    cat.nombre AS categoria,
                    COALESCE(x.veces,0)   AS ventas,
                    COALESCE(x.ingreso,0) AS ingreso

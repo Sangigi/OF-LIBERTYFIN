@@ -62,7 +62,11 @@ final class CajaControlador
         if (!$ids) $this->volver('El ticket está vacío.', 'error');
 
         $marcas = implode(',', array_fill(0, count($ids), '?'));
-        $st = $db->prepare("SELECT id, nombre, precio, costo FROM productos WHERE id IN ($marcas) AND activo = 1");
+        // El precio de venta es `subprecio`. Releerlo mal aquí sería peor que
+        // no releerlo: cobraría el importe equivocado con toda confianza.
+        $st = $db->prepare("
+            SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio, costo
+            FROM productos WHERE id IN ($marcas) AND activo = 1");
         $st->execute($ids);
         $reales = [];
         foreach ($st->fetchAll() as $p) $reales[(int)$p['id']] = $p;

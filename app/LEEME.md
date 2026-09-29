@@ -68,12 +68,51 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/servicios` | listo |
 | `/ventas/{id}` detalle | listo |
 | `/login` | listo |
+| `/corte` corte de caja | listo |
+
+## Notas del esquema
+
+Dos cosas de la base que no son obvias y cuestan caro si se ignoran:
+
+**`productos` no tiene `sucursal_id`.** La relación va por la tabla
+`producto_sucursal (producto_id, sucursal_id, stock, stock_minimo)`, y con
+LEFT JOIN: un servicio sin renglón ahí sigue siendo vendible, solo que sin
+stock propio. Un INNER JOIN lo desaparecería del catálogo.
+
+**El precio de venta es `subprecio`, no `precio`.** Así lo lee el sistema
+anterior. En el código nuevo va como
+`COALESCE(NULLIF(p.subprecio,0), p.precio)`, con `precio` de respaldo por si
+`subprecio` viene en cero.
+
+## Modo oscuro
+
+El tema se aplica en un script dentro del `<head>`, antes de que el navegador
+pinte. Si se esperara al final del documento, la página aparecería en claro y
+saltaría a oscuro: ese parpadeo blanco es lo que hace que un modo oscuro se
+sienta barato.
+
+Se guarda en `localStorage`. **Nunca se hereda del sistema operativo sin que
+el usuario lo pida**: si alguien tiene el celular en oscuro y abre la app por
+primera vez, la ve en claro.
+
+El botón muestra el icono de lo que vas a OBTENER, no el del estado actual: en
+claro se ve la luna.
+
+## Corte de caja
+
+Compara **efectivo contra efectivo**. Transferencias y tarjeta se muestran
+aparte porque no pasan por el cajón: sumarlas al corte es la forma más común
+de "cuadrar" una caja que en realidad no cuadra.
+
+Si hay diferencia, la nota es obligatoria. Y se guarda **con signo**: positiva
+si sobró, negativa si faltó. Guardar el valor absoluto esconde justo lo que
+importa saber.
 
 ## Lo que falta
 
-- Corte de caja
 - Asignar comisiones desde el detalle de venta
 - Restablecer contraseña
+- Editar servicios y clientes desde la app
 
 ## Ingreso
 

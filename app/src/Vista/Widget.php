@@ -275,6 +275,8 @@ final class Widget
             'buscar' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
             'mas'    => '<path d="M12 5v14M5 12h14"/>',
             'baja'   => '<path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 20h16"/>',
+            'luna'   => '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
+            'sol'    => '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
         ];
         $d = isset($p[$n]) ? $p[$n] : $p['panel'];
         return '<svg viewBox="0 0 24 24" style="width:' . $tam . ';height:' . $tam . ';fill:none;stroke:currentColor;'

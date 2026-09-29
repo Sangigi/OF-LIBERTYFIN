@@ -1032,3 +1032,34 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 .lf-ojo:hover{background:var(--lf-vidrio);color:var(--lf-tinta)}
 .lf-acceso-pie{margin-top:22px;padding-top:18px;border-top:1px solid var(--lf-linea);
   font-size:12px;color:var(--lf-tinta-4);text-align:center;line-height:1.5}
+
+
+/* ══════════════════════════════════════════════════════
+   21 · INTERRUPTOR DE TEMA
+   Se muestra el icono de lo que vas a OBTENER, no el del
+   estado actual: en claro se ve la luna.
+   ══════════════════════════════════════════════════════ */
+.lf-tema{display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--lf-linea);
+  background:var(--lf-sup);color:var(--lf-tinta-3);cursor:pointer;transition:all .15s}
+.lf-tema:hover{border-color:var(--lf-brand);color:var(--lf-brand-2);background:var(--lf-brand-glow)}
+.lf-tema .oscuro{display:none}
+:root[data-theme="dark"] .lf-tema .claro{display:none}
+:root[data-theme="dark"] .lf-tema .oscuro{display:inline-flex}
+
+/* La transición al cambiar de tema, solo en lo que cambia de color.
+   Poner `transition:all` aquí haría que cada hover del sistema arrastre
+   un retardo de 220 ms. */
+@media (prefers-reduced-motion: no-preference){
+  body,.card,.stat-card,.lf-main,.lf-side,.table,.btn,.form-control,.lf-oscura{
+    transition:background-color .22s ease,border-color .22s ease,color .22s ease}
+}
+
+/* Retoques del oscuro que no salen solos de los tokens */
+:root[data-theme="dark"] .lf-serv:hover{background:var(--lf-brand-soft)}
+:root[data-theme="dark"] .lf-sugerencias{box-shadow:0 8px 22px rgba(0,0,0,.5)}
+:root[data-theme="dark"] .lf-acceso{box-shadow:0 22px 52px rgba(0,0,0,.6)}
+:root[data-theme="dark"] .lf-frase h2 em{color:#5fd48f}
+:root[data-theme="dark"] .lf-tp .ci{color:#5fd48f}
+:root[data-theme="dark"] .lf-curva .ar{fill:rgba(39,174,96,.16)}
+:root[data-theme="dark"] .lf-seg > span{opacity:.88}

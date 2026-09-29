@@ -5,6 +5,24 @@ use LibertyFin\Vista\Widget as W;
 <html lang="es" data-theme="light">
 <head>
 <meta charset="utf-8">
+<script>
+// Se ejecuta antes de que el navegador pinte nada: si esperara al final
+// del documento, la página aparecería en claro y saltaría a oscuro. Ese
+// parpadeo blanco es lo que hace que un modo oscuro se sienta barato.
+(function(){
+  try {
+    var t = localStorage.getItem('lf-tema');
+    if (t === 'dark' || t === 'light') {
+      document.documentElement.setAttribute('data-theme', t);
+      return;
+    }
+  } catch (e) {}
+  // Sin preferencia guardada: claro. NUNCA se hereda del sistema sin que
+  // el usuario lo pida.
+  document.documentElement.setAttribute('data-theme', 'light');
+})();
+</script>
+
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= P::e($titulo ?? 'LibertyFin') ?> · LibertyFin</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

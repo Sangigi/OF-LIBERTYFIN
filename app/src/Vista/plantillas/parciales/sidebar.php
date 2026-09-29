@@ -5,6 +5,7 @@ $menu = [
   ['ruta' => '/caja',      'icono' => 'caja',    'texto' => 'Caja'],
   ['ruta' => '/ventas',    'icono' => 'venta',   'texto' => 'Ventas'],
   ['ruta' => '/clientes',  'icono' => 'cliente', 'texto' => 'Clientes'],
+  ['ruta' => '/corte',     'icono' => 'reloj',   'texto' => 'Corte de caja'],
   ['grupo' => 'Administración'],
   ['ruta' => '/comisiones','icono' => 'comi',    'texto' => 'Comisiones'],
   ['ruta' => '/servicios', 'icono' => 'serv',    'texto' => 'Servicios'],

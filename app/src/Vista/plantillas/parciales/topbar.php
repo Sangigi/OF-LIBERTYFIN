@@ -9,3 +9,16 @@
     <a class="btn btn-primary" href="/caja"><?= W::icono('mas', '15px') ?>Nueva venta</a>
   </div>
 </header>
+
+<script>
+(function(){
+  var b = document.getElementById('lfTema');
+  if (!b) return;
+  b.addEventListener('click', function(){
+    var raiz = document.documentElement;
+    var nuevo = raiz.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    raiz.setAttribute('data-theme', nuevo);
+    try { localStorage.setItem('lf-tema', nuevo); } catch (e) {}
+  });
+})();
+</script>

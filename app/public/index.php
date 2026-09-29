@@ -58,6 +58,9 @@ $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
 $r->get('/clientes',  ['LibertyFin\Controlador\ClientesControlador',  'index']);
 $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
+$r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
+$r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
+$r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
 
 $publicas = ['/login', '/salir'];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
