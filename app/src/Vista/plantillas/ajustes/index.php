@@ -256,6 +256,100 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
 </div>
 
 
+<?php /* ═══════════════ INTEGRACIONES ═══════════════ */ elseif ($pestana === 'integraciones'):
+$listas = 0; foreach ($integraciones as $i) if ($i['activa']) $listas++;
+?>
+<div class="alert alert-info" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span>Las credenciales se escriben en <code>config/integraciones.php</code>, fuera de
+    la carpeta pública y fuera del repositorio. <b>Nunca se muestran aquí</b>: esta
+    pantalla solo dice si están puestas.</span>
+</div>
+
+<div class="lf-stats">
+  <div class="stat-card lf-hero">
+    <div class="lf-tile"><?= W::icono('serv','19px') ?></div>
+    <div class="stat-value"><?= $listas ?></div>
+    <div class="stat-label">Integraciones activas</div>
+    <div class="stat-meta">de <?= count($integraciones) ?> disponibles</div>
+  </div>
+  <div class="stat-card">
+    <div class="lf-tile a"><?= W::icono('reloj','19px') ?></div>
+    <div class="stat-value"><?= count($integraciones) - $listas ?></div>
+    <div class="stat-label">Pendientes</div>
+    <div class="stat-meta">sin credenciales</div>
+  </div>
+</div>
+
+<section class="card">
+  <header class="card-header">Servicios externos</header>
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr><th>Servicio</th><th>Para qué</th><th>Estado</th><th>Falta</th></tr></thead>
+      <tbody>
+      <?php foreach ($integraciones as $k => $i): ?>
+        <tr style="<?= $i['activa'] ? '' : 'opacity:.7' ?>">
+          <td data-label="Servicio">
+            <b style="font-weight:600"><?= P::e($i['nombre']) ?></b>
+            <span style="display:block;color:var(--lf-tinta-4);font-size:11px;
+                  font-family:var(--lf-mono)"><?= P::e($k) ?></span>
+          </td>
+          <td data-label="Para qué" style="font-size:12.5px;color:var(--lf-tinta-3)">
+            <?= P::e($i['para']) ?></td>
+          <td data-label="Estado">
+            <?php if ($i['activa'] && $i['sandbox']): ?>
+              <span class="badge bg-warning">Pruebas</span>
+            <?php elseif ($i['activa']): ?>
+              <span class="badge bg-success">Activa</span>
+            <?php elseif ($i['lista']): ?>
+              <span class="badge bg-secondary">Configurada, apagada</span>
+            <?php else: ?>
+              <span class="badge bg-secondary">Pendiente</span>
+            <?php endif; ?>
+          </td>
+          <td data-label="Falta" style="font-size:12px;color:var(--lf-tinta-4)">
+            <?php if ($i['faltan']): ?>
+              <span class="lf-mono"><?= P::e(implode(', ', $i['faltan'])) ?></span>
+            <?php elseif (!$i['activa']): ?>
+              poner <span class="lf-mono">'activo' =&gt; true</span>
+            <?php else: ?>—<?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    Una integración sin credenciales queda apagada sola: su sección no aparece en
+    el menú y sus rutas responden 404. No hay que desactivar nada a mano.
+  </div>
+</section>
+
+<section class="card">
+  <header class="card-header">Cómo se configuran</header>
+  <div class="card-body" style="font-size:13px;line-height:1.7;color:var(--lf-tinta-2)">
+    <p style="margin-bottom:12px">
+      1. Copia <code>config/integraciones.php.ejemplo</code> como
+      <code>config/integraciones.php</code>.
+    </p>
+    <p style="margin-bottom:12px">
+      2. Llena el bloque del servicio que vayas a usar y pon
+      <code>'activo' =&gt; true</code>.
+    </p>
+    <p style="margin-bottom:12px">
+      3. Déjalo en <code>'sandbox' =&gt; true</code> hasta haber probado. En pruebas
+      nada cobra ni se envía de verdad.
+    </p>
+    <p style="margin:0;padding-top:12px;border-top:1px solid var(--lf-linea);
+              font-size:12px;color:var(--lf-tinta-4)">
+      Agrega <code>config/integraciones.php</code> al <code>.gitignore</code>. En el
+      sistema anterior las credenciales de Emida estaban escritas dentro de
+      <code>EmidaServicios/inicio.php</code>, y por eso acabaron en el repositorio.
+    </p>
+  </div>
+</section>
+
+
 <?php /* ═══════════════ CATEGORÍAS ═══════════════ */ else:
 $e = $buscar_ed($categorias); ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>

@@ -31,6 +31,7 @@ if (!empty($cfg['depurar'])) { ini_set('display_errors','1'); error_reporting(E_
 date_default_timezone_set($cfg['zona'] ?? 'America/Mexico_City');
 Conexion::configurar($cfg['bd'] + ['zona_sql' => $cfg['zona_sql'] ?? '-06:00']);
 Plantilla::base($raiz . '/src/Vista/plantillas');
+\LibertyFin\Servicio\Integraciones::cargar($raiz);
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
 
 // ── Cookie de sesión ──
@@ -78,6 +79,12 @@ $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
+// Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
+if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
+    $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
+    $r->post('/recargas/consultar',['LibertyFin\Controlador\RecargasControlador', 'consultar']);
+    $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
+}
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);

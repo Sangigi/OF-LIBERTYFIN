@@ -362,6 +362,45 @@ sistema funciona igual y simplemente no guarda ese campo: `ClienteRepo` pregunta
 una vez si la columna existe. Preferible a reventar con "Unknown column" en una
 instalación sin migrar.
 
+## Integraciones
+
+Siete servicios externos, todos con el mismo patrón: **las credenciales viven en
+`config/integraciones.php`**, fuera de `public/` y fuera del repositorio.
+
+| Servicio | Para qué |
+|---|---|
+| Emida | recargas telefónicas |
+| Facturapi | timbrado CFDI |
+| SPEI | ligas de pago por transferencia |
+| Domiciliación | cargos recurrentes |
+| PayPal | ligas de pago con tarjeta |
+| SMTP | correos |
+| cPanel | alta de bases para empresas nuevas |
+
+**Una integración sin credenciales queda apagada sola.** Su sección no aparece en
+el menú y sus rutas ni siquiera se registran: responden 404. No hay que
+desactivar nada a mano, y una empresa que vende servicios legales no ve
+"Recargas" en su menú.
+
+La pestaña de Integraciones en Ajustes dice cuáles están listas y qué campo falta
+en cada una. **Nunca muestra las credenciales**, ni siquiera parcialmente.
+
+Por qué existe este archivo: en el sistema anterior las de Emida estaban escritas
+dentro de `EmidaServicios/inicio.php`, en claro. Un archivo de código con
+contraseñas dentro termina en el repositorio, en el respaldo y en el correo de
+quien lo compartió. **Esas credenciales hay que rotarlas.**
+
+## Recargas
+
+La pantalla y el flujo están armados. Las llamadas a la API de Emida quedan
+marcadas y sin implementar hasta que haya cuenta con la que probarlas: escribir
+una integración SOAP a ciegas, sin poder ejecutarla una sola vez, produce código
+que parece listo y no lo está.
+
+Cuando llegue la cuenta, lo que falta es `RecargasControlador::consultar()` y
+`::vender()`. Todo lo demás —pantalla, validación, ruta condicionada, registro
+como venta— ya está.
+
 ## Lo que queda fuera, y por qué
 
 **Promociones.** No es una tabla, son cinco: `promociones`,
@@ -374,15 +413,9 @@ migración no apareció una sola venta con promoción aplicada. Escribir en esas
 cinco tablas sin entender el motor completo es la forma rápida de romper algo.
 Queda pendiente de decidir si se usa.
 
-**Emida Servicios.** Vende recargas telefónicas: tiempo aire de Telcel,
-Movistar, AT&T, vía una integración SOAP con `api.emida.com`. Esta empresa no lo
-usa — cero menciones en su base — y su catálogo son servicios de marketing,
-contabilidad y legal. Es una función de la plataforma pensada para otro tipo de
-cliente.
-
-Aviso aparte: los proxies del sistema anterior llaman a
+Aviso sobre Emida: los proxies del sistema anterior llaman a
 `http://104.248.179.142` **sin cifrar**. Si por ahí viajan credenciales o datos
-de transacción, van en claro.
+de transacción, van en claro. Si se reactiva, que sea sobre HTTPS.
 
 **Inventario.** Solo tiene sentido si llegan a vender producto físico. Hoy el
 catálogo son servicios y el stock nunca se mueve.

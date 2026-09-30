@@ -22,6 +22,7 @@ final class AjustesControlador
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
         'categorias'   => 'Categorías',
+        'integraciones'=> 'Integraciones',
     ];
 
     public function index($pestana = null)
@@ -43,8 +44,11 @@ final class AjustesControlador
             'abrir'      => $editar > 0 || Peticion::texto('nuevo') !== '',
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
             'sucursales' => [], 'areas' => [], 'colaboradores' => [], 'categorias' => [],
-            'empresa' => null,
+            'empresa' => null, 'integraciones' => [],
         ];
+        if ($p === 'integraciones') {
+            $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
+        }
         if ($p === 'empresa') {
             $principal = Conexion::de($GLOBALS['lf_bd_principal']);
             $datos['empresa'] = (new \LibertyFin\Datos\EmpresaRepo($principal))

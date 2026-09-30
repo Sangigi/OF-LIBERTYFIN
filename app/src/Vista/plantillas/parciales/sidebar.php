@@ -13,6 +13,11 @@ $menu = [
   ['ruta' => '/servicios', 'icono' => 'serv',    'texto' => 'Servicios'],
   ['ruta' => '/reportes',  'icono' => 'pct',     'texto' => 'Reportes'],
 ];
+// Recargas solo aparece si hay credenciales de Emida. Una empresa que
+// vende servicios legales no tiene por qué verla en su menú.
+if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
+    $menu[] = ['ruta' => '/recargas', 'icono' => 'bolsa', 'texto' => 'Recargas'];
+}
 // Usuarios solo lo ve un administrador. La comprobación de verdad está en
 // el controlador: esconder el enlace es cortesía, no seguridad.
 if (($_SESSION['usuario_rol'] ?? '') === 'admin') {
