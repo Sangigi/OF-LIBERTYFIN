@@ -1291,8 +1291,7 @@ section.card + section.card{margin-top:0}
 @media(min-width:941px){
   .lf-app{display:block}                     /* ya no hace falta el flex */
   .lf-side{
-    /* position:fixed;  */
-    left:0; top:0; bottom:0;
+    position:fixed; left:0; top:0; bottom:0;
     width:var(--lf-side-w);
     display:flex; flex-direction:column;
     z-index:30;
@@ -1454,7 +1453,8 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 
   /* El lateral, fuera de pantalla hasta que se pide */
   .lf-side{
-    position:fixed; top:0; bottom:0; left:0;
+    /* position:fixed; */
+    top:0; bottom:0; left:0;
     width:min(282px, 84vw);
     flex-direction:column; gap:0;
     background:var(--lf-panel);
