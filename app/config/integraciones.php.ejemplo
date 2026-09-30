@@ -54,6 +54,40 @@ return [
         // claro. Úsalo solo si ya le pediste a Emida un endpoint con
         // HTTPS y estás esperando que lo entreguen.
         'acepto_sin_cifrar' => false,
+
+        // ── CÓMO SE HABLA CON EMIDA ────────────────────────────
+        //
+        // El endpoint real es ws.terecargamos.com:8448, y Emida solo
+        // acepta conexiones desde direcciones que tiene autorizadas.
+        // Desde un hosting cualquiera da "Connection refused".
+        //
+        // El sistema anterior nunca habló con Emida directamente: usaba
+        // 104.248.179.142, un servidor propio cuya IP sí está en la
+        // lista, que reenvía las peticiones.
+        //
+        // Dos caminos:
+        //
+        //   A) Pedirle a Emida que autorice la IP de este servidor.
+        //      Entonces se deja `proxy` vacío y va directo. Es lo más
+        //      limpio: un salto menos y un servidor menos que mantener.
+        //
+        //   B) Seguir pasando por el intermediario. Se pone su dirección
+        //      aquí. Funciona hoy, sin pedirle nada a nadie.
+        //
+        'proxy'        => '',   // p.ej. 'http://104.248.179.142'
+        'proxy_saldo'  => 'get_balance.php',
+        'proxy_venta'  => 'pinDistSale.php',
+        'proxy_lookup' => 'lookup_transaction.php',
+
+        // Los nombres de las operaciones SOAP, si el proveedor las cambia.
+        // Vacío = se usan las que trae el sistema, que salieron de los
+        // proxies del sistema anterior:
+        //   saldo   GetMerchantBalance
+        //   vender  PinDistSale
+        //   validar CheckTrxById
+        'op_saldo'   => '',
+        'op_vender'  => '',
+        'op_validar' => '',
     ],
 
     // ── Facturación CFDI ────────────────────────────────────────

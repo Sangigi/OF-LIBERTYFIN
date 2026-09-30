@@ -21,6 +21,33 @@ namespace LibertyFin\Servicio;
  */
 final class Emida
 {
+    /**
+     * Qué operación sirve para qué, en orden de preferencia.
+     *
+     * POR QUÉ NO SE ADIVINA POR EL NOMBRE
+     *
+     * Este WSDL tiene unas 150 operaciones. Buscar por palabras eligió
+     * `CardBalance` para el saldo —que es de tarjetas de regalo— y
+     * `LookUpBillPaymentMxByInvocieNo` para recargar, que ni siquiera
+     * vende. Con un catálogo así, cualquier heurística acierta por
+     * casualidad.
+     *
+     * Estos nombres salen de los proxies del sistema anterior, que sí
+     * estaban probados contra la cuenta real: `pinDistSale.php`,
+     * `get_balance.php`, `lookup_transaction.php`.
+     *
+     * Se puede sobrescribir cada uno en config/integraciones.php si el
+     * proveedor cambia el contrato.
+     */
+    const OPERACIONES = [
+        'saldo'     => ['GetMerchantBalance', 'GetTerminalBalance', 'GetAccountBalance'],
+        'validar'   => ['CheckTrxById', 'LookUpTransactionByInvocieNo', 'CheckTBID'],
+        'vender'    => ['PinDistSale', 'PinDistSale_01', 'CardSale'],
+        'productos' => ['GetProductList', 'GetProductListExt', 'GetProductListDetailed'],
+        'carriers'  => ['GetCarrierList'],
+        'prueba'    => ['CommTest'],
+    ];
+
     /** Los códigos que el proveedor documenta. */
     const ERRORES = [
         '16'   => 'El número no existe o no admite recargas',
@@ -34,6 +61,67 @@ final class Emida
     private $cfg;
 
     public function __construct(array $cfg) { $this->cfg = $cfg; }
+
+    /**
+     * ¿Se habla con Emida por un intermediario?
+     *
+     * POR QUÉ ESTO EXISTE
+     *
+     * El endpoint real es ws.terecargamos.com:8448, y desde el hosting
+     * da "Connection refused". No es un puerto cerrado de salida: es que
+     * Emida solo acepta conexiones desde direcciones que tiene en lista,
+     * y el servidor de LibertyFin no está en ella.
+     *
+     * Por eso el sistema anterior nunca habló con Emida: hablaba con
+     * 104.248.179.142, un servidor propio cuya IP sí está autorizada, que
+     * reenvía las peticiones. Ahí viven get_balance.php, pinDistSale.php
+     * y lookup_transaction.php.
+     *
+     * Dos caminos, y los dos válidos:
+     *   · Pedirle a Emida que autorice la IP del hosting → modo directo.
+     *   · Seguir pasando por el intermediario → modo proxy.
+     */
+    public function porProxy()
+    {
+        return trim((string)($this->cfg['proxy'] ?? '')) !== '';
+    }
+
+    /**
+     * Llama a un script del intermediario.
+     * Devuelve lo que responda, ya decodificado si es JSON.
+     */
+    private function proxy($script, array $params)
+    {
+        $base = rtrim((string)($this->cfg['proxy'] ?? ''), '/');
+        $url  = $base . '/' . ltrim($script, '/');
+        if ($params) $url .= '?' . http_build_query($params);
+
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT        => max(5, (int)($this->cfg['timeout'] ?? 30)),
+            CURLOPT_FOLLOWLOCATION => true,
+            // El certificado SÍ se verifica, al revés que los proxies del
+            // sistema anterior. Si el intermediario va por http no hay
+            // nada que verificar, y eso ya se avisa en pantalla.
+            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYHOST => 2,
+            CURLOPT_USERAGENT      => 'LibertyFin/1.0',
+        ]);
+        $cuerpo = curl_exec($ch);
+        $codigo = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error  = curl_error($ch);
+        curl_close($ch);
+
+        if ($cuerpo === false) {
+            return ['ok' => false, 'error' => 'No se pudo llamar al intermediario: ' . $error];
+        }
+        if ($codigo >= 400) {
+            return ['ok' => false, 'error' => 'El intermediario respondió ' . $codigo];
+        }
+        $j = json_decode($cuerpo, true);
+        return ['ok' => true, 'datos' => $j === null ? $cuerpo : $j, 'crudo' => $cuerpo];
+    }
 
     /** ¿El endpoint va cifrado? Se muestra en pantalla. */
     public function cifrado()
@@ -163,8 +251,23 @@ final class Emida
             'usuario y comercio');
         $agrega($r, 'Va cifrada', $this->cifrado(),
             $this->cifrado() ? 'HTTPS' : 'HTTP: las credenciales viajan en claro', false);
+        $agrega($r, 'Cómo habla con Emida', true,
+            $this->porProxy()
+                ? 'por intermediario: ' . $this->cfg['proxy']
+                : 'directo al endpoint del WSDL', false);
 
         foreach ($r as $x) if ($x['bloquea'] && !$x['ok']) return $r;
+
+        // Si va por intermediario, lo que importa es que ESE responda.
+        if ($this->porProxy()) {
+            $p = $this->proxy($this->cfg['proxy_saldo'] ?? 'get_balance.php', [
+                'username' => $this->cfg['usuario'] ?? '',
+                'password' => $this->cfg['clave'] ?? '',
+            ]);
+            $agrega($r, 'El intermediario responde', $p['ok'],
+                $p['ok'] ? mb_substr(is_string($p['crudo']) ? $p['crudo'] : '', 0, 160)
+                         : $p['error']);
+        }
 
         // 1 · ¿Se baja el XML?
         $d = $this->bajarWsdl();
@@ -181,7 +284,7 @@ final class Emida
                 : 'el WSDL no declara <soap:address>');
 
         // 3 · ¿Responde ese endpoint?
-        if ($ep) {
+        if ($ep && !$this->porProxy()) {
             $abre = @fsockopen(
                 (parse_url($ep, PHP_URL_SCHEME) === 'https' ? 'ssl://' : '') . parse_url($ep, PHP_URL_HOST),
                 parse_url($ep, PHP_URL_PORT) ?: (parse_url($ep, PHP_URL_SCHEME) === 'https' ? 443 : 80),
@@ -189,8 +292,10 @@ final class Emida
             if ($abre) { fclose($abre); $agrega($r, 'El endpoint responde', true, 'contesta'); }
             else {
                 $agrega($r, 'El endpoint responde', false,
-                    ($errstr ?: 'no contesta') . '. Por eso sale "Could not connect to host": '
-                    . 'el WSDL se lee pero las llamadas van a otra dirección que no abre.');
+                    ($errstr ?: 'no contesta') . '. Emida solo acepta conexiones desde '
+                    . 'direcciones autorizadas, y la de este servidor no lo está. '
+                    . 'O pides que la autoricen, o configuras `proxy` para pasar por '
+                    . 'un servidor que sí lo esté.');
             }
         }
 
@@ -198,16 +303,16 @@ final class Emida
         $ops = $this->operacionesDelXml();
         if ($ops['ok']) {
             $n = $ops['operaciones'];
+            // 150 nombres en pantalla no se leen. Se dice cuántos y se
+            // muestran los que de verdad se van a usar.
             $agrega($r, 'Operaciones que ofrece', count($n) > 0,
-                $n ? implode(', ', $n) : 'ninguna');
-            foreach ([['saldo', ['Balance','Saldo','Funds']],
-                      ['validar número', ['Lookup','Validate','Inquiry','Consulta']],
-                      ['recargar', ['Submit','Topup','Recharge','Sale','Payment']]] as $par) {
-                $hay = null;
-                foreach ($n as $nom) { foreach ($par[1] as $pi)
-                    if (stripos($nom, $pi) !== false) { $hay = $nom; break 2; } }
-                $agrega($r, 'Operación de ' . $par[0], (bool)$hay,
-                    $hay ?: 'no se encontró: dime cuál de las de arriba es', false);
+                count($n) . ' en total');
+            foreach (['saldo' => 'saldo', 'validar' => 'validar número',
+                      'vender' => 'recargar', 'productos' => 'catálogo'] as $k => $rotulo) {
+                $op = $this->operacionPara($k);
+                $agrega($r, 'Operación de ' . $rotulo, (bool)$op,
+                    $op ?: 'ninguna de ' . implode(', ', self::OPERACIONES[$k] ?? []) . ' está en el WSDL',
+                    false);
             }
         } else {
             $agrega($r, 'Operaciones que ofrece', false, $ops['error']);
@@ -326,17 +431,22 @@ final class Emida
      * contiene. Así funciona aunque el proveedor la llame distinto:
      * GetBalance, ObtenerSaldo, BalanceInquiry…
      */
-    private function operacionQueSirvePara(array $pistas)
+    /**
+     * La operación para un propósito.
+     * Primero lo que diga la configuración, luego la lista de preferencia,
+     * y solo se devuelve si el WSDL de verdad la ofrece.
+     */
+    public function operacionPara($proposito)
     {
-        // Del XML, no de SoapClient: así se puede elegir la operación
-        // aunque el endpoint no responda, y el error queda en la llamada
-        // y no antes, donde no se entiende.
+        $propia = trim((string)($this->cfg['op_' . $proposito] ?? ''));
         $ops = $this->operacionesDelXml();
-        if (!$ops['ok']) return null;
-        foreach ($ops['operaciones'] as $nombre) {
-            foreach ($pistas as $p) {
-                if (stripos($nombre, $p) !== false) return $nombre;
-            }
+        $hay = $ops['ok'] ? $ops['operaciones'] : [];
+
+        if ($propia !== '') {
+            return in_array($propia, $hay, true) || !$hay ? $propia : null;
+        }
+        foreach (self::OPERACIONES[$proposito] ?? [] as $n) {
+            if (!$hay || in_array($n, $hay, true)) return $n;
         }
         return null;
     }
@@ -351,8 +461,21 @@ final class Emida
     /** El saldo disponible con el proveedor. */
     public function saldo()
     {
+        if ($this->porProxy()) {
+            $r = $this->proxy($this->cfg['proxy_saldo'] ?? 'get_balance.php', [
+                'username' => $this->cfg['usuario'] ?? '',
+                'password' => $this->cfg['clave'] ?? '',
+            ]);
+            if (!$r['ok']) return $r;
+            $d = $r['datos'];
+            return ['ok' => true, 'via' => 'intermediario',
+                    'saldo' => is_array($d)
+                        ? ($d['balance'] ?? $d['Balance'] ?? $d['saldo'] ?? null)
+                        : $d,
+                    'crudo' => $d];
+        }
         try {
-            $op = $this->operacionQueSirvePara(['Balance', 'Saldo', 'Funds']);
+            $op = $this->operacionPara('saldo');
             if (!$op) {
                 return ['ok' => false, 'error' =>
                     'Este WSDL no tiene una operación de saldo. Las que ofrece son: '
@@ -380,7 +503,7 @@ final class Emida
     public function validar($numero, $productoId)
     {
         try {
-            $op = $this->operacionQueSirvePara(['Lookup', 'Validate', 'Inquiry', 'Consulta']);
+            $op = $this->operacionPara('validar');
             if (!$op) {
                 // Sin validación previa se puede seguir: es una protección,
                 // no un requisito. Pero se avisa, porque cambia el riesgo.
@@ -409,8 +532,37 @@ final class Emida
         if (!$this->cifrado()) {
             error_log('[LibertyFin] Emida sobre HTTP sin cifrar: ' . ($this->cfg['wsdl'] ?? ''));
         }
+
+        if ($this->porProxy()) {
+            $r = $this->proxy($this->cfg['proxy_venta'] ?? 'pinDistSale.php', [
+                'username'  => $this->cfg['usuario'] ?? '',
+                'password'  => $this->cfg['clave'] ?? '',
+                'accountId' => $numero,
+                'productId' => $productoId,
+                'amount'    => number_format((float)$monto, 2, '.', ''),
+                'salesId'   => $salesId,
+            ]);
+            if (!$r['ok']) return $r;
+            $d = is_array($r['datos']) ? $r['datos'] : [];
+            $resp = (string)($d['responseCode'] ?? $d['ResponseCode'] ?? '');
+            $h2h  = (string)($d['h2hResultCode'] ?? $d['H2HResultCode'] ?? '');
+            if ($resp === '' && $h2h === '') {
+                return ['ok' => false, 'incierta' => true,
+                        'error' => 'El intermediario respondió algo que no se entiende. '
+                                 . 'La recarga PUDO haber salido: consulta el saldo antes de reintentar.',
+                        'crudo' => $r['datos']];
+            }
+            if (self::exitosa($resp, $h2h)) {
+                return ['ok' => true, 'via' => 'intermediario', 'duplicada' => $h2h === '294',
+                        'folio' => $d['carrierControlNo'] ?? $d['transactionId'] ?? null,
+                        'crudo' => $d];
+            }
+            return ['ok' => false, 'error' => self::mensaje($resp, $h2h),
+                    'codigo' => $resp, 'h2h' => $h2h];
+        }
+
         try {
-            $op = $this->operacionQueSirvePara(['Submit', 'Topup', 'Recharge', 'Sale', 'Payment']);
+            $op = $this->operacionPara('vender');
             if (!$op) {
                 return ['ok' => false, 'error' =>
                     'Este WSDL no tiene una operación de recarga. Las que ofrece son: '
