@@ -87,6 +87,11 @@ final class Permisos
         'ver.ajustes'      => ['superadmin','admin','soporte'],
         'ver.usuarios'     => ['superadmin','admin','soporte'],
         'ver.mantenimiento'=> ['superadmin','soporte','validador'],
+        // La bitácora la ve el administrador de la empresa, no solo la
+        // plataforma: es SU historial, sobre SUS datos. Esconderla haría
+        // que para saber quién canceló un pago tuviera que pedirlo a
+        // soporte, y eso no es auditar, es depender.
+        'ver.auditoria'    => ['superadmin','admin','soporte'],
 
         // ── Mover dinero ──
         'cobrar'           => ['superadmin','admin','cajero'],
@@ -117,6 +122,18 @@ final class Permisos
         // diagnóstico y no da de alta empresas: quien revisa documentos
         // no necesita nada de eso, y dárselo agranda sin razón lo que se
         // pierde si esa cuenta se compromete.
+        // Soporte ve todas las empresas y puede destrabar una cuenta.
+        // Lo que NO puede es cambiar roles: si pudiera volver admin a
+        // cualquiera, comprometer una cuenta de soporte daría acceso
+        // total a todos los clientes. El límite no mide confianza en la
+        // persona, mide el daño si esa cuenta se pierde.
+        'ver.empresas'     => ['superadmin','soporte'],
+        // Validación también entra a tickets: los de documentación son
+        // suyos, y mandarla a otro sistema para contestarlos sería
+        // exactamente el problema que estos tickets vienen a resolver.
+        'ver.tickets'      => ['superadmin','soporte','validador'],
+        'clave.ajena'      => ['superadmin','soporte'],
+        'bloquear.cuenta'  => ['superadmin','soporte'],
         'revisar.docs'     => ['superadmin','soporte','validador'],
         'secciones'        => ['superadmin','soporte','admin'],
         'diagnostico'      => ['superadmin','soporte'],

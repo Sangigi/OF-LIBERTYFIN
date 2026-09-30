@@ -100,6 +100,16 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/auditoria',             ['LibertyFin\Controlador\AuditoriaControlador', 'index']);
+$r->get('/tickets',               ['LibertyFin\Controlador\TicketsControlador', 'index']);
+$r->post('/tickets/crear',        ['LibertyFin\Controlador\TicketsControlador', 'crear']);
+$r->get('/tickets/{id}',          ['LibertyFin\Controlador\TicketsControlador', 'ver']);
+$r->post('/tickets/{id}/responder',['LibertyFin\Controlador\TicketsControlador', 'responder']);
+$r->post('/tickets/{id}/cambiar', ['LibertyFin\Controlador\TicketsControlador', 'cambiar']);
+$r->get('/soporte',               ['LibertyFin\Controlador\SoporteControlador', 'index']);
+$r->get('/soporte/{id}',          ['LibertyFin\Controlador\SoporteControlador', 'ficha']);
+$r->post('/soporte/restablecer',  ['LibertyFin\Controlador\SoporteControlador', 'restablecer']);
+$r->post('/soporte/alternar',     ['LibertyFin\Controlador\SoporteControlador', 'alternar']);
 $r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
 $r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
 $r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
@@ -170,6 +180,16 @@ $permisos = [
   '/recargas'               => 'ver.recargas',
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
+  '/auditoria'              => 'ver.auditoria',
+  '/tickets'                => 'ver.tickets',
+  '/tickets/crear'          => 'ver.tickets',
+  '/tickets/{id}'           => 'ver.tickets',
+  '/tickets/{id}/responder' => 'ver.tickets',
+  '/tickets/{id}/cambiar'   => 'ver.tickets',
+  '/soporte'                => 'ver.empresas',
+  '/soporte/{id}'           => 'ver.empresas',
+  '/soporte/restablecer'    => 'clave.ajena',
+  '/soporte/alternar'       => 'bloquear.cuenta',
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',
@@ -194,6 +214,13 @@ if (!in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
 }
 
 $hallazgo = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+
+// La bitácora escribe en la base de la empresa de la sesión. Se fija una
+// vez aquí para que ningún controlador tenga que acordarse.
+if (!empty($_SESSION['empresa_db'])) {
+    try { \LibertyFin\Servicio\Auditoria::en(\LibertyFin\Datos\Conexion::de($_SESSION['empresa_db'])); }
+    catch (\Throwable $e) { /* sin bitácora se opera igual */ }
+}
 
 // ── El permiso, antes de ejecutar nada ──
 if ($hallazgo !== null && !in_array($ruta, $publicas, true)) {

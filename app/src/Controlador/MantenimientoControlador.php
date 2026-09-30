@@ -9,6 +9,7 @@ use LibertyFin\Datos\AutenticacionRepo;
 use LibertyFin\Servicio\Integraciones;
 use LibertyFin\Servicio\CrearEmpresa;
 use LibertyFin\Servicio\Migraciones;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 /**
@@ -68,6 +69,7 @@ final class MantenimientoControlador
         }
         try {
             (new ConfigRepo($db))->alternarSeccion($_POST['seccion'] ?? '');
+            Auditoria::anota('seccion.alternar', (string)($_POST['seccion'] ?? ''), null, 'alternada');
             $this->volver('Sección actualizada.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
@@ -186,9 +188,14 @@ final class MantenimientoControlador
             $this->volver('Base no válida.', 'error');
         }
         try {
-            $tipo = (new CuentaRepo(Conexion::de($base)))->revisar(
+            $dbEmp = Conexion::de($base);
+            $tipo = (new CuentaRepo($dbEmp))->revisar(
                 (int)($_POST['id'] ?? 0), $_POST['decision'] ?? '',
                 $_POST['motivo'] ?? '', $_SESSION['usuario_id'] ?? 0);
+            // Se escribe en la base de ESA empresa, no en la de quien revisa:
+            // la bitácora tiene que quedar donde el cliente pueda verla.
+            Auditoria::anota('doc.revisar', $tipo, 'pendiente',
+                ($_POST['decision'] ?? '') . ' · ' . trim($_POST['motivo'] ?? ''), $dbEmp);
             $this->volver(($_POST['decision'] === 'aprobado' ? 'Aprobado' : 'Rechazado')
                 . ': ' . $tipo . '.', 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -221,6 +228,7 @@ final class MantenimientoControlador
             $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
             $r = (new CrearEmpresa($principal))->aprobar(
                 (int)($_POST['id'] ?? 0), dirname(__DIR__, 2), $_SESSION['usuario_id'] ?? 0);
+            Auditoria::anota('empresa.alta', $r['base'], null, 'creada', $principal);
             // La contraseña se muestra UNA vez. No se guarda en claro en
             // ningún lado: quien aprueba la entrega y se acabó.
             $this->volver('Empresa creada. Base ' . $r['base']

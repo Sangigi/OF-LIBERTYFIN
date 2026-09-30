@@ -4,6 +4,7 @@ namespace LibertyFin\Controlador;
 use LibertyFin\Datos\ComisionRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 final class ComisionesControlador
@@ -61,6 +62,9 @@ final class ComisionesControlador
                 (int)($_POST['renglon'] ?? 0),
                 (int)($_POST['colaborador'] ?? 0)
             );
+            \LibertyFin\Servicio\Auditoria::anota('comision.reasignar',
+                'renglón ' . (int)($_POST['renglon'] ?? 0),
+                'POR ASIGNAR', $nombre);
             $this->volver('Comisión asignada a ' . $nombre . '.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');

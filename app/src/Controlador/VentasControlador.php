@@ -8,6 +8,7 @@ use LibertyFin\Servicio\AsignarComision;
 use LibertyFin\Servicio\RegistrarPago;
 use LibertyFin\Dominio\Dinero;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 /**
@@ -108,6 +109,8 @@ final class VentasControlador
                 'fecha'      => Peticion::fecha('fecha', '') ?: ($_POST['fecha'] ?? ''),
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
             ]);
+            Auditoria::anota('pago.registrar', 'venta ' . $id,
+                null, ($_POST['metodo'] ?? '') . ' $' . ($_POST['monto'] ?? 0));
             $this->volver($id, $r['tipo'] === 'liquidacion'
                 ? 'Abono registrado. La venta queda liquidada.'
                 : 'Abono registrado. Queda un saldo de ' . \LibertyFin\Dominio\Dinero::pesos($r['saldo']) . '.', 'ok');
@@ -131,6 +134,12 @@ final class VentasControlador
         try {
             (new RegistrarPago($db))->cancelar(
                 (int)($_POST['pago'] ?? 0), $_POST['motivo'] ?? '', $_SESSION['usuario_id'] ?? null);
+            // Cancelar un pago mueve dinero hacia atrás y recalcula
+            // comisiones: de todo lo que hace el sistema, es lo que más
+            // falta hace poder reconstruir después.
+            Auditoria::anota('pago.cancelar',
+                'venta ' . $id . ' · pago ' . (int)($_POST['pago'] ?? 0),
+                'activo', 'cancelado · ' . trim($_POST['motivo'] ?? ''));
             $this->volver($id, 'Pago cancelado. Las comisiones ya se recalcularon.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($id, $e->getMessage(), 'error');
@@ -164,6 +173,9 @@ final class VentasControlador
         try {
             $r = (new AsignarComision($db))->asignar(
                 $id, (int)($_POST['colaborador'] ?? 0), $_POST['pct'] ?? 0);
+            Auditoria::anota('comision.asignar',
+                'venta ' . $id . ' · ' . $r['colaborador'],
+                null, $_POST['pct'] . '% sobre ' . $r['base']);
             $this->volver($id, $r['colaborador'] . ': '
                 . \LibertyFin\Dominio\Dinero::pesos($r['asignada'])
                 . ' sobre una base de ' . \LibertyFin\Dominio\Dinero::pesos($r['base']) . '.', 'ok');
@@ -186,6 +198,9 @@ final class VentasControlador
 
         try {
             $c = (new AsignarComision($db))->quitar((int)($_POST['comision'] ?? 0));
+            Auditoria::anota('comision.quitar',
+                'venta ' . $id . ' · comisión ' . (int)($_POST['comision'] ?? 0),
+                'activa', 'cancelada');
             $this->volver($id, 'Comisión de ' . $c['colaborador_nombre'] . ' retirada.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($id, $e->getMessage(), 'error');

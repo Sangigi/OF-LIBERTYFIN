@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 6;
+    const VERSION = 7;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -250,6 +250,38 @@ final class Migraciones
         }
     }
 
+    /**
+     * 7 · La bitácora.
+     *
+     * Vive en la base de CADA empresa, no en la principal: registra
+     * cambios sobre datos de esa empresa, y juntarlos todos obligaría a
+     * cargar el id de empresa en cada renglón y a filtrar siempre por él.
+     * Además, si una empresa se va, su bitácora se va con ella.
+     *
+     * El índice por fecha es lo que hace usable la pantalla: sin él,
+     * ver "los últimos 50 movimientos" recorre la tabla entera, y esta
+     * tabla solo crece.
+     */
+    private static function v7(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_auditoria (
+                id BIGINT AUTO_INCREMENT PRIMARY KEY,
+                accion VARCHAR(40) NOT NULL,
+                sobre VARCHAR(200) NULL,
+                antes TEXT NULL,
+                despues TEXT NULL,
+                usuario_id INT NULL,
+                usuario_nombre VARCHAR(160) NULL,
+                usuario_rol VARCHAR(40) NULL,
+                ip VARCHAR(45) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_au_fecha (creado_en),
+                KEY ix_au_accion (accion, creado_en),
+                KEY ix_au_usuario (usuario_id, creado_en)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -258,5 +290,6 @@ final class Migraciones
         4 => 'Índices de rendimiento',
         5 => 'Marca de guía de primer uso',
         6 => 'Roles nuevos en la columna usuarios.rol',
+        7 => 'Bitácora de cambios (lf_auditoria)',
     ];
 }

@@ -1558,3 +1558,50 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
   .lf-guia-card.centro{top:50%!important;bottom:auto!important;transform:translateY(-50%)!important}
 }
 @media (prefers-reduced-motion:reduce){ .lf-guia-foco{transition:none} }
+
+/* ══════════════════════════════════════════════════════
+   30 · TICKETS
+   ══════════════════════════════════════════════════════ */
+.lf-msj{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--lf-linea)}
+.lf-msj:last-child{border-bottom:none;padding-bottom:0}
+.lf-msj .lf-av{flex-shrink:0}
+.lf-msj .cuerpo{flex:1;min-width:0}
+.lf-msj .cab{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px}
+.lf-msj .cab b{font-size:13px;font-weight:600}
+.lf-msj .cab .fecha{font-size:11px;color:var(--lf-tinta-4);font-family:var(--lf-mono);margin-left:auto}
+.lf-msj p{font-size:13px;line-height:1.6;color:var(--lf-tinta-2);margin:0;overflow-wrap:anywhere}
+.lf-msj .adj{display:inline-flex;align-items:center;gap:6px;margin-top:9px;font-size:12px;
+  font-weight:600;padding:5px 11px;border-radius:var(--lf-r-pill);background:var(--lf-vidrio)}
+
+/* Una nota interna se distingue de un vistazo: el error más caro de un
+   sistema de tickets es mandarle al cliente algo escrito para el equipo. */
+.lf-msj.interno{background:var(--lf-amb-soft);border-radius:var(--lf-r);
+  padding:14px;margin:6px 0;border-bottom:none;
+  border-left:3px solid var(--lf-amb)}
+.lf-msj.interno p{color:var(--lf-tinta-2)}
+
+/* ══════════════════════════════════════════════════════
+   31 · BITÁCORA
+   ══════════════════════════════════════════════════════ */
+.lf-audit{display:flex;gap:12px;padding:12px 14px;border-radius:var(--lf-r);
+  border-bottom:1px solid var(--lf-linea)}
+.lf-audit:last-child{border-bottom:none}
+.lf-audit .lf-av{flex-shrink:0;width:30px;height:30px;font-size:11px}
+.lf-audit .cab{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lf-audit .cab b{font-size:13px;font-weight:600}
+.lf-audit .acc{font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-audit .cab .fecha{margin-left:auto;font-size:11px;color:var(--lf-tinta-4);
+  font-family:var(--lf-mono);white-space:nowrap}
+.lf-audit .sobre{font-size:12.5px;font-weight:600;margin-top:3px;overflow-wrap:anywhere}
+.lf-audit .cambio{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;
+  font-size:11.5px;font-family:var(--lf-mono)}
+.lf-audit .antes{padding:3px 8px;border-radius:var(--lf-r-sm);
+  background:var(--lf-rojo-soft);color:var(--lf-rojo);text-decoration:line-through;
+  text-decoration-thickness:1px;overflow-wrap:anywhere}
+.lf-audit .desp{padding:3px 8px;border-radius:var(--lf-r-sm);
+  background:var(--lf-brand-soft);color:var(--lf-brand-2);overflow-wrap:anywhere}
+.lf-audit .fl{color:var(--lf-tinta-4)}
+.lf-audit .ip{font-size:10.5px;color:var(--lf-tinta-4);margin-top:5px;font-family:var(--lf-mono)}
+
+/* Lo que mueve dinero se ve distinto: es lo que se revisa primero */
+.lf-audit.peso{background:var(--lf-vidrio);border-left:3px solid var(--lf-amb)}

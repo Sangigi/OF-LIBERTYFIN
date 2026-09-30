@@ -4,6 +4,7 @@ namespace LibertyFin\Controlador;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\GastoRepo;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 final class GastosControlador
@@ -76,7 +77,14 @@ final class GastosControlador
         }
         $this->token();
         try {
+            $g = (new GastoRepo($db))->uno((int)($_POST['id'] ?? 0));
             (new GastoRepo($db))->borrar((int)($_POST['id'] ?? 0));
+            // Se guarda el gasto COMPLETO en 'antes'. Un gasto borrado no
+            // se puede volver a mirar: si no queda aquí, no queda en ningún
+            // lado, y "¿quién borró los $16,025?" se vuelve incontestable.
+            Auditoria::anota('gasto.borrar',
+                $g ? ($g['concepto'] . ' · $' . $g['monto']) : ('gasto ' . (int)($_POST['id'] ?? 0)),
+                $g, null);
             $this->volver('Gasto eliminado.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');

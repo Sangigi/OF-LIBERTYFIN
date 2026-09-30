@@ -5,6 +5,7 @@ use LibertyFin\Datos\CajaRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Dominio\Dinero;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 final class CorteControlador
@@ -112,6 +113,11 @@ final class CorteControlador
 
         try {
             $repo->cerrar($caja['id'], $contado, $esperado, $_POST['nota'] ?? '');
+            Auditoria::anota('caja.cerrar', 'caja ' . $caja['id'],
+                'esperado $' . number_format($esperado, 2),
+                'contado $' . number_format($contado, 2)
+                . (abs($contado - $esperado) > 0.009
+                   ? ' · diferencia $' . number_format($contado - $esperado, 2) : ' · cuadró'));
             unset($_SESSION['caja_id']);
             $this->volver(abs($dif) <= 0.009
                 ? 'Caja cerrada. Cuadró exacto.'

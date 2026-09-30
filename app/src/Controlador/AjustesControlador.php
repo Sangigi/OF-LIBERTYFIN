@@ -5,6 +5,7 @@ use LibertyFin\Datos\AjustesRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\UsuarioRepo;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 /**
@@ -155,11 +156,19 @@ final class AjustesControlador
                     ($hecho ? 'Se guardó ' . implode(' y ', $hecho) . '. Pero: ' : '')
                     . implode('. ', $fallo), 'error');
             }
+            \LibertyFin\Servicio\Auditoria::anota('empresa.datos',
+                $_SESSION['empresa_nombre'] ?? '', null, implode(', ', $hecho));
             $this->volver('empresa', 'Guardado: ' . implode(', ', $hecho ?: ['nada que cambiar']) . '.', 'ok');
         }
 
         if (!isset($mapa[$que])) $this->volver('sucursales', 'Petición no válida.', 'error');
         list($metodo, $pestana, $rotulo) = $mapa[$que];
+
+        // Un cambio de catálogo: sucursales, áreas, colaboradores,
+        // categorías. Se registra qué se tocó, no el contenido: el valor
+        // nuevo ya está en su tabla y ahí se puede mirar.
+        \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar',
+            $rotulo . (empty($_POST['id']) ? ' nuevo' : ' #' . (int)$_POST['id']));
 
         try {
             $repo->$metodo($id, $_POST);

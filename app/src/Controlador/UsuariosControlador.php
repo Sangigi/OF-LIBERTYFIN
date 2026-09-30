@@ -8,6 +8,7 @@ use LibertyFin\Datos\EmpresaRepo;
 use LibertyFin\Datos\UsuarioRepo;
 use LibertyFin\Http\Peticion;
 use LibertyFin\Servicio\Autenticar;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 final class UsuariosControlador
@@ -40,8 +41,24 @@ final class UsuariosControlador
         $repo = new UsuarioRepo($db);
         $id   = (int)($_POST['id'] ?? 0);
         try {
-            if ($id) { $repo->actualizar($id, $_POST); $m = 'Usuario actualizado.'; }
-            else     { $repo->crear($_POST);           $m = 'Usuario dado de alta.'; }
+            if ($id) {
+                $antes = $repo->uno($id);
+                $repo->actualizar($id, $_POST);
+                $m = 'Usuario actualizado.';
+                // El cambio de ROL va aparte: es el único de esta pantalla
+                // que cambia lo que esa persona puede hacer.
+                if ($antes && ($antes['rol'] ?? '') !== ($_POST['rol'] ?? '')) {
+                    Auditoria::anota('usuario.rol', $antes['nombre'],
+                        $antes['rol'], $_POST['rol'] ?? '');
+                } else {
+                    Auditoria::anota('usuario.editar', $antes['nombre'] ?? ('usuario ' . $id));
+                }
+            } else {
+                $repo->crear($_POST);
+                $m = 'Usuario dado de alta.';
+                Auditoria::anota('usuario.crear', trim($_POST['nombre'] ?? ''),
+                    null, $_POST['rol'] ?? '');
+            }
             $this->volver('/usuarios', $m, 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver('/usuarios', $e->getMessage(), 'error');
@@ -59,6 +76,10 @@ final class UsuariosControlador
         try {
             $n = (new UsuarioRepo($db))->restablecerClave(
                 (int)($_POST['id'] ?? 0), $_POST['clave'] ?? '');
+            // La contraseña NO se registra, ni la vieja ni la nueva. Lo que
+            // importa es quién la cambió y a quién; guardarla convertiría la
+            // bitácora en el peor lugar donde buscar contraseñas.
+            Auditoria::anota('usuario.clave', $n);
             $this->volver('/usuarios',
                 'Contraseña de ' . $n . ' restablecida. Dísela en persona, no por escrito.', 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -76,6 +97,8 @@ final class UsuariosControlador
         try {
             $a = (new UsuarioRepo($db))->alternar(
                 (int)($_POST['id'] ?? 0), $_SESSION['usuario_id'] ?? 0);
+            Auditoria::anota('usuario.alternar', 'usuario ' . (int)($_POST['id'] ?? 0),
+                $a ? 'inactivo' : 'activo', $a ? 'activo' : 'inactivo');
             $this->volver('/usuarios', $a ? 'Usuario activado.'
                 : 'Usuario desactivado. Ya no puede entrar.', 'ok');
         } catch (\InvalidArgumentException $e) {

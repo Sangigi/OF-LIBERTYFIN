@@ -4,6 +4,7 @@ namespace LibertyFin\Controlador;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\ServicioRepo;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Auditoria;
 use LibertyFin\Vista\Plantilla;
 
 final class ServiciosControlador
@@ -49,7 +50,18 @@ final class ServiciosControlador
         $repo = new ServicioRepo($db);
         $id   = (int)($_POST['id'] ?? 0);
         try {
-            if ($id) { $repo->actualizar($id, $_POST); $msg = 'Servicio actualizado.'; }
+            if ($id) {
+                // Solo se audita el PRECIO. Corregir una falta de ortografía
+                // en el nombre no le interesa a nadie dentro de seis meses;
+                // que alguien bajó un servicio de $26,000 a $1, sí.
+                $antes = $repo->uno($id);
+                $repo->actualizar($id, $_POST);
+                $msg = 'Servicio actualizado.';
+                if ($antes && (float)($antes['precio'] ?? 0) !== (float)($_POST['precio'] ?? 0)) {
+                    Auditoria::anota('servicio.precio', $antes['nombre'],
+                        $antes['precio'], $_POST['precio'] ?? 0);
+                }
+            }
             else     { $repo->crear($_POST);           $msg = 'Servicio dado de alta.'; }
             $this->volver($msg, 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -67,6 +79,8 @@ final class ServiciosControlador
         if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error');
         try {
             $a = (new ServicioRepo($db))->alternar((int)($_POST['id'] ?? 0));
+            Auditoria::anota('servicio.alternar', 'servicio ' . (int)($_POST['id'] ?? 0),
+                $a ? 'inactivo' : 'activo', $a ? 'activo' : 'inactivo');
             $this->volver($a ? 'Servicio activado.' : 'Servicio desactivado. Ya no aparece en Caja.', 'ok');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] alternar servicio: ' . $e->getMessage());
