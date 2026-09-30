@@ -1291,7 +1291,8 @@ section.card + section.card{margin-top:0}
 @media(min-width:941px){
   .lf-app{display:block}                     /* ya no hace falta el flex */
   .lf-side{
-    position:fixed; left:0; top:0; bottom:0;
+    /* position:fixed;  */
+    left:0; top:0; bottom:0;
     width:var(--lf-side-w);
     display:flex; flex-direction:column;
     z-index:30;
