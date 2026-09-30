@@ -1,0 +1,141 @@
+<?php
+namespace LibertyFin\Servicio;
+
+/**
+ * Los avisos por correo.
+ *
+ * QUÉ SE AVISA Y QUÉ NO
+ *
+ * Solo lo que la persona no puede saber de otra forma y necesita saber
+ * pronto. Un aviso por cada venta convierte el correo en ruido, y a las
+ * dos semanas nadie lee ninguno — incluido el que sí importaba.
+ *
+ * Por eso son cinco y no veinte:
+ *   · Tu cuenta está lista        (no hay forma de enterarse si no)
+ *   · Tu solicitud se rechazó     (con el motivo, o no sabe qué corregir)
+ *   · Un documento se rechazó     (igual)
+ *   · Te contestaron tu ticket    (si no, tiene que entrar a revisar)
+ *   · Tu suscripción vence        (una sola vez, no todos los días)
+ *
+ * Ninguno tumba nada si falla: `enviar()` devuelve false y se sigue.
+ */
+final class Avisos
+{
+    private static function correo()
+    {
+        $cfg = Integraciones::de('smtp');
+        return $cfg ? new Correo($cfg) : null;
+    }
+
+    public static function activos() { return Integraciones::activa('smtp'); }
+
+    /** La cuenta quedó lista. Lleva la contraseña, una sola vez. */
+    public static function cuentaCreada($para, $nombre, $empresa, $usuario, $clave, $url)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+
+        // La contraseña va en el correo porque es la única forma de
+        // entregarla sin una llamada. Por eso se pide cambiarla al entrar:
+        // un correo se queda en la bandeja para siempre.
+        $html = Correo::plantilla('Tu cuenta de LibertyFin está lista',
+            '<p>Hola ' . htmlspecialchars($nombre, ENT_QUOTES) . ',</p>'
+          . '<p>Ya puedes entrar a <b>' . htmlspecialchars($empresa, ENT_QUOTES) . '</b>.</p>'
+          . '<table cellpadding="0" cellspacing="0" style="margin:18px 0;background:#f6f8f7;'
+          . 'border-radius:10px;padding:4px 16px;width:100%">'
+          . '<tr><td style="padding:9px 0;color:#6d7a74;font-size:13px">Usuario</td>'
+          . '<td style="padding:9px 0;text-align:right;font-family:ui-monospace,monospace;'
+          . 'font-weight:700">' . htmlspecialchars($usuario, ENT_QUOTES) . '</td></tr>'
+          . '<tr><td style="padding:9px 0;color:#6d7a74;font-size:13px">Contraseña</td>'
+          . '<td style="padding:9px 0;text-align:right;font-family:ui-monospace,monospace;'
+          . 'font-weight:700">' . htmlspecialchars($clave, ENT_QUOTES) . '</td></tr></table>'
+          . '<p style="font-size:13px;color:#6d7a74">Cámbiala en cuanto entres: este correo se '
+          . 'queda en tu bandeja y cualquiera que lo vea podría usarla.</p>',
+            ['Entrar a LibertyFin', $url]);
+
+        return $c->enviar($para, 'Tu cuenta de LibertyFin está lista', $html);
+    }
+
+    /** La solicitud se rechazó. El motivo es lo único que tiene. */
+    public static function solicitudRechazada($para, $nombre, $motivo)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+        $html = Correo::plantilla('Sobre tu solicitud de registro',
+            '<p>Hola ' . htmlspecialchars($nombre, ENT_QUOTES) . ',</p>'
+          . '<p>Revisamos tu solicitud y por ahora no podemos darla de alta:</p>'
+          . '<p style="padding:13px 16px;background:#fbf3e0;border-radius:10px;'
+          . 'color:#8a6410;margin:16px 0">' . nl2br(htmlspecialchars($motivo, ENT_QUOTES)) . '</p>'
+          . '<p>Si crees que hay un error o ya lo corregiste, respóndenos este correo.</p>');
+        return $c->enviar($para, 'Sobre tu solicitud de registro en LibertyFin', $html);
+    }
+
+    /** Un documento se rechazó, con el motivo. */
+    public static function documentoRechazado($para, $documento, $motivo, $url)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+        $html = Correo::plantilla('Un documento necesita corrección',
+            '<p>Revisamos <b>' . htmlspecialchars($documento, ENT_QUOTES) . '</b> y hay que '
+          . 'volver a subirlo:</p>'
+          . '<p style="padding:13px 16px;background:#fbf3e0;border-radius:10px;'
+          . 'color:#8a6410;margin:16px 0">' . nl2br(htmlspecialchars($motivo, ENT_QUOTES)) . '</p>'
+          . '<p style="font-size:13px;color:#6d7a74">Mientras la documentación no esté aprobada '
+          . 'puedes registrar ventas, pero no cobrar con tarjeta ni facturar.</p>',
+            ['Subir el documento', $url]);
+        return $c->enviar($para, 'Un documento necesita corrección', $html);
+    }
+
+    /** Alguien contestó un ticket. */
+    public static function ticketRespondido($para, $folio, $asunto, $respuesta, $url)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+        $corte = mb_substr($respuesta, 0, 400);
+        $html = Correo::plantilla('Respondimos tu ticket',
+            '<p style="color:#6d7a74;font-size:13px;font-family:ui-monospace,monospace">'
+          . htmlspecialchars($folio, ENT_QUOTES) . '</p>'
+          . '<p style="font-weight:600;margin-bottom:14px">'
+          . htmlspecialchars($asunto, ENT_QUOTES) . '</p>'
+          . '<p style="padding:14px 16px;background:#f6f8f7;border-radius:10px;'
+          . 'border-left:3px solid #27ae60">'
+          . nl2br(htmlspecialchars($corte, ENT_QUOTES))
+          . (mb_strlen($respuesta) > 400 ? '…' : '') . '</p>',
+            ['Ver el ticket', $url]);
+        return $c->enviar($para, 'Respondimos tu ticket ' . $folio, $html);
+    }
+
+    /** La suscripción está por vencer. Una sola vez, no todos los días. */
+    public static function porVencer($para, $nombre, $empresa, $dias, $fecha)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+        $html = Correo::plantilla(
+            $dias < 0 ? 'Tu suscripción venció' : 'Tu suscripción está por vencer',
+            '<p>Hola ' . htmlspecialchars($nombre, ENT_QUOTES) . ',</p>'
+          . '<p>La suscripción de <b>' . htmlspecialchars($empresa, ENT_QUOTES) . '</b> '
+          . ($dias < 0
+                ? 'venció el ' . htmlspecialchars($fecha, ENT_QUOTES) . '.'
+                : 'vence el ' . htmlspecialchars($fecha, ENT_QUOTES)
+                  . ', en ' . (int)$dias . ' día' . ($dias == 1 ? '' : 's') . '.') . '</p>'
+          . '<p style="font-size:13px;color:#6d7a74">Tu sistema sigue funcionando: no cortamos '
+          . 'el acceso de golpe. Escríbenos para renovar.</p>');
+        return $c->enviar($para,
+            $dias < 0 ? 'Tu suscripción de LibertyFin venció'
+                      : 'Tu suscripción de LibertyFin vence pronto', $html);
+    }
+
+    /** Prueba: se manda a uno mismo para comprobar el SMTP. */
+    public static function prueba($para)
+    {
+        $c = self::correo();
+        if (!$c) return ['ok' => false, 'error' => 'SMTP sin configurar'];
+        $ok = $c->enviar($para, 'Prueba de correo de LibertyFin',
+            Correo::plantilla('El correo funciona',
+                '<p>Si estás leyendo esto, la configuración de SMTP es correcta y los avisos '
+              . 'de LibertyFin van a llegar.</p>'
+              . '<p style="font-size:13px;color:#6d7a74">Enviado el '
+              . date('d/m/Y \a \l\a\s H:i') . '.</p>'));
+        return ['ok' => $ok, 'error' => $ok ? '' : $c->error()];
+    }
+}

@@ -126,6 +126,7 @@ $r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoContro
 $r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
 $r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
 $r->post('/mantenimiento/revisar',  ['LibertyFin\Controlador\MantenimientoControlador', 'revisar']);
+$r->post('/mantenimiento/correo',   ['LibertyFin\Controlador\MantenimientoControlador', 'probarCorreo']);
 $r->post('/mantenimiento/empresa/aprobar',  ['LibertyFin\Controlador\MantenimientoControlador', 'aprobarEmpresa']);
 $r->post('/mantenimiento/empresa/rechazar', ['LibertyFin\Controlador\MantenimientoControlador', 'rechazarEmpresa']);
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
@@ -211,6 +212,7 @@ $permisos = [
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',
   '/mantenimiento/revisar'  => 'revisar.docs',
+  '/mantenimiento/correo'   => 'diagnostico',
   '/mantenimiento/empresa/aprobar'  => 'alta.empresas',
   '/mantenimiento/empresa/rechazar' => 'alta.empresas',
   // El perfil y la clave son de cada quien, sin permiso. Los datos

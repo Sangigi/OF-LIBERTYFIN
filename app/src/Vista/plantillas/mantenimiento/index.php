@@ -384,6 +384,50 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
     </section>
 
     <section class="card">
+      <header class="card-header">
+        <div><span>Correo saliente</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            Sin esto, ningún aviso llega</p></div>
+        <span class="badge <?= $correoListo ? 'bg-success' : 'bg-secondary' ?>">
+          <?= $correoListo ? 'Configurado' : 'Pendiente' ?></span>
+      </header>
+      <div class="card-body">
+        <?php if (!$correoListo): ?>
+          <p style="font-size:12.5px;color:var(--lf-tinta-3);margin:0;line-height:1.55">
+            Faltan las credenciales de <code>smtp</code> en
+            <code>config/integraciones.php</code>. Mientras tanto nadie recibe su
+            contraseña al darse de alta, ni el motivo de un documento rechazado.
+          </p>
+        <?php else: ?>
+          <form method="post" action="/mantenimiento/correo"
+                style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">
+            <input type="hidden" name="token" value="<?= P::e($token) ?>">
+            <div style="flex:1;min-width:190px">
+              <label class="form-label">Mandar una prueba a</label>
+              <input class="form-control" type="email" name="para"
+                     value="<?= P::e($miCorreo) ?>" placeholder="tu@correo.com" required>
+            </div>
+            <button class="btn btn-secondary" type="submit">Enviar</button>
+          </form>
+          <?php if ($correoPrueba): ?>
+            <div style="margin-top:13px;padding:11px 13px;border-radius:var(--lf-r);font-size:12.5px;
+                 background:<?= $correoPrueba['ok'] ? 'var(--lf-brand-soft)' : 'var(--lf-rojo-soft)' ?>;
+                 color:<?= $correoPrueba['ok'] ? 'var(--lf-brand-2)' : 'var(--lf-rojo)' ?>">
+              <?= $correoPrueba['ok']
+                  ? 'El servidor aceptó el mensaje. Que salga no garantiza que llegue: revisa la bandeja y el spam.'
+                  : P::e($correoPrueba['error']) ?>
+            </div>
+          <?php endif; ?>
+          <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px;line-height:1.5">
+            Se avisa de cinco cosas: cuenta creada, solicitud rechazada, documento
+            rechazado, respuesta a un ticket y suscripción por vencer. Nada más:
+            un correo por cada venta convierte el buzón en ruido.
+          </p>
+        <?php endif; ?>
+      </div>
+    </section>
+
+    <section class="card">
       <header class="card-header">Integraciones</header>
       <div style="padding:0 10px 8px">
         <?php foreach ($integraciones as $k => $i): ?>

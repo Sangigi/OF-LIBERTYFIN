@@ -6,6 +6,7 @@ use LibertyFin\Datos\PlataformaRepo;
 use LibertyFin\Datos\BaseConocimientoRepo;
 use LibertyFin\Datos\TicketRepo;
 use LibertyFin\Http\Peticion;
+use LibertyFin\Servicio\Avisos;
 use LibertyFin\Vista\Plantilla;
 
 /**
@@ -99,10 +100,24 @@ final class TicketsControlador
             if (!empty($_FILES['adjunto']['name'])) {
                 $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
             }
-            (new TicketRepo($this->principal()))->responder(
+            $repo = new TicketRepo($this->principal());
+            $repo->responder(
                 $id, $_POST['cuerpo'] ?? '', !empty($_POST['interno']), $adjunto,
                 $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
-            $this->a('/tickets/' . $id, 'Respuesta agregada.', 'ok');
+
+            // Una nota interna NO se avisa: el cliente ni siquiera la ve.
+            $aviso = '';
+            if (empty($_POST['interno'])) {
+                $t = $repo->uno($id);
+                if ($t && !empty($t['email_admin'])) {
+                    $ok = Avisos::ticketRespondido($t['email_admin'], $t['folio'], $t['asunto'],
+                        $_POST['cuerpo'] ?? '',
+                        (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                            . ($_SERVER['HTTP_HOST'] ?? '') . '/tickets/' . (int)$id);
+                    $aviso = $ok ? ' Se le avisó por correo.' : ' El correo no salió.';
+                }
+            }
+            $this->a('/tickets/' . $id, 'Respuesta agregada.' . $aviso, 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->a('/tickets/' . $id, $e->getMessage(), 'error');
         } catch (\Throwable $e) {

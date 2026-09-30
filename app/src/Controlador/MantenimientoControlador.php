@@ -10,6 +10,7 @@ use LibertyFin\Servicio\Integraciones;
 use LibertyFin\Servicio\CrearEmpresa;
 use LibertyFin\Servicio\Migraciones;
 use LibertyFin\Servicio\Auditoria;
+use LibertyFin\Servicio\Avisos;
 use LibertyFin\Vista\Plantilla;
 
 /**
@@ -54,6 +55,9 @@ final class MantenimientoControlador
             'porRevisar'   => $this->documentosPorRevisar(),
             'solicitudes'  => Permisos::puede('alta.empresas') ? $this->solicitudes() : [],
             'puedeAlta'    => Permisos::puede('alta.empresas'),
+            'correoListo'  => Avisos::activos(),
+            'correoPrueba' => $_SESSION['lf_correo_prueba'] ?? null,
+            'miCorreo'     => $_SESSION['usuario_email'] ?? '',
             'altaLista'    => Integraciones::activa('cpanel'),
             'aviso'        => $_SESSION['lf_aviso'] ?? null,
         ]);
@@ -196,6 +200,20 @@ final class MantenimientoControlador
             // la bitácora tiene que quedar donde el cliente pueda verla.
             Auditoria::anota('doc.revisar', $tipo, 'pendiente',
                 ($_POST['decision'] ?? '') . ' · ' . trim($_POST['motivo'] ?? ''), $dbEmp);
+
+            // Rechazar sin avisar es igual que no revisar: el negocio
+            // sigue esperando sin saber que tiene que corregir algo.
+            if (($_POST['decision'] ?? '') === 'rechazado') {
+                $c = (new \LibertyFin\Datos\CuentaRepo($dbEmp))->comercio();
+                $correo = $c['titular_correo'] ?? '';
+                if ($correo) {
+                    Avisos::documentoRechazado($correo,
+                        \LibertyFin\Datos\CuentaRepo::DOCUMENTOS[$tipo][0] ?? $tipo,
+                        $_POST['motivo'] ?? '',
+                        (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                            . ($_SERVER['HTTP_HOST'] ?? '') . '/cuenta?t=documentos');
+                }
+            }
             $this->volver(($_POST['decision'] === 'aprobado' ? 'Aprobado' : 'Rechazado')
                 . ': ' . $tipo . '.', 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -229,12 +247,23 @@ final class MantenimientoControlador
             $r = (new CrearEmpresa($principal))->aprobar(
                 (int)($_POST['id'] ?? 0), dirname(__DIR__, 2), $_SESSION['usuario_id'] ?? 0);
             Auditoria::anota('empresa.alta', $r['base'], null, 'creada', $principal);
+
+            // El correo es lo único que le dice al cliente que ya puede
+            // entrar. Si falla, la empresa quedó creada igual y el aviso
+            // se lo da quien aprobó, a mano.
+            $correoOk = Avisos::cuentaCreada(
+                $r['email'] ?? '', $r['contacto'] ?? '', $r['empresa'] ?? '',
+                $r['usuario'], $r['clave'],
+                (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                    . ($_SERVER['HTTP_HOST'] ?? 'libertyfin.com.mx') . '/login');
             // La contraseña se muestra UNA vez. No se guarda en claro en
             // ningún lado: quien aprueba la entrega y se acabó.
             $this->volver('Empresa creada. Base ' . $r['base']
                 . ' · usuario ' . $r['usuario']
                 . ' · contraseña ' . $r['clave']
-                . ' — anótala, no se vuelve a mostrar.', 'ok');
+                . ' — anótala, no se vuelve a mostrar.'
+                . ($correoOk ? ' Ya le mandamos el correo.'
+                             : ' EL CORREO NO SALIÓ: entrégasela tú.'), 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
         } catch (\Throwable $e) {
@@ -251,8 +280,12 @@ final class MantenimientoControlador
         }
         try {
             $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
-            (new CrearEmpresa($principal))->rechazar(
+            $sol = (new CrearEmpresa($principal))->rechazar(
                 (int)($_POST['id'] ?? 0), $_POST['motivo'] ?? '', $_SESSION['usuario_id'] ?? 0);
+            if (is_array($sol) && !empty($sol['email_admin'])) {
+                Avisos::solicitudRechazada($sol['email_admin'], $sol['nombre_contacto'],
+                    $_POST['motivo'] ?? '');
+            }
             $this->volver('Solicitud rechazada.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');

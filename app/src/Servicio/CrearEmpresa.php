@@ -210,7 +210,8 @@ final class CrearEmpresa
             WHERE id = ?")->execute([$empresaId, $revisorId ?: null, (int)$id]);
 
         return ['base' => $base, 'usuario' => $usuario, 'clave' => $clave,
-                'empresa_id' => $empresaId];
+                'empresa_id' => $empresaId, 'email' => $s['email_admin'],
+                'contacto' => $s['nombre_contacto'], 'empresa' => $s['nombre_empresa']];
     }
 
     public function rechazar($id, $motivo, $revisorId)
@@ -221,11 +222,17 @@ final class CrearEmpresa
             throw new \InvalidArgumentException(
                 'Escribe por qué se rechaza: es lo único que el solicitante va a recibir');
         }
+        $st = $this->principal->prepare("SELECT * FROM solicitudes_empresa WHERE id = ?");
+        $st->execute([(int)$id]);
+        $sol = $st->fetch();
+
         $this->principal->prepare("
             UPDATE solicitudes_empresa
             SET estado = 'rechazada', motivo_rechazo = ?, resuelta_en = NOW(), resuelta_por = ?
             WHERE id = ? AND estado = 'pendiente'")->execute([$motivo, $revisorId ?: null, (int)$id]);
-        return true;
+
+        // Se devuelve la solicitud para poder avisarle a quien la mandó.
+        return $sol ?: true;
     }
 
     /**

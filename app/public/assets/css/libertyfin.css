@@ -1610,3 +1610,96 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 .lf-plant{border:1px dashed var(--lf-linea);background:var(--lf-sup);cursor:pointer;
   font-family:var(--lf-font)}
 .lf-plant:hover{border-style:solid;border-color:var(--lf-brand);color:var(--lf-brand-2)}
+
+
+/* ══════════════════════════════════════════════════════
+   32 · REGISTRO
+   Un asistente de tres pasos, como el del sistema anterior,
+   pero sin recargar entre uno y otro: el formulario es corto
+   y partirlo en tres peticiones pierde lo escrito si algo
+   falla en medio.
+   ══════════════════════════════════════════════════════ */
+.lf-registro{width:100%;max-width:560px;background:var(--lf-sup);
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r-panel);
+  padding:34px 34px 28px;box-shadow:var(--lf-s3)}
+@media(max-width:560px){.lf-registro{padding:26px 20px 22px}}
+
+.lf-reg-marca{display:flex;align-items:center;gap:14px;margin-bottom:26px}
+.lf-reg-marca .g{width:46px;height:46px;border-radius:15px;background:var(--lf-brand);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:20px;flex-shrink:0;box-shadow:0 6px 18px rgba(39,174,96,.32)}
+.lf-reg-marca b{display:block;font-size:19px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
+.lf-reg-marca small{font-size:12.5px;color:var(--lf-tinta-3)}
+
+/* Los tres pasos */
+.lf-reg-pasos{display:flex;align-items:center;gap:6px;margin-bottom:26px}
+.lf-reg-pasos .p{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.lf-reg-pasos .c{width:27px;height:27px;border-radius:50%;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;
+  background:var(--lf-vidrio);color:var(--lf-tinta-4);
+  font-size:12px;font-weight:700;transition:all .2s}
+.lf-reg-pasos .t{font-size:12px;font-weight:600;color:var(--lf-tinta-4);white-space:nowrap}
+.lf-reg-pasos .p.on .c{background:var(--lf-brand);color:#fff;
+  box-shadow:0 0 0 4px var(--lf-brand-ring)}
+.lf-reg-pasos .p.on .t{color:var(--lf-tinta)}
+.lf-reg-pasos .p.hecho .c{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-reg-pasos .p.hecho .t{color:var(--lf-tinta-3)}
+.lf-reg-pasos .ln{flex:1;height:1.5px;background:var(--lf-linea);min-width:10px}
+@media(max-width:520px){ .lf-reg-pasos .t{display:none} }
+
+/* Las hojas */
+.lf-reg-form .hoja{display:none}
+.lf-reg-form .hoja.on{display:block;animation:lf-hoja .22s ease}
+@keyframes lf-hoja{from{opacity:0;transform:translateX(7px)}}
+.lf-reg-form h3{font-size:16px;font-weight:700;letter-spacing:-.3px;margin-bottom:18px}
+.lf-reg-form .campo{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.lf-reg-form .fila{display:flex;gap:14px;flex-wrap:wrap}
+.lf-reg-form .fila .campo{flex:1;min-width:190px}
+.lf-reg-form .fila .campo.estrecho{flex:0 0 170px}
+@media(max-width:520px){ .lf-reg-form .fila .campo.estrecho{flex:1} }
+.lf-reg-form label{font-size:12px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-reg-form label i{color:var(--lf-brand-2);font-style:normal}
+.lf-reg-form small{font-size:11px;color:var(--lf-tinta-4);line-height:1.45}
+.lf-reg-form input{width:100%;padding:11px 14px;background:var(--lf-sup-2);
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  color:var(--lf-tinta);font-size:14px;font-family:var(--lf-font);outline:none;
+  transition:border-color .15s,box-shadow .15s,background .15s}
+.lf-reg-form input:focus{background:var(--lf-sup);border-color:var(--lf-brand);
+  box-shadow:0 0 0 3px var(--lf-brand-ring)}
+
+.lf-reg-form .acc{display:flex;align-items:center;justify-content:space-between;
+  gap:12px;margin-top:22px}
+.lf-reg-form .acc .lf-entrar{width:auto;min-width:160px;margin-top:0;padding:12px 26px}
+.lf-btn-atras{padding:12px 20px;border-radius:var(--lf-r-pill);border:1px solid var(--lf-linea);
+  background:none;color:var(--lf-tinta-3);font-family:var(--lf-font);font-size:13.5px;
+  font-weight:600;cursor:pointer}
+.lf-btn-atras:hover{border-color:var(--lf-tinta-4);color:var(--lf-tinta-2)}
+
+/* El resumen del último paso */
+.lf-reg-form .resumen{border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  padding:4px 15px;background:var(--lf-sup-2)}
+.lf-reg-form .resumen .r{display:flex;justify-content:space-between;gap:14px;
+  padding:9px 0;border-bottom:1px solid var(--lf-linea);font-size:13px}
+.lf-reg-form .resumen .r:last-child{border-bottom:none}
+.lf-reg-form .resumen span{color:var(--lf-tinta-3);flex-shrink:0}
+.lf-reg-form .resumen b{font-weight:600;text-align:right;overflow-wrap:anywhere}
+.lf-reg-form .resumen b.vacio{color:var(--lf-tinta-4);font-weight:400;font-style:italic}
+.lf-reg-form .nota{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.6;margin-top:16px}
+
+/* Confirmación */
+.lf-reg-listo{text-align:center;padding:8px 0}
+.lf-reg-listo .ok{display:inline-flex;align-items:center;justify-content:center;
+  width:64px;height:64px;border-radius:50%;background:var(--lf-brand-soft);
+  color:var(--lf-brand-2);margin-bottom:16px}
+.lf-reg-listo h2{font-size:20px;font-weight:700;letter-spacing:-.4px;margin-bottom:8px}
+.lf-reg-listo > p{font-size:13.5px;color:var(--lf-tinta-3);line-height:1.6;margin-bottom:24px}
+.lf-reg-listo .pasos-despues{text-align:left;margin-bottom:24px}
+.lf-reg-listo .p{display:flex;gap:13px;align-items:flex-start;padding:11px 0;
+  border-bottom:1px solid var(--lf-linea)}
+.lf-reg-listo .p:last-child{border-bottom:none}
+.lf-reg-listo .n{width:25px;height:25px;border-radius:50%;flex-shrink:0;
+  background:var(--lf-vidrio);color:var(--lf-tinta-3);display:flex;
+  align-items:center;justify-content:center;font-size:11.5px;font-weight:700}
+.lf-reg-listo .p b{display:block;font-size:13.5px;font-weight:600;margin-bottom:2px}
+.lf-reg-listo .p small{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5}
+.lf-reg-listo .lf-entrar{text-decoration:none;display:flex;align-items:center;justify-content:center}

@@ -99,6 +99,7 @@ final class Autenticar
             'usuario_rol'      => $usuario['rol'],
             'sucursal_id'      => $usuario['sucursal_id'] ? (int)$usuario['sucursal_id'] : null,
             'sucursal_nombre'  => $sucursal['nombre'] ?? 'Matriz',
+            'usuario_email'    => $usuario['email'] ?? '',
         ];
 
         // La personalización se lee una vez al entrar y vive en la sesión:
