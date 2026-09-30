@@ -42,7 +42,7 @@ final class GastoRepo extends Repo
         return $r;
     }
 
-    public function listado($desde, $hasta, $categoria = '', $buscar = '')
+    public function listado($desde, $hasta, $categoria = '', $buscar = '', $limite = 10, $desfase = 0)
     {
         list($a, $b) = $this->rango($desde, $hasta);
         $w = ['g.venta_id IS NULL', 'g.fecha >= ?', 'g.fecha < ?'];
@@ -56,7 +56,17 @@ final class GastoRepo extends Repo
             LEFT JOIN usuarios u ON u.id = g.usuario_id
             WHERE " . implode(' AND ', $w) . "
             ORDER BY g.fecha DESC, g.id DESC
-            LIMIT 200", $p);
+            LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, $p);
+    }
+
+    public function cuantos($desde, $hasta, $categoria = '', $buscar = '')
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $w = ['g.venta_id IS NULL', 'g.fecha >= ?', 'g.fecha < ?']; $p = [$a, $b];
+        if ($categoria !== '') { $w[] = 'g.categoria = ?'; $p[] = $categoria; }
+        if ($buscar !== '')    { $w[] = '(g.concepto LIKE ? OR g.descripcion LIKE ?)';
+                                 $l = '%'.$buscar.'%'; $p[] = $l; $p[] = $l; }
+        return (int)$this->valor("SELECT COUNT(*) FROM gastos g WHERE " . implode(' AND ', $w), $p);
     }
 
     public function porCategoria($desde, $hasta)

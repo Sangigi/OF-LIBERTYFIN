@@ -19,6 +19,9 @@ final class GastosControlador
         $buscar = Peticion::texto('q');
         $editar = Peticion::entero('editar');
         $vista  = Peticion::opcion('t', ['generales','operacion','proveedores'], 'generales');
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = Peticion::POR_PAGINA;
+        $totalG = $vista === 'generales' ? $repo->cuantos($desde, $hasta, $cat, $buscar) : 0;
 
         Plantilla::pagina('gastos/index', [
             'titulo'    => 'Gastos',
@@ -26,7 +29,11 @@ final class GastosControlador
             'subtitulo' => Fechas::rotulo($desde, $hasta),
             'resumen'   => $repo->resumen($desde, $hasta),
             'vista'     => $vista,
-            'gastos'    => $vista === 'generales' ? $repo->listado($desde, $hasta, $cat, $buscar) : [],
+            'gastos'    => $vista === 'generales'
+                         ? $repo->listado($desde, $hasta, $cat, $buscar, $porPag, ($pagina-1)*$porPag) : [],
+            'pagina'    => $pagina,
+            'paginas'   => max(1, (int)ceil($totalG / $porPag)),
+            'totalG'    => $totalG,
             'operacion' => $vista === 'operacion' ? $repo->operacion($desde, $hasta) : [],
             'proveedores'   => $vista === 'proveedores' ? $repo->proveedores() : [],
             'prov_editando' => ($vista === 'proveedores' && $editar) ? $repo->proveedor($editar) : null,

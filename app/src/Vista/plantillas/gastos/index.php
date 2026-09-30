@@ -326,9 +326,11 @@ document.querySelectorAll('.lf-alt-prov').forEach(function(b){
         </tbody>
       </table>
     </div>
-    <div class="card-footer" style="display:flex;justify-content:space-between">
-      <span><?= count($gastos) ?> movimientos</span>
-      <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($resumen['total'] ?? 0) ?></b>
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span><?= count($gastos) ?> de <?= number_format($totalG) ?> ·
+        <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($resumen['total'] ?? 0) ?></b></span>
+      <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+        'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n,'t'=>'generales']); }]); ?>
     </div>
   </section>
 

@@ -47,9 +47,9 @@ $em = $empresa; ?>
                  style="text-transform:uppercase" placeholder="Opcional"></div>
         <div style="flex:1;min-width:170px"><label class="form-label">Giro</label>
           <input class="form-control" name="giro_comercial" value="<?= P::e($em['giro_comercial'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="width:160px"><label class="form-label">Teléfono</label>
+        <div style="width:170px"><label class="form-label">Teléfono</label>
           <input class="form-control" name="telefono" value="<?= P::e($em['telefono'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="flex:2;min-width:240px"><label class="form-label">Dirección</label>
+        <div style="flex:2;min-width:260px"><label class="form-label">Dirección</label>
           <input class="form-control" name="direccion" value="<?= P::e($em['direccion'] ?? '') ?>" placeholder="Opcional"></div>
         <div style="flex:1;min-width:180px"><label class="form-label">Contacto</label>
           <input class="form-control" name="nombre_contacto" value="<?= P::e($em['nombre_contacto'] ?? '') ?>" placeholder="Opcional"></div>

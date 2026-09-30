@@ -109,7 +109,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
   </div>
 </div>
 
-<div class="lf-split">
+<div class="lf-split" style="margin-top:4px">
   <section class="card">
     <header class="card-header">
       <div><span>Cobrado contra vendido</span>

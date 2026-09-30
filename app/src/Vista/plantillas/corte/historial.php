@@ -97,7 +97,12 @@ $pct = ($r['cortes'] ?? 0) > 0 ? round(($r['cuadrados'] ?? 0) / $r['cortes'] * 1
       </tbody>
     </table>
   </div>
-  <div class="card-footer">
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($cortes) ?> de <?= number_format($totalC) ?> cortes</span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n){ return '?t=historial&p=' . $n; }]); ?>
+  </div>
+  <div class="card-footer" style="border-top:none;padding-top:0">
     El "cobrado" incluye transferencias y tarjeta; el "contado" es solo efectivo.
     Por eso casi nunca coinciden, y no tienen por qué.
   </div>

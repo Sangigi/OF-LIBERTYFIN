@@ -186,8 +186,12 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
 </div>
 
 <?php if ($colaboradores): ?>
-<section class="card">
-  <header class="card-header">Comisiones por colaborador</header>
+<section class="card" style="margin-top:2px">
+  <header class="card-header">
+    <div><span>Comisiones por colaborador</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Devengado en el periodo</p></div>
+  </header>
   <div style="padding:0 10px 8px">
     <?php foreach ($colaboradores as $c): $sd = $c['nombre'] === 'POR ASIGNAR'; ?>
       <div class="lf-row" style="<?= $sd?'opacity:.72':'' ?>">

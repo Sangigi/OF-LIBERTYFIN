@@ -113,37 +113,43 @@ $iniciales = function ($n) {
 </section>
 <?php endif; ?>
 
-<div class="lf-split">
-  <section class="card">
-    <header class="card-header">Por colaborador</header>
-    <div style="padding:0 10px 8px">
-      <?php if (!$equipo): ?>
-        <p style="padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
-          No hay comisiones devengadas en este periodo.</p>
-      <?php endif; ?>
-      <?php foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
-        <div class="lf-row" style="<?= $huerfano ? 'opacity:.72' : '' ?>">
-          <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
-            <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
-          <span style="flex:1;min-width:0">
-            <b style="display:block;font-size:13.5px"><?= P::e($c['colaborador_nombre']) ?></b>
-            <small style="color:var(--lf-tinta-4);font-size:11.5px">
-              <?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
-          </span>
-          <?php if ($huerfano): ?>
-            <span class="badge bg-warning" style="margin-right:8px">No se paga</span>
-          <?php endif; ?>
-          <b class="lf-mono" style="font-size:14px"><?= D::pesos($c['devengado']) ?></b>
+<section class="card">
+  <header class="card-header">
+    <div><span>Por colaborador</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Devengado en el periodo</p></div>
+    <span class="badge bg-secondary"><?= count($equipo) ?> con comisión</span>
+  </header>
+  <div class="lf-equipo">
+    <?php if (!$equipo): ?>
+      <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
+        No hay comisiones devengadas en este periodo.</p>
+    <?php endif; ?>
+    <?php
+    // Rejilla en vez de lista: con seis u ocho colaboradores una lista
+    // vertical deja media pantalla en blanco.
+    $mayor = 0; foreach ($equipo as $c) $mayor = max($mayor, (float)$c['devengado']);
+    foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
+      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>">
+        <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
+          <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
+        <div style="flex:1;min-width:0">
+          <b><?= P::e($c['colaborador_nombre']) ?></b>
+          <small><?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
+          <?php W::avance($mayor > 0 ? $c['devengado'] / $mayor * 100 : 0, $huerfano); ?>
         </div>
-      <?php endforeach; ?>
-    </div>
-    <div class="card-footer" style="display:flex;justify-content:space-between">
-      <span>Total generado</span>
-      <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b>
-    </div>
-  </section>
+        <span class="mn"><?= D::pesos($c['devengado']) ?>
+          <?php if ($huerfano): ?><i>no se paga</i><?php endif; ?></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <div class="card-footer" style="display:flex;justify-content:space-between">
+    <span>Total generado en el periodo</span>
+    <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b>
+  </div>
+</section>
 
-  <div>
+<div class="lf-tres">
     <?php if ($areas): ?>
     <section class="card">
       <header class="card-header">Por área</header>
@@ -209,5 +215,4 @@ $iniciales = function ($n) {
       </div>
     </section>
     <?php endif; ?>
-  </div>
 </div>

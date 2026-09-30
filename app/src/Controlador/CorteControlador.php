@@ -18,12 +18,18 @@ final class CorteControlador
 
         $p = Peticion::opcion('t', ['turno','historial'], 'turno');
         if ($p === 'historial') {
+            $pagina  = max(1, Peticion::entero('p', 1));
+            $porPag  = Peticion::POR_PAGINA;
+            $totalC  = $repo->cuantosCortes($suc);
             Plantilla::pagina('corte/historial', [
                 'titulo'    => 'Corte de caja',
                 'icono'     => 'caja',
                 'subtitulo' => 'Historial · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
                 'pestana'   => 'historial',
-                'cortes'    => $repo->historialCompleto($suc, 40),
+                'cortes'    => $repo->historialCompleto($suc, $porPag, ($pagina-1)*$porPag),
+                'pagina'    => $pagina,
+                'paginas'   => max(1, (int)ceil($totalC / $porPag)),
+                'totalC'    => $totalC,
                 'resumen'   => $repo->resumenHistorial($suc),
                 'aviso'     => $_SESSION['lf_aviso'] ?? null,
             ]);

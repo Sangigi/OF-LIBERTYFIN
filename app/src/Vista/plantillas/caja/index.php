@@ -17,7 +17,12 @@ $token = $_SESSION['lf_token'];
   <section class="card">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
       <span>Servicios</span>
-      <form class="lf-search" method="get" style="max-width:260px">
+      <div class="lf-pag-serv" id="pagServ" hidden>
+        <button type="button" id="servAnt" aria-label="Anterior">&lsaquo;</button>
+        <span><b id="servPag">1</b> de <b id="servTot">1</b></span>
+        <button type="button" id="servSig" aria-label="Siguiente">&rsaquo;</button>
+      </div>
+      <form class="lf-search" method="get" style="max-width:240px">
         <?= W::icono('buscar','15px') ?>
         <input type="search" name="q" value="<?= P::e($buscar) ?>" placeholder="Nombre o código">
         <?php if ($area): ?><input type="hidden" name="area" value="<?= P::e($area) ?>"><?php endif; ?>
@@ -49,11 +54,6 @@ $token = $_SESSION['lf_token'];
           <span class="p"><?= (float)$s['precio'] > 0 ? D::pesos($s['precio']) : 'Precio libre' ?></span>
         </button>
       <?php endforeach; ?>
-    </div>
-    <div class="lf-pag-serv" id="pagServ" hidden>
-      <button type="button" id="servAnt" aria-label="Anterior">&lsaquo;</button>
-      <span><b id="servPag">1</b> de <b id="servTot">1</b></span>
-      <button type="button" id="servSig" aria-label="Siguiente">&rsaquo;</button>
     </div>
   </section>
 

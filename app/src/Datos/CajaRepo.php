@@ -95,7 +95,7 @@ final class CajaRepo extends Repo
     }
 
     /** Historial completo, con lo que se movió en cada turno. */
-    public function historialCompleto($sucursalId, $limite = 40)
+    public function historialCompleto($sucursalId, $limite = 10, $desfase = 0)
     {
         return $this->todos("
             SELECT c.*, u.nombre AS usuario,
@@ -116,7 +116,12 @@ final class CajaRepo extends Repo
             ) mv ON mv.caja_id = c.id
             WHERE c.sucursal_id = ?
             ORDER BY c.id DESC
-            LIMIT " . (int)$limite, [(int)$sucursalId]);
+            LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, [(int)$sucursalId]);
+    }
+
+    public function cuantosCortes($sucursalId)
+    {
+        return (int)$this->valor("SELECT COUNT(*) FROM caja WHERE sucursal_id = ?", [(int)$sucursalId]);
     }
 
     /** Las cifras del historial: cuántos cuadraron y cuánto se desvió. */

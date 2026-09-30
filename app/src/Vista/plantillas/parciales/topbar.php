@@ -1,12 +1,44 @@
-<?php use LibertyFin\Vista\Widget as W; use LibertyFin\Vista\Plantilla as P; ?>
+<?php
+use LibertyFin\Vista\Widget as W;
+use LibertyFin\Vista\Plantilla as P;
+
+/**
+ * Acciones por sección.
+ *
+ * Antes salían "Exportar" y "Nueva venta" en todas partes. El de exportar
+ * no hacía nada, y el de nueva venta no tiene sentido estando ya en la
+ * caja. Aquí cada sección declara lo suyo, y donde no hay nada útil no
+ * aparece nada.
+ */
+$acciones = [
+  'panel'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
+  'venta'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
+  'cliente' => [['/clientes?nuevo=1', 'mas', 'Nuevo cliente', 'primary']],
+  'reloj'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
+  'baja'    => [['/gastos?nuevo=1', 'mas', 'Nuevo gasto', 'primary']],
+  'serv'    => [['/servicios?nuevo=1', 'mas', 'Nuevo servicio', 'primary']],
+  // Reportes sí exporta de verdad: baja el detalle en CSV.
+  'pct'     => [['/reportes/csv', 'baja', 'Descargar CSV', 'secondary']],
+];
+$aqui = $acciones[$icono] ?? [];
+?>
 <header class="lf-top">
-  <div>
+  <div class="lf-top-tit">
     <h1><?= W::icono($icono, '18px') ?><span><?= P::e($titulo) ?></span></h1>
     <?php if ($subtitulo): ?><p><?= P::e($subtitulo) ?></p><?php endif; ?>
   </div>
+
   <div class="lf-acc">
-    <button class="btn btn-secondary"><?= W::icono('baja', '15px') ?>Exportar</button>
-    <a class="btn btn-primary" href="/caja"><?= W::icono('mas', '15px') ?>Nueva venta</a>
+    <?php foreach ($aqui as $a): ?>
+      <a class="btn btn-<?= $a[3] ?>" href="<?= P::e($a[0]) ?>">
+        <?= W::icono($a[1], '15px') ?><?= P::e($a[2]) ?></a>
+    <?php endforeach; ?>
+
+    <button type="button" class="lf-tema" id="lfTema"
+            aria-label="Cambiar entre claro y oscuro" title="Cambiar tema">
+      <span class="claro"><?= W::icono('luna', '16px') ?></span>
+      <span class="oscuro"><?= W::icono('sol', '16px') ?></span>
+    </button>
   </div>
 </header>
 
