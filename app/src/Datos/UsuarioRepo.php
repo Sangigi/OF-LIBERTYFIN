@@ -10,8 +10,12 @@ namespace LibertyFin\Datos;
  */
 final class UsuarioRepo extends Repo
 {
-    const ROLES = ['admin' => 'Administrador', 'supervisor' => 'Supervisor',
-                   'cajero' => 'Cajero', 'vendedor' => 'Vendedor'];
+    /**
+     * Los roles salen de Dominio\Permisos, no de una lista aparte.
+     * Tener dos listas es garantía de que un día alguien agrega un rol
+     * en una y no en la otra.
+     */
+    const ROLES_FUENTE = \LibertyFin\Dominio\Permisos::class;
     const CLAVE_MINIMA = 8;
 
     public function todos_()
@@ -75,7 +79,9 @@ final class UsuarioRepo extends Repo
         if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
 
         $rol = $d['rol'] ?? '';
-        if (!isset(self::ROLES[$rol])) throw new \InvalidArgumentException('Ese rol no existe');
+        if (!isset(\LibertyFin\Dominio\Permisos::ROLES[$rol])) {
+            throw new \InvalidArgumentException('Ese rol no existe');
+        }
 
         $email = trim($d['email'] ?? '');
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {

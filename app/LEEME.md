@@ -72,7 +72,8 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/cobranza` | listo |
 | `/gastos` | listo |
 | `/reportes` | listo |
-| `/ajustes` | listo · solo admin |
+| `/ajustes` | listo · admin y soporte |
+| `/mantenimiento` | listo · solo soporte |
 | `/usuarios` | listo · pestaña de Ajustes |
 | `/cuenta` | listo |
 
@@ -328,6 +329,57 @@ Al registrar un gasto, el campo de proveedor sugiere los que ya existen sin
 obligar a elegirlos. Y si se le cambia el nombre a un proveedor, los gastos
 anteriores se actualizan solos: si no, quedarían apuntando a un nombre que ya
 no existe.
+
+## Roles y permisos
+
+Cinco roles, una sola matriz en `Dominio\Permisos`. El router, el menú y los
+controladores leen de ahí, así que no puede pasar lo del sistema anterior: que
+el enlace esté escondido pero la URL siga funcionando si alguien la escribe.
+
+| Rol | Para quién |
+|---|---|
+| **Administrador** | Dueño o gerente. Ve el dinero y configura. |
+| **Supervisor** | Coordina la operación y ve reportes. No configura ni toca usuarios. |
+| **Cajero** | Cobra, abre y cierra su caja. No ve comisiones de nadie. |
+| **Vendedor** | Vende y da seguimiento a sus clientes. |
+| **Soporte** | Mantenimiento y diagnóstico. Ve todo, no mueve dinero. |
+
+**Los permisos se nombran por lo que la persona HACE, no por la pantalla.**
+`cobrar` es cobrar, exista o no una sección llamada Caja. Mover algo de lugar no
+obliga a repensar los permisos.
+
+**Un permiso que no existe se niega.** Escribirlo mal debe cerrar la puerta, no
+abrirla.
+
+### Dos decisiones que vale la pena defender
+
+**Soporte ve todo y no mueve nada.** Quien entra a arreglar un problema necesita
+mirar, no cobrar. Si además pudiera cobrar, cancelar pagos o asignar comisiones,
+no habría forma de saber si un descuadre lo causó la empresa o quien vino a
+ayudar.
+
+**Cajero no ve comisiones.** No es desconfianza: el importe que cobra alguien más
+no es asunto suyo, y tenerlo a la vista en la pantalla donde atiende clientes es
+una fuga de información que nadie pidió.
+
+## Mantenimiento
+
+Solo para soporte. Dos cosas:
+
+**Revisión de la base** · las seis señales que suelen estar detrás de un número
+que no cuadra: ventas sin área, fechas desfasadas, cobrado mayor al total,
+comisiones sin dueño, ventas sin cliente, cajas sin cerrar. Cada una dice qué
+problema concreto causa.
+
+**Secciones apagables** · Cobranza, Corte, Comisiones, Gastos, Reportes y
+Recargas se pueden ocultar por empresa. Panel, Caja, Ventas, Clientes y Ajustes
+no: sin ellas no se puede trabajar y el usuario pensaría que el sistema se rompió.
+
+Soporte sigue viendo las secciones apagadas, porque para eso entra.
+
+La configuración vive en `sistema_config` dentro de la base de cada empresa.
+**Las credenciales no van ahí**: una contraseña en una tabla la ve cualquiera con
+acceso a la base, y todo respaldo se la lleva.
 
 ## Notas de maqueta
 

@@ -40,7 +40,9 @@ final class Router
             if ($r['metodo'] !== $metodo) continue;
             if (preg_match($r['patron'], $ruta, $m)) {
                 array_shift($m);
-                return ['destino' => $r['destino'], 'args' => array_map('intval', $m)];
+                return ['destino' => $r['destino'],
+                        'args'    => array_map('intval', $m),
+                        'patron'  => $r['ruta']];
             }
         }
         return null;

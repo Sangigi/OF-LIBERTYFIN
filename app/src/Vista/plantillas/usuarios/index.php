@@ -2,6 +2,7 @@
 use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Vista\Widget as W;
 use LibertyFin\Datos\UsuarioRepo as U;
+use LibertyFin\Dominio\Permisos as Perm;
 
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
@@ -45,11 +46,14 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     </div>
     <div style="width:150px">
       <label class="form-label">Rol</label>
-      <select class="form-select" name="rol" required>
-        <?php foreach (U::ROLES as $k => $v): ?>
-          <option value="<?= $k ?>" <?= (isset($e['rol']) && $e['rol']===$k)?'selected':'' ?>><?= $v ?></option>
+      <select class="form-select" name="rol" id="selRol" required>
+        <?php foreach (Perm::ROLES as $k => $v): ?>
+          <option value="<?= $k ?>" data-para="<?= P::e($v['para']) ?>"
+            <?= (isset($e['rol']) && $e['rol']===$k)?'selected':'' ?>><?= P::e($v['rotulo']) ?></option>
         <?php endforeach; ?>
       </select>
+      <small id="rolPara" style="font-size:11px;color:var(--lf-tinta-4);
+             margin-top:5px;display:block;line-height:1.4;max-width:160px"></small>
     </div>
     <div style="width:160px">
       <label class="form-label">Sucursal</label>
@@ -106,7 +110,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
             </span>
           </td>
           <td data-label="Rol"><span class="badge <?= $u['rol']==='admin'?'bg-success':'bg-secondary' ?>">
-            <?= P::e(U::ROLES[$u['rol']] ?? $u['rol']) ?></span></td>
+            <?= P::e(Perm::ROLES[$u['rol']]['rotulo'] ?? $u['rol']) ?></span></td>
           <td data-label="Sucursal" style="font-size:12.5px"><?= P::e($u['sucursal'] ?: '—') ?></td>
           <td data-label="Ventas" class="text-end lf-mono"><?= (int)$u['ventas'] ?></td>
           <td data-label="Estado">
@@ -136,6 +140,28 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
   </div>
 </section>
 
+<section class="card">
+  <header class="card-header">
+    <div><span>Qué abre cada rol</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        El permiso se verifica en el servidor, no escondiendo el enlace</p></div>
+  </header>
+  <div class="lf-equipo" style="padding:4px 20px 18px">
+    <?php foreach (Perm::ROLES as $k => $r): $res = Perm::resumen($k); ?>
+      <div class="lf-pers" style="align-items:flex-start">
+        <span class="lf-av <?= $k==='admin' ? '' : 'gris' ?>" style="flex-shrink:0">
+          <?= P::e(mb_strtoupper(mb_substr($r['rotulo'],0,2))) ?></span>
+        <div style="flex:1;min-width:0">
+          <b style="white-space:normal"><?= P::e($r['rotulo']) ?></b>
+          <small style="white-space:normal;line-height:1.45"><?= P::e($r['para']) ?></small>
+        </div>
+        <span class="mn" style="font-size:12px">
+          <?= $res['ve'] ?> ve<i><?= $res['hace'] ?> hace</i></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</section>
+
 <form method="post" action="/usuarios/restablecer" id="formClave" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>">
   <input type="hidden" name="id" id="clvId">
@@ -147,6 +173,15 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 </form>
 
 <script>
+// Al elegir rol se explica para quién es. Nombrar un rol sin saber qué
+// abre es la forma más común de darle a alguien más de lo que necesita.
+(function(){
+  var s = document.getElementById('selRol'), t = document.getElementById('rolPara');
+  if (!s || !t) return;
+  function pinta(){ t.textContent = s.options[s.selectedIndex].dataset.para || ''; }
+  s.addEventListener('change', pinta); pinta();
+})();
+
 document.querySelectorAll('.lf-clave').forEach(function(b){
   b.addEventListener('click', function(){
     var c = prompt('Contraseña nueva para ' + b.dataset.nombre

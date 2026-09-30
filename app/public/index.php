@@ -86,6 +86,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
+$r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
 $r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
@@ -99,6 +101,54 @@ $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
 
+// ── Qué permiso pide cada ruta ──
+// El router ya no solo dice si la ruta existe: dice quién puede entrar.
+// Esconder el enlace del menú es cortesía; esto es la puerta.
+$permisos = [
+  '/'                       => 'ver.panel',
+  '/ventas'                 => 'ver.ventas',
+  '/ventas/{id}'            => 'ver.ventas',
+  '/ventas/{id}/ticket'     => 'ver.ventas',
+  '/ventas/{id}/pagar'      => 'abonar',
+  '/ventas/{id}/cancelar-pago' => 'cancelar.pago',
+  '/ventas/{id}/comision'   => 'asignar.comision',
+  '/ventas/{id}/quitar-comision' => 'quitar.comision',
+  '/caja'                   => 'cobrar',
+  '/caja/clientes'          => 'cobrar',
+  '/caja/cobrar'            => 'cobrar',
+  '/cobranza'               => 'ver.cobranza',
+  '/corte'                  => 'ver.corte',
+  '/corte/abrir'            => 'abrir.caja',
+  '/corte/cerrar'           => 'cerrar.caja',
+  '/clientes'               => 'ver.clientes',
+  '/clientes/guardar'       => 'editar.clientes',
+  '/comisiones'             => 'ver.comisiones',
+  '/comisiones/reasignar'   => 'asignar.comision',
+  '/gastos'                 => 'ver.gastos',
+  '/gastos/guardar'         => 'editar.gastos',
+  '/gastos/borrar'          => 'borrar.gastos',
+  '/gastos/proveedor'       => 'editar.gastos',
+  '/gastos/proveedor/alternar' => 'editar.gastos',
+  '/servicios'              => 'ver.servicios',
+  '/servicios/guardar'      => 'editar.servicios',
+  '/servicios/alternar'     => 'editar.servicios',
+  '/reportes'               => 'ver.reportes',
+  '/reportes/csv'           => 'ver.reportes',
+  '/ajustes'                => 'ver.ajustes',
+  '/ajustes/guardar'        => 'editar.ajustes',
+  '/ajustes/alternar'       => 'editar.ajustes',
+  '/usuarios'               => 'ver.usuarios',
+  '/usuarios/guardar'       => 'editar.usuarios',
+  '/usuarios/restablecer'   => 'editar.usuarios',
+  '/usuarios/alternar'      => 'editar.usuarios',
+  '/recargas'               => 'ver.recargas',
+  '/recargas/consultar'     => 'ver.recargas',
+  '/recargas/vender'        => 'vender.recarga',
+  '/mantenimiento'          => 'ver.mantenimiento',
+  '/mantenimiento/secciones'=> 'secciones',
+  // /cuenta no lleva permiso: cualquiera administra su propia clave.
+];
+
 $publicas = ['/login', '/salir'];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 
@@ -109,6 +159,20 @@ if (!in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
 }
 
 $hallazgo = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+
+// ── El permiso, antes de ejecutar nada ──
+if ($hallazgo !== null && !in_array($ruta, $publicas, true)) {
+    $patron = $hallazgo['patron'] ?? $ruta;
+    $necesita = $permisos[$patron] ?? null;
+    if ($necesita !== null && !\LibertyFin\Dominio\Permisos::puede($necesita)) {
+        http_response_code(403);
+        Plantilla::pagina('errores/403', [
+            'titulo' => 'Sin permiso', 'icono' => 'alerta', 'subtitulo' => '',
+            'permiso' => $necesita,
+        ]);
+        exit;
+    }
+}
 
 if ($hallazgo === null) {
     http_response_code(404);

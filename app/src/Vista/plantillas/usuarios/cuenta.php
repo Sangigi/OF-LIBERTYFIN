@@ -2,6 +2,7 @@
 use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Vista\Widget as W;
 use LibertyFin\Datos\UsuarioRepo as U;
+use LibertyFin\Dominio\Permisos as Perm;
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
 ?>
@@ -45,7 +46,7 @@ $token = $_SESSION['lf_token'];
     <div class="card-body" style="font-size:13px">
       <?php foreach ([
         'Nombre'   => $_SESSION['usuario_nombre'] ?? '',
-        'Rol'      => U::ROLES[$_SESSION['usuario_rol'] ?? ''] ?? ($_SESSION['usuario_rol'] ?? ''),
+        'Rol'      => (Perm::ROLES[$_SESSION['usuario_rol'] ?? '']['rotulo'] ?? ($_SESSION['usuario_rol'] ?? '')),
         'Empresa'  => $_SESSION['empresa_nombre'] ?? '',
         'Sucursal' => $_SESSION['sucursal_nombre'] ?? '',
       ] as $k => $v): if ($v === '') continue; ?>
