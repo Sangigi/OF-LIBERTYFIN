@@ -139,41 +139,78 @@ final class Emida
     {
         $wsdl = trim((string)($this->cfg['wsdl'] ?? ''));
         $r = [];
-        $r[] = ['Extensión SOAP de PHP', class_exists('SoapClient'),
-                class_exists('SoapClient') ? 'disponible' : 'falta: actívala en el servidor'];
-        $r[] = ['allow_url_fopen', (bool)ini_get('allow_url_fopen'),
-                ini_get('allow_url_fopen') ? 'encendido' : 'apagado: SOAP no puede leer el WSDL'];
-        $r[] = ['Dirección del WSDL', $wsdl !== '', $wsdl ?: 'sin configurar'];
-        $r[] = ['Va cifrada', $this->cifrado(),
-                $this->cifrado() ? 'HTTPS' : 'HTTP: las credenciales viajan en claro'];
-        $r[] = ['Credenciales', trim((string)($this->cfg['usuario'] ?? '')) !== ''
-                             && trim((string)($this->cfg['merchant_id'] ?? '')) !== '',
-                'usuario y comercio'];
 
-        $ok = true;
-        foreach ($r as $x) if (!$x[1]) { $ok = false; break; }
-        if ($ok) {
-            try {
-                $this->cliente();
-                $r[] = ['Descarga del WSDL', true, 'el XML se leyó bien'];
-                $ops = $this->operaciones();
-                if ($ops['ok']) {
-                    $nombres = array_keys($ops['operaciones']);
-                    $r[] = ['Operaciones que ofrece', count($nombres) > 0,
-                            implode(', ', $nombres) ?: 'ninguna'];
-                    foreach ([['saldo', ['Balance','Saldo','Funds']],
-                              ['validar número', ['Lookup','Validate','Inquiry','Consulta']],
-                              ['recargar', ['Submit','Topup','Recharge','Sale','Payment']]] as $par) {
-                        $hay = null;
-                        foreach ($nombres as $n) foreach ($par[1] as $p)
-                            if (stripos($n, $p) !== false) { $hay = $n; break 2; }
-                        $r[] = ['Operación de ' . $par[0], (bool)$hay,
-                                $hay ?: 'no se encontró: dime cuál de las de arriba es'];
-                    }
-                } else {
-                    $r[] = ['Operaciones que ofrece', false, $ops['error']];
-                }
-            } catch (\Throwable $e) { $r[] = ['Descarga del WSDL', false, $e->getMessage()]; }
+        // Un renglón informativo NO detiene la prueba. Antes "va cifrada"
+        // contaba como fallo, así que con HTTP —que es lo normal aquí—
+        // la revisión se cortaba justo antes de lo único que importa:
+        // si el WSDL se lee y a dónde apunta.
+        $agrega = function (&$r, $que, $ok, $detalle, $bloquea = true) {
+            $r[] = ['que' => $que, 'ok' => $ok, 'detalle' => $detalle, 'bloquea' => $bloquea];
+        };
+
+        // La extensión SOAP hace falta para LLAMAR, no para leer el WSDL.
+        // Si no está, el resto del diagnóstico sigue siendo útil: dice a
+        // dónde apunta y qué ofrece, que es lo que hay que averiguar.
+        $agrega($r, 'Extensión SOAP de PHP', class_exists('SoapClient'),
+            class_exists('SoapClient')
+                ? 'disponible'
+                : 'falta: sin ella se puede diagnosticar pero no recargar', false);
+        $agrega($r, 'allow_url_fopen', (bool)ini_get('allow_url_fopen'),
+            ini_get('allow_url_fopen') ? 'encendido' : 'apagado: SOAP no puede leer el WSDL');
+        $agrega($r, 'Dirección del WSDL', $wsdl !== '', $wsdl ?: 'sin configurar');
+        $agrega($r, 'Credenciales', trim((string)($this->cfg['usuario'] ?? '')) !== ''
+                                 && trim((string)($this->cfg['merchant_id'] ?? '')) !== '',
+            'usuario y comercio');
+        $agrega($r, 'Va cifrada', $this->cifrado(),
+            $this->cifrado() ? 'HTTPS' : 'HTTP: las credenciales viajan en claro', false);
+
+        foreach ($r as $x) if ($x['bloquea'] && !$x['ok']) return $r;
+
+        // 1 · ¿Se baja el XML?
+        $d = $this->bajarWsdl();
+        $agrega($r, 'Descarga del WSDL', $d['ok'],
+            $d['ok'] ? ($d['bytes'] . ' bytes de XML') : $d['error']);
+        if (!$d['ok']) return $r;
+
+        // 2 · ¿A dónde manda las llamadas? Esto es lo que suele fallar:
+        // el WSDL se lee y el endpoint que declara es otro.
+        $ep = $this->endpoint();
+        $mismoHost = $ep && parse_url($ep, PHP_URL_HOST) === parse_url($wsdl, PHP_URL_HOST);
+        $agrega($r, 'A dónde manda las llamadas', (bool)$ep,
+            $ep ? ($ep . ($mismoHost ? '' : '  ← host distinto al del WSDL'))
+                : 'el WSDL no declara <soap:address>');
+
+        // 3 · ¿Responde ese endpoint?
+        if ($ep) {
+            $abre = @fsockopen(
+                (parse_url($ep, PHP_URL_SCHEME) === 'https' ? 'ssl://' : '') . parse_url($ep, PHP_URL_HOST),
+                parse_url($ep, PHP_URL_PORT) ?: (parse_url($ep, PHP_URL_SCHEME) === 'https' ? 443 : 80),
+                $errno, $errstr, 6);
+            if ($abre) { fclose($abre); $agrega($r, 'El endpoint responde', true, 'contesta'); }
+            else {
+                $agrega($r, 'El endpoint responde', false,
+                    ($errstr ?: 'no contesta') . '. Por eso sale "Could not connect to host": '
+                    . 'el WSDL se lee pero las llamadas van a otra dirección que no abre.');
+            }
+        }
+
+        // 4 · Qué operaciones ofrece, y cuál sirve para qué.
+        $ops = $this->operacionesDelXml();
+        if ($ops['ok']) {
+            $n = $ops['operaciones'];
+            $agrega($r, 'Operaciones que ofrece', count($n) > 0,
+                $n ? implode(', ', $n) : 'ninguna');
+            foreach ([['saldo', ['Balance','Saldo','Funds']],
+                      ['validar número', ['Lookup','Validate','Inquiry','Consulta']],
+                      ['recargar', ['Submit','Topup','Recharge','Sale','Payment']]] as $par) {
+                $hay = null;
+                foreach ($n as $nom) { foreach ($par[1] as $pi)
+                    if (stripos($nom, $pi) !== false) { $hay = $nom; break 2; } }
+                $agrega($r, 'Operación de ' . $par[0], (bool)$hay,
+                    $hay ?: 'no se encontró: dime cuál de las de arriba es', false);
+            }
+        } else {
+            $agrega($r, 'Operaciones que ofrece', false, $ops['error']);
         }
         return $r;
     }
@@ -187,6 +224,71 @@ final class Emida
             'MerchantId'     => $this->cfg['merchant_id'] ?? '',
             'ClerkPassword'  => $this->cfg['clerk_password'] ?? ($this->cfg['clave'] ?? ''),
         ];
+    }
+
+    /**
+     * Descarga el WSDL como texto, con su autenticación.
+     *
+     * Se hace aparte de SoapClient a propósito: SoapClient falla con un
+     * mensaje único ("Could not connect to host") sin importar si el
+     * problema fue la descarga, el XML o el endpoint. Bajándolo a mano
+     * se puede decir exactamente cuál de los tres.
+     */
+    public function bajarWsdl()
+    {
+        $wsdl = trim((string)($this->cfg['wsdl'] ?? ''));
+        if ($wsdl === '') return ['ok' => false, 'error' => 'Sin dirección de WSDL'];
+
+        $http = ['timeout' => max(5, (int)($this->cfg['timeout'] ?? 30)),
+                 'user_agent' => 'LibertyFin/1.0', 'ignore_errors' => true];
+        $usr = (string)($this->cfg['usuario'] ?? '');
+        if ($usr !== '') {
+            $http['header'] = 'Authorization: Basic '
+                . base64_encode($usr . ':' . (string)($this->cfg['clave'] ?? ''));
+        }
+        $ctx = stream_context_create(['http' => $http,
+            'ssl' => ['verify_peer' => true, 'verify_peer_name' => true]]);
+
+        $xml = @file_get_contents($wsdl, false, $ctx);
+        if ($xml === false) {
+            $e = error_get_last();
+            return ['ok' => false, 'error' => 'No se pudo descargar: '
+                . ($e['message'] ?? 'sin detalle')];
+        }
+        if (stripos($xml, '<definitions') === false && stripos($xml, ':definitions') === false) {
+            return ['ok' => false,
+                    'error' => 'Lo que devolvió no es un WSDL. Primeros caracteres: '
+                             . mb_substr(strip_tags($xml), 0, 120)];
+        }
+        return ['ok' => true, 'xml' => $xml, 'bytes' => strlen($xml)];
+    }
+
+    /**
+     * A qué dirección se mandan las llamadas.
+     *
+     * NO es la misma que la del WSDL. El XML declara su propio endpoint
+     * en <soap:address>, y si ahí dice https o una IP distinta, las
+     * llamadas van a otro lado aunque el WSDL se haya leído bien. Ese es
+     * justo el caso de "se descargó el WSDL pero no conecta".
+     */
+    public function endpoint()
+    {
+        $d = $this->bajarWsdl();
+        if (!$d['ok']) return null;
+        if (preg_match('/<(?:\w+:)?address\s+location=["\']([^"\']+)["\']/i', $d['xml'], $m)) {
+            return $m[1];
+        }
+        return null;
+    }
+
+    /** Las operaciones, leídas del XML. No necesita conectar a nada. */
+    public function operacionesDelXml()
+    {
+        $d = $this->bajarWsdl();
+        if (!$d['ok']) return ['ok' => false, 'error' => $d['error']];
+        preg_match_all('/<(?:\w+:)?operation\s+name=["\']([^"\']+)["\']/i', $d['xml'], $m);
+        $nombres = array_values(array_unique($m[1] ?? []));
+        return ['ok' => true, 'operaciones' => $nombres];
     }
 
     /**
@@ -226,14 +328,24 @@ final class Emida
      */
     private function operacionQueSirvePara(array $pistas)
     {
-        $ops = $this->operaciones();
+        // Del XML, no de SoapClient: así se puede elegir la operación
+        // aunque el endpoint no responda, y el error queda en la llamada
+        // y no antes, donde no se entiende.
+        $ops = $this->operacionesDelXml();
         if (!$ops['ok']) return null;
-        foreach ($ops['operaciones'] as $nombre => $_) {
+        foreach ($ops['operaciones'] as $nombre) {
             foreach ($pistas as $p) {
                 if (stripos($nombre, $p) !== false) return $nombre;
             }
         }
         return null;
+    }
+
+    /** Los nombres disponibles, para decirlos en un mensaje de error. */
+    private function nombresDisponibles()
+    {
+        $o = $this->operacionesDelXml();
+        return $o['ok'] ? implode(', ', $o['operaciones']) : ('no se pudieron leer: ' . $o['error']);
     }
 
     /** El saldo disponible con el proveedor. */
@@ -242,10 +354,9 @@ final class Emida
         try {
             $op = $this->operacionQueSirvePara(['Balance', 'Saldo', 'Funds']);
             if (!$op) {
-                $ops = $this->operaciones();
                 return ['ok' => false, 'error' =>
                     'Este WSDL no tiene una operación de saldo. Las que ofrece son: '
-                    . implode(', ', array_keys($ops['operaciones'] ?? []))
+                    . $this->nombresDisponibles()
                     . '. Dime cuál corresponde y la conecto.'];
             }
             $r = $this->cliente()->__soapCall($op, [$this->base()]);
@@ -301,10 +412,9 @@ final class Emida
         try {
             $op = $this->operacionQueSirvePara(['Submit', 'Topup', 'Recharge', 'Sale', 'Payment']);
             if (!$op) {
-                $ops = $this->operaciones();
                 return ['ok' => false, 'error' =>
-                    'Este WSDL no tiene una operación de recarga reconocible. Ofrece: '
-                    . implode(', ', array_keys($ops['operaciones'] ?? []))
+                    'Este WSDL no tiene una operación de recarga. Las que ofrece son: '
+                    . $this->nombresDisponibles()
                     . '. Dime cuál es la de vender y la conecto.'];
             }
             $r = $this->cliente()->__soapCall($op, [array_merge($this->base(), [

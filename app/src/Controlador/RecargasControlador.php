@@ -46,7 +46,9 @@ final class RecargasControlador
     {
         if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
 
+        ob_start();
         $r = (new Emida(Integraciones::de('emida')))->saldo();
+        ob_end_clean();
         if (!$r['ok']) $this->volver($r['error'], 'error');
 
         $_SESSION['lf_saldo_emida'] = $r['saldo'];
@@ -62,7 +64,15 @@ final class RecargasControlador
     public function probar()
     {
         if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
-        $_SESSION['lf_prueba_emida'] = (new Emida(Integraciones::de('emida')))->probar();
+
+        // SOAP a veces escupe warnings directo a la salida, y cualquier
+        // byte impreso antes de header() rompe la redirección con
+        // "headers already sent". Se captura y se tira.
+        ob_start();
+        $r = (new Emida(Integraciones::de('emida')))->probar();
+        ob_end_clean();
+
+        $_SESSION['lf_prueba_emida'] = $r;
         $this->volver('Prueba terminada.', 'ok');
     }
 
@@ -84,7 +94,9 @@ final class RecargasControlador
         $api = new Emida(Integraciones::de('emida'));
 
         // 1 · Validar ANTES de cobrar nada.
+        ob_start();
         $v = $api->validar($numero, $producto);
+        ob_end_clean();
         if (!$v['ok']) {
             $this->volver('No se pudo validar el número: ' . $v['error'], 'error');
         }
@@ -93,7 +105,9 @@ final class RecargasControlador
         // el mismo, el proveedor devuelve 294 en vez de recargar dos veces.
         $salesId = date('YmdHis') . substr(bin2hex(random_bytes(3)), 0, 4);
 
+        ob_start();
         $r = $api->recargar($numero, $producto, $monto, $salesId);
+        ob_end_clean();
 
         if (!empty($r['incierta'])) {
             // El peor caso: no se sabe si salió. Nunca se reintenta solo.

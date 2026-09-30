@@ -102,15 +102,16 @@ $token = $_SESSION['lf_token'];
 
       <?php if ($prueba): ?>
         <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lf-linea)">
-          <?php foreach ($prueba as $x): list($que, $ok, $detalle) = $x; ?>
+          <?php foreach ($prueba as $x):
+            $col = $x['ok'] ? 'var(--lf-brand-2)'
+                 : (empty($x['bloquea']) ? 'var(--lf-amb)' : 'var(--lf-rojo)'); ?>
             <div style="display:flex;gap:10px;align-items:flex-start;padding:6px 0;font-size:12px">
-              <span style="flex-shrink:0;width:16px;text-align:center;
-                    color:<?= $ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)' ?>;font-weight:700">
-                <?= $ok ? '✓' : '×' ?></span>
+              <span style="flex-shrink:0;width:16px;text-align:center;color:<?= $col ?>;font-weight:700">
+                <?= $x['ok'] ? '✓' : (empty($x['bloquea']) ? '!' : '×') ?></span>
               <span style="flex:1;min-width:0">
-                <b style="font-weight:600;display:block"><?= P::e($que) ?></b>
-                <span style="color:var(--lf-tinta-4);font-size:11px;overflow-wrap:anywhere">
-                  <?= P::e($detalle) ?></span>
+                <b style="font-weight:600;display:block"><?= P::e($x['que']) ?></b>
+                <span style="color:var(--lf-tinta-4);font-size:11px;overflow-wrap:anywhere;
+                      line-height:1.45"><?= P::e($x['detalle']) ?></span>
               </span>
             </div>
           <?php endforeach; ?>
