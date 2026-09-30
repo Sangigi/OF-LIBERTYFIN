@@ -68,7 +68,7 @@ final class ClienteRepo extends Repo
                    COALESCE(SUM(pg.cobrado),0)             AS cobrado,
                    COALESCE(SUM(v.total - COALESCE(pg.cobrado,0)),0) AS saldo,
                    MAX(v.fecha)                            AS ultima,
-                   MAX(v.area_nombre)                      AS area
+                   COALESCE(MAX(c.area), MAX(v.area_nombre)) AS area
             FROM ventas v
             INNER JOIN clientes c ON c.id = v.cliente_id
             LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
@@ -170,26 +170,70 @@ final class ClienteRepo extends Repo
         }
 
         return [$nombre, $rfc ?: null, $email ?: null, $tel ?: null,
-                trim($d['direccion'] ?? '') ?: null];
+                trim($d['direccion'] ?? '') ?: null,
+                trim($d['area'] ?? '') ?: null];
+    }
+
+    /**
+     * ¿Existe la columna `area`? Se pregunta una vez y se recuerda.
+     *
+     * La agrega 12_area_cliente.sql. Mientras no se corra, el sistema
+     * funciona igual: simplemente no guarda el área. Preferible a
+     * reventar con "Unknown column" en una instalación sin migrar.
+     */
+    private function tieneArea()
+    {
+        static $tiene = null;
+        if ($tiene !== null) return $tiene;
+        try {
+            $tiene = (bool)$this->valor("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'clientes'
+                  AND COLUMN_NAME = 'area'");
+        } catch (\Throwable $e) { $tiene = false; }
+        return $tiene;
     }
 
     public function crear(array $d)
     {
-        list($nombre, $rfc, $email, $tel, $dir) = $this->limpiar($d);
-        $this->db->prepare("
-            INSERT INTO clientes (nombre, rfc, email, telefono, direccion, activo, fecha_creacion)
-            VALUES (?,?,?,?,?,1,NOW())
-        ")->execute([$nombre, $rfc, $email, $tel, $dir]);
+        list($nombre, $rfc, $email, $tel, $dir, $area) = $this->limpiar($d);
+        if ($this->tieneArea()) {
+            $this->db->prepare("
+                INSERT INTO clientes (nombre, rfc, area, email, telefono, direccion, activo, fecha_creacion)
+                VALUES (?,?,?,?,?,?,1,NOW())
+            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir]);
+        } else {
+            $this->db->prepare("
+                INSERT INTO clientes (nombre, rfc, email, telefono, direccion, activo, fecha_creacion)
+                VALUES (?,?,?,?,?,1,NOW())
+            ")->execute([$nombre, $rfc, $email, $tel, $dir]);
+        }
         return (int)$this->db->lastInsertId();
     }
 
     public function actualizar($id, array $d)
     {
-        list($nombre, $rfc, $email, $tel, $dir) = $this->limpiar($d, $id);
-        $this->db->prepare("
-            UPDATE clientes SET nombre = ?, rfc = ?, email = ?, telefono = ?, direccion = ?
-            WHERE id = ?
-        ")->execute([$nombre, $rfc, $email, $tel, $dir, (int)$id]);
+        list($nombre, $rfc, $email, $tel, $dir, $area) = $this->limpiar($d, $id);
+        if ($this->tieneArea()) {
+            $this->db->prepare("
+                UPDATE clientes SET nombre = ?, rfc = ?, area = ?, email = ?,
+                       telefono = ?, direccion = ? WHERE id = ?
+            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir, (int)$id]);
+        } else {
+            $this->db->prepare("
+                UPDATE clientes SET nombre = ?, rfc = ?, email = ?, telefono = ?, direccion = ?
+                WHERE id = ?
+            ")->execute([$nombre, $rfc, $email, $tel, $dir, (int)$id]);
+        }
         return (int)$id;
+    }
+
+    /** Las áreas que ya se usan, para sugerirlas en el formulario. */
+    public function areasUsadas()
+    {
+        $r = $this->todos("
+            SELECT DISTINCT area_nombre AS area FROM ventas
+            WHERE area_nombre IS NOT NULL AND area_nombre <> '' ORDER BY area_nombre");
+        return array_column($r, 'area');
     }
 }

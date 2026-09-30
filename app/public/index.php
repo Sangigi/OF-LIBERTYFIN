@@ -22,8 +22,17 @@ $cfg = is_readable($raiz . '/config/config.php')
 
 if (!empty($cfg['depurar'])) { ini_set('display_errors','1'); error_reporting(E_ALL); }
 
-Conexion::configurar($cfg['bd']);
+// ── Zona horaria ──
+// PHP y MySQL tienen que coincidir. Si no, date() arma el folio con la
+// hora de México y NOW() guarda UTC: seis horas de diferencia que, en
+// una venta de las 18:00 de fin de mes, la mandan al mes siguiente.
+// Pasó de verdad: INITME Solutions, 31 de agosto a las 18:09, quedó
+// registrada el 1 de septiembre.
+date_default_timezone_set($cfg['zona'] ?? 'America/Mexico_City');
+Conexion::configurar($cfg['bd'] + ['zona_sql' => $cfg['zona_sql'] ?? '-06:00']);
 Plantilla::base($raiz . '/src/Vista/plantillas');
+\LibertyFin\Servicio\Integraciones::cargar($raiz);
+\LibertyFin\Servicio\Archivos::destino($raiz . '/public/assets/subidas');
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
 
 // ── Cookie de sesión ──
@@ -49,6 +58,7 @@ $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/',        ['LibertyFin\Controlador\PanelControlador',  'index']);
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
+$r->get('/ventas/{id}/ticket',        ['LibertyFin\Controlador\VentasControlador', 'ticket']);
 $r->post('/ventas/{id}/pagar',        ['LibertyFin\Controlador\VentasControlador', 'pagar']);
 $r->post('/ventas/{id}/cancelar-pago',['LibertyFin\Controlador\VentasControlador', 'cancelarPago']);
 $r->post('/ventas/{id}/comision',        ['LibertyFin\Controlador\VentasControlador', 'asignarComision']);
@@ -59,13 +69,89 @@ $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
 $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador', 'index']);
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
 $r->get('/clientes',  ['LibertyFin\Controlador\ClientesControlador',  'index']);
+$r->get('/cobranza',  ['LibertyFin\Controlador\CobranzaControlador',  'index']);
+$r->get('/gastos',          ['LibertyFin\Controlador\GastosControlador', 'index']);
+$r->post('/gastos/guardar', ['LibertyFin\Controlador\GastosControlador', 'guardar']);
+$r->post('/gastos/borrar',  ['LibertyFin\Controlador\GastosControlador', 'borrar']);
+$r->post('/gastos/proveedor',          ['LibertyFin\Controlador\GastosControlador', 'guardarProveedor']);
+$r->post('/gastos/proveedor/alternar', ['LibertyFin\Controlador\GastosControlador', 'alternarProveedor']);
 $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
 $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  'guardar']);
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
+$r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
+// Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
+if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
+    $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
+    $r->post('/recargas/consultar',['LibertyFin\Controlador\RecargasControlador', 'consultar']);
+    $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
+}
+$r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
+$r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
+$r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
+$r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
+$r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
+$r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
+$r->get('/usuarios',             ['LibertyFin\Controlador\UsuariosControlador', 'index']);
+$r->post('/usuarios/guardar',    ['LibertyFin\Controlador\UsuariosControlador', 'guardar']);
+$r->post('/usuarios/restablecer',['LibertyFin\Controlador\UsuariosControlador', 'restablecer']);
+$r->post('/usuarios/alternar',   ['LibertyFin\Controlador\UsuariosControlador', 'alternar']);
+$r->get('/cuenta',               ['LibertyFin\Controlador\UsuariosControlador', 'miCuenta']);
+$r->post('/cuenta/clave',        ['LibertyFin\Controlador\UsuariosControlador', 'cambiarClave']);
+$r->post('/cuenta/foto',         ['LibertyFin\Controlador\UsuariosControlador', 'guardarFoto']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
+
+// ── Qué permiso pide cada ruta ──
+// El router ya no solo dice si la ruta existe: dice quién puede entrar.
+// Esconder el enlace del menú es cortesía; esto es la puerta.
+$permisos = [
+  '/'                       => 'ver.panel',
+  '/ventas'                 => 'ver.ventas',
+  '/ventas/{id}'            => 'ver.ventas',
+  '/ventas/{id}/ticket'     => 'ver.ventas',
+  '/ventas/{id}/pagar'      => 'abonar',
+  '/ventas/{id}/cancelar-pago' => 'cancelar.pago',
+  '/ventas/{id}/comision'   => 'asignar.comision',
+  '/ventas/{id}/quitar-comision' => 'quitar.comision',
+  '/caja'                   => 'cobrar',
+  '/caja/clientes'          => 'cobrar',
+  '/caja/cobrar'            => 'cobrar',
+  '/cobranza'               => 'ver.cobranza',
+  '/corte'                  => 'ver.corte',
+  '/corte/abrir'            => 'abrir.caja',
+  '/corte/cerrar'           => 'cerrar.caja',
+  '/clientes'               => 'ver.clientes',
+  '/clientes/guardar'       => 'editar.clientes',
+  '/comisiones'             => 'ver.comisiones',
+  '/comisiones/reasignar'   => 'asignar.comision',
+  '/gastos'                 => 'ver.gastos',
+  '/gastos/guardar'         => 'editar.gastos',
+  '/gastos/borrar'          => 'borrar.gastos',
+  '/gastos/proveedor'       => 'editar.gastos',
+  '/gastos/proveedor/alternar' => 'editar.gastos',
+  '/servicios'              => 'ver.servicios',
+  '/servicios/guardar'      => 'editar.servicios',
+  '/servicios/alternar'     => 'editar.servicios',
+  '/reportes'               => 'ver.reportes',
+  '/reportes/csv'           => 'ver.reportes',
+  '/ajustes'                => 'ver.ajustes',
+  '/ajustes/guardar'        => 'editar.ajustes',
+  '/ajustes/alternar'       => 'editar.ajustes',
+  '/usuarios'               => 'ver.usuarios',
+  '/usuarios/guardar'       => 'editar.usuarios',
+  '/usuarios/restablecer'   => 'editar.usuarios',
+  '/usuarios/alternar'      => 'editar.usuarios',
+  '/recargas'               => 'ver.recargas',
+  '/recargas/consultar'     => 'ver.recargas',
+  '/recargas/vender'        => 'vender.recarga',
+  '/mantenimiento'          => 'ver.mantenimiento',
+  '/mantenimiento/secciones'=> 'secciones',
+  '/mantenimiento/migrar'   => 'secciones',
+  // /cuenta no lleva permiso: cualquiera administra su propia clave.
+];
 
 $publicas = ['/login', '/salir'];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
@@ -77,6 +163,20 @@ if (!in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
 }
 
 $hallazgo = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
+
+// ── El permiso, antes de ejecutar nada ──
+if ($hallazgo !== null && !in_array($ruta, $publicas, true)) {
+    $patron = $hallazgo['patron'] ?? $ruta;
+    $necesita = $permisos[$patron] ?? null;
+    if ($necesita !== null && !\LibertyFin\Dominio\Permisos::puede($necesita)) {
+        http_response_code(403);
+        Plantilla::pagina('errores/403', [
+            'titulo' => 'Sin permiso', 'icono' => 'alerta', 'subtitulo' => '',
+            'permiso' => $necesita,
+        ]);
+        exit;
+    }
+}
 
 if ($hallazgo === null) {
     http_response_code(404);

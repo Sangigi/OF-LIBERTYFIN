@@ -32,6 +32,14 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 </div>
 <?php endif; ?>
 
+<div style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
+  <a class="btn btn-secondary btn-sm" href="/ventas/<?= (int)$v['id'] ?>/ticket" target="_blank">
+    <?= W::icono('venta','15px') ?>Ver ticket</a>
+  <a class="btn btn-secondary btn-sm" href="/ventas/<?= (int)$v['id'] ?>/ticket?auto=1" target="_blank">
+    <?= W::icono('baja','15px') ?>Imprimir</a>
+  <a class="btn btn-secondary btn-sm" href="/ventas">Volver al listado</a>
+</div>
+
 <div class="lf-stats">
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>

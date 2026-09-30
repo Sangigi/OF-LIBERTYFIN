@@ -37,7 +37,7 @@ final class PanelControlador
             'saludo'    => self::saludo(),
             'resumen'   => $resumen,
             'avance'    => Dinero::pct($cobrado, $vendido),
-            'salud'     => self::salud($cobrado, $vendido, $viejo),
+            'alCorriente' => self::alCorriente($cobrado, $vendido, $viejo),
             'sintesis'  => self::sintesis($cobrado, $vendido, $resumen, $viejo),
             'meses'     => $meses,
             'hoy'       => $hoy,
@@ -51,13 +51,19 @@ final class PanelControlador
     }
 
     /**
-     * Puntaje de salud de la cobranza, 0 a 100.
+     * Qué tan al corriente está la cobranza, de 0 a 100.
      *
-     * Dos cosas, no una: qué tanto se ha cobrado, y qué tan rancio está
-     * lo que falta. Una empresa al 70% cobrado con todo fresco está mejor
-     * que otra al 85% con la mitad parada hace tres meses.
+     * Antes se llamaba "salud" y nadie entendía qué medía. Es esto:
+     * el porcentaje cobrado, castigado por la parte del saldo que lleva
+     * más de 30 días sin un abono.
+     *
+     *     al_corriente = %cobrado x (1 - rancio x 0.35)
+     *
+     * Dos empresas al 70% cobrado no están igual: si a una el saldo se le
+     * está añejando y a la otra no, la primera está peor. El 0.35 es una
+     * decisión, no una verdad: castiga el saldo viejo sin que domine.
      */
-    private static function salud($cobrado, $vendido, array $viejo)
+    private static function alCorriente($cobrado, $vendido, array $viejo)
     {
         if ($vendido <= 0) return 0;
         $pctCobrado = min(100, ($cobrado / $vendido) * 100);

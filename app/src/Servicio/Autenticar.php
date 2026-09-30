@@ -2,6 +2,7 @@
 namespace LibertyFin\Servicio;
 
 use LibertyFin\Datos\AutenticacionRepo;
+use LibertyFin\Servicio\Migraciones;
 use PDO;
 
 /**
@@ -99,6 +100,32 @@ final class Autenticar
             'sucursal_id'      => $usuario['sucursal_id'] ? (int)$usuario['sucursal_id'] : null,
             'sucursal_nombre'  => $sucursal['nombre'] ?? 'Matriz',
         ];
+
+        // La personalización se lee una vez al entrar y vive en la sesión:
+        // el armazón la pinta en cada página y consultarla cada vez sería
+        // una consulta más por petición para un dato que casi nunca cambia.
+        try {
+            $db = \LibertyFin\Datos\Conexion::de($empresa['nombre_base_datos']);
+
+            // La base se pone al día sola al entrar.
+            //
+            // LibertyFin crea una base por empresa, y el esquema vive como
+            // CREATE TABLE dentro de registroEmpresa.php. Sin esto, una
+            // empresa creada hoy nace sin las columnas que agregó la última
+            // versión, y falla con un error que ninguna otra empresa tiene.
+            //
+            // En una base al día cuesta una consulta.
+            if (!Migraciones::alDia($db)) Migraciones::aplicar($db);
+
+            $cfg = new \LibertyFin\Datos\ConfigRepo($db);
+            $color = (string)$cfg->valorDe('marca.color', '');
+            if (preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $_SESSION['lf_marca_color'] = $color;
+            $logo = (string)$cfg->valorDe('marca.logo', '');
+            if ($logo) $_SESSION['lf_marca_logo'] = $logo;
+            $foto = (new \LibertyFin\Datos\UsuarioRepo($db))->foto($usuario['id']);
+            if ($foto) $_SESSION['lf_foto'] = $foto;
+        } catch (\Throwable $e) { /* sin personalización se ve el tema base */ }
+
         return $_SESSION;
     }
 

@@ -10,51 +10,78 @@ $token = $_SESSION['lf_token'];
   </div>
 
   <?php if ($error): ?>
-    <div class="alert alert-danger" style="margin-bottom:16px">
-      <?= W::icono('alerta','18px') ?><span><?= P::e($error) ?></span>
-    </div>
+    <div class="lf-aviso err"><?= W::icono('alerta','17px') ?><span><?= P::e($error) ?></span></div>
   <?php endif; ?>
 
   <?php if ($bloqueo > 0): ?>
-    <div class="alert alert-warning" style="margin-bottom:16px">
-      <?= W::icono('reloj','18px') ?>
-      <span>Demasiados intentos. Vuelve a probar en <?= ceil($bloqueo / 60) ?> minutos.</span>
-    </div>
+    <div class="lf-aviso amb"><?= W::icono('reloj','17px') ?>
+      <span>Demasiados intentos. Vuelve a probar en <?= ceil($bloqueo / 60) ?> minutos.</span></div>
   <?php endif; ?>
 
-  <form method="post" action="/login" autocomplete="on">
+  <form method="post" action="/login" autocomplete="on" class="lf-acceso-form">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
 
-    <label class="form-label" for="usuario">Usuario o correo</label>
-    <input class="form-control" type="text" id="usuario" name="usuario"
-           value="<?= P::e($usuario) ?>" autocomplete="username"
-           <?= $bloqueo > 0 ? 'disabled' : 'autofocus' ?> required>
-
-    <label class="form-label" for="clave" style="margin-top:14px">Contraseña</label>
-    <div style="position:relative">
-      <input class="form-control" type="password" id="clave" name="clave"
-             autocomplete="current-password" style="padding-right:46px"
-             <?= $bloqueo > 0 ? 'disabled' : '' ?> required>
-      <button type="button" class="lf-ojo" id="ojo" aria-label="Mostrar contraseña">Ver</button>
+    <div class="campo">
+      <label for="usuario">Usuario o correo</label>
+      <input type="text" id="usuario" name="usuario" value="<?= P::e($usuario) ?>"
+             autocomplete="username" autocapitalize="none" spellcheck="false"
+             <?= $bloqueo > 0 ? 'disabled' : 'autofocus' ?> required>
     </div>
 
-    <button class="btn btn-primary" type="submit" style="width:100%;margin-top:20px;padding:13px"
-            <?= $bloqueo > 0 ? 'disabled' : '' ?>>Entrar</button>
+    <div class="campo">
+      <label for="clave">Contraseña</label>
+      <div class="con-ojo">
+        <input type="password" id="clave" name="clave" autocomplete="current-password"
+               <?= $bloqueo > 0 ? 'disabled' : '' ?> required>
+        <button type="button" id="ojo" aria-label="Mostrar contraseña" title="Mostrar">
+          <?= W::icono('buscar','15px') ?>
+        </button>
+      </div>
+    </div>
+
+    <button class="lf-entrar" type="submit" id="btnEntrar" <?= $bloqueo > 0 ? 'disabled' : '' ?>>
+      <span class="txt">Entrar</span>
+      <span class="giro" aria-hidden="true"></span>
+    </button>
   </form>
 
   <p class="lf-acceso-pie">
-    Si olvidaste tu contraseña, pídele a un administrador que te la restablezca.
+    ¿Olvidaste tu contraseña? Pídele a un administrador que te la restablezca.
   </p>
 </main>
 
 <script>
+(function(){
+  // Al enviar, el botón pasa a girar. El ingreso hace varias consultas
+  // y espera 350 ms a propósito para que un usuario que no existe tarde
+  // lo mismo que uno que sí: sin señal visible, ese silencio se siente
+  // como que el clic no funcionó y la gente vuelve a picarle.
+  var f = document.querySelector('.lf-acceso-form'), b = document.getElementById('btnEntrar');
+  if (f && b) f.addEventListener('submit', function(){
+    if (!f.checkValidity || f.checkValidity()) {
+      b.classList.add('cargando');
+      b.disabled = true;
+      // Si el navegador vuelve atrás con la página en caché, el botón
+      // seguiría girando para siempre.
+      setTimeout(function(){ b.classList.remove('cargando'); b.disabled = false; }, 12000);
+    }
+  });
+})();
+
+window.addEventListener('pageshow', function(e){
+  if (!e.persisted) return;
+  var b = document.getElementById('btnEntrar');
+  if (b) { b.classList.remove('cargando'); b.disabled = false; }
+});
+
 (function(){
   var o = document.getElementById('ojo'), c = document.getElementById('clave');
   if (!o || !c) return;
   o.addEventListener('click', function(){
     var ver = c.type === 'password';
     c.type = ver ? 'text' : 'password';
-    o.textContent = ver ? 'Ocultar' : 'Ver';
+    o.classList.toggle('on', ver);
+    o.setAttribute('aria-label', ver ? 'Ocultar contraseña' : 'Mostrar contraseña');
     c.focus();
   });
 })();

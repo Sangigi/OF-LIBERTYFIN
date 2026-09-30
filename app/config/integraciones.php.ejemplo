@@ -1,0 +1,118 @@
+<?php
+/**
+ * INTEGRACIONES · credenciales de servicios externos
+ *
+ * Copiar como config/integraciones.php y llenar lo que se use.
+ * Este archivo NUNCA va al repositorio: agrégalo al .gitignore.
+ *
+ * ──────────────────────────────────────────────────────────────────
+ * POR QUÉ ESTE ARCHIVO EXISTE
+ *
+ * En el sistema anterior las credenciales de Emida estaban escritas
+ * dentro de EmidaServicios/inicio.php:
+ *
+ *     $username = "juanc141_alexis";
+ *     $password = "•••••••";
+ *
+ * Un archivo de código con contraseñas dentro termina en el
+ * repositorio, en el respaldo y en el correo de quien lo compartió.
+ * Aquí viven fuera de public/ y fuera de git.
+ *
+ * ──────────────────────────────────────────────────────────────────
+ * CÓMO FUNCIONA
+ *
+ * Una integración sin credenciales queda APAGADA: su sección no
+ * aparece en el menú y sus rutas responden 404. No hay que desactivar
+ * nada a mano — basta con no llenarla.
+ *
+ * Así una empresa que vende servicios legales no ve "Recargas" en su
+ * menú, y una tienda que sí las vende solo tiene que llenar su bloque.
+ * ──────────────────────────────────────────────────────────────────
+ */
+return [
+
+    // ── Recargas telefónicas ────────────────────────────────────
+    // Tiempo aire y pago de servicios. Proveedor: Emida.
+    // OJO: el sistema anterior llama a estos proxies por HTTP sin
+    // cifrar. Si se reactiva, que sea sobre HTTPS.
+    'emida' => [
+        'activo'          => false,
+        'usuario'         => '',   // EMIDA_USERNAME
+        'clave'           => '',   // EMIDA_PASSWORD
+        'merchant_id'     => '',   // EMIDA_MERCHANT_ID · identifica al comercio
+        'clerk_password'  => '',   // EMIDA_CLERK_PASSWORD · identifica la terminal
+        // La integración es SOAP: se conecta al WSDL, no a una URL REST.
+        // El sistema anterior apunta a http://104.248.179.142/webServices.wsdl
+        // SIN cifrar. Pídele a Emida la dirección con HTTPS.
+        'wsdl'            => '',
+        'timeout'         => 30,
+        'sandbox'         => true,
+    ],
+
+    // ── Facturación CFDI ────────────────────────────────────────
+    'facturapi' => [
+        'activo'         => false,
+        'llave'          => '',   // FACTURAPI_API_KEY
+        'llave_prueba'   => '',   // FACTURAPI_API_TEST_KEY
+        'organizacion'   => '',   // FACTURAPI_..._ORGANIZATION_ID
+        'sandbox'        => true,
+    ],
+
+    // ── Ligas de pago por transferencia ─────────────────────────
+    'spei' => [
+        'activo'         => false,
+        'usuario'        => '',
+        'clave'          => '',
+        'usuario_prueba' => '',
+        'clave_prueba'   => '',
+        'integracion_id' => '',
+        'negocio_id'     => '',
+        'url'            => '',
+        'url_sandbox'    => '',
+        'dias_vigencia'  => 3,
+        'timeout'        => 30,
+        'sandbox'        => true,
+    ],
+
+    // ── Cargos recurrentes ──────────────────────────────────────
+    'domiciliacion' => [
+        'activo'         => false,
+        'usuario'        => '',
+        'clave'          => '',
+        'integracion_id' => '',
+        'negocio_id'     => '',
+        'url_liga'       => '',
+        'url_pagar'      => '',
+        'url_cancelar'   => '',
+        'sandbox'        => true,
+    ],
+
+    // ── PayPal ──────────────────────────────────────────────────
+    'paypal' => [
+        'activo'   => false,
+        'cliente'  => '',
+        'secreto'  => '',
+        'webhook'  => '',
+        'sandbox'  => true,
+    ],
+
+    // ── Correo saliente ─────────────────────────────────────────
+    'smtp' => [
+        'activo'  => false,
+        'host'    => '',
+        'usuario' => '',
+        'clave'   => '',
+        'puerto'  => 587,
+        'desde'   => '',
+        'nombre'  => '',
+    ],
+
+    // ── cPanel · crear bases de empresas nuevas ─────────────────
+    // Solo lo usa la capa de plataforma, no una empresa.
+    'cpanel' => [
+        'activo'  => false,
+        'host'    => '',
+        'usuario' => '',
+        'token'   => '',
+    ],
+];

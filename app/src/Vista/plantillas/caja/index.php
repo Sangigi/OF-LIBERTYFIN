@@ -17,14 +17,19 @@ $token = $_SESSION['lf_token'];
   <section class="card">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
       <span>Servicios</span>
-      <form class="lf-search" method="get" style="max-width:260px">
+      <div class="lf-pag-serv" id="pagServ" hidden>
+        <button type="button" id="servAnt" aria-label="Anterior">&lsaquo;</button>
+        <span><b id="servPag">1</b> de <b id="servTot">1</b></span>
+        <button type="button" id="servSig" aria-label="Siguiente">&rsaquo;</button>
+      </div>
+      <form class="lf-search" method="get" style="max-width:240px">
         <?= W::icono('buscar','15px') ?>
         <input type="search" name="q" value="<?= P::e($buscar) ?>" placeholder="Nombre o código">
         <?php if ($area): ?><input type="hidden" name="area" value="<?= P::e($area) ?>"><?php endif; ?>
       </form>
     </header>
 
-    <div style="padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap">
+    <div class="lf-cat-fila">
       <a class="lf-pill <?= $area === '' ? 'active' : '' ?>" href="/caja<?= $buscar ? '?q='.urlencode($buscar) : '' ?>">Todos</a>
       <?php foreach ($areas as $a): ?>
         <a class="lf-pill <?= (string)$area === (string)$a['id'] ? 'active' : '' ?>"
@@ -39,14 +44,16 @@ $token = $_SESSION['lf_token'];
           No hay servicios que coincidan.</p>
       <?php endif; ?>
       <?php foreach ($servicios as $s): ?>
-        <button type="button" class="lf-serv"
+        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
                 data-precio="<?= (float)$s['precio'] ?>">
-          <span class="e"><?= W::icono('serv','17px') ?></span>
+          <span class="e"<?= !empty($s['imagen'])
+              ? ' style="background-image:url(\''.P::e($s['imagen']).'\');background-size:cover"' : '' ?>>
+            <?= !empty($s['imagen']) ? '' : W::icono('serv','17px') ?></span>
           <b><?= P::e($s['nombre']) ?></b>
           <small><?= P::e($s['codigo']) ?></small>
-          <span class="p"><?= D::corto($s['precio']) ?></span>
+          <span class="p"><?= (float)$s['precio'] > 0 ? D::pesos($s['precio']) : 'Precio libre' ?></span>
         </button>
       <?php endforeach; ?>
     </div>
@@ -107,12 +114,13 @@ $token = $_SESSION['lf_token'];
     </div>
 
     <div style="padding:0 20px 14px">
-      <input class="form-control form-control-sm" type="text" name="descripcion"
-             placeholder="Descripción de la venta (opcional)">
+      <label class="form-label">Descripción de la venta</label>
+      <textarea class="form-control lf-desc" name="descripcion" rows="3"
+                placeholder="Qué se vendió, condiciones, referencias… (opcional)"></textarea>
     </div>
 
     <button class="btn btn-primary" type="submit" id="btnCobrar" disabled
-            style="display:block;width:calc(100% - 40px);margin:0 20px 20px;padding:13px">
+            style="width:calc(100% - 40px);margin:0 20px 20px;padding:14px">
       <?= W::icono('cobro','16px') ?><span id="btnTexto">Cobrar</span>
     </button>
   </form>
@@ -130,16 +138,19 @@ $token = $_SESSION['lf_token'];
     lineas.forEach(function(l, i){
       var d = document.createElement('div');
       d.className = 'lf-linea';
+      // El precio es editable: muchos servicios se cotizan por caso y el
+      // catálogo los tiene en cero a propósito.
       d.innerHTML = '<div style="flex:1;min-width:0"><b>' + l.nombre + '</b>'
-        + '<small>' + l.cantidad + ' x ' + pesos(l.precio) + '</small></div>'
-        + '<span class="lf-mono" style="font-weight:700">' + pesos(l.precio*l.cantidad) + '</span>'
+        + '<small>cantidad ' + l.cantidad + '</small></div>'
+        + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
+        +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
         + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>';
       lista.appendChild(d);
     });
     $('vacio').hidden = lineas.length > 0;
     $('conteo').textContent = lineas.length + ' concepto' + (lineas.length===1?'':'s');
     $('lineas').value = JSON.stringify(lineas.map(function(l){
-      return {id:l.id, cantidad:l.cantidad}; }));
+      return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
     calcular();
   }
 
@@ -164,6 +175,31 @@ $token = $_SESSION['lf_token'];
     $('btnCobrar').disabled = lineas.length === 0;
   }
 
+  // Paginación de la rejilla: 21 por página, sin recargar. Con el catálogo
+  // completo a la vista la columna crece tanto que el ticket queda perdido
+  // al fondo de la pantalla.
+  (function(){
+    var POR_PAG = 21;
+    var tarjetas = Array.prototype.slice.call(document.querySelectorAll('.lf-serv'));
+    var totalPag = Math.ceil(tarjetas.length / POR_PAG) || 1;
+    var actual = 1;
+    var caja = $('pagServ');
+    if (totalPag <= 1) { if (caja) caja.hidden = true; return; }
+    caja.hidden = false;
+    $('servTot').textContent = totalPag;
+    function pinta(){
+      tarjetas.forEach(function(t, i){
+        t.style.display = (i >= (actual-1)*POR_PAG && i < actual*POR_PAG) ? '' : 'none';
+      });
+      $('servPag').textContent = actual;
+      $('servAnt').disabled = actual === 1;
+      $('servSig').disabled = actual === totalPag;
+    }
+    $('servAnt').addEventListener('click', function(){ if (actual>1){ actual--; pinta(); } });
+    $('servSig').addEventListener('click', function(){ if (actual<totalPag){ actual++; pinta(); } });
+    pinta();
+  })();
+
   document.querySelectorAll('.lf-serv').forEach(function(b){
     b.addEventListener('click', function(){
       var id = +b.dataset.id;
@@ -179,6 +215,14 @@ $token = $_SESSION['lf_token'];
     if (!b) return;
     lineas.splice(+b.dataset.i, 1);
     pintar();
+  });
+
+  // Cambiar el precio no repinta la lista: perdería el foco a media escritura.
+  $('lista').addEventListener('input', function(e){
+    var i = e.target.closest('.lf-precio');
+    if (!i) return;
+    lineas[+i.dataset.i].precio = Math.max(0, parseFloat(i.value) || 0);
+    calcular();
   });
 
   ['ivaPct','anticipo','gastos'].forEach(function(id){

@@ -55,8 +55,15 @@ final class CajaControlador
             $this->volver('El ticket está vacío.', 'error');
         }
 
-        // Los precios NO se toman del formulario: se releen de la base.
-        // Si vinieran del navegador, cualquiera podría cobrarse lo que quisiera.
+        // El precio SÍ puede venir del formulario: estos servicios se cotizan
+        // por caso y el catálogo tiene varios en cero a propósito.
+        //
+        // Lo que se relee de la base es el NOMBRE y el COSTO, y se valida que
+        // el producto exista y esté activo. El precio se acepta, se limpia y
+        // queda registrado en venta_detalles junto con el usuario que lo
+        // capturó: aquí el control es el rastro, no el candado.
+        //
+        // Si el formulario no manda precio, se usa el del catálogo.
         $ids = array_map(function ($l) { return (int)($l['id'] ?? 0); }, $lineas);
         $ids = array_values(array_filter(array_unique($ids)));
         if (!$ids) $this->volver('El ticket está vacío.', 'error');
@@ -79,8 +86,19 @@ final class CajaControlador
             $id = (int)($l['id'] ?? 0);
             if (!isset($reales[$id])) continue;
             $p = $reales[$id];
-            $ticket->agregar($id, $p['nombre'], $p['precio'],
+
+            $precio = isset($l['precio']) ? round((float)$l['precio'], 2) : (float)$p['precio'];
+            if ($precio < 0) $precio = 0;
+            if ($precio > 9999999) {
+                $this->volver('Ese precio no parece correcto. Revísalo.', 'error');
+            }
+            $ticket->agregar($id, $p['nombre'], $precio,
                 max(1, (float)($l['cantidad'] ?? 1)), 0, $p['costo'] ?? 0);
+        }
+
+        // Un ticket entero en cero casi siempre es un dedazo, no una cortesía.
+        if ($ticket->subtotalCapturado() <= 0) {
+            $this->volver('El ticket suma cero. Pon el precio de cada servicio antes de cobrar.', 'error');
         }
         $ticket->gastosOperacion((float)($_POST['gastos'] ?? 0));
 

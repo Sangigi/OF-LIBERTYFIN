@@ -32,6 +32,8 @@ final class ComisionesControlador
             'resumen'    => $repo->resumen($desde, $hasta),
             'equipo'     => $repo->porColaborador($desde, $hasta),
             'areas'      => $repo->porArea($desde, $hasta),
+            'liberacion' => $repo->liberacion($desde, $hasta),
+            'atadas'     => $repo->atadas($desde, $hasta, 5),
             'sin_dueno'  => $sinDueno,
             'candidatos' => $candidatos,
             'desde'      => $desde,

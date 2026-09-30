@@ -69,6 +69,13 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/ventas/{id}` detalle | listo |
 | `/login` | listo |
 | `/corte` corte de caja | listo |
+| `/cobranza` | listo |
+| `/gastos` | listo |
+| `/reportes` | listo |
+| `/ajustes` | listo · admin y soporte |
+| `/mantenimiento` | listo · solo soporte |
+| `/usuarios` | listo · pestaña de Ajustes |
+| `/cuenta` | listo |
 
 ## Notas del esquema
 
@@ -155,9 +162,385 @@ a un producto que ya no existe.
 Las validaciones baratas van antes de consultar la base: no tiene sentido ir a
 buscar códigos duplicados para terminar rechazando un precio en cero.
 
-## Lo que falta
+## Usuarios y contraseñas
 
-- Restablecer contraseña
+**La contraseña nunca sale del repositorio.** Ningún método la devuelve,
+ninguna vista la recibe. Lo único que existe es cambiarla, y siempre pasa por
+`password_hash()` con bcrypt.
+
+**Dos caminos distintos, a propósito:**
+
+- Un administrador **restablece** la de otro sin pedir la anterior: es para
+  cuando alguien la olvidó.
+- Cada quien **cambia la suya** desde `/cuenta`, y ahí sí hay que saber la
+  actual. Al cambiarla se cierra la sesión: si alguien la cambió porque
+  sospecha que se la sabían, dejar la sesión viva no serviría de nada.
+
+**Las reglas son ocho caracteres y que no sea el nombre de usuario.**
+Deliberadamente NO se exige mayúscula, número y símbolo. Esa regla produce
+`Empresa2026!` pegado en un post-it, que es peor que una frase larga que la
+persona sí recuerda.
+
+**Un usuario no se borra, se desactiva.** Las ventas apuntan a quien las hizo;
+borrarlo sería perder el rastro de quién cobró. Y no se puede desactivar al
+único administrador activo: nadie podría volver a entrar a configurar.
+
+Al dar de alta, la contraseña se escribe en claro a propósito: la pone el
+administrador y se la dice a la persona. Después nadie puede volver a verla,
+ni él.
+
+## Cobranza
+
+Contesta "a quién le hablo hoy", no "cuánto me deben". Por eso ordena por
+antigüedad del último abono y no por monto: $18,000 parados dos meses son peor
+noticia que $30,000 que abonaron ayer.
+
+**Los días se cuentan desde el último abono, no desde la venta.** Una venta de
+hace seis meses con un abono ayer está al corriente; una de hace dos meses sin
+tocar, no.
+
+Las cuatro tarjetas de arriba son filtros: tocas "Más de 60 días" y la lista se
+reduce a eso. Y hay dos vistas: por venta, para cobrar; por cliente, para
+sentarse a negociar con alguien que debe varias.
+
+## Gastos
+
+Dos clases que NO se mezclan:
+
+- **De operación** · cuelgan de una venta y se restan de la utilidad antes de
+  comisionar. Se capturan en Caja o en el detalle de la venta.
+- **Generales** · renta, nómina, servicios. No pertenecen a ninguna venta y no
+  tocan comisiones. Son los de esta pantalla.
+
+Confundirlos repetiría un error que ya costó caro: un gasto general restado a
+una venta le baja la comisión a alguien sin razón. Por eso la pantalla muestra
+los dos totales por separado y nunca los suma en la misma cifra.
+
+Solo se pueden borrar los generales. Uno de operación cambia la base de comisión
+de su venta, y eso se toca desde el detalle de esa venta.
+
+## La arquitectura no copia la del sistema anterior
+
+El sistema viejo tenía 37 pantallas porque creció sobre la marcha: cada cosa
+nueva era un archivo nuevo. Aquí se agrupa por lo que la gente hace, no por
+cómo se fue construyendo.
+
+| Sección | Absorbe del sistema anterior |
+|---|---|
+| Panel | dashboard |
+| Caja | caja, checkout |
+| Ventas | ventas_lista, detalle, ticket (botón, no pantalla) |
+| Cobranza | cuentas_por_cobrar |
+| Corte de caja | caja_apertura, caja_cierre, caja_historial, caja_resumen |
+| Clientes | clientes, facturar_cliente |
+| Comisiones | recalcular_comisiones |
+| Gastos | gastos |
+| Servicios | productos, promociones |
+| Reportes | reportes |
+| **Ajustes** | **configuracion, sucursales, comisiones_config, categorias, usuarios** |
+
+**Ajustes** son cuatro pestañas que en el viejo eran cuatro pantallas de entre
+700 y 1,500 líneas. Son tablas chicas que se tocan una vez al mes y siempre
+juntas: darle pantalla completa a cada una solo obliga a navegar de más.
+
+## Reportes
+
+Contesta la pregunta que el sistema anterior no podía: **cuánto queda de
+verdad.**
+
+    Cobrado
+      − gastos de operación
+      − gastos generales
+      − comisiones devengadas
+    = queda
+
+Parte del **cobrado**, no de lo facturado. Lo facturado y el saldo pendiente
+aparecen abajo, en una nota aparte, con el porqué escrito: sumar lo facturado
+como ingreso fue lo que hacía que el sistema mostrara $558,057.60 cuando lo
+real eran $289,468.05.
+
+Y el IVA se señala aparte cuando lo hay: no es ingreso, es del SAT.
+
+**Los criterios de fecha no son iguales para todo, a propósito:**
+
+| Concepto | Se mide por |
+|---|---|
+| Cobrado | `venta_pagos.fecha_pago` — cuándo entró el dinero |
+| Gastos de operación | `ventas.fecha` — cuelgan de su venta |
+| Gastos generales | `gastos.fecha` — cuándo se pagó |
+| Comisiones | `ventas.fecha` — a qué venta pertenecen |
+
+El margen por área es la cifra más útil de la pantalla: un área con mucho
+cobrado y margen bajo está trabajando para pagar comisiones.
+
+**El CSV sale con BOM y punto y coma.** Sin eso, Excel en español abre el
+archivo con todo en una columna y rompe los acentos. Es un detalle tonto que
+hace la diferencia entre un reporte que se usa y uno que no.
+
+## Ticket
+
+Vive en `/ventas/{id}/ticket` y trae su propio CSS: es la única pantalla que se
+imprime, y cargar la hoja completa para tacharla al imprimir no tiene sentido.
+Ancho de 80 mm, el de las térmicas.
+
+Con `?auto=1` se manda a imprimir solo, para encadenarlo después de cobrar.
+
+## Historial de cortes
+
+Pestaña de Corte de caja. Cuenta cuántos cuadraron y acumula sobrantes y
+faltantes por separado, que es lo que revela si alguien se está equivocando
+siempre para el mismo lado.
+
+La columna "cobrado" incluye transferencias y tarjeta; la de "contado" es solo
+efectivo. Por eso casi nunca coinciden, y no tienen por qué.
+
+## Datos de la empresa
+
+Pestaña de Ajustes. Solo se editan contacto y datos fiscales, con lista blanca
+de campos: el plan, el nombre de la base y sus credenciales NO se tocan desde
+aquí. Cambiarlos dejaría a la empresa sin poder entrar, y eso es trabajo de
+quien administra la plataforma.
+
+## Zona horaria
+
+**PHP y MySQL tienen que estar en la misma zona.** `public/index.php` fija la de
+PHP y `Conexion` la de cada sesión de MySQL, con los valores de
+`config/config.php`.
+
+Si no coinciden, `date()` arma el folio con la hora de México y `NOW()` guarda
+UTC: seis horas de diferencia. Casi siempre da igual, pero una venta de las
+18:00 del último día del mes queda registrada en el mes siguiente.
+
+Pasó de verdad. INITME Solutions, folio `20260831180937` — 31 de agosto a las
+18:09 — quedó guardada el 1 de septiembre a las 00:09. Eso movió $2,900 de venta
+y $825 de comisión al mes equivocado, y era la causa de que el sistema no
+cuadrara contra el Excel.
+
+Se pone la zona de la **sesión**, no la del servidor: así funciona aunque el
+hosting esté en UTC y no se pueda cambiar.
+
+## Proveedores
+
+Viven dentro de Gastos, como pestaña. No tienen sección propia porque solo
+existen para una cosa: saber a quién se le paga. Un proveedor sin gastos
+asociados es un dato muerto.
+
+Al registrar un gasto, el campo de proveedor sugiere los que ya existen sin
+obligar a elegirlos. Y si se le cambia el nombre a un proveedor, los gastos
+anteriores se actualizan solos: si no, quedarían apuntando a un nombre que ya
+no existe.
+
+## Roles y permisos
+
+Cinco roles, una sola matriz en `Dominio\Permisos`. El router, el menú y los
+controladores leen de ahí, así que no puede pasar lo del sistema anterior: que
+el enlace esté escondido pero la URL siga funcionando si alguien la escribe.
+
+| Rol | Para quién |
+|---|---|
+| **Administrador** | Dueño o gerente. Ve el dinero y configura. |
+| **Supervisor** | Coordina la operación y ve reportes. No configura ni toca usuarios. |
+| **Cajero** | Cobra, abre y cierra su caja. No ve comisiones de nadie. |
+| **Vendedor** | Vende y da seguimiento a sus clientes. |
+| **Soporte** | Mantenimiento y diagnóstico. Ve todo, no mueve dinero. |
+
+**Los permisos se nombran por lo que la persona HACE, no por la pantalla.**
+`cobrar` es cobrar, exista o no una sección llamada Caja. Mover algo de lugar no
+obliga a repensar los permisos.
+
+**Un permiso que no existe se niega.** Escribirlo mal debe cerrar la puerta, no
+abrirla.
+
+### Dos decisiones que vale la pena defender
+
+**Soporte ve todo y no mueve nada.** Quien entra a arreglar un problema necesita
+mirar, no cobrar. Si además pudiera cobrar, cancelar pagos o asignar comisiones,
+no habría forma de saber si un descuadre lo causó la empresa o quien vino a
+ayudar.
+
+**Cajero no ve comisiones.** No es desconfianza: el importe que cobra alguien más
+no es asunto suyo, y tenerlo a la vista en la pantalla donde atiende clientes es
+una fuga de información que nadie pidió.
+
+## Mantenimiento
+
+Solo para soporte. Dos cosas:
+
+**Revisión de la base** · las seis señales que suelen estar detrás de un número
+que no cuadra: ventas sin área, fechas desfasadas, cobrado mayor al total,
+comisiones sin dueño, ventas sin cliente, cajas sin cerrar. Cada una dice qué
+problema concreto causa.
+
+**Secciones apagables** · Cobranza, Corte, Comisiones, Gastos, Reportes y
+Recargas se pueden ocultar por empresa. Panel, Caja, Ventas, Clientes y Ajustes
+no: sin ellas no se puede trabajar y el usuario pensaría que el sistema se rompió.
+
+Soporte sigue viendo las secciones apagadas, porque para eso entra.
+
+La configuración vive en `sistema_config` dentro de la base de cada empresa.
+**Las credenciales no van ahí**: una contraseña en una tabla la ve cualquiera con
+acceso a la base, y todo respaldo se la lleva.
+
+## Migraciones · una base por empresa
+
+LibertyFin crea una base de datos por empresa, y en el sistema anterior el
+esquema vive como 36 `CREATE TABLE` escritos dentro de `registroEmpresa.php`.
+
+Eso significa que cada columna nueva hay que agregarla a mano en TODAS las bases
+existentes, y además acordarse de meterla en ese archivo para las que nazcan
+después. Nadie se acuerda, y el síntoma es el peor posible: **una empresa nueva
+estrena el sistema y le falta una columna**, con un error que ningún otro
+cliente tiene.
+
+`Servicio\Migraciones` lo resuelve. Cada migración tiene número y es
+**idempotente**: correrla dos veces no hace nada la segunda. La versión aplicada
+se guarda en `sistema_config` de cada empresa.
+
+**Se ejecutan solas al entrar**, si la base está atrasada. En una base al día el
+costo es una consulta.
+
+Y en Mantenimiento hay una tabla con la versión de cada empresa y un botón para
+poner al día las que nadie ha abierto todavía.
+
+| Versión | Qué trae |
+|---|---|
+| 1 | Tabla de configuración por empresa |
+| 2 | Área del cliente |
+| 3 | Foto de perfil e imagen del servicio |
+| 4 | Índices de rendimiento |
+
+**Al agregar una migración:** escribe el método `vN`, súbelo a
+`Migraciones::VERSION` y descríbelo en `DESCRIPCIONES`. Nada más.
+
+Los índices se aplican desde la versión 1 de cada empresa a propósito: en una
+base recién creada no se notan, pero ponerlos desde el día uno evita descubrir
+tarde que el listado recorre la tabla entera.
+
+## Personalización
+
+**Color de la marca.** Se elige en Ajustes → Empresa y cambia el sistema entero.
+Solo se guarda ese dato: los hovers, los fondos tenues y los anillos de foco se
+calculan con `color-mix()`. Se ve al instante mientras se elige, antes de
+guardar.
+
+El color entra al HTML dentro de una etiqueta `<style>`, así que se valida contra
+`/^#[0-9a-fA-F]{6}$/` antes de escribirlo. Cualquier otra cosa se descarta.
+
+**Logotipo de la empresa**, **foto de perfil** y **imagen del servicio**. Las
+tres pasan por `Servicio\Archivos`, con estas defensas en orden de importancia:
+
+1. El tipo se deduce del **contenido** con `getimagesize()`, no del nombre ni del
+   Content-Type: los dos los escribe quien sube el archivo.
+2. El nombre se descarta entero y se genera uno aleatorio con la extensión del
+   tipo real.
+3. `public/assets/subidas/.htaccess` apaga PHP en esa carpeta. Si algo se cuela,
+   queda inerte.
+4. Tope de 3 MB y de 4000 píxeles por lado.
+
+La personalización se lee al entrar y vive en la sesión: el armazón la pinta en
+cada página, y consultarla cada vez sería una consulta más por petición para un
+dato que casi nunca cambia.
+
+`14_fotos.sql` agrega la columna de foto en usuarios. Hasta que se corra, el
+sistema funciona igual y no guarda fotos de perfil. La del servicio no necesita
+migración: `productos.imagen` ya existe.
+
+## Notas de maqueta
+
+**La app NO carga Bootstrap.** `libertyfin.css` se escribió como capa encima de
+él y aquí se sostiene solo, así que la sección 23 del archivo trae lo que
+Bootstrap aportaba: el reset de listas, la paginación en flex, el botón como
+inline-flex.
+
+Si alguien vuelve a meter Bootstrap, esa sección se puede recortar. Mientras no
+esté, no se toca.
+
+**La paginación es un parcial único**, `parciales/paginacion.php`. Diez filas por
+página, definidas en `Peticion::POR_PAGINA`. Con veinticinco la tabla crecía
+tanto que la columna de al lado quedaba corta.
+
+**Columnas de igual altura**: `.lf-split` con `align-items:stretch` y las
+tarjetas creciendo hasta llenar su columna.
+
+**El marcador del panel dice "al corriente", no "salud".** Mide el porcentaje
+cobrado castigado por la parte del saldo que lleva más de 30 días sin abono, y
+la pantalla ahora lo explica debajo. El nombre viejo no decía nada.
+
+**El precio del servicio es editable en Caja.** Antes se releía de la base "para
+que nadie se cobre un servicio de $26,000 en $1", pero estos servicios se
+cotizan por caso y el catálogo tiene varios en cero a propósito. Ahora se acepta
+el precio capturado, se valida que no sea negativo ni absurdo, y queda
+registrado con el usuario que lo puso: el control es el rastro, no el candado.
+Un ticket que suma cero sí se rechaza, porque eso casi siempre es un dedazo.
+
+**El área del cliente necesita `12_area_cliente.sql`.** Hasta que se corra, el
+sistema funciona igual y simplemente no guarda ese campo: `ClienteRepo` pregunta
+una vez si la columna existe. Preferible a reventar con "Unknown column" en una
+instalación sin migrar.
+
+## Integraciones
+
+Siete servicios externos, todos con el mismo patrón: **las credenciales viven en
+`config/integraciones.php`**, fuera de `public/` y fuera del repositorio.
+
+| Servicio | Para qué |
+|---|---|
+| Emida | recargas telefónicas |
+| Facturapi | timbrado CFDI |
+| SPEI | ligas de pago por transferencia |
+| Domiciliación | cargos recurrentes |
+| PayPal | ligas de pago con tarjeta |
+| SMTP | correos |
+| cPanel | alta de bases para empresas nuevas |
+
+**Una integración sin credenciales queda apagada sola.** Su sección no aparece en
+el menú y sus rutas ni siquiera se registran: responden 404. No hay que
+desactivar nada a mano, y una empresa que vende servicios legales no ve
+"Recargas" en su menú.
+
+La pestaña de Integraciones en Ajustes dice cuáles están listas y qué campo falta
+en cada una. **Nunca muestra las credenciales**, ni siquiera parcialmente.
+
+Por qué existe este archivo: en el sistema anterior las de Emida estaban escritas
+dentro de `EmidaServicios/inicio.php`, en claro. Un archivo de código con
+contraseñas dentro termina en el repositorio, en el respaldo y en el correo de
+quien lo compartió. **Esas credenciales hay que rotarlas.**
+
+## Recargas
+
+La pantalla y el flujo están armados. Las llamadas a la API de Emida quedan
+marcadas y sin implementar hasta que haya cuenta con la que probarlas: escribir
+una integración SOAP a ciegas, sin poder ejecutarla una sola vez, produce código
+que parece listo y no lo está.
+
+Cuando llegue la cuenta, lo que falta es `RecargasControlador::consultar()` y
+`::vender()`. Todo lo demás —pantalla, validación, ruta condicionada, registro
+como venta— ya está.
+
+## Lo que queda fuera, y por qué
+
+**Promociones.** No es una tabla, son cinco: `promociones`,
+`promociones_aplicables`, `promociones_sucursales`, `promociones_combo` y
+`promociones_obtener`. Es un motor de promociones de tienda — combos, 2x1,
+"compra X y llévate Y" — segmentado por categoría y sucursal.
+
+Esta empresa vende servicios con precio negociado por cliente, y en toda la
+migración no apareció una sola venta con promoción aplicada. Escribir en esas
+cinco tablas sin entender el motor completo es la forma rápida de romper algo.
+Queda pendiente de decidir si se usa.
+
+Aviso sobre Emida: los proxies del sistema anterior llaman a
+`http://104.248.179.142` **sin cifrar**. Si por ahí viajan credenciales o datos
+de transacción, van en claro. Si se reactiva, que sea sobre HTTPS.
+
+**Inventario.** Solo tiene sentido si llegan a vender producto físico. Hoy el
+catálogo son servicios y el stock nunca se mueve.
+
+**Facturación CFDI.** Necesita definir el PAC y el flujo de timbrado.
+
+La capa SaaS (empresas, planes, suscripciones, distribuidores) es otro sistema
+y va al final.
+
 - Comisión por producto cuando la venta tiene varios
 
 ## Ingreso

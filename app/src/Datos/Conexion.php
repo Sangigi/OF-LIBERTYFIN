@@ -30,6 +30,11 @@ final class Conexion
                 PDO::MYSQL_ATTR_USE_BUFFERED_QUERY => true,
             ]
         );
+        // La zona de la SESIÓN, no la del servidor: así funciona aunque
+        // el hosting esté en UTC y no se pueda cambiar.
+        if (!empty($c['zona_sql'])) {
+            $pdo->exec("SET time_zone = '" . str_replace("'", '', $c['zona_sql']) . "'");
+        }
         return self::$vivas[$base] = $pdo;
     }
 }

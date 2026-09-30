@@ -43,7 +43,7 @@ final class ServicioRepo extends Repo
         return $r;
     }
 
-    public function catalogo($desde, $hasta, $buscar = '', $limite = 40)
+    public function catalogo($desde, $hasta, $buscar = '', $limite = 10, $desfase = 0)
     {
         list($a, $b) = $this->rango($desde, $hasta);
         // Solo DOS fechas: las del subquery de ventas. El WHERE exterior
@@ -52,7 +52,7 @@ final class ServicioRepo extends Repo
         if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
                               $l = '%' . $buscar . '%'; $p[] = $l; $p[] = $l; }
         return $this->todos("
-            SELECT p.id, p.codigo, p.nombre,
+            SELECT p.id, p.codigo, p.nombre, p.imagen,
                    COALESCE(NULLIF(p.subprecio,0), p.precio) AS precio,
                    cat.nombre AS categoria,
                    COALESCE(x.veces,0)   AS ventas,
@@ -68,7 +68,7 @@ final class ServicioRepo extends Repo
             ) x ON x.producto_id = p.id
             WHERE " . implode(' AND ', $w) . "
             ORDER BY ingreso DESC, p.nombre
-            LIMIT " . (int)$limite, $p);
+            LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, $p);
     }
 
     public function masFacturan($desde, $hasta, $tope = 5)
@@ -143,6 +143,18 @@ final class ServicioRepo extends Repo
         return [$codigo, $nombre, trim($d['descripcion'] ?? '') ?: null, $precio, $costo, $cat];
     }
 
+    public function guardarImagen($id, $ruta)
+    {
+        $this->db->prepare("UPDATE productos SET imagen = ? WHERE id = ?")
+                 ->execute([$ruta ?: null, (int)$id]);
+        return true;
+    }
+
+    public function imagenDe($id)
+    {
+        return (string)$this->valor("SELECT COALESCE(imagen,'') FROM productos WHERE id = ?", [(int)$id]);
+    }
+
     public function crear(array $d)
     {
         list($codigo, $nombre, $desc, $precio, $costo, $cat) = $this->limpiar($d);
@@ -177,5 +189,13 @@ final class ServicioRepo extends Repo
         $this->db->prepare("UPDATE productos SET activo = 1 - activo WHERE id = ?")
                  ->execute([(int)$id]);
         return (int)$this->valor("SELECT activo FROM productos WHERE id = ?", [(int)$id]);
+    }
+
+    public function cuantos($buscar = '')
+    {
+        $w = ['p.activo = 1']; $p = [];
+        if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
+                              $l = '%'.$buscar.'%'; $p[] = $l; $p[] = $l; }
+        return (int)$this->valor("SELECT COUNT(*) FROM productos p WHERE " . implode(' AND ', $w), $p);
     }
 }

@@ -30,7 +30,7 @@ $iniciales = function ($n) {
 <div class="lf-stats">
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('pct','19px') ?></div>
-    <div class="stat-value"><?= D::corto($pagar) ?></div>
+    <div class="stat-value"><?= D::pesos($pagar) ?></div>
     <div class="stat-label">Por pagar</div>
     <?php W::avance(D::pct($pagar, max(0.01,$total))); ?>
     <div class="stat-meta">de <?= D::corto($total) ?> que generó el periodo</div>
@@ -38,7 +38,7 @@ $iniciales = function ($n) {
 
   <div class="stat-card">
     <div class="lf-tile a"><?= W::icono('alerta','19px') ?></div>
-    <div class="stat-value"><?= D::corto($sin) ?></div>
+    <div class="stat-value"><?= D::pesos($sin) ?></div>
     <div class="stat-label">Sin dueño</div>
     <?php W::avance(D::pct($sin, max(0.01,$total)), true); ?>
     <div class="stat-meta"><?= (int)($resumen['ventas_pendientes'] ?? 0) ?> ventas sin confirmar quién vendió</div>
@@ -46,7 +46,7 @@ $iniciales = function ($n) {
 
   <div class="stat-card">
     <div class="lf-tile g"><?= W::icono('reloj','19px') ?></div>
-    <div class="stat-value"><?= D::corto($resumen['por_liberar'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($resumen['por_liberar'] ?? 0) ?></div>
     <div class="stat-label">Por liberar</div>
     <div class="stat-meta">se libera conforme los clientes paguen</div>
   </div>
@@ -113,44 +113,106 @@ $iniciales = function ($n) {
 </section>
 <?php endif; ?>
 
-<div class="lf-split">
-  <section class="card">
-    <header class="card-header">Por colaborador</header>
-    <div style="padding:0 10px 8px">
-      <?php if (!$equipo): ?>
-        <p style="padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
-          No hay comisiones devengadas en este periodo.</p>
-      <?php endif; ?>
-      <?php foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
-        <div class="lf-row" style="<?= $huerfano ? 'opacity:.72' : '' ?>">
-          <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
-            <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
-          <span style="flex:1;min-width:0">
-            <b style="display:block;font-size:13.5px"><?= P::e($c['colaborador_nombre']) ?></b>
-            <small style="color:var(--lf-tinta-4);font-size:11.5px">
-              <?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
-          </span>
-          <?php if ($huerfano): ?>
-            <span class="badge bg-warning" style="margin-right:8px">No se paga</span>
-          <?php endif; ?>
-          <b class="lf-mono" style="font-size:14px"><?= D::pesos($c['devengado']) ?></b>
+<section class="card">
+  <header class="card-header">
+    <div><span>Por colaborador</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Devengado en el periodo</p></div>
+    <span class="badge bg-secondary"><?= count($equipo) ?> con comisión</span>
+  </header>
+  <div class="lf-equipo">
+    <?php if (!$equipo): ?>
+      <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
+        No hay comisiones devengadas en este periodo.</p>
+    <?php endif; ?>
+    <?php
+    // Rejilla en vez de lista: con seis u ocho colaboradores una lista
+    // vertical deja media pantalla en blanco.
+    $mayor = 0; foreach ($equipo as $c) $mayor = max($mayor, (float)$c['devengado']);
+    foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
+      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>">
+        <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
+          <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
+        <div style="flex:1;min-width:0">
+          <b><?= P::e($c['colaborador_nombre']) ?></b>
+          <small><?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
+          <?php W::avance($mayor > 0 ? $c['devengado'] / $mayor * 100 : 0, $huerfano); ?>
         </div>
-      <?php endforeach; ?>
-    </div>
-    <div class="card-footer" style="display:flex;justify-content:space-between">
-      <span>Total generado</span>
-      <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b>
-    </div>
-  </section>
+        <span class="mn"><?= D::pesos($c['devengado']) ?>
+          <?php if ($huerfano): ?><i>no se paga</i><?php endif; ?></span>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <div class="card-footer" style="display:flex;justify-content:space-between">
+    <span>Total generado en el periodo</span>
+    <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b>
+  </div>
+</section>
 
-  <?php if ($areas): ?>
-  <section class="card">
-    <header class="card-header">Por área</header>
-    <div class="card-body">
-      <?php W::dona(array_map(function($a){
-        return ['rotulo'=>$a['area'] ?: 'Sin área','monto'=>$a['monto']]; }, $areas),
-        D::corto($total), 'generado'); ?>
-    </div>
-  </section>
-  <?php endif; ?>
+<div class="lf-tres">
+    <?php if ($areas): ?>
+    <section class="card">
+      <header class="card-header">Por área</header>
+      <div class="card-body">
+        <?php W::dona(array_map(function($a){
+          return ['rotulo'=>$a['area'] ?: 'Sin área','monto'=>$a['monto']]; }, $areas),
+          D::corto($total), 'generado'); ?>
+      </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($liberacion): ?>
+    <section class="card">
+      <header class="card-header">
+        <div><span>Cuánto se ha liberado</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            De lo asignado, qué parte ya se ganó</p></div>
+      </header>
+      <div class="card-body">
+        <?php foreach ($liberacion as $l):
+          $pct = D::pct($l['devengada'], max(0.01, $l['asignada'])); ?>
+          <div style="margin-bottom:14px">
+            <div style="display:flex;justify-content:space-between;gap:10px;font-size:12.5px;margin-bottom:5px">
+              <b style="font-weight:600"><?= P::e($l['area'] ?: 'Sin área') ?></b>
+              <span class="lf-mono" style="color:var(--lf-tinta-3)">
+                <?= D::pesos($l['devengada']) ?> de <?= D::pesos($l['asignada']) ?></span>
+            </div>
+            <?php W::avance($pct, $pct < 99.5); ?>
+          </div>
+        <?php endforeach; ?>
+        <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:4px;padding-top:12px;
+                  border-top:1px solid var(--lf-linea);line-height:1.5">
+          Lo que falta se libera conforme los clientes paguen. Un área muy abajo
+          no está vendiendo mal: está esperando cobranza.
+        </p>
+      </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($atadas): ?>
+    <section class="card">
+      <header class="card-header">
+        <div><span>Comisión atada</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            Las ventas que más comisión retienen sin cobrar</p></div>
+      </header>
+      <div style="padding:0 10px 8px">
+        <?php foreach ($atadas as $a): ?>
+          <a class="lf-row" href="/ventas/<?= (int)$a['id'] ?>">
+            <span style="flex:1;min-width:0">
+              <b style="display:block;font-size:13px"><?= P::e($a['cliente'] ?: 'Público general') ?></b>
+              <small style="color:var(--lf-tinta-4);font-size:11.5px">
+                cobrado <?= D::pesos($a['cobrado']) ?> de <?= D::pesos($a['total']) ?></small>
+            </span>
+            <b class="lf-mono" style="font-size:13.5px;color:var(--lf-amb)">
+              <?= D::pesos($a['pendiente']) ?></b>
+          </a>
+        <?php endforeach; ?>
+      </div>
+      <div class="card-footer">
+        Cobrar estas ventas es lo que libera esa comisión. Es la lista corta de
+        a quién perseguir si el equipo quiere cobrar su parte.
+      </div>
+    </section>
+    <?php endif; ?>
 </div>

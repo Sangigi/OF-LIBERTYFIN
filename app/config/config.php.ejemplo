@@ -8,5 +8,11 @@ return [
         'clave'   => '',
         'principal' => 'juanc141_ventas',
     ],
+    // Zona horaria. Tiene que ser la misma en PHP y en MySQL: si no, el
+    // folio de la venta y su fecha quedan desfasados, y una venta de las
+    // 18:00 de fin de mes se registra en el mes siguiente.
+    'zona'     => 'America/Mexico_City',
+    'zona_sql' => '-06:00',
+
     'depurar' => false,   // true solo en local
 ];

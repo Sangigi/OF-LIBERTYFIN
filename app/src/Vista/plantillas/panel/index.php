@@ -27,8 +27,13 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
       <h2>La cobranza <em><?= P::e($sintesis['tono']) ?></em><?php if(isset($sintesis['pct'])): ?>:
         <?= $sintesis['pct'] ?>% del periodo ya entró.<?php endif; ?></h2>
       <p><?= P::e($sintesis['detalle']) ?></p>
+      <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:8px">
+        El marcador es qué tan al corriente va la cobranza: el porcentaje ya
+        cobrado, castigado por la parte del saldo que lleva más de 30 días
+        sin un abono.
+      </p>
     </div>
-    <?php W::marcador($salud, 'salud'); ?>
+    <?php W::marcador($alCorriente, 'al corriente'); ?>
   </div>
 
   <div class="lf-oscura">
@@ -72,7 +77,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
   ?>
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>
-    <div class="stat-value"><?= D::corto($cobrado) ?></div>
+    <div class="stat-value"><?= D::pesos($cobrado) ?></div>
     <div class="stat-label">Cobrado en el periodo</div>
     <?php W::avance($avance); ?>
     <div class="stat-meta"><?= $avance ?>% de lo vendido · faltan <?= D::corto($saldoT) ?></div>
@@ -81,7 +86,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 
   <div class="stat-card">
     <div class="lf-tile a"><?= W::icono('reloj','19px') ?></div>
-    <div class="stat-value"><?= D::corto($saldoT) ?></div>
+    <div class="stat-value"><?= D::pesos($saldoT) ?></div>
     <div class="stat-label">Por cobrar</div>
     <?php W::avance(100 - $avance, true); ?>
     <div class="stat-meta"><?= (int)($resumen['con_saldo'] ?? 0) ?> ventas con saldo abierto</div>
@@ -89,22 +94,31 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 
   <div class="stat-card">
     <div class="lf-tile g"><?= W::icono('bolsa','19px') ?></div>
-    <div class="stat-value"><?= D::corto($vendido) ?></div>
+    <div class="stat-value"><?= D::pesos($vendido) ?></div>
     <div class="stat-label">Vendido</div>
     <div class="stat-meta"><?= (int)($resumen['ventas'] ?? 0) ?> ventas · ticket <?= D::corto($resumen['promedio'] ?? 0) ?></div>
     <?php W::spark($sv); ?>
   </div>
 
+  <?php if (\LibertyFin\Dominio\Permisos::puede('ver.comisiones')): ?>
   <div class="stat-card">
     <div class="lf-tile l"><?= W::icono('pct','19px') ?></div>
-    <div class="stat-value"><?= D::corto($comisiones['por_pagar']) ?></div>
+    <div class="stat-value"><?= D::pesos($comisiones['por_pagar']) ?></div>
     <div class="stat-label">Comisiones por pagar</div>
     <?php W::avance(D::pct($comisiones['por_pagar'], max(0.01, $comisiones['total']))); ?>
     <div class="stat-meta">de <?= D::corto($comisiones['total']) ?> generadas</div>
   </div>
+  <?php else: ?>
+  <div class="stat-card">
+    <div class="lf-tile l"><?= W::icono('cliente','19px') ?></div>
+    <div class="stat-value"><?= (int)($resumen['ventas'] ?? 0) ?></div>
+    <div class="stat-label">Ventas del periodo</div>
+    <div class="stat-meta">ticket promedio <?= D::corto($resumen['promedio'] ?? 0) ?></div>
+  </div>
+  <?php endif; ?>
 </div>
 
-<div class="lf-split">
+<div class="lf-split" style="margin-top:4px">
   <section class="card">
     <header class="card-header">
       <div><span>Cobrado contra vendido</span>
@@ -158,7 +172,12 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
   </section>
 </div>
 
-<?php if ((float)$comisiones['sin_asignar'] > 0): ?>
+<?php
+// El aviso de comisiones sin dueño solo lo ve quien puede entrar a
+// resolverlo. A un cajero le decía un importe que no le toca saber y lo
+// mandaba a una pantalla donde igual iba a recibir un 403.
+if ((float)$comisiones['sin_asignar'] > 0
+    && \LibertyFin\Dominio\Permisos::puede('ver.comisiones')): ?>
 <a class="alert alert-warning" href="/comisiones" style="text-decoration:none">
   <span class="lf-tile a" style="width:34px;height:34px;border-radius:11px;margin:0;font-size:16px;flex-shrink:0">
     <?= W::icono('alerta','17px') ?></span>

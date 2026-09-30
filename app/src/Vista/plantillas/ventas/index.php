@@ -79,15 +79,10 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros) {
     </div>
     <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
       <span><?= count($ventas) ?> de <?= number_format($total) ?> ventas</span>
-      <?php if ($paginas > 1): ?>
-      <nav><ul class="pagination" style="margin:0">
-        <li class="page-item <?= $pagina<=1?'disabled':'' ?>">
-          <a class="page-link" href="<?= P::e($qs(['p'=>$pagina-1])) ?>">‹</a></li>
-        <li class="page-item disabled"><span class="page-link"><?= $pagina ?> / <?= $paginas ?></span></li>
-        <li class="page-item <?= $pagina>=$paginas?'disabled':'' ?>">
-          <a class="page-link" href="<?= P::e($qs(['p'=>$pagina+1])) ?>">›</a></li>
-      </ul></nav>
-      <?php endif; ?>
+      <?php P::parcial('parciales/paginacion', [
+        'pagina'  => $pagina, 'paginas' => $paginas,
+        'enlace'  => function ($n) use ($qs) { return $qs(['p' => $n]); },
+      ]); ?>
     </div>
   </section>
 

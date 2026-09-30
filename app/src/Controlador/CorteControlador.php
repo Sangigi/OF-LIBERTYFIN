@@ -4,6 +4,7 @@ namespace LibertyFin\Controlador;
 use LibertyFin\Datos\CajaRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Dominio\Dinero;
+use LibertyFin\Http\Peticion;
 use LibertyFin\Vista\Plantilla;
 
 final class CorteControlador
@@ -14,6 +15,27 @@ final class CorteControlador
         $repo = new CajaRepo($db);
         $suc  = (int)($_SESSION['sucursal_id'] ?? 0);
         $usr  = (int)($_SESSION['usuario_id'] ?? 0);
+
+        $p = Peticion::opcion('t', ['turno','historial'], 'turno');
+        if ($p === 'historial') {
+            $pagina  = max(1, Peticion::entero('p', 1));
+            $porPag  = Peticion::POR_PAGINA;
+            $totalC  = $repo->cuantosCortes($suc);
+            Plantilla::pagina('corte/historial', [
+                'titulo'    => 'Corte de caja',
+                'icono'     => 'caja',
+                'subtitulo' => 'Historial · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
+                'pestana'   => 'historial',
+                'cortes'    => $repo->historialCompleto($suc, $porPag, ($pagina-1)*$porPag),
+                'pagina'    => $pagina,
+                'paginas'   => max(1, (int)ceil($totalC / $porPag)),
+                'totalC'    => $totalC,
+                'resumen'   => $repo->resumenHistorial($suc),
+                'aviso'     => $_SESSION['lf_aviso'] ?? null,
+            ]);
+            unset($_SESSION['lf_aviso']);
+            return;
+        }
 
         $caja = $repo->abierta($usr, $suc);
         $mov = $cobros = [];
@@ -31,6 +53,7 @@ final class CorteControlador
             'icono'     => 'caja',
             'subtitulo' => $caja ? 'Caja abierta · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz')
                                  : 'Sin caja abierta',
+            'pestana'   => 'turno',
             'caja'      => $caja,
             'mov'       => $mov,
             'cobros'    => $cobros,

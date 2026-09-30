@@ -25,9 +25,19 @@ use LibertyFin\Vista\Widget as W;
 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title><?= P::e($titulo ?? 'LibertyFin') ?> · LibertyFin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2327ae60'/><text x='50' y='50' font-family='DM Sans,system-ui,sans-serif' font-size='62' font-weight='800' fill='white' text-anchor='middle' dominant-baseline='central'>L</text></svg>">
+<meta name="theme-color" content="#27ae60">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/libertyfin.css?v=1">
+<link rel="stylesheet" href="/assets/css/libertyfin.css?v=2">
+<?php
+// El color de la empresa se inyecta como variable. Todo lo demás
+// —hovers, fondos tenues, anillos de foco— se calcula con color-mix,
+// así que basta con este dato para que el sistema entero cambie.
+$marca = $_SESSION['lf_marca_color'] ?? '';
+if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
+<style>:root{--lf-brand:<?= $marca ?>}</style>
+<?php endif; ?>
 </head>
 <body>
 <div class="lf-app">

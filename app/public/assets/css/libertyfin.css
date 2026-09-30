@@ -715,10 +715,7 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-stack .lf-av:first-child{margin-left:0}
 
 /* Buscador redondo */
-.lf-search{position:relative;display:flex;align-items:center}
-.lf-search > i,.lf-search > .fas{position:absolute;left:14px;font-size:14px;
-  color:var(--lf-tinta-4);pointer-events:none}
-.lf-search input{width:100%;padding:9px 14px 9px 38px;background:var(--lf-sup);
+.lf-search input{background:var(--lf-sup);
   border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
   color:var(--lf-tinta);font-size:13px;outline:none;
   transition:border-color .15s,box-shadow .15s}
@@ -1011,27 +1008,6 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-seg > span:last-child{border-radius:0 var(--lf-r-pill) var(--lf-r-pill) 0}
 
 
-/* ══════════════════════════════════════════════════════
-   20 · ACCESO
-   ══════════════════════════════════════════════════════ */
-body.lf-centro{display:flex;align-items:center;justify-content:center;
-  min-height:100vh;min-height:100dvh;padding:24px}
-.lf-acceso{width:100%;max-width:396px;background:var(--lf-sup);
-  border:1px solid var(--lf-linea);border-radius:var(--lf-r-panel);
-  padding:34px 32px;box-shadow:var(--lf-s2)}
-@media(max-width:480px){.lf-acceso{padding:26px 22px}}
-.lf-acceso-marca{display:flex;align-items:center;gap:13px;margin-bottom:26px}
-.lf-acceso-marca .g{width:46px;height:46px;border-radius:50%;background:var(--lf-brand);
-  color:#fff;display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:19px;flex-shrink:0;box-shadow:0 4px 14px rgba(39,174,96,.3)}
-.lf-acceso-marca b{display:block;font-size:20px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
-.lf-acceso-marca small{font-size:12.5px;color:var(--lf-tinta-3)}
-.lf-ojo{position:absolute;right:6px;top:50%;transform:translateY(-50%);
-  border:none;background:none;color:var(--lf-tinta-3);font-size:12px;font-weight:600;
-  padding:7px 10px;border-radius:var(--lf-r-sm);cursor:pointer}
-.lf-ojo:hover{background:var(--lf-vidrio);color:var(--lf-tinta)}
-.lf-acceso-pie{margin-top:22px;padding-top:18px;border-top:1px solid var(--lf-linea);
-  font-size:12px;color:var(--lf-tinta-4);text-align:center;line-height:1.5}
 
 
 /* ══════════════════════════════════════════════════════
@@ -1077,3 +1053,462 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 .lf-alta > summary svg{color:var(--lf-brand)}
 .lf-alta[open] > summary{border-bottom:1px solid var(--lf-linea)}
 .lf-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:18px 20px}
+
+/* Azulejo en rojo, para lo que de verdad urge */
+.lf-tile.r{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+a.stat-card{text-decoration:none;color:inherit;display:block}
+a.stat-card:hover{color:inherit}
+
+
+/* ══════════════════════════════════════════════════════
+   23 · CORRECCIONES DE BASE
+   La app nueva NO carga Bootstrap: este archivo se escribió
+   como capa encima de él y aquí tiene que sostenerse solo.
+   Todo lo de abajo es lo que Bootstrap aportaba y faltaba.
+   ══════════════════════════════════════════════════════ */
+
+/* Listas sin viñetas dentro de componentes */
+.pagination,.lf-pills,.nav,.list-group{list-style:none;margin:0;padding:0}
+
+/* Paginación · flecha izquierda, número al centro, flecha derecha */
+.pagination{display:flex;align-items:center;gap:6px}
+.page-item{display:block;margin:0}
+.page-item .page-link{display:flex;align-items:center;justify-content:center;
+  min-width:34px;height:34px;padding:0 11px;line-height:1}
+.page-item.disabled .page-link{pointer-events:none}
+.page-item.disabled span.page-link{border-color:transparent;background:transparent;
+  color:var(--lf-tinta-3);font-variant-numeric:tabular-nums}
+
+/* La lupa DENTRO del campo. El icono es un <svg>, no un <i>. */
+.lf-search{position:relative;display:flex;align-items:center}
+.lf-search > svg,.lf-search > i,.lf-search > .fas{
+  position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  color:var(--lf-tinta-4);pointer-events:none;z-index:1}
+.lf-search input{width:100%;padding:9px 14px 9px 39px}
+
+/* Botón: nada de display:block por fuera. El contenido va centrado
+   siempre, con o sin icono. */
+.btn{display:inline-flex!important;align-items:center;justify-content:center;
+  gap:8px;text-align:center;line-height:1.15}
+.btn > svg{flex-shrink:0}
+.btn-block,.btn.w-100{width:100%}
+
+/* Separación entre tarjetas y entre columnas */
+.card,.stat-card{margin-bottom:18px}
+.lf-split > * > .card:last-child,.lf-split > .card:last-child{margin-bottom:0}
+.lf-split{gap:20px}
+.lf-stats .stat-card{margin-bottom:0}
+
+/* Columnas de igual altura: la tarjeta crece hasta llenar su columna */
+.lf-split{align-items:stretch}
+.lf-split > .card{display:flex;flex-direction:column;height:100%}
+.lf-split > .card > .table-responsive,.lf-split > .card > .card-body{flex:1}
+.lf-split > div{display:flex;flex-direction:column;gap:20px}
+.lf-split > div > .card{margin-bottom:0}
+.lf-split > div > .card:last-child{flex:1;display:flex;flex-direction:column}
+.lf-split > div > .card:last-child > .card-body{flex:1}
+@media(max-width:940px){
+  .lf-split > .card,.lf-split > div > .card:last-child{height:auto;display:block}
+}
+
+/* Formularios: que nada se pegue ni se encime */
+.lf-form{gap:16px 14px;align-items:flex-end}
+.lf-form > div{display:flex;flex-direction:column}
+.lf-form .btn{align-self:flex-end;margin-bottom:0}
+.lf-filtros{gap:12px;row-gap:10px;align-items:center}
+.lf-filtros .form-control,.lf-filtros .form-select{height:36px}
+.lf-filtros .btn{height:36px}
+
+/* Píldoras: aire arriba para que no choquen con el borde */
+.lf-pills{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+
+/* Dona: aire entre el círculo y la leyenda */
+.lf-dona-fila{gap:28px;padding:4px 0}
+.lf-donut .mid b{font-size:16px;letter-spacing:-.4px;padding:0 6px;
+  overflow-wrap:anywhere;max-width:86%}
+.lf-donut .mid small{font-size:10px}
+
+/* Barra lateral fija: el menú y el perfil se quedan en pantalla */
+@media(min-width:941px){
+  .lf-side{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden}
+  .lf-nav{overflow-y:auto;min-height:0}
+  .lf-pie{margin-top:auto}
+}
+
+/* Rejilla de servicios en Caja */
+.lf-grid-serv{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.lf-serv{padding:13px 11px}
+.lf-serv b{min-height:2.6em;display:flex;align-items:center;justify-content:center}
+
+/* Campo de descripción de la venta */
+.lf-desc{width:100%;min-height:74px;resize:vertical;font-family:var(--lf-font);
+  padding:11px 13px;line-height:1.5}
+
+/* Precio editable dentro del ticket */
+.lf-precio{width:94px;padding:6px 9px;text-align:right;font-weight:700;font-size:13px;
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
+  color:var(--lf-tinta);outline:none;flex-shrink:0}
+.lf-precio:focus{border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-ring)}
+/* Los que no traen precio se marcan: hay que ponérselo */
+.lf-serv.sin-precio .p{color:var(--lf-amb);font-family:var(--lf-font);
+  font-size:11px;font-weight:600}
+.lf-serv.sin-precio .e{background:var(--lf-amb-soft);color:var(--lf-amb)}
+
+/* Paginación de la rejilla de servicios */
+.lf-pag-serv{display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:4px 20px 18px;font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-pag-serv button{width:32px;height:32px;border-radius:50%;border:1px solid var(--lf-linea);
+  background:var(--lf-sup);color:var(--lf-tinta-2);cursor:pointer;font-size:15px;line-height:1}
+.lf-pag-serv button:hover:not(:disabled){border-color:var(--lf-brand);color:var(--lf-brand-2)}
+.lf-pag-serv button:disabled{opacity:.35;cursor:default}
+.lf-pag-serv b{font-family:var(--lf-mono);font-weight:600}
+
+/* El rótulo del marcador puede ser de dos palabras */
+.lf-ring .mid small{font-size:9px;letter-spacing:.2px;line-height:1.15;
+  max-width:70px;text-align:center}
+
+
+/* ══════════════════════════════════════════════════════
+   24 · AJUSTES FINOS DE MAQUETA
+   ══════════════════════════════════════════════════════ */
+
+/* Encabezado de tarjeta con subtítulo: que el texto no empuje el badge */
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.card-header > div{min-width:0}
+.card-header p{font-weight:400}
+
+/* Las barras horizontales necesitan aire cuando son la única tarjeta */
+.lf-bars{gap:15px}
+.lf-bars .r > span:first-child{font-size:12px}
+
+/* Tablas: la última columna de acciones no se estira */
+.table td:last-child:empty{width:0;padding:0}
+.table th:last-child:empty{width:0;padding:0}
+
+/* Tarjetas de cifra: que el número no se pegue al borde */
+.stat-card{padding:20px 22px 18px}
+.stat-value{overflow-wrap:anywhere;padding-right:4px}
+
+/* El pie de tarjeta con paginación se alinea sin saltos */
+.card-footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card-footer > span:only-child{flex:1}
+
+/* Píldoras de pestaña: separadas del contenido de abajo */
+.lf-pills + .alert,.lf-pills + .lf-alta,.lf-pills + .card,
+.lf-pills + .lf-stats,.lf-pills + form{margin-top:2px}
+
+/* En pantallas chicas las columnas parejas estorban */
+@media(max-width:940px){
+  .lf-split > div{gap:18px}
+  .card,.stat-card{margin-bottom:16px}
+}
+
+
+/* ══════════════════════════════════════════════════════
+   25 · CORRECCIONES DE MAQUETA · SEGUNDA PASADA
+   ══════════════════════════════════════════════════════ */
+
+/* La barra lateral no se movía porque el flex la estiraba al alto del
+   contenido: sticky no tiene contra qué pegarse si el elemento ya es
+   tan alto como su contenedor. align-self la vuelve a su alto real. */
+@media(min-width:941px){
+  .lf-app{align-items:flex-start}
+  .lf-side{align-self:flex-start;position:sticky;top:0;
+    height:100vh;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  .lf-nav{flex:1;overflow-y:auto;min-height:0}
+  .lf-pie{margin-top:0;flex-shrink:0}
+  /* El panel blanco necesita su propio alto mínimo para que el lienzo
+     no se vea cortado cuando hay poco contenido. */
+  .lf-main{min-height:100vh;min-height:100dvh}
+}
+
+/* Separación entre tarjetas sueltas y entre bloques del panel */
+.lf-split,.lf-stats{margin-bottom:20px}
+.lf-sintesis,.lf-trio{margin-bottom:22px}
+section.card + section.card{margin-top:0}
+.lf-cont > .card,.lf-cont > section.card{margin-bottom:20px}
+.lf-cont > .card:last-child{margin-bottom:0}
+
+/* Caja · las píldoras de categoría no chocan con el borde */
+.lf-pos .card > div:first-of-type .lf-pill{margin-top:2px}
+.lf-pos .card header + div{padding-top:4px}
+
+/* Caja · el paginador de servicios sube al encabezado */
+.lf-pag-serv{padding:0;gap:8px}
+.lf-pag-serv button{width:28px;height:28px;font-size:14px}
+.lf-pag-serv span{font-size:11.5px;white-space:nowrap}
+.card-header .lf-pag-serv{margin-left:auto;flex-shrink:0}
+
+/* Formularios · que dos campos contiguos nunca se toquen */
+.lf-form,.card-body form{column-gap:16px;row-gap:16px}
+.lf-form > div + div,.card-body form > div + div{margin-left:0}
+
+/* Tabla de comisiones · sin el vacío gigante cuando hay pocos */
+.lf-tres{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;align-items:start}
+@media(max-width:1100px){.lf-tres{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:700px){.lf-tres{grid-template-columns:1fr}}
+.lf-tres > .card{margin-bottom:0}
+
+/* Botón de tema, ahora sí visible */
+.lf-tema{display:inline-flex;align-items:center;justify-content:center;
+  width:36px;height:36px;border-radius:50%;border:1px solid var(--lf-linea);
+  background:var(--lf-sup);color:var(--lf-tinta-3);cursor:pointer;
+  transition:all .15s;flex-shrink:0;padding:0}
+.lf-tema:hover{border-color:var(--lf-brand);color:var(--lf-brand-2);background:var(--lf-brand-glow)}
+.lf-tema .claro,.lf-tema .oscuro{display:inline-flex}
+.lf-tema .oscuro{display:none}
+:root[data-theme="dark"] .lf-tema .claro{display:none}
+:root[data-theme="dark"] .lf-tema .oscuro{display:inline-flex}
+
+/* Encabezado: el título no empuja las acciones */
+.lf-top-tit{min-width:0;flex:1}
+.lf-acc{flex-shrink:0}
+
+/* Rejilla de colaboradores: aprovecha el ancho en vez de dejarlo en blanco */
+.lf-equipo{display:grid;grid-template-columns:repeat(auto-fill,minmax(268px,1fr));
+  gap:12px;padding:4px 20px 18px}
+.lf-pers{display:flex;align-items:center;gap:12px;padding:13px 15px;
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r)}
+.lf-pers.sin{opacity:.78;border-style:dashed}
+.lf-pers b{display:block;font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-pers small{display:block;font-size:11px;color:var(--lf-tinta-4);margin-bottom:2px}
+.lf-pers .lf-prog{margin-top:6px;height:4px}
+.lf-pers .mn{font-family:var(--lf-mono);font-size:13.5px;font-weight:700;
+  white-space:nowrap;text-align:right;flex-shrink:0}
+.lf-pers .mn i{display:block;font-style:normal;font-family:var(--lf-font);
+  font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--lf-amb);margin-top:2px}
+
+
+/* ══════════════════════════════════════════════════════
+   26 · BARRA LATERAL FIJA DE VERDAD
+   `sticky` dependía de demasiadas condiciones del flujo: basta
+   con que un ancestro tenga overflow, o con que el propio
+   elemento ya sea tan alto como su contenedor, para que no se
+   pegue. `fixed` sale del flujo y no puede moverse.
+   ══════════════════════════════════════════════════════ */
+@media(min-width:941px){
+  .lf-app{display:block}                     /* ya no hace falta el flex */
+  .lf-side{
+    position:fixed; left:0; top:0; bottom:0;
+    width:var(--lf-side-w);
+    display:flex; flex-direction:column;
+    z-index:30;
+    padding-bottom:env(safe-area-inset-bottom,0px);
+    background:var(--lf-lienzo);             /* tapa lo que pase por debajo */
+  }
+  /* El menú es lo único que hace scroll. El perfil y la marca no. */
+  .lf-marca{flex-shrink:0}
+  .lf-nav{flex:1 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain}
+  .lf-pie{flex-shrink:0; margin-top:0}
+  /* El contenido se corre para dejarle su lugar. */
+  .lf-main{margin-left:var(--lf-side-w); min-height:100vh; min-height:100dvh}
+}
+
+/* Caja · las píldoras de categoría necesitaban aire arriba y abajo */
+.lf-pos .card > div:has(> .lf-pill){padding:12px 20px 16px}
+.lf-cat-fila{display:flex;gap:8px;flex-wrap:wrap;padding:12px 20px 16px;
+  border-bottom:1px solid var(--lf-linea);margin-bottom:14px}
+
+
+/* ══════════════════════════════════════════════════════
+   27 · ACCESO
+   La única pantalla sin barra lateral ni menús, y la única
+   que ve alguien que todavía no es nadie. Estilos propios:
+   reusar los del sistema la hacía ver como un formulario
+   más, suelto en medio de la nada.
+   ══════════════════════════════════════════════════════ */
+body.lf-centro{display:flex;align-items:center;justify-content:center;
+  min-height:100vh;min-height:100dvh;padding:24px;
+  background:radial-gradient(1200px 600px at 50% -10%,
+    color-mix(in srgb,var(--lf-brand) 9%,var(--lf-lienzo)) 0%, var(--lf-lienzo) 62%)}
+
+.lf-acceso{width:100%;max-width:392px;background:var(--lf-sup);
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r-panel);
+  padding:36px 34px 30px;box-shadow:var(--lf-s3)}
+@media(max-width:480px){.lf-acceso{padding:28px 22px 24px}}
+
+.lf-acceso-marca{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.lf-acceso-marca .g{width:48px;height:48px;border-radius:16px;background:var(--lf-brand);
+  color:#fff;display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:21px;flex-shrink:0;box-shadow:0 6px 18px rgba(39,174,96,.32)}
+.lf-acceso-marca b{display:block;font-size:20px;font-weight:700;letter-spacing:-.5px;line-height:1.15}
+.lf-acceso-marca small{font-size:12.5px;color:var(--lf-tinta-3)}
+
+/* Avisos propios: el .alert del sistema traía márgenes pensados para
+   una tarjeta ancha y aquí se veía desproporcionado. */
+.lf-aviso{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
+  border-radius:var(--lf-r);font-size:12.5px;line-height:1.5;margin-bottom:18px}
+.lf-aviso svg{flex-shrink:0;margin-top:1px}
+.lf-aviso.err{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-aviso.amb{background:var(--lf-amb-soft);color:var(--lf-amb)}
+
+.lf-acceso-form{display:flex;flex-direction:column;gap:16px}
+.lf-acceso-form .campo{display:flex;flex-direction:column;gap:7px}
+.lf-acceso-form label{font-size:12px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-acceso-form input[type=text],.lf-acceso-form input[type=password]{
+  width:100%;padding:12px 14px;background:var(--lf-sup-2);
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  color:var(--lf-tinta);font-size:14.5px;font-family:var(--lf-font);outline:none;
+  transition:border-color .15s,box-shadow .15s,background .15s}
+.lf-acceso-form input:focus{background:var(--lf-sup);border-color:var(--lf-brand);
+  box-shadow:0 0 0 3px var(--lf-brand-ring)}
+.lf-acceso-form input:disabled{opacity:.55;cursor:not-allowed}
+
+/* El ojo: icono, no texto. "Ver" y "Ocultar" cambian de ancho y
+   hacían saltar el campo al alternar. */
+.con-ojo{position:relative}
+.con-ojo input{padding-right:46px!important}
+.con-ojo button{position:absolute;right:5px;top:50%;transform:translateY(-50%);
+  width:34px;height:34px;display:flex;align-items:center;justify-content:center;
+  border:none;background:none;color:var(--lf-tinta-4);cursor:pointer;
+  border-radius:var(--lf-r-sm);padding:0}
+.con-ojo button:hover{background:var(--lf-vidrio);color:var(--lf-tinta-2)}
+.con-ojo button.on{color:var(--lf-brand-2);background:var(--lf-brand-glow)}
+
+.lf-entrar{width:100%;padding:14px;margin-top:6px;border:none;
+  border-radius:var(--lf-r-pill);background:var(--lf-brand);color:#fff;
+  font-family:var(--lf-font);font-size:14.5px;font-weight:700;cursor:pointer;
+  transition:background .15s,transform .1s,box-shadow .15s}
+.lf-entrar:hover:not(:disabled){background:var(--lf-brand-2);
+  box-shadow:0 6px 18px rgba(39,174,96,.28)}
+.lf-entrar:active:not(:disabled){transform:translateY(1px)}
+.lf-entrar:disabled{opacity:.45;cursor:not-allowed}
+
+.lf-acceso-pie{margin-top:24px;padding-top:18px;border-top:1px solid var(--lf-linea);
+  font-size:11.5px;color:var(--lf-tinta-4);text-align:center;line-height:1.6}
+
+:root[data-theme="dark"] body.lf-centro{
+  background:radial-gradient(1200px 600px at 50% -10%,
+    color-mix(in srgb,var(--lf-brand) 13%,var(--lf-lienzo)) 0%, var(--lf-lienzo) 62%)}
+
+/* Contador de permisos en la tarjeta de rol */
+.lf-pers .mn i{color:var(--lf-tinta-4);font-weight:600;text-transform:none;letter-spacing:0}
+
+/* Logo de la empresa y foto de perfil */
+.lf-marca img.g{object-fit:cover;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.lf-av.con-foto{background-size:cover;background-position:center;color:transparent;
+  border:2px solid var(--lf-sup);box-shadow:0 0 0 1px var(--lf-linea)}
+.lf-marca b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+
+/* Vista previa al elegir una imagen */
+.lf-foto{display:flex;align-items:center;gap:14px}
+.lf-foto .prev{width:64px;height:64px;border-radius:50%;flex-shrink:0;
+  background:var(--lf-vidrio);background-size:cover;background-position:center;
+  border:1px solid var(--lf-linea);display:flex;align-items:center;justify-content:center;
+  color:var(--lf-tinta-4);font-size:22px;font-weight:700;font-family:var(--lf-mono)}
+.lf-foto .prev.cuadro{border-radius:var(--lf-r)}
+.lf-foto input[type=file]{font-size:12px;color:var(--lf-tinta-3)}
+.lf-foto input[type=file]::file-selector-button{
+  padding:8px 15px;margin-right:11px;border-radius:var(--lf-r-pill);
+  border:1px solid var(--lf-linea);background:var(--lf-sup);color:var(--lf-tinta-2);
+  font-family:var(--lf-font);font-size:12.5px;font-weight:600;cursor:pointer}
+.lf-foto input[type=file]::file-selector-button:hover{
+  border-color:var(--lf-brand);color:var(--lf-brand-2)}
+
+/* Selector de color de marca */
+.lf-colores{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.lf-color{width:34px;height:34px;border-radius:50%;cursor:pointer;
+  border:2px solid var(--lf-sup);box-shadow:0 0 0 1px var(--lf-linea);
+  transition:transform .12s}
+.lf-color:hover{transform:scale(1.12)}
+.lf-color.on{box-shadow:0 0 0 2px var(--lf-tinta)}
+.lf-color-libre{width:34px;height:34px;padding:0;border:none;background:none;
+  cursor:pointer;border-radius:50%;overflow:hidden}
+.lf-color-libre::-webkit-color-swatch-wrapper{padding:0}
+.lf-color-libre::-webkit-color-swatch{border:2px solid var(--lf-sup);border-radius:50%}
+
+/* Miniatura del servicio en las tablas */
+.lf-mini-img{width:32px;height:32px;border-radius:9px;flex-shrink:0;
+  background:var(--lf-vidrio);background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;color:var(--lf-tinta-4)}
+
+/* Botón de entrar con giro de carga */
+.lf-entrar{position:relative;display:flex;align-items:center;justify-content:center;gap:10px}
+.lf-entrar .giro{display:none;width:16px;height:16px;flex-shrink:0;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;
+  animation:lf-giro .7s linear infinite}
+.lf-entrar.cargando .giro{display:block}
+.lf-entrar.cargando .txt{opacity:.85}
+.lf-entrar.cargando{cursor:progress;opacity:1}
+@keyframes lf-giro{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){
+  .lf-entrar .giro{animation-duration:1.6s}
+}
+
+
+/* ══════════════════════════════════════════════════════
+   28 · MÓVIL
+   El lateral entra deslizándose desde la izquierda sobre un
+   velo con desenfoque, y las cuatro secciones más usadas
+   viven en una barra de abajo, al alcance del pulgar.
+   ══════════════════════════════════════════════════════ */
+.lf-velo{display:none}
+.lf-dedo{display:none}
+.lf-cerrar-menu{display:none}
+
+@media(max-width:940px){
+  .lf-app{display:block}
+
+  /* El lateral, fuera de pantalla hasta que se pide */
+  .lf-side{
+    position:fixed; top:0; bottom:0; left:0;
+    width:min(282px, 84vw);
+    flex-direction:column; gap:0;
+    background:var(--lf-panel);
+    border-right:1px solid var(--lf-linea);
+    box-shadow:var(--lf-s3);
+    padding:0 0 env(safe-area-inset-bottom,0px);
+    overflow:hidden;
+    z-index:60;
+    transform:translateX(-102%);
+    transition:transform .26s cubic-bezier(.32,.72,.3,1);
+  }
+  body.lf-menu-abierto .lf-side{transform:translateX(0)}
+
+  .lf-side .lf-marca{padding:18px 20px 14px;flex-shrink:0}
+  .lf-side .lf-marca small{display:block}
+  .lf-nav{display:block;flex:1;min-height:0;overflow-y:auto;padding:6px 12px}
+  .lf-nav .sec{display:block}
+  .lf-pie{display:block;flex-shrink:0;border-top:1px solid var(--lf-linea);
+    padding:12px;margin:0 12px 10px}
+
+  .lf-cerrar-menu{display:flex;align-items:center;justify-content:center;
+    position:absolute;top:14px;right:12px;width:32px;height:32px;
+    border-radius:50%;border:1px solid var(--lf-linea);background:var(--lf-sup);
+    color:var(--lf-tinta-3);font-size:19px;line-height:1;cursor:pointer;z-index:2}
+
+  /* El velo: desenfoque en vez de un negro plano, para que se siga
+     viendo dónde estabas. */
+  .lf-velo{display:block;position:fixed;inset:0;z-index:50;
+    background:rgba(16,22,19,.34);
+    -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+    animation:lf-velo .22s ease}
+  @keyframes lf-velo{from{opacity:0}}
+  body.lf-menu-abierto{overflow:hidden}
+
+  /* El contenido deja lugar a la barra de abajo */
+  .lf-main{margin-left:0;border-radius:var(--lf-r-panel) var(--lf-r-panel) 0 0;
+    border-right:1px solid var(--lf-linea);margin-top:0;
+    padding-bottom:calc(66px + env(safe-area-inset-bottom,0px))}
+
+  /* La barra del pulgar */
+  .lf-dedo{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:40;
+    background:var(--lf-sup);border-top:1px solid var(--lf-linea);
+    padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));
+    box-shadow:0 -2px 14px rgba(27,36,32,.06)}
+  .lf-dedo a,.lf-dedo button{flex:1;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:3px;padding:6px 2px;
+    border:none;background:none;cursor:pointer;text-decoration:none;
+    color:var(--lf-tinta-4);border-radius:var(--lf-r-sm);min-width:0}
+  .lf-dedo span{font-size:10px;font-weight:600;letter-spacing:-.1px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .lf-dedo a.on{color:var(--lf-brand-2)}
+  .lf-dedo a:active,.lf-dedo button:active{background:var(--lf-vidrio)}
+  .lf-dedo svg{flex-shrink:0}
+}
+
+@media(max-width:940px) and (prefers-reduced-motion:reduce){
+  .lf-side{transition:none}
+}

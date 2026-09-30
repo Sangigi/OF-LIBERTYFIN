@@ -35,7 +35,7 @@ final class VentasControlador
         ];
 
         $pagina  = max(1, Peticion::entero('p', 1));
-        $porPag  = 25;
+        $porPag  = Peticion::POR_PAGINA;
         $desfase = ($pagina - 1) * $porPag;
 
         $resumen = $repo->resumen($desde, $hasta, $filtros);
@@ -193,5 +193,30 @@ final class VentasControlador
             error_log('[LibertyFin] quitarComision: ' . $e->getMessage());
             $this->volver($id, 'No se pudo quitar la comisión.', 'error');
         }
+    }
+
+    /** El ticket, para imprimir. Sin barra lateral ni menús. */
+    public function ticket($id)
+    {
+        $db    = Conexion::de($_SESSION['empresa_db']);
+        $repo  = new VentaRepo($db);
+        $venta = $repo->detalle($id);
+        if (!$venta) {
+            http_response_code(404);
+            Plantilla::pagina('errores/404', ['titulo'=>'No encontrada','icono'=>'alerta','subtitulo'=>'']);
+            return;
+        }
+        $empresa = null;
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal']);
+            $empresa = (new \LibertyFin\Datos\EmpresaRepo($principal))->uno($_SESSION['empresa_id'] ?? 0);
+        } catch (\Throwable $e) { /* el ticket se imprime igual sin el membrete */ }
+
+        // Sin layout: es una hoja suelta que se manda a la impresora.
+        Plantilla::parcial('ventas/ticket', [
+            'venta'   => $venta,
+            'lineas'  => $repo->lineas($id),
+            'empresa' => $empresa,
+        ]);
     }
 }
