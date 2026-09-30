@@ -101,6 +101,39 @@ final class ComisionRepo extends Repo
         ", [self::SIN_DUENO]);
     }
 
+
+    /** Todos los colaboradores activos, agrupados por área. */
+    public function catalogo()
+    {
+        $filas = $this->todos("
+            SELECT a.nombre AS area, c.id, c.nombre
+            FROM comision_colaboradores c
+            INNER JOIN comision_areas a ON a.id = c.area_id
+            WHERE c.activo = 1 AND a.activo = 1
+            ORDER BY a.nombre, (c.nombre = ?), c.nombre", [self::SIN_DUENO]);
+        $g = [];
+        foreach ($filas as $f) $g[$f['area']][] = ['id' => $f['id'], 'nombre' => $f['nombre']];
+        return $g;
+    }
+
+    /**
+     * Los porcentajes que ya se han usado, para sugerirlos.
+     * Evita tener que recordar que Ventas va al 10% y Legal al 41%.
+     */
+    public function porcentajesUsados()
+    {
+        $filas = $this->todos("
+            SELECT colaborador_id, porcentaje_regla AS pct, COUNT(*) AS veces
+            FROM venta_comisiones WHERE cancelada = 0
+            GROUP BY colaborador_id, porcentaje_regla
+            ORDER BY colaborador_id, veces DESC");
+        $m = [];
+        foreach ($filas as $f) {
+            if (!isset($m[$f['colaborador_id']])) $m[$f['colaborador_id']] = (float)$f['pct'];
+        }
+        return $m;
+    }
+
     /** Candidatos para reasignar un renglón sin dueño. */
     public function colaboradoresDe($area)
     {

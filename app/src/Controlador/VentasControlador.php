@@ -3,6 +3,8 @@ namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\VentaRepo;
+use LibertyFin\Datos\ComisionRepo;
+use LibertyFin\Servicio\AsignarComision;
 use LibertyFin\Servicio\RegistrarPago;
 use LibertyFin\Dominio\Dinero;
 use LibertyFin\Http\Peticion;
@@ -83,6 +85,8 @@ final class VentasControlador
             'pagos'      => $repo->pagos($id),
             'gastos'     => $repo->gastos($id),
             'comisiones' => $repo->comisiones($id),
+            'catalogo'   => (new ComisionRepo($db))->catalogo(),
+            'sugeridos'  => (new ComisionRepo($db))->porcentajesUsados(),
             'nueva'      => Peticion::entero('nueva') === 1,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);
@@ -146,5 +150,48 @@ final class VentasControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /ventas/' . (int)$id); exit;
+    }
+
+    /** Asigna una comisión a la venta. */
+    public function asignarComision($id)
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (($_SESSION['usuario_rol'] ?? '') !== 'admin') {
+            $this->volver($id, 'Solo un administrador puede asignar comisiones.', 'error');
+        }
+        if (!$this->tokenValido()) $this->volver($id, 'No se pudo verificar el formulario.', 'error');
+
+        try {
+            $r = (new AsignarComision($db))->asignar(
+                $id, (int)($_POST['colaborador'] ?? 0), $_POST['pct'] ?? 0);
+            $this->volver($id, $r['colaborador'] . ': '
+                . \LibertyFin\Dominio\Dinero::pesos($r['asignada'])
+                . ' sobre una base de ' . \LibertyFin\Dominio\Dinero::pesos($r['base']) . '.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($id, $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] asignarComision: ' . $e->getMessage());
+            $this->volver($id, 'No se pudo asignar la comisión.', 'error');
+        }
+    }
+
+    /** Quita una comisión. */
+    public function quitarComision($id)
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (($_SESSION['usuario_rol'] ?? '') !== 'admin') {
+            $this->volver($id, 'Solo un administrador puede quitar comisiones.', 'error');
+        }
+        if (!$this->tokenValido()) $this->volver($id, 'No se pudo verificar el formulario.', 'error');
+
+        try {
+            $c = (new AsignarComision($db))->quitar((int)($_POST['comision'] ?? 0));
+            $this->volver($id, 'Comisión de ' . $c['colaborador_nombre'] . ' retirada.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($id, $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] quitarComision: ' . $e->getMessage());
+            $this->volver($id, 'No se pudo quitar la comisión.', 'error');
+        }
     }
 }

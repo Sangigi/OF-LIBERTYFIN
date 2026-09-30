@@ -108,11 +108,37 @@ Si hay diferencia, la nota es obligatoria. Y se guarda **con signo**: positiva
 si sobró, negativa si faltó. Guardar el valor absoluto esconde justo lo que
 importa saber.
 
+## Asignar comisiones
+
+Se hace desde el detalle de la venta. Eliges colaborador y porcentaje, y ves
+en vivo cuánto le tocaría antes de guardar. El porcentaje se sugiere solo con
+el que esa persona suele cobrar.
+
+**La base la calcula `Dominio\Comision`, no el formulario.** Esa es toda la
+diferencia con `guardar_comision_producto.php` del sistema anterior, que tomaba
+`venta_detalles.precio_unitario` tal cual y suponía que venía sin impuesto. Esa
+suposición costó tres errores en la migración:
+
+| Venta | Salió | Debía ser |
+|---|---|---|
+| Leopoldo · Francisco Flores 10% | $672.80 | $580.00 |
+| Reyna · base con IVA | $579.98 | $499.98 |
+| PW · base con IVA y gastos | $1,478.84 | $999.00 |
+
+Aquí no puede pasar: el precio pasa por `Iva::quitar()` antes de tocar nada.
+
+Reglas que impone el servicio:
+
+- Nadie puede tener dos comisiones en la misma venta
+- No se comisiona una venta cancelada
+- Si los gastos se comen la utilidad, no deja asignar
+- Quitar una comisión la cancela, no la borra, y resincroniza lo devengado
+
 ## Lo que falta
 
-- Asignar comisiones desde el detalle de venta
 - Restablecer contraseña
 - Editar servicios y clientes desde la app
+- Comisión por producto cuando la venta tiene varios
 
 ## Ingreso
 

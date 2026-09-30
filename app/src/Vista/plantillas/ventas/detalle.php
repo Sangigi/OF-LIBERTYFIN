@@ -154,7 +154,8 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         <table class="table">
           <thead><tr>
             <th>Colaborador</th><th>Área</th><th class="text-end">%</th>
-            <th class="text-end">Si liquida</th><th class="text-end">Devengada</th><th class="text-end">Pendiente</th>
+            <th class="text-end">Si liquida</th><th class="text-end">Devengada</th>
+            <th class="text-end">Pendiente</th><th></th>
           </tr></thead>
           <tbody>
           <?php foreach ($comisiones as $c): $sd = $c['colaborador_nombre'] === 'POR ASIGNAR'; ?>
@@ -171,6 +172,14 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               <td data-label="Si liquida" class="text-end lf-mono" style="color:var(--lf-tinta-3)"><?= D::pesos($c['asignada']) ?></td>
               <td data-label="Devengada" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($c['devengada']) ?></td>
               <td data-label="Pendiente" class="text-end lf-mono" style="color:var(--lf-amb)"><?= D::pesos($c['pendiente']) ?></td>
+              <td style="text-align:right">
+                <?php if ($esAdmin): ?>
+                  <button type="button" class="lf-btn-ghost lf-quitar-com"
+                          data-com="<?= (int)$c['id'] ?>"
+                          data-quien="<?= P::e($c['colaborador_nombre']) ?>"
+                          title="Quitar esta comisión">&times;</button>
+                <?php endif; ?>
+              </td>
             </tr>
           <?php endforeach; ?>
           </tbody>
@@ -179,6 +188,57 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
       <div class="card-footer">
         Se ha cobrado el <?= $avance ?>%, así que solo se devenga esa parte.
         Lo pendiente se libera conforme el cliente pague.
+      </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ($esAdmin && $v['estado'] !== 'cancelada'): ?>
+    <section class="card">
+      <header class="card-header">
+        <span><?= $comisiones ? 'Agregar otra comisión' : 'Asignar comisión' ?></span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Se calcula sobre el neto de <?= D::pesos($neto) ?>, sin IVA y ya con los gastos restados</p>
+      </header>
+      <div class="card-body">
+        <?php if ($neto <= 0): ?>
+          <p style="font-size:13px;color:var(--lf-amb);margin:0">
+            Esta venta no deja base comisionable: los gastos se comen la utilidad.</p>
+        <?php else: ?>
+        <form method="post" action="/ventas/<?= (int)$v['id'] ?>/comision"
+              style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+          <input type="hidden" name="token" value="<?= P::e($token) ?>">
+          <div style="flex:2;min-width:220px">
+            <label class="form-label">Colaborador</label>
+            <select class="form-select" name="colaborador" id="selColab" required>
+              <option value="">Elegir…</option>
+              <?php foreach ($catalogo as $area => $gente): ?>
+                <optgroup label="<?= P::e($area) ?>">
+                  <?php foreach ($gente as $g): ?>
+                    <option value="<?= (int)$g['id'] ?>"
+                            data-pct="<?= isset($sugeridos[$g['id']]) ? $sugeridos[$g['id']] : '' ?>">
+                      <?= P::e($g['nombre']) ?></option>
+                  <?php endforeach; ?>
+                </optgroup>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <div style="width:118px">
+            <label class="form-label">Porcentaje</label>
+            <input class="form-control lf-mono" type="number" name="pct" id="inpPct"
+                   step="0.01" min="0.01" max="100" placeholder="0.00" required>
+          </div>
+          <div style="width:128px">
+            <label class="form-label">Le tocarían</label>
+            <input class="form-control lf-mono" id="prevCom" value="—" readonly
+                   style="background:var(--lf-vidrio);border-style:dashed">
+          </div>
+          <button class="btn btn-primary" type="submit">Asignar</button>
+        </form>
+        <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px">
+          El porcentaje se sugiere solo con el que ese colaborador suele cobrar.
+          Nadie puede tener dos comisiones en la misma venta.
+        </p>
+        <?php endif; ?>
       </div>
     </section>
     <?php endif; ?>
@@ -260,12 +320,46 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 </div>
 
 <?php if ($esAdmin): ?>
+<form method="post" action="/ventas/<?= (int)$v['id'] ?>/quitar-comision" id="formQuitarCom" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="comision" id="comId">
+</form>
 <form method="post" action="/ventas/<?= (int)$v['id'] ?>/cancelar-pago" id="formCancelar" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>">
   <input type="hidden" name="pago" id="cancPago">
   <input type="hidden" name="motivo" id="cancMotivo">
 </form>
 <script>
+// Vista previa de cuánto le tocaría, mientras se escribe.
+(function(){
+  var neto = <?= json_encode((float)$neto) ?>;
+  var sel = document.getElementById('selColab'),
+      pct = document.getElementById('inpPct'),
+      pre = document.getElementById('prevCom');
+  if (!sel || !pct || !pre) return;
+  function pintar(){
+    var p = parseFloat(pct.value);
+    pre.value = isNaN(p) || p <= 0 ? '—'
+      : '$' + (Math.round(neto * p) / 100).toLocaleString('es-MX',
+              {minimumFractionDigits:2, maximumFractionDigits:2});
+  }
+  sel.addEventListener('change', function(){
+    var o = sel.options[sel.selectedIndex];
+    if (o && o.dataset.pct) pct.value = o.dataset.pct;
+    pintar();
+  });
+  pct.addEventListener('input', pintar);
+})();
+
+document.querySelectorAll('.lf-quitar-com').forEach(function(b){
+  b.addEventListener('click', function(){
+    if (!confirm('¿Quitar la comisión de ' + b.dataset.quien + '?\n\n'
+               + 'Se cancela y lo devengado se recalcula.')) return;
+    document.getElementById('comId').value = b.dataset.com;
+    document.getElementById('formQuitarCom').submit();
+  });
+});
+
 document.querySelectorAll('.lf-cancelar').forEach(function(b){
   b.addEventListener('click', function(){
     var m = prompt('¿Por qué se cancela el pago de ' + b.dataset.monto + '?\n\nEl motivo queda registrado.');

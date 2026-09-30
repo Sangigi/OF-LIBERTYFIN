@@ -51,6 +51,8 @@ $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
 $r->post('/ventas/{id}/pagar',        ['LibertyFin\Controlador\VentasControlador', 'pagar']);
 $r->post('/ventas/{id}/cancelar-pago',['LibertyFin\Controlador\VentasControlador', 'cancelarPago']);
+$r->post('/ventas/{id}/comision',        ['LibertyFin\Controlador\VentasControlador', 'asignarComision']);
+$r->post('/ventas/{id}/quitar-comision', ['LibertyFin\Controlador\VentasControlador', 'quitarComision']);
 $r->get('/caja',          ['LibertyFin\Controlador\CajaControlador', 'index']);
 $r->get('/caja/clientes', ['LibertyFin\Controlador\CajaControlador', 'clientes']);
 $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
