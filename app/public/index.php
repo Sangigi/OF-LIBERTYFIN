@@ -32,6 +32,7 @@ date_default_timezone_set($cfg['zona'] ?? 'America/Mexico_City');
 Conexion::configurar($cfg['bd'] + ['zona_sql' => $cfg['zona_sql'] ?? '-06:00']);
 Plantilla::base($raiz . '/src/Vista/plantillas');
 \LibertyFin\Servicio\Integraciones::cargar($raiz);
+\LibertyFin\Servicio\Archivos::destino($raiz . '/public/assets/subidas');
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
 
 // ── Cookie de sesión ──
@@ -97,6 +98,7 @@ $r->post('/usuarios/restablecer',['LibertyFin\Controlador\UsuariosControlador', 
 $r->post('/usuarios/alternar',   ['LibertyFin\Controlador\UsuariosControlador', 'alternar']);
 $r->get('/cuenta',               ['LibertyFin\Controlador\UsuariosControlador', 'miCuenta']);
 $r->post('/cuenta/clave',        ['LibertyFin\Controlador\UsuariosControlador', 'cambiarClave']);
+$r->post('/cuenta/foto',         ['LibertyFin\Controlador\UsuariosControlador', 'guardarFoto']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);

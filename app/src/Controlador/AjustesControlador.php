@@ -53,6 +53,11 @@ final class AjustesControlador
             $principal = Conexion::de($GLOBALS['lf_bd_principal']);
             $datos['empresa'] = (new \LibertyFin\Datos\EmpresaRepo($principal))
                                 ->uno($_SESSION['empresa_id'] ?? 0);
+            $cfg = new \LibertyFin\Datos\ConfigRepo($db);
+            $datos['marca'] = [
+                'color' => $cfg->valorDe('marca.color', '#27ae60'),
+                'logo'  => $cfg->valorDe('marca.logo', ''),
+            ];
         }
         if ($p === 'sucursales') $datos['sucursales'] = $repo->sucursales();
         if ($p === 'comisiones') {
@@ -87,6 +92,30 @@ final class AjustesControlador
                 (new \LibertyFin\Datos\EmpresaRepo($principal))
                     ->actualizar($_SESSION['empresa_id'] ?? 0, $_POST);
                 $_SESSION['empresa_nombre'] = trim($_POST['nombre_empresa'] ?? '');
+
+                $cfg = new \LibertyFin\Datos\ConfigRepo($db);
+
+                // El color entra solo si es un hexadecimal de verdad:
+                // va directo a una etiqueta <style> del HTML.
+                $color = trim($_POST['marca_color'] ?? '');
+                if (preg_match('/^#[0-9a-fA-F]{6}$/', $color)) {
+                    $cfg->guardar('marca.color', $color);
+                    $_SESSION['lf_marca_color'] = $color;
+                }
+
+                if (!empty($_FILES['logo']['name'])) {
+                    $antes = $cfg->valorDe('marca.logo', '');
+                    $ruta  = \LibertyFin\Servicio\Archivos::imagen($_FILES['logo'], 'logo');
+                    $cfg->guardar('marca.logo', $ruta);
+                    $_SESSION['lf_marca_logo'] = $ruta;
+                    if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
+                }
+                if (!empty($_POST['quitar_logo'])) {
+                    $antes = $cfg->valorDe('marca.logo', '');
+                    $cfg->guardar('marca.logo', '');
+                    unset($_SESSION['lf_marca_logo']);
+                    if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
+                }
                 $this->volver('empresa', 'Datos de la empresa actualizados.', 'ok');
             } catch (\InvalidArgumentException $e) {
                 $this->volver('empresa', $e->getMessage(), 'error');

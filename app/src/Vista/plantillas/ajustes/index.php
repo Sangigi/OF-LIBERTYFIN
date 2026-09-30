@@ -37,7 +37,8 @@ $em = $empresa; ?>
   <section class="card">
     <header class="card-header">Datos de la empresa</header>
     <div class="card-body">
-      <form method="post" action="/ajustes/guardar" style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end">
+      <form method="post" action="/ajustes/guardar" enctype="multipart/form-data"
+            style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
         <input type="hidden" name="token" value="<?= P::e($token) ?>">
         <input type="hidden" name="que" value="empresa">
         <div style="flex:2;min-width:220px"><label class="form-label">Razón social</label>
@@ -55,11 +56,87 @@ $em = $empresa; ?>
           <input class="form-control" name="nombre_contacto" value="<?= P::e($em['nombre_contacto'] ?? '') ?>" placeholder="Opcional"></div>
         <div style="flex:1;min-width:190px"><label class="form-label">Correo</label>
           <input class="form-control" type="email" name="email_admin" value="<?= P::e($em['email_admin'] ?? '') ?>" placeholder="Opcional"></div>
+        <div style="width:100%;border-top:1px solid var(--lf-linea);padding-top:18px;
+                    display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start">
+
+          <div style="flex:1;min-width:250px">
+            <label class="form-label">Logotipo</label>
+            <div class="lf-foto">
+              <span class="prev cuadro" id="prevLogo"
+                    style="<?= $marca['logo'] ? "background-image:url('".P::e($marca['logo'])."')" : '' ?>">
+                <?= $marca['logo'] ? '' : P::e(mb_strtoupper(mb_substr($em['nombre_empresa'],0,1))) ?></span>
+              <div style="flex:1;min-width:0">
+                <input type="file" name="logo" id="inpLogo" accept="image/png,image/jpeg,image/webp">
+                <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:6px;line-height:1.4">
+                  Cuadrado, mínimo 128 px. Aparece arriba del menú y en los tickets.
+                </p>
+                <?php if ($marca['logo']): ?>
+                  <label style="font-size:11.5px;color:var(--lf-tinta-3);display:flex;
+                         align-items:center;gap:6px;margin-top:6px;cursor:pointer">
+                    <input type="checkbox" name="quitar_logo" value="1"> Quitar el logotipo
+                  </label>
+                <?php endif; ?>
+              </div>
+            </div>
+          </div>
+
+          <div style="flex:1;min-width:250px">
+            <label class="form-label">Color de la marca</label>
+            <div class="lf-colores">
+              <?php foreach (['#27ae60','#1d6fa5','#7c3aed','#c2410c','#be123c','#0f766e','#2c3e50'] as $c): ?>
+                <span class="lf-color<?= strtolower($marca['color'])===$c ? ' on' : '' ?>"
+                      data-color="<?= $c ?>" style="background:<?= $c ?>"
+                      role="button" tabindex="0" aria-label="Color <?= $c ?>"></span>
+              <?php endforeach; ?>
+              <input class="lf-color-libre" type="color" id="colorLibre"
+                     value="<?= P::e($marca['color']) ?>" aria-label="Otro color">
+              <input type="hidden" name="marca_color" id="marcaColor" value="<?= P::e($marca['color']) ?>">
+            </div>
+            <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:10px;line-height:1.45">
+              Cambia todo el sistema: botones, gráficas, resaltados. Los tonos
+              derivados se calculan solos, así que solo hay que elegir este.
+            </p>
+          </div>
+        </div>
+
         <button class="btn btn-primary" type="submit">Guardar</button>
         <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
-          Estos datos salen en los tickets y en las facturas.
+          El nombre, el RFC y la dirección salen en los tickets y en las facturas.
         </p>
       </form>
+
+      <script>
+      (function(){
+        // Vista previa del logo antes de subirlo
+        var inp = document.getElementById('inpLogo'), prev = document.getElementById('prevLogo');
+        if (inp && prev) inp.addEventListener('change', function(){
+          var f = inp.files && inp.files[0];
+          if (!f) return;
+          prev.style.backgroundImage = "url('" + URL.createObjectURL(f) + "')";
+          prev.textContent = '';
+        });
+
+        // Color: los redondos y el selector libre escriben el mismo campo
+        var oculto = document.getElementById('marcaColor'),
+            libre  = document.getElementById('colorLibre'),
+            raiz   = document.documentElement;
+        function pon(c){
+          oculto.value = c;
+          if (libre) libre.value = c;
+          raiz.style.setProperty('--lf-brand', c);   // se ve al instante
+          document.querySelectorAll('.lf-color').forEach(function(s){
+            s.classList.toggle('on', s.dataset.color.toLowerCase() === c.toLowerCase());
+          });
+        }
+        document.querySelectorAll('.lf-color').forEach(function(s){
+          s.addEventListener('click', function(){ pon(s.dataset.color); });
+          s.addEventListener('keydown', function(e){
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pon(s.dataset.color); }
+          });
+        });
+        if (libre) libre.addEventListener('input', function(){ pon(libre.value); });
+      })();
+      </script>
     </div>
   </section>
 

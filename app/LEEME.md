@@ -381,6 +381,35 @@ La configuración vive en `sistema_config` dentro de la base de cada empresa.
 **Las credenciales no van ahí**: una contraseña en una tabla la ve cualquiera con
 acceso a la base, y todo respaldo se la lleva.
 
+## Personalización
+
+**Color de la marca.** Se elige en Ajustes → Empresa y cambia el sistema entero.
+Solo se guarda ese dato: los hovers, los fondos tenues y los anillos de foco se
+calculan con `color-mix()`. Se ve al instante mientras se elige, antes de
+guardar.
+
+El color entra al HTML dentro de una etiqueta `<style>`, así que se valida contra
+`/^#[0-9a-fA-F]{6}$/` antes de escribirlo. Cualquier otra cosa se descarta.
+
+**Logotipo de la empresa**, **foto de perfil** y **imagen del servicio**. Las
+tres pasan por `Servicio\Archivos`, con estas defensas en orden de importancia:
+
+1. El tipo se deduce del **contenido** con `getimagesize()`, no del nombre ni del
+   Content-Type: los dos los escribe quien sube el archivo.
+2. El nombre se descarta entero y se genera uno aleatorio con la extensión del
+   tipo real.
+3. `public/assets/subidas/.htaccess` apaga PHP en esa carpeta. Si algo se cuela,
+   queda inerte.
+4. Tope de 3 MB y de 4000 píxeles por lado.
+
+La personalización se lee al entrar y vive en la sesión: el armazón la pinta en
+cada página, y consultarla cada vez sería una consulta más por petición para un
+dato que casi nunca cambia.
+
+`14_fotos.sql` agrega la columna de foto en usuarios. Hasta que se corra, el
+sistema funciona igual y no guarda fotos de perfil. La del servicio no necesita
+migración: `productos.imagen` ya existe.
+
 ## Notas de maqueta
 
 **La app NO carga Bootstrap.** `libertyfin.css` se escribió como capa encima de

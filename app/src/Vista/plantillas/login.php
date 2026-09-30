@@ -39,7 +39,10 @@ $token = $_SESSION['lf_token'];
       </div>
     </div>
 
-    <button class="lf-entrar" type="submit" <?= $bloqueo > 0 ? 'disabled' : '' ?>>Entrar</button>
+    <button class="lf-entrar" type="submit" id="btnEntrar" <?= $bloqueo > 0 ? 'disabled' : '' ?>>
+      <span class="txt">Entrar</span>
+      <span class="giro" aria-hidden="true"></span>
+    </button>
   </form>
 
   <p class="lf-acceso-pie">
@@ -48,6 +51,29 @@ $token = $_SESSION['lf_token'];
 </main>
 
 <script>
+(function(){
+  // Al enviar, el botón pasa a girar. El ingreso hace varias consultas
+  // y espera 350 ms a propósito para que un usuario que no existe tarde
+  // lo mismo que uno que sí: sin señal visible, ese silencio se siente
+  // como que el clic no funcionó y la gente vuelve a picarle.
+  var f = document.querySelector('.lf-acceso-form'), b = document.getElementById('btnEntrar');
+  if (f && b) f.addEventListener('submit', function(){
+    if (!f.checkValidity || f.checkValidity()) {
+      b.classList.add('cargando');
+      b.disabled = true;
+      // Si el navegador vuelve atrás con la página en caché, el botón
+      // seguiría girando para siempre.
+      setTimeout(function(){ b.classList.remove('cargando'); b.disabled = false; }, 12000);
+    }
+  });
+})();
+
+window.addEventListener('pageshow', function(e){
+  if (!e.persisted) return;
+  var b = document.getElementById('btnEntrar');
+  if (b) { b.classList.remove('cargando'); b.disabled = false; }
+});
+
 (function(){
   var o = document.getElementById('ojo'), c = document.getElementById('clave');
   if (!o || !c) return;

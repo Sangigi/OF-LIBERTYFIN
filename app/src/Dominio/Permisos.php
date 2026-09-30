@@ -96,6 +96,27 @@ final class Permisos
         'diagnostico'      => ['soporte'],
     ];
 
+    /**
+     * El nombre legible de un rol, sin quedarse nunca en blanco.
+     *
+     * Si en la base hay un rol que esta versión no conoce —porque venía
+     * del sistema anterior o porque alguien lo escribió a mano— se
+     * muestra el valor crudo. Una celda vacía hace pensar que el dato
+     * se perdió; ver "empleado" dice exactamente qué pasa.
+     */
+    public static function rotulo($rol)
+    {
+        $rol = trim((string)$rol);
+        if ($rol === '') return 'sin rol asignado';
+        return self::ROLES[$rol]['rotulo'] ?? $rol;
+    }
+
+    /** ¿Es un rol que esta versión conoce? */
+    public static function conocido($rol)
+    {
+        return isset(self::ROLES[trim((string)$rol)]);
+    }
+
     public static function puede($permiso, $rol = null)
     {
         $rol = $rol ?? ($_SESSION['usuario_rol'] ?? '');

@@ -174,4 +174,37 @@ final class UsuarioRepo extends Repo
                  ->execute([(int)$id]);
         return (int)$this->valor("SELECT COALESCE(activo,1) FROM usuarios WHERE id = ?", [(int)$id]);
     }
+
+    /**
+     * ¿Existe la columna `foto`? Se pregunta una vez.
+     * La agrega 14_fotos.sql; sin ella el sistema funciona igual.
+     */
+    private function tieneFoto()
+    {
+        static $t = null;
+        if ($t !== null) return $t;
+        try {
+            $t = (bool)$this->valor("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios' AND COLUMN_NAME = 'foto'");
+        } catch (\Throwable $e) { $t = false; }
+        return $t;
+    }
+
+    public function foto($id)
+    {
+        if (!$this->tieneFoto()) return '';
+        return (string)$this->valor("SELECT COALESCE(foto,'') FROM usuarios WHERE id = ?", [(int)$id]);
+    }
+
+    public function guardarFoto($id, $ruta)
+    {
+        if (!$this->tieneFoto()) {
+            throw new \InvalidArgumentException(
+                'Falta correr 14_fotos.sql para poder guardar fotos de perfil');
+        }
+        $this->db->prepare("UPDATE usuarios SET foto = ? WHERE id = ?")
+                 ->execute([$ruta ?: null, (int)$id]);
+        return true;
+    }
 }

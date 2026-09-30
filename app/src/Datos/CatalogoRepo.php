@@ -27,7 +27,7 @@ final class CatalogoRepo extends Repo
             $l = '%' . $buscar . '%'; $p[] = $l; $p[] = $l;
         }
         return $this->todos("
-            SELECT p.id, p.codigo, p.nombre,
+            SELECT p.id, p.codigo, p.nombre, p.imagen,
                    COALESCE(NULLIF(p.subprecio,0), p.precio) AS precio,
                    p.costo, p.categoria_id,
                    c.nombre AS categoria,

@@ -6,8 +6,7 @@ use LibertyFin\Dominio\Permisos; ?>
       <?= W::icono('alerta','26px') ?></div>
     <h2 style="font-size:19px;margin-bottom:8px">Esta sección no es para tu rol</h2>
     <p style="color:var(--lf-tinta-3);font-size:13.5px;line-height:1.6;margin-bottom:6px">
-      Entraste como <b><?= P::e(Permisos::ROLES[$_SESSION['usuario_rol'] ?? '']['rotulo']
-                          ?? ($_SESSION['usuario_rol'] ?? 'usuario')) ?></b>,
+      Entraste como <b><?= P::e(Permisos::rotulo($_SESSION['usuario_rol'] ?? '')) ?></b>,
       y este rol no incluye ese permiso.
     </p>
     <p style="color:var(--lf-tinta-4);font-size:12px;margin-bottom:24px">

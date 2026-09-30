@@ -52,7 +52,7 @@ final class ServicioRepo extends Repo
         if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
                               $l = '%' . $buscar . '%'; $p[] = $l; $p[] = $l; }
         return $this->todos("
-            SELECT p.id, p.codigo, p.nombre,
+            SELECT p.id, p.codigo, p.nombre, p.imagen,
                    COALESCE(NULLIF(p.subprecio,0), p.precio) AS precio,
                    cat.nombre AS categoria,
                    COALESCE(x.veces,0)   AS ventas,
@@ -141,6 +141,18 @@ final class ServicioRepo extends Repo
 
         $cat = (int)($d['categoria_id'] ?? 0) ?: null;
         return [$codigo, $nombre, trim($d['descripcion'] ?? '') ?: null, $precio, $costo, $cat];
+    }
+
+    public function guardarImagen($id, $ruta)
+    {
+        $this->db->prepare("UPDATE productos SET imagen = ? WHERE id = ?")
+                 ->execute([$ruta ?: null, (int)$id]);
+        return true;
+    }
+
+    public function imagenDe($id)
+    {
+        return (string)$this->valor("SELECT COALESCE(imagen,'') FROM productos WHERE id = ?", [(int)$id]);
     }
 
     public function crear(array $d)

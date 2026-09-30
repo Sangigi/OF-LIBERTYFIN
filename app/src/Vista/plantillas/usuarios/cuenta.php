@@ -11,6 +11,19 @@ $token = $_SESSION['lf_token'];
 <div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>
 </div>
+
+<script>
+(function(){
+  var i = document.getElementById('inpFoto'), p = document.getElementById('prevFoto');
+  if (!i || !p) return;
+  i.addEventListener('change', function(){
+    var f = i.files && i.files[0];
+    if (!f) return;
+    p.style.backgroundImage = "url('" + URL.createObjectURL(f) + "')";
+    p.textContent = '';
+  });
+})();
+</script>
 <?php endif; ?>
 
 <div class="lf-split">
@@ -42,11 +55,37 @@ $token = $_SESSION['lf_token'];
   </section>
 
   <section class="card">
+    <header class="card-header">Mi foto</header>
+    <div class="card-body">
+      <form method="post" action="/cuenta/foto" enctype="multipart/form-data">
+        <input type="hidden" name="token" value="<?= P::e($token) ?>">
+        <div class="lf-foto">
+          <span class="prev" id="prevFoto"
+                style="<?= $foto ? "background-image:url('".P::e($foto)."')" : '' ?>">
+            <?= $foto ? '' : P::e(mb_strtoupper(mb_substr($_SESSION['usuario_nombre'] ?? 'U',0,1))) ?></span>
+          <div style="flex:1;min-width:0">
+            <input type="file" name="foto" id="inpFoto" accept="image/png,image/jpeg,image/webp">
+            <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:6px;line-height:1.4">
+              Cuadrada. Se recorta en círculo y aparece en el menú.
+            </p>
+          </div>
+        </div>
+        <div style="display:flex;gap:9px;margin-top:16px;flex-wrap:wrap">
+          <button class="btn btn-primary" type="submit">Guardar foto</button>
+          <?php if ($foto): ?>
+            <button class="btn btn-secondary" type="submit" name="quitar" value="1">Quitar</button>
+          <?php endif; ?>
+        </div>
+      </form>
+    </div>
+  </section>
+
+  <section class="card">
     <header class="card-header">Mis datos</header>
     <div class="card-body" style="font-size:13px">
       <?php foreach ([
         'Nombre'   => $_SESSION['usuario_nombre'] ?? '',
-        'Rol'      => (Perm::ROLES[$_SESSION['usuario_rol'] ?? '']['rotulo'] ?? ($_SESSION['usuario_rol'] ?? '')),
+        'Rol'      => Perm::rotulo($_SESSION['usuario_rol'] ?? ''),
         'Empresa'  => $_SESSION['empresa_nombre'] ?? '',
         'Sucursal' => $_SESSION['sucursal_nombre'] ?? '',
       ] as $k => $v): if ($v === '') continue; ?>

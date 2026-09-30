@@ -109,8 +109,15 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               </span>
             </span>
           </td>
-          <td data-label="Rol"><span class="badge <?= $u['rol']==='admin'?'bg-success':'bg-secondary' ?>">
-            <?= P::e(Perm::ROLES[$u['rol']]['rotulo'] ?? $u['rol']) ?></span></td>
+          <td data-label="Rol">
+            <span class="badge <?= $u['rol']==='admin' ? 'bg-success'
+                                 : (Perm::conocido($u['rol']) ? 'bg-secondary' : 'bg-warning') ?>">
+              <?= P::e(Perm::rotulo($u['rol'])) ?></span>
+            <?php if (!Perm::conocido($u['rol'])): ?>
+              <span style="display:block;color:var(--lf-amb);font-size:11px;margin-top:3px">
+                El sistema no reconoce este rol: no tiene permisos</span>
+            <?php endif; ?>
+          </td>
           <td data-label="Sucursal" style="font-size:12.5px"><?= P::e($u['sucursal'] ?: '—') ?></td>
           <td data-label="Ventas" class="text-end lf-mono"><?= (int)$u['ventas'] ?></td>
           <td data-label="Estado">

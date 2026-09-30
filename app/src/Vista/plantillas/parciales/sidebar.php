@@ -60,14 +60,41 @@ foreach ($secciones as $s) {
     $menu[] = $s;
 }
 
+/**
+ * Qué entrada se marca como activa.
+ *
+ * Antes se comparaba por icono, y dos secciones que comparten icono se
+ * encendían juntas: Caja y Corte usan 'caja', Clientes y Usuarios usan
+ * 'cliente'. Se compara por ruta, que es lo único único.
+ *
+ * Gana la coincidencia más larga: estando en /ventas/137 debe marcarse
+ * /ventas, no la raíz.
+ */
+$aqui = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+$activa = '/'; $largo = 0;
+foreach ($menu as $m) {
+    if (isset($m['grupo'])) continue;
+    $r = $m['ruta'];
+    $coincide = ($r === '/') ? ($aqui === '/') : ($aqui === $r || strpos($aqui, $r . '/') === 0);
+    if ($coincide && strlen($r) >= $largo) { $activa = $r; $largo = strlen($r); }
+}
+// Usuarios y Mi cuenta viven bajo Ajustes en el menú.
+if (strpos($aqui, '/usuarios') === 0) $activa = '/ajustes';
+
 $u   = $_SESSION['usuario_nombre'] ?? 'Usuario';
-$rol = Permisos::ROLES[$_SESSION['usuario_rol'] ?? '']['rotulo'] ?? ($_SESSION['usuario_rol'] ?? '');
+$rol = Permisos::rotulo($_SESSION['usuario_rol'] ?? '');
 $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
 ?>
 <aside class="lf-side">
   <div class="lf-marca">
-    <span class="g">L</span>
-    <span><b>LibertyFin</b><small><?= P::e($_SESSION['sucursal_nombre'] ?? 'Matriz') ?></small></span>
+    <?php $logo = $_SESSION['lf_marca_logo'] ?? ''; ?>
+    <?php if ($logo): ?>
+      <img class="g" src="<?= P::e($logo) ?>" alt="" width="38" height="38">
+    <?php else: ?>
+      <span class="g"><?= P::e(mb_strtoupper(mb_substr($_SESSION['empresa_nombre'] ?? 'L', 0, 1))) ?></span>
+    <?php endif; ?>
+    <span><b><?= P::e($_SESSION['empresa_nombre'] ?? 'LibertyFin') ?></b>
+      <small><?= P::e($_SESSION['sucursal_nombre'] ?? 'Matriz') ?></small></span>
   </div>
 
   <nav class="lf-nav">
@@ -75,7 +102,7 @@ $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
       <?php if (isset($m['grupo'])): ?>
         <div class="sec"><?= P::e($m['grupo']) ?></div>
       <?php else: ?>
-        <a href="<?= P::e($m['ruta']) ?>" class="<?= ($activo === $m['icono'] ? 'on' : '') ?>">
+        <a href="<?= P::e($m['ruta']) ?>" class="<?= ($activa === $m['ruta'] ? 'on' : '') ?>">
           <?= W::icono($m['icono'], '17px') ?><?= P::e($m['texto']) ?>
         </a>
       <?php endif; ?>
@@ -84,7 +111,10 @@ $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
 
   <div class="lf-pie">
     <div class="lf-ucard">
-      <a href="/cuenta" class="lf-av" title="Mi cuenta" style="text-decoration:none"><?= P::e($ini) ?></a>
+      <?php $foto = $_SESSION['lf_foto'] ?? ''; ?>
+      <a href="/cuenta" class="lf-av<?= $foto ? ' con-foto' : '' ?>" title="Mi cuenta"
+         style="text-decoration:none<?= $foto ? ";background-image:url('" . P::e($foto) . "')" : '' ?>">
+        <?= $foto ? '' : P::e($ini) ?></a>
       <span style="flex:1;min-width:0"><b><?= P::e($u) ?></b><small><?= P::e($rol) ?></small></span>
       <a href="/salir" class="lf-btn-ghost" title="Cerrar sesión" style="flex-shrink:0">
         <?= W::icono('baja','15px') ?></a>

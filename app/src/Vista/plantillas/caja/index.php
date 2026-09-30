@@ -48,7 +48,9 @@ $token = $_SESSION['lf_token'];
                 data-id="<?= (int)$s['id'] ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
                 data-precio="<?= (float)$s['precio'] ?>">
-          <span class="e"><?= W::icono('serv','17px') ?></span>
+          <span class="e"<?= !empty($s['imagen'])
+              ? ' style="background-image:url(\''.P::e($s['imagen']).'\');background-size:cover"' : '' ?>>
+            <?= !empty($s['imagen']) ? '' : W::icono('serv','17px') ?></span>
           <b><?= P::e($s['nombre']) ?></b>
           <small><?= P::e($s['codigo']) ?></small>
           <span class="p"><?= (float)$s['precio'] > 0 ? D::pesos($s['precio']) : 'Precio libre' ?></span>

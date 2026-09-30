@@ -24,7 +24,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     <?= W::icono($e ? 'serv' : 'mas','16px') ?>
     <?= $e ? 'Editar ' . P::e($e['nombre']) : 'Dar de alta un servicio' ?>
   </summary>
-  <form method="post" action="/servicios/guardar" class="lf-form">
+  <form method="post" action="/servicios/guardar" class="lf-form" enctype="multipart/form-data">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
     <div style="flex:2;min-width:220px">
@@ -56,6 +56,23 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
       <label class="form-label">Costo</label>
       <input class="form-control lf-mono" type="number" name="costo" step="0.01" min="0"
              value="<?= P::e($e['costo'] ?? '0') ?>">
+    </div>
+    <div style="flex:1;min-width:230px">
+      <label class="form-label">Imagen</label>
+      <div class="lf-foto">
+        <span class="prev cuadro" id="prevServ" style="width:48px;height:48px;font-size:16px;
+              <?= !empty($e['imagen']) ? "background-image:url('".P::e($e['imagen'])."')" : '' ?>">
+          <?= !empty($e['imagen']) ? '' : '+' ?></span>
+        <div style="flex:1;min-width:0">
+          <input type="file" name="imagen" id="inpServ" accept="image/png,image/jpeg,image/webp">
+          <?php if (!empty($e['imagen'])): ?>
+            <label style="font-size:11px;color:var(--lf-tinta-3);display:flex;
+                   align-items:center;gap:6px;margin-top:5px;cursor:pointer">
+              <input type="checkbox" name="quitar_imagen" value="1"> Quitar
+            </label>
+          <?php endif; ?>
+        </div>
+      </div>
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
@@ -149,7 +166,14 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
       <?php endif; ?>
       <?php foreach ($catalogo as $s): ?>
         <tr>
-          <td data-label="Servicio"><b style="font-weight:600"><?= P::e($s['nombre']) ?></b></td>
+          <td data-label="Servicio">
+            <span style="display:flex;align-items:center;gap:10px">
+              <span class="lf-mini-img"
+                    style="<?= !empty($s['imagen']) ? "background-image:url('".P::e($s['imagen'])."')" : '' ?>">
+                <?= !empty($s['imagen']) ? '' : W::icono('serv','14px') ?></span>
+              <b style="font-weight:600"><?= P::e($s['nombre']) ?></b>
+            </span>
+          </td>
           <td data-label="Código"><span class="badge bg-secondary"><?= P::e($s['codigo']) ?></span></td>
           <td data-label="Área"><span class="badge bg-secondary"><?= P::e($s['categoria'] ?: 'Sin área') ?></span></td>
           <td data-label="Precio" class="text-end lf-mono"><?= D::pesos($s['precio']) ?></td>
@@ -193,4 +217,17 @@ document.querySelectorAll('.lf-alternar').forEach(function(b){
     document.getElementById('formAlternar').submit();
   });
 });
+</script>
+
+<script>
+(function(){
+  var i = document.getElementById('inpServ'), p = document.getElementById('prevServ');
+  if (!i || !p) return;
+  i.addEventListener('change', function(){
+    var f = i.files && i.files[0];
+    if (!f) return;
+    p.style.backgroundImage = "url('" + URL.createObjectURL(f) + "')";
+    p.textContent = '';
+  });
+})();
 </script>

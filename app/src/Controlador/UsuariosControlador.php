@@ -87,7 +87,12 @@ final class UsuariosControlador
 
     public function miCuenta()
     {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $foto = (new UsuarioRepo($db))->foto($_SESSION['usuario_id'] ?? 0);
+        $_SESSION['lf_foto'] = $foto;
+
         Plantilla::pagina('usuarios/cuenta', [
+            'foto'      => $foto,
             'titulo'    => 'Mi cuenta',
             'icono'     => 'cliente',
             'subtitulo' => $_SESSION['usuario_nombre'] ?? '',
@@ -141,5 +146,34 @@ final class UsuariosControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: ' . $destino); exit;
+    }
+
+    /** Foto de perfil. Cada quien la suya, sin pedir permiso a nadie. */
+    public function guardarFoto()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token('/cuenta');
+        $repo = new UsuarioRepo($db);
+        $id   = (int)($_SESSION['usuario_id'] ?? 0);
+        try {
+            if (!empty($_POST['quitar'])) {
+                $antes = $repo->foto($id);
+                $repo->guardarFoto($id, '');
+                unset($_SESSION['lf_foto']);
+                if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
+                $this->volver('/cuenta', 'Foto quitada.', 'ok');
+            }
+            $antes = $repo->foto($id);
+            $ruta  = \LibertyFin\Servicio\Archivos::imagen($_FILES['foto'] ?? [], 'perfil');
+            $repo->guardarFoto($id, $ruta);
+            $_SESSION['lf_foto'] = $ruta;
+            if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
+            $this->volver('/cuenta', 'Foto actualizada.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver('/cuenta', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] foto: ' . $e->getMessage());
+            $this->volver('/cuenta', 'No se pudo guardar la foto.', 'error');
+        }
     }
 }
