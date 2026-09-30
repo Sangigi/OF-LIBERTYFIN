@@ -60,6 +60,9 @@ $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
 $r->get('/clientes',  ['LibertyFin\Controlador\ClientesControlador',  'index']);
 $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
+$r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  'guardar']);
+$r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
+$r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);

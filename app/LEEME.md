@@ -134,10 +134,30 @@ Reglas que impone el servicio:
 - Si los gastos se comen la utilidad, no deja asignar
 - Quitar una comisión la cancela, no la borra, y resincroniza lo devengado
 
+## Alta y edición de clientes y servicios
+
+Un panel plegable arriba de cada listado, hecho con `<details>`: se abre y se
+cierra sin una línea de JavaScript. Editar es el mismo formulario con los datos
+cargados.
+
+**Clientes.** Valida el RFC con su formato real, el correo, y guarda del
+teléfono solo lo que sirve para marcar. Rechaza nombres repetidos: dos clientes
+con el mismo nombre son casi siempre captura duplicada, que fue justo lo que
+llenó julio de basura.
+
+**Servicios.** El código no se puede repetir: si dos servicios lo comparten, es
+imposible saber cuál se vendió. Y el costo no puede superar al precio, porque
+eso daría una base comisionable negativa.
+
+Un servicio no se borra nunca, se desactiva. Borrarlo dejaría ventas apuntando
+a un producto que ya no existe.
+
+Las validaciones baratas van antes de consultar la base: no tiene sentido ir a
+buscar códigos duplicados para terminar rechazando un precio en cero.
+
 ## Lo que falta
 
 - Restablecer contraseña
-- Editar servicios y clientes desde la app
 - Comisión por producto cuando la venta tiene varios
 
 ## Ingreso

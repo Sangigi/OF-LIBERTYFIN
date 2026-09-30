@@ -6,7 +6,67 @@ use LibertyFin\Dominio\Dinero as D;
 $mv  = $resumen['mas_vendido'] ?? null;
 $at  = $resumen['area_top'] ?? null;
 $tot = 0; foreach ($areas as $a) $tot += (float)$a['monto'];
+if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
+$token = $_SESSION['lf_token'];
+$e = $editando;
+$qs = function (array $x = []) use ($desde,$hasta,$buscar) {
+    return '?' . http_build_query(array_merge(['desde'=>$desde,'hasta'=>$hasta,'q'=>$buscar], $x)); };
 ?>
+
+<?php if ($aviso): ?>
+<div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>
+</div>
+<?php endif; ?>
+
+<details class="lf-alta" <?= $abrir ? 'open' : '' ?>>
+  <summary>
+    <?= W::icono($e ? 'serv' : 'mas','16px') ?>
+    <?= $e ? 'Editar ' . P::e($e['nombre']) : 'Dar de alta un servicio' ?>
+  </summary>
+  <form method="post" action="/servicios/guardar" class="lf-form">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
+    <div style="flex:2;min-width:220px">
+      <label class="form-label">Nombre</label>
+      <input class="form-control" name="nombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
+    </div>
+    <div style="width:130px">
+      <label class="form-label">Código</label>
+      <input class="form-control" name="codigo" value="<?= P::e($e['codigo'] ?? '') ?>"
+             style="text-transform:uppercase" required>
+    </div>
+    <div style="flex:1;min-width:150px">
+      <label class="form-label">Área</label>
+      <select class="form-select" name="categoria_id">
+        <option value="">Sin área</option>
+        <?php foreach ($categorias as $c): ?>
+          <option value="<?= (int)$c['id'] ?>"
+            <?= (isset($e['categoria_id']) && (int)$e['categoria_id'] === (int)$c['id']) ? 'selected' : '' ?>>
+            <?= P::e($c['nombre']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div style="width:130px">
+      <label class="form-label">Precio</label>
+      <input class="form-control lf-mono" type="number" name="precio" step="0.01" min="0.01"
+             value="<?= P::e($e['subprecio'] ?? $e['precio'] ?? '') ?>" required>
+    </div>
+    <div style="width:130px">
+      <label class="form-label">Costo</label>
+      <input class="form-control lf-mono" type="number" name="costo" step="0.01" min="0"
+             value="<?= P::e($e['costo'] ?? '0') ?>">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
+      <?php if ($e): ?><a class="btn btn-secondary" href="/servicios">Cancelar</a><?php endif; ?>
+    </div>
+    <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
+      El precio es lo que se cobra al cliente. El costo se resta de la utilidad antes
+      de calcular comisiones, así que no puede ser mayor al precio.
+    </p>
+  </form>
+</details>
 
 <form class="lf-filtros" method="get">
   <div class="lf-search">
@@ -75,11 +135,12 @@ $tot = 0; foreach ($areas as $a) $tot += (float)$a['monto'];
     <table class="table table-hover">
       <thead><tr>
         <th>Servicio</th><th>Código</th><th>Área</th>
-        <th class="text-end">Precio</th><th class="text-end">Ventas</th><th class="text-end">Ingreso</th>
+        <th class="text-end">Precio</th><th class="text-end">Ventas</th>
+        <th class="text-end">Ingreso</th><th></th>
       </tr></thead>
       <tbody>
       <?php if (!$catalogo): ?>
-        <tr><td colspan="6" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
+        <tr><td colspan="7" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
           No hay servicios que coincidan.</td></tr>
       <?php endif; ?>
       <?php foreach ($catalogo as $s): ?>
@@ -96,6 +157,13 @@ $tot = 0; foreach ($areas as $a) $tot += (float)$a['monto'];
               <span class="badge bg-warning">Sin ventas</span>
             <?php endif; ?>
           </td>
+          <td style="text-align:right;white-space:nowrap">
+            <a class="lf-btn-ghost" href="<?= P::e($qs(['editar'=>$s['id']])) ?>"
+               title="Editar"><?= W::icono('serv','15px') ?></a>
+            <button type="button" class="lf-btn-ghost lf-alternar"
+                    data-id="<?= (int)$s['id'] ?>" data-nombre="<?= P::e($s['nombre']) ?>"
+                    title="Desactivar">&times;</button>
+          </td>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -106,3 +174,18 @@ $tot = 0; foreach ($areas as $a) $tot += (float)$a['monto'];
     <span>Cobrado en el periodo <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($tot) ?></b></span>
   </div>
 </section>
+
+<form method="post" action="/servicios/alternar" id="formAlternar" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="id" id="altId">
+</form>
+<script>
+document.querySelectorAll('.lf-alternar').forEach(function(b){
+  b.addEventListener('click', function(){
+    if (!confirm('¿Desactivar "' + b.dataset.nombre + '"?\n\n'
+      + 'Deja de aparecer en Caja, pero las ventas que ya lo usaron no se tocan.')) return;
+    document.getElementById('altId').value = b.dataset.id;
+    document.getElementById('formAlternar').submit();
+  });
+});
+</script>

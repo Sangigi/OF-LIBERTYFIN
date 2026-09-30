@@ -1063,3 +1063,17 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 :root[data-theme="dark"] .lf-tp .ci{color:#5fd48f}
 :root[data-theme="dark"] .lf-curva .ar{fill:rgba(39,174,96,.16)}
 :root[data-theme="dark"] .lf-seg > span{opacity:.88}
+
+
+/* ══════════════════════════════════════════════════════
+   22 · PANEL DE ALTA · <details> sin JavaScript
+   ══════════════════════════════════════════════════════ */
+.lf-alta{background:var(--lf-sup);border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r-lg);box-shadow:var(--lf-s1);margin-bottom:18px;overflow:hidden}
+.lf-alta > summary{display:flex;align-items:center;gap:9px;padding:15px 20px;
+  cursor:pointer;font-weight:600;font-size:14px;list-style:none;user-select:none}
+.lf-alta > summary::-webkit-details-marker{display:none}
+.lf-alta > summary:hover{background:var(--lf-vidrio)}
+.lf-alta > summary svg{color:var(--lf-brand)}
+.lf-alta[open] > summary{border-bottom:1px solid var(--lf-linea)}
+.lf-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:18px 20px}

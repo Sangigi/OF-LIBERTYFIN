@@ -129,4 +129,67 @@ final class ClienteRepo extends Repo
                 AND v.total - COALESCE(pg.cobrado,0) > 0.01
             ) x") ?: [];
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // ALTA Y EDICION
+    // ─────────────────────────────────────────────────────────────
+
+    public function uno_($id)
+    {
+        return $this->uno("SELECT * FROM clientes WHERE id = ?", [(int)$id]);
+    }
+
+    /**
+     * Valida y normaliza lo que llega del formulario.
+     * @throws \InvalidArgumentException con un mensaje apto para mostrar
+     */
+    private function limpiar(array $d, $idActual = null)
+    {
+        $nombre = trim($d['nombre'] ?? '');
+        if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
+        if (mb_strlen($nombre) > 150) throw new \InvalidArgumentException('El nombre es demasiado largo');
+
+        $rfc = mb_strtoupper(trim($d['rfc'] ?? ''));
+        if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) {
+            throw new \InvalidArgumentException('El RFC no tiene el formato correcto');
+        }
+        $email = trim($d['email'] ?? '');
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('El correo no es válido');
+        }
+        // Del teléfono se guarda solo lo que sirve para marcar.
+        $tel = preg_replace('/[^0-9+]/', '', (string)($d['telefono'] ?? ''));
+
+        // Mismo nombre dos veces es casi siempre captura duplicada, y fue
+        // justo lo que llenó julio de basura.
+        $sql = "SELECT id FROM clientes WHERE nombre = ?";
+        $p = [$nombre];
+        if ($idActual) { $sql .= " AND id <> ?"; $p[] = (int)$idActual; }
+        if ($this->valor($sql . " LIMIT 1", $p)) {
+            throw new \InvalidArgumentException('Ya existe un cliente con ese nombre');
+        }
+
+        return [$nombre, $rfc ?: null, $email ?: null, $tel ?: null,
+                trim($d['direccion'] ?? '') ?: null];
+    }
+
+    public function crear(array $d)
+    {
+        list($nombre, $rfc, $email, $tel, $dir) = $this->limpiar($d);
+        $this->db->prepare("
+            INSERT INTO clientes (nombre, rfc, email, telefono, direccion, activo, fecha_creacion)
+            VALUES (?,?,?,?,?,1,NOW())
+        ")->execute([$nombre, $rfc, $email, $tel, $dir]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function actualizar($id, array $d)
+    {
+        list($nombre, $rfc, $email, $tel, $dir) = $this->limpiar($d, $id);
+        $this->db->prepare("
+            UPDATE clientes SET nombre = ?, rfc = ?, email = ?, telefono = ?, direccion = ?
+            WHERE id = ?
+        ")->execute([$nombre, $rfc, $email, $tel, $dir, (int)$id]);
+        return (int)$id;
+    }
 }

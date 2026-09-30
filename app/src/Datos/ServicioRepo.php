@@ -96,4 +96,86 @@ final class ServicioRepo extends Repo
             WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
             GROUP BY area HAVING monto > 0 ORDER BY monto DESC", [$a, $b]);
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // ALTA Y EDICION
+    // ─────────────────────────────────────────────────────────────
+
+    public function uno_($id)
+    {
+        return $this->uno("SELECT * FROM productos WHERE id = ?", [(int)$id]);
+    }
+
+    public function categorias()
+    {
+        return $this->todos("SELECT id, nombre FROM categorias ORDER BY nombre");
+    }
+
+    private function limpiar(array $d, $idActual = null)
+    {
+        $nombre = trim($d['nombre'] ?? '');
+        if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
+
+        $codigo = mb_strtoupper(trim($d['codigo'] ?? ''));
+        if ($codigo === '') throw new \InvalidArgumentException('El código es obligatorio');
+
+        // Lo barato primero. Buscar duplicados es una consulta a la base;
+        // rechazar un precio en cero no cuesta nada. Validar en ese orden
+        // evita ir a la base para descubrir algo que ya se sabía.
+        $precio = round((float)($d['precio'] ?? 0), 2);
+        if ($precio <= 0) throw new \InvalidArgumentException('El precio debe ser mayor a cero');
+        $costo = round((float)($d['costo'] ?? 0), 2);
+        if ($costo < 0) throw new \InvalidArgumentException('El costo no puede ser negativo');
+        if ($costo > $precio) {
+            throw new \InvalidArgumentException('El costo no puede ser mayor al precio');
+        }
+
+        // El código identifica al servicio en toda la operación: repetirlo
+        // hace imposible saber cuál se vendió.
+        $sql = "SELECT id FROM productos WHERE codigo = ?";
+        $p = [$codigo];
+        if ($idActual) { $sql .= " AND id <> ?"; $p[] = (int)$idActual; }
+        if ($this->valor($sql . " LIMIT 1", $p)) {
+            throw new \InvalidArgumentException('Ya hay un servicio con el código ' . $codigo);
+        }
+
+        $cat = (int)($d['categoria_id'] ?? 0) ?: null;
+        return [$codigo, $nombre, trim($d['descripcion'] ?? '') ?: null, $precio, $costo, $cat];
+    }
+
+    public function crear(array $d)
+    {
+        list($codigo, $nombre, $desc, $precio, $costo, $cat) = $this->limpiar($d);
+        // `subprecio` es el precio de venta y `precio` queda de respaldo:
+        // se guardan iguales para que ambas lecturas den lo mismo.
+        $this->db->prepare("
+            INSERT INTO productos (codigo, nombre, descripcion, precio, subprecio, costo,
+                                   categoria_id, stock, stock_minimo, activo)
+            VALUES (?,?,?,?,?,?,?,0,0,1)
+        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function actualizar($id, array $d)
+    {
+        list($codigo, $nombre, $desc, $precio, $costo, $cat) = $this->limpiar($d, $id);
+        $this->db->prepare("
+            UPDATE productos SET codigo = ?, nombre = ?, descripcion = ?,
+                   precio = ?, subprecio = ?, costo = ?, categoria_id = ?,
+                   fecha_actualizacion = NOW()
+            WHERE id = ?
+        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat, (int)$id]);
+        return (int)$id;
+    }
+
+    /**
+     * Activa o desactiva. No se borra nunca: un servicio borrado deja
+     * ventas apuntando a un producto que ya no existe.
+     */
+    public function alternar($id)
+    {
+        $this->db->prepare("UPDATE productos SET activo = 1 - activo WHERE id = ?")
+                 ->execute([(int)$id]);
+        return (int)$this->valor("SELECT activo FROM productos WHERE id = ?", [(int)$id]);
+    }
 }

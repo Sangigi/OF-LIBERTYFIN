@@ -7,11 +7,56 @@ $ini = function ($n) {
     $p = preg_split('/\s+/', trim($n));
     return mb_strtoupper(mb_substr($p[0],0,1) . (isset($p[1]) ? mb_substr($p[1],0,1) : ''));
 };
+if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
+$token = $_SESSION['lf_token'];
+$e = $editando;
 $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     return '?' . http_build_query(array_merge(['desde'=>$desde,'hasta'=>$hasta,'q'=>$buscar], $x));
 };
 $ant = $antiguedad;
 ?>
+
+<?php if ($aviso): ?>
+<div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>
+</div>
+<?php endif; ?>
+
+<details class="lf-alta" <?= $abrir ? 'open' : '' ?>>
+  <summary>
+    <?= W::icono($e ? 'cliente' : 'mas','16px') ?>
+    <?= $e ? 'Editar a ' . P::e($e['nombre']) : 'Dar de alta un cliente' ?>
+  </summary>
+  <form method="post" action="/clientes/guardar" class="lf-form">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
+    <div style="flex:2;min-width:220px">
+      <label class="form-label">Nombre</label>
+      <input class="form-control" name="nombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
+    </div>
+    <div style="flex:1;min-width:140px">
+      <label class="form-label">RFC</label>
+      <input class="form-control" name="rfc" value="<?= P::e($e['rfc'] ?? '') ?>"
+             placeholder="Opcional" style="text-transform:uppercase">
+    </div>
+    <div style="flex:1;min-width:140px">
+      <label class="form-label">Teléfono</label>
+      <input class="form-control" name="telefono" value="<?= P::e($e['telefono'] ?? '') ?>" placeholder="Opcional">
+    </div>
+    <div style="flex:1.5;min-width:180px">
+      <label class="form-label">Correo</label>
+      <input class="form-control" type="email" name="email" value="<?= P::e($e['email'] ?? '') ?>" placeholder="Opcional">
+    </div>
+    <div style="flex:2;min-width:200px">
+      <label class="form-label">Dirección</label>
+      <input class="form-control" name="direccion" value="<?= P::e($e['direccion'] ?? '') ?>" placeholder="Opcional">
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
+      <?php if ($e): ?><a class="btn btn-secondary" href="/clientes">Cancelar</a><?php endif; ?>
+    </div>
+  </form>
+</details>
 
 <form class="lf-filtros" method="get">
   <div class="lf-search">
@@ -91,11 +136,11 @@ $ant = $antiguedad;
     <table class="table table-hover">
       <thead><tr>
         <th>Cliente</th><th>Área</th><th class="text-end">Compras</th>
-        <th class="text-end">Facturado</th><th class="text-end">Saldo</th><th>Última</th>
+        <th class="text-end">Facturado</th><th class="text-end">Saldo</th><th>Última</th><th></th>
       </tr></thead>
       <tbody>
       <?php if (!$clientes): ?>
-        <tr><td colspan="6" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
+        <tr><td colspan="7" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
           Ningún cliente con actividad en este periodo.</td></tr>
       <?php endif; ?>
       <?php foreach ($clientes as $c): $deb = (float)$c['saldo'] > 0.01; ?>
@@ -124,6 +169,10 @@ $ant = $antiguedad;
           </td>
           <td data-label="Última" class="lf-mono" style="font-size:12px">
             <?= date('d M', strtotime($c['ultima'])) ?></td>
+          <td style="text-align:right">
+            <a class="lf-btn-ghost" href="<?= P::e($qs(['editar'=>$c['id']])) ?>"
+               title="Editar"><?= W::icono('cliente','15px') ?></a>
+          </td>
         </tr>
       <?php endforeach; ?>
       </tbody>
