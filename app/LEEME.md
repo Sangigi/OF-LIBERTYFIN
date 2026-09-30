@@ -75,7 +75,7 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/ajustes` | listo · admin y soporte |
 | `/mantenimiento` | listo · solo soporte |
 | `/usuarios` | listo · pestaña de Ajustes |
-| `/cuenta` | listo |
+| `/cuenta` | listo · 5 pestañas |
 
 ## Notas del esquema
 
@@ -415,6 +415,40 @@ poner al día las que nadie ha abierto todavía.
 Los índices se aplican desde la versión 1 de cada empresa a propósito: en una
 base recién creada no se notan, pero ponerlos desde el día uno evita descubrir
 tarde que el listado recorre la tabla entera.
+
+## Mi cuenta
+
+Cinco pestañas. Las últimas cuatro solo las ve quien puede `editar.empresa`: un
+cajero ve únicamente su perfil, porque lo fiscal y el alta de comercio
+comprometen a la empresa entera.
+
+| Pestaña | Para qué |
+|---|---|
+| **Mi perfil** | Foto y contraseña. De cada quien, sin permiso. |
+| **Plan** | Qué plan tiene, cuándo vence, y los tres pasos que faltan para cobrar de verdad |
+| **Datos fiscales** | RFC, CP, razón social y régimen SAT. Lo que el SAT pide para timbrar. |
+| **Cobrar con tarjeta** | El alta de comercio: titular, representante legal, identificación y datos bancarios |
+| **Documentos** | Cinco obligatorios y dos opcionales, con su estado de revisión |
+
+**El aviso de documentación aparece en todas las pestañas**, no solo en la suya.
+Es lo que bloquea poder cobrar de verdad, y esconderlo en una sola hace que se
+olvide.
+
+**La CLABE se valida a 18 dígitos exactos.** Una mal escrita manda el dinero a
+otra cuenta o rebota el alta semanas después, cuando ya nadie recuerda qué se
+capturó.
+
+**Subir un documento de nuevo lo devuelve a "pendiente".** El archivo cambió, así
+que la revisión previa ya no vale.
+
+Las dos tablas (`datos_pago_comercio` y `documentos_comercio`) ya existían en el
+esquema del sistema anterior: se usan tal cual. Si una empresa no las trae, se
+crean solas.
+
+Los documentos aceptan **PDF además de imagen**, y el PDF se valida por su firma
+—los cuatro bytes `%PDF`— no por la extensión. El tope es de 10 MB y no de 3:
+un estado de cuenta escaneado pasa fácil de 3 MB, y rechazarlo obliga a la gente
+a comprimirlo, que es justo donde se rinden.
 
 ## Personalización
 

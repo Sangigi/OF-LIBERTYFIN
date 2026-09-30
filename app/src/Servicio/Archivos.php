@@ -87,6 +87,75 @@ final class Archivos
         return '/assets/subidas/' . $nombre;
     }
 
+    private static $ultimoMime = '';
+    public static function ultimoMime() { return self::$ultimoMime; }
+
+    /**
+     * Guarda un documento: imagen o PDF.
+     *
+     * Los papeles del alta de comercio llegan casi siempre en PDF, así que
+     * getimagesize() no sirve para validarlos. Para el PDF se comprueba la
+     * firma del archivo —los cuatro bytes `%PDF`— que es lo más cercano a
+     * mirar el contenido sin una librería completa.
+     *
+     * El tope es mayor que el de una imagen: un estado de cuenta escaneado
+     * pasa fácil de 3 MB y rechazarlo obligaría a la gente a comprimirlo,
+     * que es justo donde se rinden.
+     */
+    const MAX_DOC = 10485760;   // 10 MB
+
+    public static function documento(array $archivo, $prefijo = 'doc')
+    {
+        if (!isset($archivo['error']) || is_array($archivo['error'])) {
+            throw new \InvalidArgumentException('No se recibió el archivo');
+        }
+        if ($archivo['error'] === UPLOAD_ERR_NO_FILE) {
+            throw new \InvalidArgumentException('No elegiste ningún archivo');
+        }
+        if ($archivo['error'] !== UPLOAD_ERR_OK) {
+            throw new \InvalidArgumentException('No se pudo subir el archivo');
+        }
+        if ($archivo['size'] > self::MAX_DOC) {
+            throw new \InvalidArgumentException(
+                'El archivo no puede pesar más de ' . round(self::MAX_DOC / 1048576) . ' MB');
+        }
+        if (!is_uploaded_file($archivo['tmp_name'])) {
+            throw new \InvalidArgumentException('Origen del archivo no válido');
+        }
+
+        // ¿Imagen?
+        $info = @getimagesize($archivo['tmp_name']);
+        if ($info !== false && isset(self::TIPOS[$info[2]])) {
+            $ext = self::TIPOS[$info[2]];
+            self::$ultimoMime = image_type_to_mime_type($info[2]);
+        } else {
+            // ¿PDF? Se leen los primeros bytes, no la extensión.
+            $f = @fopen($archivo['tmp_name'], 'rb');
+            $cabeza = $f ? fread($f, 5) : '';
+            if ($f) fclose($f);
+            if (strncmp($cabeza, '%PDF-', 5) !== 0) {
+                throw new \InvalidArgumentException(
+                    'Solo se aceptan JPG, PNG, WebP o PDF');
+            }
+            $ext = 'pdf';
+            self::$ultimoMime = 'application/pdf';
+        }
+
+        if (!self::$destino || !is_dir(self::$destino)) {
+            if (!@mkdir(self::$destino, 0755, true) && !is_dir(self::$destino)) {
+                throw new \RuntimeException('No existe la carpeta de subidas');
+            }
+        }
+        $nombre = preg_replace('/[^a-z0-9_-]/i', '', $prefijo) . '_'
+                . bin2hex(random_bytes(10)) . '.' . $ext;
+        $ruta = self::$destino . '/' . $nombre;
+        if (!move_uploaded_file($archivo['tmp_name'], $ruta)) {
+            throw new \RuntimeException('No se pudo guardar el archivo');
+        }
+        @chmod($ruta, 0644);
+        return '/assets/subidas/' . $nombre;
+    }
+
     /** Borra una imagen subida. Solo dentro de la carpeta de subidas. */
     public static function borrar($rutaPublica)
     {

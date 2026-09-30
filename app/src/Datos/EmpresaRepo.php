@@ -20,6 +20,13 @@ final class EmpresaRepo
     const EDITABLES = ['nombre_empresa','giro_comercial','rfc','telefono',
                        'direccion','nombre_contacto','email_admin'];
 
+    /**
+     * Los datos que pide el SAT para timbrar. Viven en la base de la
+     * empresa, no en la principal: son operativos, los captura el propio
+     * negocio y cambian sin que la plataforma se entere.
+     */
+    const FISCALES = ['tipo_persona','rfc_fiscal','cp_fiscal','razon_social','regimen_sat'];
+
     public function uno($id)
     {
         $st = $this->principal->prepare("

@@ -100,6 +100,9 @@ $r->post('/usuarios/alternar',   ['LibertyFin\Controlador\UsuariosControlador', 
 $r->get('/cuenta',               ['LibertyFin\Controlador\UsuariosControlador', 'miCuenta']);
 $r->post('/cuenta/clave',        ['LibertyFin\Controlador\UsuariosControlador', 'cambiarClave']);
 $r->post('/cuenta/foto',         ['LibertyFin\Controlador\UsuariosControlador', 'guardarFoto']);
+$r->post('/cuenta/fiscales',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarFiscales']);
+$r->post('/cuenta/comercio',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarComercio']);
+$r->post('/cuenta/documento',    ['LibertyFin\Controlador\UsuariosControlador', 'subirDocumento']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
@@ -150,7 +153,12 @@ $permisos = [
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',
-  // /cuenta no lleva permiso: cualquiera administra su propia clave.
+  // El perfil y la clave son de cada quien, sin permiso. Los datos
+  // fiscales, el alta de comercio y los documentos comprometen a la
+  // empresa entera: esos sí son de administrador.
+  '/cuenta/fiscales'  => 'editar.empresa',
+  '/cuenta/comercio'  => 'editar.empresa',
+  '/cuenta/documento' => 'editar.empresa',
 ];
 
 $publicas = ['/login', '/salir'];

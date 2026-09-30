@@ -1,7 +1,10 @@
 <?php
 namespace LibertyFin\Controlador;
 
+use LibertyFin\Datos\ConfigRepo;
 use LibertyFin\Datos\Conexion;
+use LibertyFin\Datos\CuentaRepo;
+use LibertyFin\Datos\EmpresaRepo;
 use LibertyFin\Datos\UsuarioRepo;
 use LibertyFin\Http\Peticion;
 use LibertyFin\Servicio\Autenticar;
@@ -85,20 +88,134 @@ final class UsuariosControlador
 
     // ── Mi cuenta · sin rol de administrador ──
 
+    const PESTANAS = [
+        'perfil'    => 'Mi perfil',
+        'plan'      => 'Plan',
+        'fiscales'  => 'Datos fiscales',
+        'comercio'  => 'Cobrar con tarjeta',
+        'documentos'=> 'Documentos',
+    ];
+
     public function miCuenta()
     {
-        $db = Conexion::de($_SESSION['empresa_db']);
+        $db   = Conexion::de($_SESSION['empresa_db']);
+        // Un cajero solo ve su perfil: lo fiscal y el alta de comercio
+        // comprometen a la empresa entera.
+        $suyas = \LibertyFin\Dominio\Permisos::puede('editar.empresa')
+               ? self::PESTANAS : ['perfil' => self::PESTANAS['perfil']];
+        $p = Peticion::opcion('t', array_keys($suyas), 'perfil');
         $foto = (new UsuarioRepo($db))->foto($_SESSION['usuario_id'] ?? 0);
         $_SESSION['lf_foto'] = $foto;
 
-        Plantilla::pagina('usuarios/cuenta', [
-            'foto'      => $foto,
+        $datos = [
             'titulo'    => 'Mi cuenta',
             'icono'     => 'cliente',
-            'subtitulo' => $_SESSION['usuario_nombre'] ?? '',
+            'subtitulo' => $suyas[$p],
+            'pestana'   => $p,
+            'pestanas'  => $suyas,
+            'foto'      => $foto,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
-        ]);
+            'empresa'   => null, 'fiscales' => [], 'comercio' => [],
+            'documentos'=> [], 'estadoDocs' => [],
+        ];
+
+        $cuenta = new CuentaRepo($db);
+        $cfg    = new ConfigRepo($db);
+
+        // El estado de la documentación se muestra en TODAS las pestañas:
+        // es lo que bloquea poder cobrar de verdad, y esconderlo en una
+        // sola hace que se olvide.
+        $datos['estadoDocs'] = $cuenta->estadoDocumentacion();
+
+        if ($p === 'plan') {
+            try {
+                $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+                $datos['empresa'] = (new EmpresaRepo($principal))->uno($_SESSION['empresa_id'] ?? 0);
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] plan: ' . $e->getMessage());
+            }
+        }
+        if ($p === 'fiscales') {
+            foreach (EmpresaRepo::FISCALES as $c) $datos['fiscales'][$c] = $cfg->valorDe('fiscal.' . $c, '');
+        }
+        if ($p === 'comercio')   $datos['comercio'] = $cuenta->comercio();
+        if ($p === 'documentos') $datos['documentos'] = $cuenta->documentos();
+
+        Plantilla::pagina('usuarios/cuenta', $datos);
         unset($_SESSION['lf_aviso']);
+    }
+
+    /** Datos fiscales. Viven en la base de la empresa. */
+    public function guardarFiscales()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token('/cuenta?t=fiscales');
+
+        $rfc = mb_strtoupper(trim($_POST['rfc_fiscal'] ?? ''));
+        if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) {
+            $this->volver('/cuenta?t=fiscales', 'El RFC no tiene el formato correcto.', 'error');
+        }
+        $cp = preg_replace('/\D/', '', (string)($_POST['cp_fiscal'] ?? ''));
+        if ($cp !== '' && strlen($cp) !== 5) {
+            $this->volver('/cuenta?t=fiscales', 'El código postal son 5 dígitos.', 'error');
+        }
+        $reg = trim($_POST['regimen_sat'] ?? '');
+        if ($reg !== '' && !isset(CuentaRepo::REGIMENES[$reg])) {
+            $this->volver('/cuenta?t=fiscales', 'Ese régimen fiscal no existe.', 'error');
+        }
+
+        try {
+            $cfg = new ConfigRepo($db);
+            $cfg->guardar('fiscal.tipo_persona', trim($_POST['tipo_persona'] ?? ''));
+            $cfg->guardar('fiscal.rfc_fiscal',   $rfc);
+            $cfg->guardar('fiscal.cp_fiscal',    $cp);
+            $cfg->guardar('fiscal.razon_social', trim($_POST['razon_social'] ?? ''));
+            $cfg->guardar('fiscal.regimen_sat',  $reg);
+            $this->volver('/cuenta?t=fiscales', 'Datos fiscales guardados.', 'ok');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] fiscales: ' . $e->getMessage());
+            $this->volver('/cuenta?t=fiscales', 'No se pudieron guardar.', 'error');
+        }
+    }
+
+    /** El alta de comercio para procesar pagos. */
+    public function guardarComercio()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token('/cuenta?t=comercio');
+        try {
+            (new CuentaRepo($db))->guardarComercio($_POST, $_SESSION['usuario_id'] ?? 0);
+            $this->volver('/cuenta?t=comercio', 'Datos de comercio guardados.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver('/cuenta?t=comercio', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] comercio: ' . $e->getMessage());
+            $this->volver('/cuenta?t=comercio', 'No se pudieron guardar.', 'error');
+        }
+    }
+
+    /** Sube un documento para revisión. */
+    public function subirDocumento()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token('/cuenta?t=documentos');
+        $tipo = $_POST['tipo'] ?? '';
+        try {
+            $meta = [
+                'nombre' => $_FILES['archivo']['name'] ?? null,
+                'bytes'  => $_FILES['archivo']['size'] ?? null,
+            ];
+            $ruta = \LibertyFin\Servicio\Archivos::documento($_FILES['archivo'] ?? [], 'doc');
+            $meta['mime'] = \LibertyFin\Servicio\Archivos::ultimoMime();
+            (new CuentaRepo($db))->guardarDocumento($tipo, $ruta, $meta, $_SESSION['usuario_id'] ?? 0);
+            $this->volver('/cuenta?t=documentos',
+                'Documento subido. Un administrador de LibertyFin lo revisa en 24 a 72 horas.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver('/cuenta?t=documentos', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] documento: ' . $e->getMessage());
+            $this->volver('/cuenta?t=documentos', 'No se pudo subir el documento.', 'error');
+        }
     }
 
     public function cambiarClave()
