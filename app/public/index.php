@@ -97,6 +97,7 @@ if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
 if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
     $r->post('/recargas/consultar',['LibertyFin\Controlador\RecargasControlador', 'consultar']);
+    $r->post('/recargas/probar',  ['LibertyFin\Controlador\RecargasControlador', 'probar']);
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
@@ -182,6 +183,7 @@ $permisos = [
   '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',
   '/recargas/consultar'     => 'ver.recargas',
+  '/recargas/probar'        => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
   '/conocimiento'           => 'ver.conocimiento',
   '/conocimiento/guardar'   => 'editar.conocimiento',

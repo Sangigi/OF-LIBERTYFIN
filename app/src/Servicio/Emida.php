@@ -51,28 +51,112 @@ final class Emida
             throw new \RuntimeException(
                 'Este servidor no tiene la extensión SOAP de PHP. Actívala para usar recargas.');
         }
+        if (!ini_get('allow_url_fopen')) {
+            throw new \RuntimeException(
+                'Este servidor tiene allow_url_fopen apagado y SOAP lo necesita para leer el WSDL.');
+        }
 
-        $seg = max(5, (int)($this->cfg['timeout'] ?? 30));
+        $seg  = max(5, (int)($this->cfg['timeout'] ?? 30));
+        $usr  = (string)($this->cfg['usuario'] ?? '');
+        $pwd  = (string)($this->cfg['clave'] ?? '');
+
+        // EL WSDL VA PROTEGIDO CON AUTENTICACIÓN BÁSICA.
+        //
+        // Sin esta cabecera, PHP descarga una página de error en vez del
+        // XML y SoapClient falla con "failed to load external entity",
+        // que no dice nada de lo que de verdad pasó. El sistema anterior
+        // sí la mandaba; yo la había omitido.
+        $http = ['timeout' => $seg, 'user_agent' => 'LibertyFin/1.0'];
+        if ($usr !== '') {
+            $http['header'] = "Authorization: Basic " . base64_encode($usr . ':' . $pwd);
+        }
+
         $ctx = stream_context_create([
-            'ssl' => [
-                // El certificado SÍ se verifica, al contrario del sistema
-                // anterior. Con verify_peer en false, HTTPS no protege nada.
-                'verify_peer'       => true,
-                'verify_peer_name'  => true,
-                'allow_self_signed' => false,
-            ],
-            'http' => ['timeout' => $seg, 'user_agent' => 'LibertyFin/1.0'],
+            // Para una dirección IP no hay certificado válido posible: se
+            // emiten para nombres de dominio. Si el endpoint es https a una
+            // IP, verificar siempre falla, y APAGAR la verificación no lo
+            // arregla: lo esconde. Por eso esto se queda en true y el
+            // aviso dice que hay que pedir un dominio.
+            'ssl' => ['verify_peer' => true, 'verify_peer_name' => true,
+                      'allow_self_signed' => false],
+            'http' => $http,
         ]);
 
-        return new \SoapClient($wsdl, [
+        $opciones = [
             'trace'              => true,
             'exceptions'         => true,
-            'cache_wsdl'         => WSDL_CACHE_DISK,
+            // Sin caché mientras se está probando: un WSDL mal descargado
+            // queda guardado y sigue fallando aunque ya se arregle.
+            'cache_wsdl'         => !empty($this->cfg['sandbox']) ? WSDL_CACHE_NONE : WSDL_CACHE_DISK,
             'connection_timeout' => $seg,
             'features'           => SOAP_SINGLE_ELEMENT_ARRAYS,
             'encoding'           => 'UTF-8',
             'stream_context'     => $ctx,
-        ]);
+        ];
+        // Y también como credenciales del propio cliente, para las
+        // llamadas que van después de leer el WSDL.
+        if ($usr !== '') { $opciones['login'] = $usr; $opciones['password'] = $pwd; }
+
+        try {
+            return new \SoapClient($wsdl, $opciones);
+        } catch (\SoapFault $e) {
+            throw new \RuntimeException(self::explicar($wsdl, $e->getMessage()));
+        }
+    }
+
+    /**
+     * Traduce el error de SOAP a algo accionable.
+     *
+     * "failed to load external entity" significa que PHP no pudo bajar el
+     * XML, y las causas son pocas y conocidas. Decirlas ahorra una tarde.
+     */
+    private static function explicar($wsdl, $mensaje)
+    {
+        $esHttps = strncasecmp($wsdl, 'https://', 8) === 0;
+        $esIp    = (bool)preg_match('~^https?://\d{1,3}(\.\d{1,3}){3}~', $wsdl);
+
+        if (stripos($mensaje, 'external entity') !== false
+            || stripos($mensaje, "Couldn't load from") !== false) {
+            if ($esHttps && $esIp) {
+                return 'No se pudo leer el WSDL en ' . $wsdl . '. Está apuntando a una '
+                     . 'dirección IP por HTTPS, y eso casi nunca funciona: los certificados '
+                     . 'se emiten para nombres de dominio, no para IPs. Cámbialo a http:// '
+                     . 'y pídele a Emida un dominio con certificado.';
+            }
+            return 'No se pudo leer el WSDL en ' . $wsdl . '. Puede ser que el servidor de '
+                 . 'Emida no responda desde aquí, que las credenciales no sirvan para '
+                 . 'descargarlo, o que el hosting bloquee la salida a esa dirección. '
+                 . 'Comprueba desde el servidor con: curl -u USUARIO:CLAVE ' . $wsdl;
+        }
+        return 'No se pudo conectar con Emida: ' . $mensaje;
+    }
+
+    /**
+     * Prueba la conexión y dice qué falla, paso por paso.
+     * Sirve para no adivinar cuando una recarga no sale.
+     */
+    public function probar()
+    {
+        $wsdl = trim((string)($this->cfg['wsdl'] ?? ''));
+        $r = [];
+        $r[] = ['Extensión SOAP de PHP', class_exists('SoapClient'),
+                class_exists('SoapClient') ? 'disponible' : 'falta: actívala en el servidor'];
+        $r[] = ['allow_url_fopen', (bool)ini_get('allow_url_fopen'),
+                ini_get('allow_url_fopen') ? 'encendido' : 'apagado: SOAP no puede leer el WSDL'];
+        $r[] = ['Dirección del WSDL', $wsdl !== '', $wsdl ?: 'sin configurar'];
+        $r[] = ['Va cifrada', $this->cifrado(),
+                $this->cifrado() ? 'HTTPS' : 'HTTP: las credenciales viajan en claro'];
+        $r[] = ['Credenciales', trim((string)($this->cfg['usuario'] ?? '')) !== ''
+                             && trim((string)($this->cfg['merchant_id'] ?? '')) !== '',
+                'usuario y comercio'];
+
+        $ok = true;
+        foreach ($r as $x) if (!$x[1]) { $ok = false; break; }
+        if ($ok) {
+            try { $this->cliente(); $r[] = ['Descarga del WSDL', true, 'el XML se leyó bien']; }
+            catch (\Throwable $e) { $r[] = ['Descarga del WSDL', false, $e->getMessage()]; }
+        }
+        return $r;
     }
 
     /** Los campos que toda petición lleva. */
@@ -93,7 +177,8 @@ final class Emida
             $r = $this->cliente()->__soapCall('GetBalance', [$this->base()]);
             return ['ok' => true, 'saldo' => $r->Balance ?? $r->balance ?? null, 'crudo' => $r];
         } catch (\SoapFault $e) {
-            return ['ok' => false, 'error' => 'El proveedor respondió con un error: ' . $e->getMessage()];
+            return ['ok' => false, 'error' => self::explicar(
+                (string)($this->cfg['wsdl'] ?? ''), $e->getMessage())];
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
         }

@@ -35,9 +35,10 @@ final class RecargasControlador
             'cifrado'   => $api->cifrado(),
             'aceptado'  => !empty($cfg['acepto_sin_cifrar']),
             'saldo'     => $_SESSION['lf_saldo_emida'] ?? null,
+            'prueba'    => $_SESSION['lf_prueba_emida'] ?? null,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
-        unset($_SESSION['lf_aviso'], $_SESSION['lf_saldo_emida']);
+        unset($_SESSION['lf_aviso'], $_SESSION['lf_saldo_emida'], $_SESSION['lf_prueba_emida']);
     }
 
     /** Consulta el saldo con el proveedor. */
@@ -50,6 +51,19 @@ final class RecargasControlador
 
         $_SESSION['lf_saldo_emida'] = $r['saldo'];
         $this->volver('Saldo consultado.', 'ok');
+    }
+
+    /**
+     * Prueba la conexión paso por paso.
+     *
+     * Existe porque "no se pudo conectar" puede ser cinco cosas
+     * distintas, y sin esto hay que ir descartándolas a ciegas.
+     */
+    public function probar()
+    {
+        if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
+        $_SESSION['lf_prueba_emida'] = (new Emida(Integraciones::de('emida')))->probar();
+        $this->volver('Prueba terminada.', 'ok');
     }
 
     /** Valida, recarga y registra la venta, en ese orden. */
