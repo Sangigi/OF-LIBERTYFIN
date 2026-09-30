@@ -138,9 +138,15 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
           <div style="min-width:130px">
             <label class="form-label">Método</label>
             <select class="form-select" name="metodo">
-              <option value="efectivo">Efectivo</option>
-              <option value="transferencia" selected>Transferencia</option>
-              <option value="tarjeta">Tarjeta</option>
+              <?php
+              // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a
+              // quien la tiene apagada hace que se elija y el abono falle
+              // al guardar, con el cliente esperando.
+              $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
+              foreach ($metodos as $k): ?>
+                <option value="<?= P::e($k) ?>" <?= $k === 'transferencia' ? 'selected' : '' ?>>
+                  <?= P::e($rot[$k] ?? $k) ?></option>
+              <?php endforeach; ?>
             </select>
           </div>
           <div style="flex:1;min-width:130px">

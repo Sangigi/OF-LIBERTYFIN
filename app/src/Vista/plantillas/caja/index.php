@@ -105,7 +105,12 @@ $token = $_SESSION['lf_token'];
     </div>
 
     <div style="padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap">
-      <?php foreach (['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'] as $k=>$v): ?>
+      <?php
+      // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a quien
+      // la tiene apagada hace que el cajero la elija y la venta falle al
+      // guardar, cuando el cliente ya está esperando.
+      $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
+      foreach ($metodos as $k): $v = $rot[$k] ?? $k; ?>
         <label class="lf-pill<?= $k==='efectivo'?' active':'' ?>" style="cursor:pointer">
           <input type="radio" name="metodo" value="<?= $k ?>" <?= $k==='efectivo'?'checked':'' ?> hidden>
           <?= $v ?>

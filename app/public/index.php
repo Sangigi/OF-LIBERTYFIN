@@ -116,6 +116,7 @@ $r->post('/plataforma/usuario',   ['LibertyFin\Controlador\PlataformaControlador
 $r->post('/plataforma/alternar',  ['LibertyFin\Controlador\PlataformaControlador', 'alternarUsuario']);
 $r->post('/plataforma/clave',     ['LibertyFin\Controlador\PlataformaControlador', 'claveUsuario']);
 $r->post('/plataforma/empresa',   ['LibertyFin\Controlador\PlataformaControlador', 'suspenderEmpresa']);
+$r->post('/plataforma/global',    ['LibertyFin\Controlador\PlataformaControlador', 'alternarGlobal']);
 $r->get('/informes',              ['LibertyFin\Controlador\InformesControlador', 'index']);
 $r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlador', 'index']);
 $r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
@@ -130,6 +131,7 @@ $r->get('/soporte',               ['LibertyFin\Controlador\SoporteControlador', 
 $r->get('/soporte/{id}',          ['LibertyFin\Controlador\SoporteControlador', 'ficha']);
 $r->post('/soporte/restablecer',  ['LibertyFin\Controlador\SoporteControlador', 'restablecer']);
 $r->post('/soporte/alternar',     ['LibertyFin\Controlador\SoporteControlador', 'alternar']);
+$r->post('/soporte/ajuste',       ['LibertyFin\Controlador\SoporteControlador', 'alternarAjuste']);
 $r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
 $r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
 $r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
@@ -210,6 +212,7 @@ $permisos = [
   '/plataforma/alternar'    => 'usuarios.plataforma',
   '/plataforma/clave'       => 'usuarios.plataforma',
   '/plataforma/empresa'     => 'suspender.empresa',
+  '/plataforma/global'      => 'ajustes.globales',
   '/informes'               => 'ver.informes',
   '/conocimiento'           => 'ver.conocimiento',
   '/conocimiento/guardar'   => 'editar.conocimiento',
@@ -224,6 +227,7 @@ $permisos = [
   '/soporte/{id}'           => 'ver.empresas',
   '/soporte/restablecer'    => 'clave.ajena',
   '/soporte/alternar'       => 'bloquear.cuenta',
+  '/soporte/ajuste'         => 'ajustes.empresa',
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',

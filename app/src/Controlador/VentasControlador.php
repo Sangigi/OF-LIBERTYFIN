@@ -83,6 +83,7 @@ final class VentasControlador
                           . date('d/m/Y H:i', strtotime($venta['fecha'])),
             'venta'      => $venta,
             'lineas'     => $repo->lineas($id),
+            'metodos'    => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
             'pagos'      => $repo->pagos($id),
             'gastos'     => $repo->gastos($id),
             'comisiones' => $repo->comisiones($id),
@@ -103,8 +104,9 @@ final class VentasControlador
         try {
             $r = (new RegistrarPago($db))->abonar($id, [
                 'monto'      => $_POST['monto'] ?? 0,
-                'metodo'     => in_array($_POST['metodo'] ?? '', ['efectivo','transferencia','tarjeta'], true)
-                                ? $_POST['metodo'] : 'efectivo',
+                'metodo'      => in_array($_POST['metodo'] ?? '',
+                                    (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(), true)
+                                    ? $_POST['metodo'] : 'efectivo',
                 'referencia' => trim($_POST['referencia'] ?? ''),
                 'fecha'      => Peticion::fecha('fecha', '') ?: ($_POST['fecha'] ?? ''),
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,

@@ -65,8 +65,10 @@ $secciones = Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '') ? $dePlatafo
 // Se filtra por permiso y por integración. Un grupo cuyas entradas
 // desaparecieron tampoco se muestra: un encabezado suelto se ve roto.
 // Qué secciones apagó soporte para esta empresa.
+// Un rol de plataforma no tiene empresa: no hay secciones que apagar.
 $apagadas = [];
 try {
+    if (empty($_SESSION['empresa_db'])) throw new \RuntimeException('sin empresa');
     $cfg = new ConfigRepo(Conexion::de($_SESSION['empresa_db']));
     foreach (ConfigRepo::APAGABLES as $k => $_) {
         if (!$cfg->seccionActiva($k)) $apagadas[$k] = true;

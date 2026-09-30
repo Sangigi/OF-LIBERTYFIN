@@ -162,6 +162,7 @@ final class PlataformaRepo
             $f['marca'] = ['color' => $cfg->valorDe('marca.color', ''),
                            'logo'  => $cfg->valorDe('marca.logo', '')];
             $f['secciones'] = $cfg->secciones();
+            $f['metodos']   = $cfg->metodos();
         } catch (\Throwable $ex) {}
 
         return $f;

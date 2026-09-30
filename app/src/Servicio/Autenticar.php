@@ -125,6 +125,16 @@ final class Autenticar
         // La personalización se lee una vez al entrar y vive en la sesión:
         // el armazón la pinta en cada página y consultarla cada vez sería
         // una consulta más por petición para un dato que casi nunca cambia.
+
+        // Los interruptores globales se leen UNA vez al entrar y viven en
+        // la sesión: los consulta cada página y cada carga de menú, y
+        // preguntarle a la base principal cada vez sería una consulta más
+        // por petición para un dato que cambia dos veces al año.
+        try {
+            $_SESSION['lf_global'] = (new \LibertyFin\Datos\AjustesPlataformaRepo(
+                \LibertyFin\Datos\Conexion::de($GLOBALS['lf_bd_principal'] ?? '')))->paraSesion();
+        } catch (\Throwable $e) { $_SESSION['lf_global'] = []; }
+
         try {
             $db = \LibertyFin\Datos\Conexion::de($empresa['nombre_base_datos']);
 
@@ -210,6 +220,16 @@ final class Autenticar
         $_SESSION['user_agent']     = $_SERVER['HTTP_USER_AGENT'] ?? '';
         // Sin empresa: es la marca de que estas claves NO deben existir.
         unset($_SESSION['empresa_db'], $_SESSION['empresa_id'], $_SESSION['sucursal_id']);
+
+
+        // Los interruptores globales se leen UNA vez al entrar y viven en
+        // la sesión: los consulta cada página y cada carga de menú, y
+        // preguntarle a la base principal cada vez sería una consulta más
+        // por petición para un dato que cambia dos veces al año.
+        try {
+            $_SESSION['lf_global'] = (new \LibertyFin\Datos\AjustesPlataformaRepo(
+                \LibertyFin\Datos\Conexion::de($GLOBALS['lf_bd_principal'] ?? '')))->paraSesion();
+        } catch (\Throwable $e) { $_SESSION['lf_global'] = []; }
 
         $this->repo->marcarAccesoPlataforma((int)$u['id']);
         return true;

@@ -109,7 +109,8 @@ final class CajaControlador
                 'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
                 'caja_id'        => $_SESSION['caja_id'] ?? null,
                 'anticipo'       => (float)($_POST['anticipo'] ?? 0),
-                'metodo_pago'    => in_array($_POST['metodo'] ?? '', ['efectivo','transferencia','tarjeta'], true)
+                'metodo_pago'     => in_array($_POST['metodo'] ?? '',
+                                    (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(), true)
                                     ? $_POST['metodo'] : 'efectivo',
                 'referencia'     => trim($_POST['referencia'] ?? ''),
                 'descripcion'    => trim($_POST['descripcion'] ?? ''),

@@ -5,10 +5,19 @@ use LibertyFin\Dominio\Permisos;
 
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
-$d = $diagnostico;
+// Un rol de plataforma no tiene base de empresa, así que no hay
+// diagnóstico que mostrar. Se rellena con nulos en vez de acceder a
+// claves que no existen: el aviso de más arriba ya explica por qué.
+$d = $diagnostico + [
+  'php' => null, 'mysql' => null, 'zona_php' => null, 'zona_sql' => null,
+  'hora_php' => null, 'hora_sql' => null, 'tablas' => [],
+  'ventas_sin_area' => null, 'ventas_desfasadas' => null,
+  'cobrado_mayor_total' => null, 'comisiones_sin_dueno' => null,
+  'ventas_sin_cliente' => null, 'cajas_abiertas' => null,
+];
 
 // Las señales que de verdad importan, con su umbral.
-$señales = [
+$señales = $d['php'] === null ? [] : [
   ['Ventas sin área',            $d['ventas_sin_area'],      'Los reportes por área salen vacíos'],
   ['Ventas con fecha desfasada', $d['ventas_desfasadas'],    'Pueden caer en el mes equivocado'],
   ['Cobrado mayor al total',     $d['cobrado_mayor_total'],  'Alguien cobró de más'],
@@ -16,7 +25,9 @@ $señales = [
   ['Ventas sin cliente',         $d['ventas_sin_cliente'],   'No se pueden perseguir en cobranza'],
   ['Cajas abiertas ahora',       $d['cajas_abiertas'],       'Turnos sin cerrar'],
 ];
-$hora_ok = abs(strtotime($d['hora_php']) - strtotime($d['hora_sql'])) <= 60;
+$hora_ok = ($d['hora_php'] && $d['hora_sql'])
+         ? abs(strtotime($d['hora_php']) - strtotime($d['hora_sql'])) <= 60
+         : null;
 ?>
 
 <?php if ($aviso): ?>
@@ -309,6 +320,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
   </div>
 </section>
 
+<?php if ($señales): ?>
 <section class="card">
   <header class="card-header">
     <div><span>Revisión de la base</span>
@@ -335,6 +347,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
     de cero explica un problema concreto.
   </div>
 </section>
+<?php endif; ?>
 
 <div class="lf-split">
   <section class="card">
@@ -383,6 +396,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
             <b class="lf-mono" style="font-size:12px;text-align:right"><?= P::e($v) ?></b>
           </div>
         <?php endforeach; ?>
+        <?php if ($hora_ok !== null): ?>
         <div style="margin-top:12px;padding:11px 13px;border-radius:var(--lf-r);font-size:12.5px;
              background:<?= $hora_ok ? 'var(--lf-brand-soft)' : 'var(--lf-rojo-soft)' ?>;
              color:<?= $hora_ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)' ?>">
@@ -390,6 +404,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
             ? 'PHP y MySQL están a la misma hora.'
             : 'PHP y MySQL NO coinciden. Las ventas de la tarde pueden registrarse al día siguiente.' ?>
         </div>
+        <?php endif; ?>
       </div>
     </section>
 

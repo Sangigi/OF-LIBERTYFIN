@@ -241,4 +241,44 @@ final class SoporteControlador
         }
         return array_slice($r, 0, 8);
     }
+
+    /**
+     * Apaga o enciende una sección o un método en UNA empresa.
+     *
+     * Se hace desde la ficha y no desde Mantenimiento porque ahí sí se
+     * sabe de qué empresa se habla. Antes Mantenimiento las apagaba en
+     * la empresa de la sesión, que para un rol de plataforma no existe.
+     */
+    public function alternarAjuste()
+    {
+        if (!$this->token()) $this->volver(null, 'No se pudo verificar el formulario.', 'error');
+        $base = $_POST['base'] ?? '';
+        $emp  = (int)($_POST['empresa'] ?? 0);
+        if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$base)) {
+            $this->volver($emp, 'Base no válida.', 'error');
+        }
+        try {
+            $db  = Conexion::de($base);
+            $cfg = new \LibertyFin\Datos\ConfigRepo($db);
+            $que = $_POST['que'] ?? '';
+            $k   = $_POST['clave'] ?? '';
+
+            if ($que === 'seccion')      $cfg->alternarSeccion($k);
+            elseif ($que === 'metodo')   $cfg->alternarMetodo($k);
+            else $this->volver($emp, 'Eso no se puede cambiar.', 'error');
+
+            // La bitácora va en la base de ESA empresa: es su historial,
+            // y ahí es donde su administrador va a buscar por qué
+            // desapareció una sección.
+            \LibertyFin\Servicio\Auditoria::anota('seccion.alternar',
+                $que . ' · ' . $k, null, 'alternado por soporte', $db);
+
+            $this->volver($emp, 'Listo. Su gente lo ve al recargar.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($emp, $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] ajuste empresa: ' . $e->getMessage());
+            $this->volver($emp, 'No se pudo cambiar.', 'error');
+        }
+    }
 }

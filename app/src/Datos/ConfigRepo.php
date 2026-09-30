@@ -143,10 +143,74 @@ final class ConfigRepo extends Repo
         'facturacion' => 'Facturación',
     ];
 
+    /**
+     * ¿Está disponible esta sección para esta empresa?
+     *
+     * Tienen que decir que sí los DOS interruptores: el de LibertyFin y
+     * el de la empresa. Si LibertyFin apagó Facturación porque está
+     * rota, que una empresa la tenga encendida no la arregla.
+     */
     public function seccionActiva($clave)
     {
         if (!isset(self::APAGABLES[$clave])) return true;
+        if (!self::globalActivo('seccion.' . $clave)) return false;
         return $this->valorDe('seccion.' . $clave, '1') !== '0';
+    }
+
+    /** ¿Está disponible este método de pago? Misma regla. */
+    public function metodoActivo($clave)
+    {
+        // El efectivo no se puede apagar: sin él no hay forma de cobrar
+        // en el mostrador.
+        if ($clave === 'efectivo') return true;
+        if (!self::globalActivo('metodo.' . $clave)) return false;
+        return $this->valorDe('metodo.' . $clave, '1') !== '0';
+    }
+
+    public function metodos()
+    {
+        $r = ['efectivo' => ['rotulo' => 'Efectivo', 'activa' => true, 'fijo' => true]];
+        foreach (\LibertyFin\Datos\AjustesPlataformaRepo::METODOS as $k => $rotulo) {
+            $r[$k] = ['rotulo' => $rotulo,
+                      'activa' => $this->metodoActivo($k),
+                      'global' => self::globalActivo('metodo.' . $k)];
+        }
+        return $r;
+    }
+
+    /** Los métodos que de verdad se pueden usar al cobrar. */
+    public function metodosDisponibles()
+    {
+        $r = ['efectivo'];
+        foreach (\LibertyFin\Datos\AjustesPlataformaRepo::METODOS as $k => $_) {
+            if ($this->metodoActivo($k)) $r[] = $k;
+        }
+        return $r;
+    }
+
+    public function alternarMetodo($clave)
+    {
+        if (!isset(\LibertyFin\Datos\AjustesPlataformaRepo::METODOS[$clave])) {
+            throw new \InvalidArgumentException('Ese método no se puede apagar');
+        }
+        if (!self::globalActivo('metodo.' . $clave)) {
+            throw new \InvalidArgumentException(
+                'LibertyFin tiene ese método apagado para todos. No se puede encender aquí.');
+        }
+        return $this->guardar('metodo.' . $clave,
+            $this->valorDe('metodo.' . $clave, '1') !== '0' ? '0' : '1');
+    }
+
+    /**
+     * Lo global vive en la sesión. Se lee una vez al entrar.
+     * Si no está —sesión vieja— se asume encendido: preferible a apagar
+     * media aplicación por no haber leído un dato.
+     */
+    private static function globalActivo($clave)
+    {
+        $g = $_SESSION['lf_global'] ?? null;
+        if (!is_array($g) || !array_key_exists($clave, $g)) return true;
+        return (bool)$g[$clave];
     }
 
     public function secciones()
@@ -163,7 +227,14 @@ final class ConfigRepo extends Repo
         if (!isset(self::APAGABLES[$clave])) {
             throw new \InvalidArgumentException('Esa sección no se puede apagar');
         }
-        return $this->guardar('seccion.' . $clave, $this->seccionActiva($clave) ? '0' : '1');
+        if (!self::globalActivo('seccion.' . $clave)) {
+            throw new \InvalidArgumentException(
+                'LibertyFin tiene esa sección apagada para todos. No se puede encender aquí.');
+        }
+        // Se lee el valor PROPIO, no el efectivo: si se leyera el
+        // efectivo, apagar algo ya apagado por lo global lo encendería.
+        $propio = $this->valorDe('seccion.' . $clave, '1') !== '0';
+        return $this->guardar('seccion.' . $clave, $propio ? '0' : '1');
     }
 
     // ── Diagnóstico ─────────────────────────────────────────────

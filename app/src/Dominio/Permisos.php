@@ -149,6 +149,13 @@ final class Permisos
         'usuarios.plataforma' => ['superadmin'],
         // Suspender una empresa la deja sin entrar, pero conserva todo.
         'suspender.empresa'   => ['superadmin'],
+        // Apagar algo para TODAS las empresas es una decisión de
+        // mantenimiento, no de atención: la toma quien responde por la
+        // plataforma, no quien contesta un ticket.
+        'ajustes.globales'    => ['superadmin'],
+        // Apagar una sección o un método en UNA empresa sí lo hace
+        // soporte: suele ser justo lo que el cliente está pidiendo.
+        'ajustes.empresa'     => ['superadmin','soporte'],
     ];
 
     /**

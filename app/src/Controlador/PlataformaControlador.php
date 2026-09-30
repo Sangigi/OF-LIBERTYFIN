@@ -49,6 +49,7 @@ final class PlataformaControlador
             'roles'     => array_filter(Permisos::rolesQuePuedeAsignar(),
                               function ($r) { return ($r['nivel'] ?? '') === 'plataforma'; }),
             'editando'  => \LibertyFin\Http\Peticion::entero('editar'),
+            'global'    => (new \LibertyFin\Datos\AjustesPlataformaRepo($principal))->estado(),
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);
@@ -215,5 +216,41 @@ final class PlataformaControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /plataforma'); exit;
+    }
+
+    /**
+     * Apaga o enciende algo para TODAS las empresas.
+     *
+     * Apagar exige un motivo porque lo van a ver los afectados. Sin él,
+     * lo único que sabrían es que una función desapareció.
+     */
+    public function alternarGlobal()
+    {
+        if (!$this->token()) $this->a('No se pudo verificar el formulario.', 'error');
+        $principal = $this->principal();
+        $clave = $_POST['clave'] ?? '';
+
+        $validas = [];
+        foreach (\LibertyFin\Datos\AjustesPlataformaRepo::SECCIONES as $k => $_) $validas[] = 'seccion.' . $k;
+        foreach (\LibertyFin\Datos\AjustesPlataformaRepo::METODOS as $k => $_)   $validas[] = 'metodo.' . $k;
+        if (!in_array($clave, $validas, true)) $this->a('Eso no se puede apagar.', 'error');
+
+        try {
+            $ahora = (new \LibertyFin\Datos\AjustesPlataformaRepo($principal))->alternar(
+                $clave, $_POST['nota'] ?? '', $_SESSION['usuario_nombre'] ?? '');
+            // La sesión de quien lo cambió se actualiza de inmediato; las
+            // demás lo toman al volver a entrar.
+            $_SESSION['lf_global'][$clave] = $ahora;
+            Auditoria::anota('seccion.alternar', 'global · ' . $clave,
+                $ahora ? 'apagado' : 'encendido', $ahora ? 'encendido' : 'apagado', $principal);
+            $this->a($ahora
+                ? 'Encendido para todas las empresas.'
+                : 'Apagado para todas. Las que lo tenían encendido dejan de verlo al recargar.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->a($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] global: ' . $e->getMessage());
+            $this->a('No se pudo cambiar.', 'error');
+        }
     }
 }

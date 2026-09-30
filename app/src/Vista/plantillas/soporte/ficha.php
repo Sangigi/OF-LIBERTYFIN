@@ -167,22 +167,46 @@ $malas = array_filter($f['senales'], function ($s) { return (int)$s['valor'] > 0
 
     <?php if (!empty($f['secciones'])): ?>
     <section class="card">
-      <header class="card-header">Secciones apagadas</header>
-      <div class="card-body">
-        <?php $off = array_filter($f['secciones'], function ($s) { return !$s['activa']; }); ?>
-        <?php if (!$off): ?>
-          <p style="font-size:12.5px;color:var(--lf-tinta-4);margin:0">
-            Todas encendidas.</p>
-        <?php else: ?>
-          <div style="display:flex;gap:7px;flex-wrap:wrap">
-            <?php foreach ($off as $s): ?>
-              <span class="badge bg-secondary"><?= P::e($s['rotulo']) ?></span>
-            <?php endforeach; ?>
-          </div>
-          <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:11px;line-height:1.5">
-            Si pregunta por una de estas, no le falta: está apagada.
-          </p>
-        <?php endif; ?>
+      <header class="card-header">
+        <div><span>Qué tiene encendido</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            Si pregunta por algo que no ve, aquí está la respuesta</p></div>
+      </header>
+      <div style="padding:0 10px 8px">
+        <?php foreach ([['Secciones', $f['secciones'], 'seccion'],
+                        ['Métodos de pago', $f['metodos'] ?? [], 'metodo']] as $bl):
+          list($rotulo, $items, $que) = $bl; if (!$items) continue; ?>
+          <div class="sec" style="padding:12px 10px 5px"><?= P::e($rotulo) ?></div>
+          <?php foreach ($items as $k => $i):
+            $fijo = !empty($i['fijo']);
+            $bloqueadoGlobal = isset($i['global']) && !$i['global']; ?>
+            <div class="lf-row" style="padding:8px 10px">
+              <span style="flex:1;min-width:0">
+                <b style="display:block;font-size:13px"><?= P::e($i['rotulo']) ?></b>
+                <?php if ($bloqueadoGlobal): ?>
+                  <small style="color:var(--lf-amb);font-size:11px">
+                    apagado por LibertyFin para todos</small>
+                <?php elseif ($fijo): ?>
+                  <small style="color:var(--lf-tinta-4);font-size:11px">
+                    no se puede apagar</small>
+                <?php endif; ?>
+              </span>
+              <?php if ($fijo || $bloqueadoGlobal): ?>
+                <span class="badge <?= $i['activa'] ? 'bg-success' : 'bg-secondary' ?>">
+                  <?= $i['activa'] ? 'Encendido' : 'Apagado' ?></span>
+              <?php else: ?>
+                <button type="button" class="btn btn-sm <?= $i['activa'] ? 'btn-secondary' : 'btn-primary' ?> lf-aj"
+                        data-que="<?= $que ?>" data-clave="<?= P::e($k) ?>"
+                        data-n="<?= P::e($i['rotulo']) ?>" data-a="<?= $i['activa'] ? 1 : 0 ?>">
+                  <?= $i['activa'] ? 'Apagar' : 'Encender' ?></button>
+              <?php endif; ?>
+            </div>
+          <?php endforeach; ?>
+        <?php endforeach; ?>
+      </div>
+      <div class="card-footer">
+        Esto solo afecta a esta empresa. Para apagar algo en todas, es
+        <a href="/plataforma">Cuentas</a>.
       </div>
     </section>
     <?php endif; ?>
@@ -240,6 +264,13 @@ $malas = array_filter($f['senales'], function ($s) { return (int)$s['valor'] > 0
   </div>
 </section>
 
+<form method="post" action="/soporte/ajuste" id="fAj" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="base" value="<?= P::e($e['nombre_base_datos']) ?>">
+  <input type="hidden" name="empresa" value="<?= (int)$e['id'] ?>">
+  <input type="hidden" name="que" id="ajQue">
+  <input type="hidden" name="clave" id="ajClave">
+</form>
 <form method="post" action="/soporte/restablecer" id="fRest" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>">
   <input type="hidden" name="base" value="<?= P::e($e['nombre_base_datos']) ?>">
@@ -253,6 +284,17 @@ $malas = array_filter($f['senales'], function ($s) { return (int)$s['valor'] > 0
   <input type="hidden" name="id" id="blId">
 </form>
 <script>
+document.querySelectorAll('.lf-aj').forEach(function(b){
+  b.addEventListener('click', function(){
+    var apagar = b.dataset.a === '1';
+    if (!confirm((apagar ? '¿Apagar "' : '¿Encender "') + b.dataset.n + '" para esta empresa?\n\n'
+      + (apagar ? 'Su gente deja de verlo al recargar.' : 'Vuelve a aparecer en su menú.'))) return;
+    document.getElementById('ajQue').value = b.dataset.que;
+    document.getElementById('ajClave').value = b.dataset.clave;
+    document.getElementById('fAj').submit();
+  });
+});
+
 document.querySelectorAll('.lf-rest').forEach(function(b){
   b.addEventListener('click', function(){
     if (!confirm('¿Restablecer la contraseña de ' + b.dataset.n + '?\n\n'

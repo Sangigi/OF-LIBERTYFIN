@@ -116,6 +116,50 @@ $yo = (int)($_SESSION['usuario_id'] ?? 0);
   </div>
 </section>
 
+<?php /* ═══ INTERRUPTORES GLOBALES ═══ */ ?>
+<section class="card">
+  <header class="card-header">
+    <div><span>Qué está disponible, para todos</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Apagar aquí lo apaga en todas las empresas, aunque ellas lo tengan encendido</p></div>
+  </header>
+  <div class="card-body">
+    <div style="display:flex;gap:24px;flex-wrap:wrap">
+      <?php foreach ([['Secciones', $global['secciones'], 'seccion.'],
+                      ['Métodos de pago', $global['metodos'], 'metodo.']] as $bloque):
+        list($rotulo, $items, $pre) = $bloque; ?>
+        <div style="flex:1;min-width:260px">
+          <b style="font-size:13px;font-weight:600;display:block;margin-bottom:11px">
+            <?= P::e($rotulo) ?></b>
+          <?php foreach ($items as $k => $i): ?>
+            <div class="lf-row" style="padding:9px 0">
+              <span style="flex:1;min-width:0">
+                <b style="display:block;font-size:13px"><?= P::e($i['rotulo']) ?></b>
+                <?php if (!$i['activa'] && $i['nota']): ?>
+                  <small style="color:var(--lf-amb);font-size:11px;white-space:normal;line-height:1.4">
+                    <?= P::e($i['nota']) ?></small>
+                <?php endif; ?>
+              </span>
+              <button type="button" class="btn btn-sm <?= $i['activa'] ? 'btn-secondary' : 'btn-primary' ?> lf-glob"
+                      data-clave="<?= P::e($pre . $k) ?>" data-n="<?= P::e($i['rotulo']) ?>"
+                      data-a="<?= $i['activa'] ? 1 : 0 ?>">
+                <?= $i['activa'] ? 'Apagar' : 'Encender' ?></button>
+            </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endforeach; ?>
+    </div>
+    <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:16px;line-height:1.55;
+              padding-top:14px;border-top:1px solid var(--lf-linea)">
+      Los dos interruptores contestan preguntas distintas. <b>El global dice "esto
+      funciona"</b> — se apaga cuando algo está roto o el proveedor se cayó.
+      <b>El de la empresa dice "esto lo uso"</b>. Por eso el global manda: si una
+      empresa pudiera encender algo que sabemos que no sirve, lo estaría usando roto.
+      El efectivo no aparece porque apagarlo dejaría a un negocio sin poder cobrar.
+    </p>
+  </div>
+</section>
+
 <section class="card">
   <header class="card-header">
     <div><span>Suspender empresas</span>
@@ -162,6 +206,11 @@ $yo = (int)($_SESSION['usuario_id'] ?? 0);
 <form method="post" action="/plataforma/alternar" id="fAlP" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>"><input type="hidden" name="id" id="alPId">
 </form>
+<form method="post" action="/plataforma/global" id="fGlob" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="clave" id="globClave">
+  <input type="hidden" name="nota" id="globNota">
+</form>
 <form method="post" action="/plataforma/empresa" id="fSusp" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>"><input type="hidden" name="id" id="suspId">
 </form>
@@ -180,6 +229,23 @@ document.querySelectorAll('.lf-al-p').forEach(function(b){
     document.getElementById('fAlP').submit();
   });
 });
+document.querySelectorAll('.lf-glob').forEach(function(b){
+  b.addEventListener('click', function(){
+    var apagar = b.dataset.a === '1', nota = '';
+    if (apagar) {
+      nota = prompt('¿Por qué se apaga "' + b.dataset.n + '" para TODAS las empresas?\n\n'
+        + 'Esto lo van a ver los afectados.');
+      if (!nota || nota.trim().length < 8) {
+        if (nota !== null) alert('Escribe al menos una frase.');
+        return;
+      }
+    } else if (!confirm('¿Encender "' + b.dataset.n + '" para todas las empresas?')) return;
+    document.getElementById('globClave').value = b.dataset.clave;
+    document.getElementById('globNota').value = (nota || '').trim();
+    document.getElementById('fGlob').submit();
+  });
+});
+
 document.querySelectorAll('.lf-susp').forEach(function(b){
   b.addEventListener('click', function(){
     var s = b.dataset.a === '1';
