@@ -31,6 +31,17 @@ $atrasadas = 0;
 foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema['ultima']) $atrasadas++;
 ?>
 
+<?php if ($todo && $esquema['actual'] < $esquema['ultima']): ?>
+<div class="alert alert-danger" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b>Esta empresa está en la versión <?= (int)$esquema['actual'] ?> de
+    <?= (int)$esquema['ultima'] ?>.</b>
+    Hasta ponerla al día, funciones nuevas pueden fallar sin explicación —por
+    ejemplo, asignar el rol de soporte. Se aplica sola al entrar; si no, usa el
+    botón de abajo.</span>
+</div>
+<?php endif; ?>
+
 <?php /* ═══ SOLICITUDES DE ALTA ═══ */ ?>
 <?php if ($puedeAlta): ?>
 <?php if (!$altaLista): ?>

@@ -47,6 +47,13 @@ return [
         'wsdl'            => '',
         'timeout'         => 30,
         'sandbox'         => true,
+
+        // El aviso de "conexión sin cifrar" sale mientras el WSDL sea
+        // http://. Ponerlo en true lo oculta, pero NO cifra nada: el
+        // usuario, la clave y el teléfono del cliente siguen viajando en
+        // claro. Úsalo solo si ya le pediste a Emida un endpoint con
+        // HTTPS y estás esperando que lo entreguen.
+        'acepto_sin_cifrar' => false,
     ],
 
     // ── Facturación CFDI ────────────────────────────────────────

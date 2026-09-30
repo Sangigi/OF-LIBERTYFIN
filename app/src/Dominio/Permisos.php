@@ -132,6 +132,12 @@ final class Permisos
         // suyos, y mandarla a otro sistema para contestarlos sería
         // exactamente el problema que estos tickets vienen a resolver.
         'ver.tickets'      => ['superadmin','soporte','validador'],
+        // La base de conocimientos la LEE cualquiera del equipo de
+        // plataforma; escribirla también, a propósito: quien resuelve un
+        // caso raro es quien sabe explicarlo, y si tiene que pedir permiso
+        // para documentarlo, no lo documenta.
+        'ver.conocimiento'    => ['superadmin','soporte','validador'],
+        'editar.conocimiento' => ['superadmin','soporte','validador'],
         'clave.ajena'      => ['superadmin','soporte'],
         'bloquear.cuenta'  => ['superadmin','soporte'],
         'revisar.docs'     => ['superadmin','soporte','validador'],

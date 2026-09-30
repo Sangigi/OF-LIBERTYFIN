@@ -64,7 +64,10 @@ final class UsuariosControlador
             $this->volver('/usuarios', $e->getMessage(), 'error');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] guardar usuario: ' . $e->getMessage());
-            $this->volver('/usuarios', 'No se pudo guardar el usuario.', 'error');
+            // Un error de base de datos aquí casi siempre es de esquema, y
+            // el mensaje genérico obliga a ir a buscar el log del servidor.
+            $this->volver('/usuarios',
+                'No se pudo guardar el usuario: ' . $e->getMessage(), 'error');
         }
     }
 

@@ -82,6 +82,21 @@ final class UsuarioRepo extends Repo
         if (!isset(\LibertyFin\Dominio\Permisos::ROLES[$rol])) {
             throw new \InvalidArgumentException('Ese rol no existe');
         }
+        // La columna `rol` es un ENUM en el esquema original. MySQL NO
+        // falla al escribir un valor fuera de la lista en modo relajado:
+        // guarda cadena vacía. En modo estricto sí falla, pero con un
+        // "Data truncated" que no le dice nada a nadie.
+        //
+        // Se comprueba antes y se explica qué hacer.
+        if (!$this->rolCabe($rol)) {
+            throw new \InvalidArgumentException(
+                'La base de datos todavía no acepta el rol "' . $rol . '". '
+                . 'Cierra sesión y vuelve a entrar: las migraciones se aplican al entrar. '
+                . 'Si sigue igual, corre esto en MySQL: '
+                . 'ALTER TABLE usuarios MODIFY COLUMN rol '
+                . "ENUM('admin','cajero','inventario','soporte','superadmin','validador') "
+                . "NOT NULL DEFAULT 'cajero';");
+        }
 
         $email = trim($d['email'] ?? '');
         if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
@@ -229,5 +244,26 @@ final class UsuarioRepo extends Repo
                 WHERE id = ? AND guia_vista_en IS NULL")->execute([(int)$id]);
             return true;
         } catch (\Throwable $e) { return false; }
+    }
+
+    /**
+     * ¿La columna `rol` acepta ese valor?
+     *
+     * Si es ENUM, se mira su lista. Si alguien ya la pasó a VARCHAR,
+     * cabe cualquier cosa y no hay nada que comprobar.
+     */
+    private function rolCabe($rol)
+    {
+        static $tipo = null;
+        if ($tipo === null) {
+            try {
+                $tipo = (string)$this->valor("
+                    SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios'
+                      AND COLUMN_NAME = 'rol'");
+            } catch (\Throwable $e) { $tipo = ''; }
+        }
+        if (stripos($tipo, 'enum') !== 0) return true;   // no es ENUM: cabe
+        return stripos($tipo, "'" . $rol . "'") !== false;
     }
 }

@@ -33,6 +33,7 @@ final class RecargasControlador
             'subtitulo' => !empty($cfg['sandbox']) ? 'Modo de pruebas' : 'En producción',
             'sandbox'   => !empty($cfg['sandbox']),
             'cifrado'   => $api->cifrado(),
+            'aceptado'  => !empty($cfg['acepto_sin_cifrar']),
             'saldo'     => $_SESSION['lf_saldo_emida'] ?? null,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);

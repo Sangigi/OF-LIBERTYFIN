@@ -100,6 +100,9 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlador', 'index']);
+$r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
+$r->post('/conocimiento/alternar',['LibertyFin\Controlador\ConocimientoControlador', 'alternar']);
 $r->get('/auditoria',             ['LibertyFin\Controlador\AuditoriaControlador', 'index']);
 $r->get('/tickets',               ['LibertyFin\Controlador\TicketsControlador', 'index']);
 $r->post('/tickets/crear',        ['LibertyFin\Controlador\TicketsControlador', 'crear']);
@@ -180,6 +183,9 @@ $permisos = [
   '/recargas'               => 'ver.recargas',
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
+  '/conocimiento'           => 'ver.conocimiento',
+  '/conocimiento/guardar'   => 'editar.conocimiento',
+  '/conocimiento/alternar'  => 'editar.conocimiento',
   '/auditoria'              => 'ver.auditoria',
   '/tickets'                => 'ver.tickets',
   '/tickets/crear'          => 'ver.tickets',

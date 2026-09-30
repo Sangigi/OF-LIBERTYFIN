@@ -41,6 +41,20 @@ $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?:
 </div>
 <?php endif; ?>
 
+<script>
+document.addEventListener('click', function(ev){
+  var b = ev.target.closest('.lf-plant');
+  if (!b) return;
+  ev.preventDefault();
+  var c = document.getElementById('cuerpoResp');
+  if (!c) return;
+  // Se AGREGA, no se reemplaza: quien ya escribió media respuesta no
+  // debería perderla por tocar una plantilla.
+  c.value = (c.value.trim() ? c.value.trim() + '\n\n' : '') + b.dataset.txt;
+  c.focus();
+});
+</script>
+
 <div class="lf-split">
   <div>
     <section class="card">
@@ -74,7 +88,16 @@ $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?:
       <div class="card-body">
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data">
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
-          <textarea class="form-control lf-desc" name="cuerpo" rows="4" required
+          <?php if ($plantillas): ?>
+            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px;align-items:center">
+              <span style="font-size:11.5px;color:var(--lf-tinta-4)">Plantillas:</span>
+              <?php foreach ($plantillas as $pl): ?>
+                <button type="button" class="lf-pill lf-plant"
+                        data-txt="<?= P::e($pl['cuerpo']) ?>"><?= P::e($pl['titulo']) ?></button>
+              <?php endforeach; ?>
+            </div>
+          <?php endif; ?>
+          <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="4" required
                     placeholder="Qué encontraste y qué tiene que hacer"></textarea>
           <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px">
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
@@ -95,6 +118,29 @@ $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?:
   </div>
 
   <div>
+    <?php if ($ayuda): ?>
+    <section class="card">
+      <header class="card-header">
+        <div><span>Errores conocidos de esta categoría</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            Quizá ya sabemos qué es</p></div>
+      </header>
+      <div style="padding:0 10px 8px">
+        <?php foreach ($ayuda as $a): ?>
+          <a class="lf-row" href="/conocimiento?ver=<?= (int)$a['id'] ?>" target="_blank">
+            <span style="flex:1;min-width:0">
+              <b style="display:block;font-size:12.5px"><?= P::e($a['titulo']) ?></b>
+              <?php if ($a['sintoma']): ?>
+                <small style="color:var(--lf-tinta-4);font-size:11px">
+                  <?= P::e(mb_substr($a['sintoma'], 0, 70)) ?></small>
+              <?php endif; ?>
+            </span>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    </section>
+    <?php endif; ?>
+
     <section class="card">
       <header class="card-header">Estado</header>
       <div class="card-body">

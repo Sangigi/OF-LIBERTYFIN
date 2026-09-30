@@ -11,7 +11,7 @@ $token = $_SESSION['lf_token'];
 </div>
 <?php endif; ?>
 
-<?php if (!$cifrado): ?>
+<?php if (!$cifrado && !$aceptado): ?>
 <div class="alert alert-danger" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?>
   <span><b>La conexión con Emida va sin cifrar.</b> El usuario, la clave y el

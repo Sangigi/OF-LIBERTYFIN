@@ -3,6 +3,7 @@ namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\PlataformaRepo;
+use LibertyFin\Datos\BaseConocimientoRepo;
 use LibertyFin\Datos\TicketRepo;
 use LibertyFin\Http\Peticion;
 use LibertyFin\Vista\Plantilla;
@@ -64,6 +65,12 @@ final class TicketsControlador
             't'         => $t,
             'mensajes'  => $repo->mensajes($id),
             'eventos'   => $repo->eventos($id),
+            // Las plantillas se cargan aquí y no en otra pantalla: una
+            // respuesta guardada que hay que ir a buscar a otro lado no se
+            // usa, y entonces da igual tenerla.
+            'plantillas'=> (new BaseConocimientoRepo($this->principal()))->plantillas(),
+            'ayuda'     => (new BaseConocimientoRepo($this->principal()))
+                             ->buscar('', 'error', $t['categoria'], 4),
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);

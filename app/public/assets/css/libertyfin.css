@@ -1605,3 +1605,8 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 
 /* Lo que mueve dinero se ve distinto: es lo que se revisa primero */
 .lf-audit.peso{background:var(--lf-vidrio);border-left:3px solid var(--lf-amb)}
+
+/* Plantillas de respuesta dentro del ticket */
+.lf-plant{border:1px dashed var(--lf-linea);background:var(--lf-sup);cursor:pointer;
+  font-family:var(--lf-font)}
+.lf-plant:hover{border-style:solid;border-color:var(--lf-brand);color:var(--lf-brand-2)}
