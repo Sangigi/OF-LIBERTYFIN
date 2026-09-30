@@ -7,6 +7,15 @@ namespace LibertyFin\Http;
  */
 final class Peticion
 {
+    /**
+     * Filas por página en todas las tablas.
+     *
+     * Diez y no veinticinco: con veinticinco la tabla crece tanto que la
+     * columna de al lado queda corta y la pantalla se ve desbalanceada.
+     * Diez cabe en una pantalla sin bajar.
+     */
+    const POR_PAGINA = 10;
+
     public static function texto($clave, $porDefecto = '')
     { return isset($_GET[$clave]) ? trim((string)$_GET[$clave]) : $porDefecto; }
 

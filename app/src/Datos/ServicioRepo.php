@@ -43,7 +43,7 @@ final class ServicioRepo extends Repo
         return $r;
     }
 
-    public function catalogo($desde, $hasta, $buscar = '', $limite = 40)
+    public function catalogo($desde, $hasta, $buscar = '', $limite = 10, $desfase = 0)
     {
         list($a, $b) = $this->rango($desde, $hasta);
         // Solo DOS fechas: las del subquery de ventas. El WHERE exterior
@@ -68,7 +68,7 @@ final class ServicioRepo extends Repo
             ) x ON x.producto_id = p.id
             WHERE " . implode(' AND ', $w) . "
             ORDER BY ingreso DESC, p.nombre
-            LIMIT " . (int)$limite, $p);
+            LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, $p);
     }
 
     public function masFacturan($desde, $hasta, $tope = 5)
@@ -177,5 +177,13 @@ final class ServicioRepo extends Repo
         $this->db->prepare("UPDATE productos SET activo = 1 - activo WHERE id = ?")
                  ->execute([(int)$id]);
         return (int)$this->valor("SELECT activo FROM productos WHERE id = ?", [(int)$id]);
+    }
+
+    public function cuantos($buscar = '')
+    {
+        $w = ['p.activo = 1']; $p = [];
+        if ($buscar !== '') { $w[] = '(p.nombre LIKE ? OR p.codigo LIKE ?)';
+                              $l = '%'.$buscar.'%'; $p[] = $l; $p[] = $l; }
+        return (int)$this->valor("SELECT COUNT(*) FROM productos p WHERE " . implode(' AND ', $w), $p);
     }
 }

@@ -4,6 +4,7 @@ namespace LibertyFin\Controlador;
 use LibertyFin\Datos\CajaRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Dominio\Dinero;
+use LibertyFin\Http\Peticion;
 use LibertyFin\Vista\Plantilla;
 
 final class CorteControlador

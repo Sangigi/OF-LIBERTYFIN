@@ -17,7 +17,7 @@ final class ClientesControlador
         $hasta  = Peticion::fecha('hasta', date('Y-m-t'));
         $buscar = Peticion::texto('q');
         $pagina = max(1, Peticion::entero('p', 1));
-        $porPag = 25;
+        $porPag = Peticion::POR_PAGINA;
 
         $total = $repo->cuantos($desde, $hasta, $buscar);
         $editar = Peticion::entero('editar');
@@ -30,6 +30,7 @@ final class ClientesControlador
             'clientes'   => $repo->listado($desde, $hasta, $buscar, $porPag, ($pagina-1)*$porPag),
             'top'        => $repo->masFacturan($desde, $hasta, 5),
             'antiguedad' => $repo->antiguedad(),
+            'areas'      => $repo->areasUsadas(),
             'desde'      => $desde, 'hasta' => $hasta, 'buscar' => $buscar,
             'editando'   => $editar ? $repo->uno_($editar) : null,
             'abrir'      => $editar > 0 || Peticion::texto('nuevo') !== '',

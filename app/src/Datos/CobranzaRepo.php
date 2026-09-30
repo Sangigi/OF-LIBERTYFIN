@@ -49,7 +49,14 @@ final class CobranzaRepo extends Repo
      * @param string $orden  dias | saldo | cliente
      * @param string $tramo  todos | t30 | t60 | t60mas
      */
-    public function listado($orden = 'dias', $tramo = 'todos', $buscar = '')
+    public function cuantas($tramo = 'todos', $buscar = '')
+    {
+        list($w, $p) = $this->filtro($tramo, $buscar);
+        $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
+        return (int)$this->valor("SELECT COUNT(*) FROM (" . $this->base() . ") x {$where}", $p);
+    }
+
+    private function filtro($tramo, $buscar)
     {
         $w = []; $p = [];
         if ($tramo === 't30')    $w[] = 'dias <= 30';
@@ -57,17 +64,24 @@ final class CobranzaRepo extends Repo
         if ($tramo === 't60mas') $w[] = 'dias > 60';
         if ($buscar !== '') { $w[] = '(cliente LIKE ? OR codigo_venta LIKE ?)';
                               $l = '%'.$buscar.'%'; $p[] = $l; $p[] = $l; }
+        return [$w, $p];
+    }
+
+    public function listado($orden = 'dias', $tramo = 'todos', $buscar = '', $limite = 10, $desfase = 0)
+    {
+        list($w, $p) = $this->filtro($tramo, $buscar);
         $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
 
         $orden = ['dias' => 'dias DESC, saldo DESC',
                   'saldo' => 'saldo DESC',
                   'cliente' => 'cliente, dias DESC'][$orden] ?? 'dias DESC, saldo DESC';
 
-        return $this->todos("SELECT * FROM (" . $this->base() . ") x {$where} ORDER BY {$orden} LIMIT 200", $p);
+        return $this->todos("SELECT * FROM (" . $this->base() . ") x {$where}
+            ORDER BY {$orden} LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, $p);
     }
 
     /** Agrupado por cliente: con quién hay que sentarse, no qué venta. */
-    public function porCliente($tope = 20)
+    public function porCliente($tope = 10, $desfase = 0)
     {
         return $this->todos("
             SELECT cliente_id, cliente, telefono,
@@ -78,6 +92,6 @@ final class CobranzaRepo extends Repo
             FROM (" . $this->base() . ") x
             GROUP BY cliente_id, cliente, telefono
             ORDER BY MAX(dias) DESC, SUM(saldo) DESC
-            LIMIT " . (int)$tope);
+            LIMIT " . (int)$tope . " OFFSET " . (int)$desfase);
     }
 }

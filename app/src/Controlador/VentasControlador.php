@@ -35,7 +35,7 @@ final class VentasControlador
         ];
 
         $pagina  = max(1, Peticion::entero('p', 1));
-        $porPag  = 25;
+        $porPag  = Peticion::POR_PAGINA;
         $desfase = ($pagina - 1) * $porPag;
 
         $resumen = $repo->resumen($desde, $hasta, $filtros);

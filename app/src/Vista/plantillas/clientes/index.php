@@ -39,7 +39,15 @@ $ant = $antiguedad;
       <input class="form-control" name="rfc" value="<?= P::e($e['rfc'] ?? '') ?>"
              placeholder="Opcional" style="text-transform:uppercase">
     </div>
-    <div style="flex:1;min-width:140px">
+    <div style="flex:1;min-width:150px">
+      <label class="form-label">Área</label>
+      <input class="form-control" name="area" list="lfAreas"
+             value="<?= P::e($e['area'] ?? '') ?>" placeholder="Opcional">
+      <datalist id="lfAreas">
+        <?php foreach ($areas as $a): ?><option value="<?= P::e($a) ?>"></option><?php endforeach; ?>
+      </datalist>
+    </div>
+    <div style="flex:1;min-width:150px">
       <label class="form-label">Teléfono</label>
       <input class="form-control" name="telefono" value="<?= P::e($e['telefono'] ?? '') ?>" placeholder="Opcional">
     </div>
@@ -180,14 +188,9 @@ $ant = $antiguedad;
   </div>
   <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
     <span><?= count($clientes) ?> de <?= number_format($total) ?> clientes</span>
-    <?php if ($paginas > 1): ?>
-    <nav><ul class="pagination" style="margin:0">
-      <li class="page-item <?= $pagina<=1?'disabled':'' ?>">
-        <a class="page-link" href="<?= P::e($qs(['p'=>$pagina-1])) ?>">‹</a></li>
-      <li class="page-item disabled"><span class="page-link"><?= $pagina ?> / <?= $paginas ?></span></li>
-      <li class="page-item <?= $pagina>=$paginas?'disabled':'' ?>">
-        <a class="page-link" href="<?= P::e($qs(['p'=>$pagina+1])) ?>">›</a></li>
-    </ul></nav>
-    <?php endif; ?>
+    <?php P::parcial('parciales/paginacion', [
+        'pagina'  => $pagina, 'paginas' => $paginas,
+        'enlace'  => function ($n) use ($qs) { return $qs(['p' => $n]); },
+      ]); ?>
   </div>
 </section>

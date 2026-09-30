@@ -27,8 +27,13 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
       <h2>La cobranza <em><?= P::e($sintesis['tono']) ?></em><?php if(isset($sintesis['pct'])): ?>:
         <?= $sintesis['pct'] ?>% del periodo ya entró.<?php endif; ?></h2>
       <p><?= P::e($sintesis['detalle']) ?></p>
+      <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:8px">
+        El marcador es qué tan al corriente va la cobranza: el porcentaje ya
+        cobrado, castigado por la parte del saldo que lleva más de 30 días
+        sin un abono.
+      </p>
     </div>
-    <?php W::marcador($salud, 'salud'); ?>
+    <?php W::marcador($alCorriente, 'al corriente'); ?>
   </div>
 
   <div class="lf-oscura">
@@ -72,7 +77,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
   ?>
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>
-    <div class="stat-value"><?= D::corto($cobrado) ?></div>
+    <div class="stat-value"><?= D::pesos($cobrado) ?></div>
     <div class="stat-label">Cobrado en el periodo</div>
     <?php W::avance($avance); ?>
     <div class="stat-meta"><?= $avance ?>% de lo vendido · faltan <?= D::corto($saldoT) ?></div>
@@ -81,7 +86,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 
   <div class="stat-card">
     <div class="lf-tile a"><?= W::icono('reloj','19px') ?></div>
-    <div class="stat-value"><?= D::corto($saldoT) ?></div>
+    <div class="stat-value"><?= D::pesos($saldoT) ?></div>
     <div class="stat-label">Por cobrar</div>
     <?php W::avance(100 - $avance, true); ?>
     <div class="stat-meta"><?= (int)($resumen['con_saldo'] ?? 0) ?> ventas con saldo abierto</div>
@@ -89,7 +94,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 
   <div class="stat-card">
     <div class="lf-tile g"><?= W::icono('bolsa','19px') ?></div>
-    <div class="stat-value"><?= D::corto($vendido) ?></div>
+    <div class="stat-value"><?= D::pesos($vendido) ?></div>
     <div class="stat-label">Vendido</div>
     <div class="stat-meta"><?= (int)($resumen['ventas'] ?? 0) ?> ventas · ticket <?= D::corto($resumen['promedio'] ?? 0) ?></div>
     <?php W::spark($sv); ?>
@@ -97,7 +102,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 
   <div class="stat-card">
     <div class="lf-tile l"><?= W::icono('pct','19px') ?></div>
-    <div class="stat-value"><?= D::corto($comisiones['por_pagar']) ?></div>
+    <div class="stat-value"><?= D::pesos($comisiones['por_pagar']) ?></div>
     <div class="stat-label">Comisiones por pagar</div>
     <?php W::avance(D::pct($comisiones['por_pagar'], max(0.01, $comisiones['total']))); ?>
     <div class="stat-meta">de <?= D::corto($comisiones['total']) ?> generadas</div>

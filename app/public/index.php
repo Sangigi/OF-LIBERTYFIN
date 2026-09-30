@@ -22,7 +22,14 @@ $cfg = is_readable($raiz . '/config/config.php')
 
 if (!empty($cfg['depurar'])) { ini_set('display_errors','1'); error_reporting(E_ALL); }
 
-Conexion::configurar($cfg['bd']);
+// ── Zona horaria ──
+// PHP y MySQL tienen que coincidir. Si no, date() arma el folio con la
+// hora de México y NOW() guarda UTC: seis horas de diferencia que, en
+// una venta de las 18:00 de fin de mes, la mandan al mes siguiente.
+// Pasó de verdad: INITME Solutions, 31 de agosto a las 18:09, quedó
+// registrada el 1 de septiembre.
+date_default_timezone_set($cfg['zona'] ?? 'America/Mexico_City');
+Conexion::configurar($cfg['bd'] + ['zona_sql' => $cfg['zona_sql'] ?? '-06:00']);
 Plantilla::base($raiz . '/src/Vista/plantillas');
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
 
@@ -64,6 +71,8 @@ $r->get('/cobranza',  ['LibertyFin\Controlador\CobranzaControlador',  'index']);
 $r->get('/gastos',          ['LibertyFin\Controlador\GastosControlador', 'index']);
 $r->post('/gastos/guardar', ['LibertyFin\Controlador\GastosControlador', 'guardar']);
 $r->post('/gastos/borrar',  ['LibertyFin\Controlador\GastosControlador', 'borrar']);
+$r->post('/gastos/proveedor',          ['LibertyFin\Controlador\GastosControlador', 'guardarProveedor']);
+$r->post('/gastos/proveedor/alternar', ['LibertyFin\Controlador\GastosControlador', 'alternarProveedor']);
 $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
 $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  'guardar']);
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);

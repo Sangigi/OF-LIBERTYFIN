@@ -715,10 +715,7 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-stack .lf-av:first-child{margin-left:0}
 
 /* Buscador redondo */
-.lf-search{position:relative;display:flex;align-items:center}
-.lf-search > i,.lf-search > .fas{position:absolute;left:14px;font-size:14px;
-  color:var(--lf-tinta-4);pointer-events:none}
-.lf-search input{width:100%;padding:9px 14px 9px 38px;background:var(--lf-sup);
+.lf-search input{background:var(--lf-sup);
   border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
   color:var(--lf-tinta);font-size:13px;outline:none;
   transition:border-color .15s,box-shadow .15s}
@@ -1082,3 +1079,147 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 .lf-tile.r{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
 a.stat-card{text-decoration:none;color:inherit;display:block}
 a.stat-card:hover{color:inherit}
+
+
+/* ══════════════════════════════════════════════════════
+   23 · CORRECCIONES DE BASE
+   La app nueva NO carga Bootstrap: este archivo se escribió
+   como capa encima de él y aquí tiene que sostenerse solo.
+   Todo lo de abajo es lo que Bootstrap aportaba y faltaba.
+   ══════════════════════════════════════════════════════ */
+
+/* Listas sin viñetas dentro de componentes */
+.pagination,.lf-pills,.nav,.list-group{list-style:none;margin:0;padding:0}
+
+/* Paginación · flecha izquierda, número al centro, flecha derecha */
+.pagination{display:flex;align-items:center;gap:6px}
+.page-item{display:block;margin:0}
+.page-item .page-link{display:flex;align-items:center;justify-content:center;
+  min-width:34px;height:34px;padding:0 11px;line-height:1}
+.page-item.disabled .page-link{pointer-events:none}
+.page-item.disabled span.page-link{border-color:transparent;background:transparent;
+  color:var(--lf-tinta-3);font-variant-numeric:tabular-nums}
+
+/* La lupa DENTRO del campo. El icono es un <svg>, no un <i>. */
+.lf-search{position:relative;display:flex;align-items:center}
+.lf-search > svg,.lf-search > i,.lf-search > .fas{
+  position:absolute;left:13px;top:50%;transform:translateY(-50%);
+  color:var(--lf-tinta-4);pointer-events:none;z-index:1}
+.lf-search input{width:100%;padding:9px 14px 9px 39px}
+
+/* Botón: nada de display:block por fuera. El contenido va centrado
+   siempre, con o sin icono. */
+.btn{display:inline-flex!important;align-items:center;justify-content:center;
+  gap:8px;text-align:center;line-height:1.15}
+.btn > svg{flex-shrink:0}
+.btn-block,.btn.w-100{width:100%}
+
+/* Separación entre tarjetas y entre columnas */
+.card,.stat-card{margin-bottom:18px}
+.lf-split > * > .card:last-child,.lf-split > .card:last-child{margin-bottom:0}
+.lf-split{gap:20px}
+.lf-stats .stat-card{margin-bottom:0}
+
+/* Columnas de igual altura: la tarjeta crece hasta llenar su columna */
+.lf-split{align-items:stretch}
+.lf-split > .card{display:flex;flex-direction:column;height:100%}
+.lf-split > .card > .table-responsive,.lf-split > .card > .card-body{flex:1}
+.lf-split > div{display:flex;flex-direction:column;gap:20px}
+.lf-split > div > .card{margin-bottom:0}
+.lf-split > div > .card:last-child{flex:1;display:flex;flex-direction:column}
+.lf-split > div > .card:last-child > .card-body{flex:1}
+@media(max-width:940px){
+  .lf-split > .card,.lf-split > div > .card:last-child{height:auto;display:block}
+}
+
+/* Formularios: que nada se pegue ni se encime */
+.lf-form{gap:16px 14px;align-items:flex-end}
+.lf-form > div{display:flex;flex-direction:column}
+.lf-form .btn{align-self:flex-end;margin-bottom:0}
+.lf-filtros{gap:12px;row-gap:10px;align-items:center}
+.lf-filtros .form-control,.lf-filtros .form-select{height:36px}
+.lf-filtros .btn{height:36px}
+
+/* Píldoras: aire arriba para que no choquen con el borde */
+.lf-pills{display:flex;gap:8px;flex-wrap:wrap;padding-top:2px}
+
+/* Dona: aire entre el círculo y la leyenda */
+.lf-dona-fila{gap:28px;padding:4px 0}
+.lf-donut .mid b{font-size:16px;letter-spacing:-.4px;padding:0 6px;
+  overflow-wrap:anywhere;max-width:86%}
+.lf-donut .mid small{font-size:10px}
+
+/* Barra lateral fija: el menú y el perfil se quedan en pantalla */
+@media(min-width:941px){
+  .lf-side{position:sticky;top:0;height:100vh;height:100dvh;overflow:hidden}
+  .lf-nav{overflow-y:auto;min-height:0}
+  .lf-pie{margin-top:auto}
+}
+
+/* Rejilla de servicios en Caja */
+.lf-grid-serv{grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.lf-serv{padding:13px 11px}
+.lf-serv b{min-height:2.6em;display:flex;align-items:center;justify-content:center}
+
+/* Campo de descripción de la venta */
+.lf-desc{width:100%;min-height:74px;resize:vertical;font-family:var(--lf-font);
+  padding:11px 13px;line-height:1.5}
+
+/* Precio editable dentro del ticket */
+.lf-precio{width:94px;padding:6px 9px;text-align:right;font-weight:700;font-size:13px;
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
+  color:var(--lf-tinta);outline:none;flex-shrink:0}
+.lf-precio:focus{border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-ring)}
+/* Los que no traen precio se marcan: hay que ponérselo */
+.lf-serv.sin-precio .p{color:var(--lf-amb);font-family:var(--lf-font);
+  font-size:11px;font-weight:600}
+.lf-serv.sin-precio .e{background:var(--lf-amb-soft);color:var(--lf-amb)}
+
+/* Paginación de la rejilla de servicios */
+.lf-pag-serv{display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:4px 20px 18px;font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-pag-serv button{width:32px;height:32px;border-radius:50%;border:1px solid var(--lf-linea);
+  background:var(--lf-sup);color:var(--lf-tinta-2);cursor:pointer;font-size:15px;line-height:1}
+.lf-pag-serv button:hover:not(:disabled){border-color:var(--lf-brand);color:var(--lf-brand-2)}
+.lf-pag-serv button:disabled{opacity:.35;cursor:default}
+.lf-pag-serv b{font-family:var(--lf-mono);font-weight:600}
+
+/* El rótulo del marcador puede ser de dos palabras */
+.lf-ring .mid small{font-size:9px;letter-spacing:.2px;line-height:1.15;
+  max-width:70px;text-align:center}
+
+
+/* ══════════════════════════════════════════════════════
+   24 · AJUSTES FINOS DE MAQUETA
+   ══════════════════════════════════════════════════════ */
+
+/* Encabezado de tarjeta con subtítulo: que el texto no empuje el badge */
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.card-header > div{min-width:0}
+.card-header p{font-weight:400}
+
+/* Las barras horizontales necesitan aire cuando son la única tarjeta */
+.lf-bars{gap:15px}
+.lf-bars .r > span:first-child{font-size:12px}
+
+/* Tablas: la última columna de acciones no se estira */
+.table td:last-child:empty{width:0;padding:0}
+.table th:last-child:empty{width:0;padding:0}
+
+/* Tarjetas de cifra: que el número no se pegue al borde */
+.stat-card{padding:20px 22px 18px}
+.stat-value{overflow-wrap:anywhere;padding-right:4px}
+
+/* El pie de tarjeta con paginación se alinea sin saltos */
+.card-footer{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.card-footer > span:only-child{flex:1}
+
+/* Píldoras de pestaña: separadas del contenido de abajo */
+.lf-pills + .alert,.lf-pills + .lf-alta,.lf-pills + .card,
+.lf-pills + .lf-stats,.lf-pills + form{margin-top:2px}
+
+/* En pantallas chicas las columnas parejas estorban */
+@media(max-width:940px){
+  .lf-split > div{gap:18px}
+  .card,.stat-card{margin-bottom:16px}
+}

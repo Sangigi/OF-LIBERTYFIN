@@ -16,26 +16,26 @@ $tono = function ($d) { return $d > 60 ? 'r' : ($d > 30 ? 'a' : ''); };
 <div class="lf-stats">
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('reloj','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['total'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['total'] ?? 0) ?></div>
     <div class="stat-label">Por cobrar</div>
     <div class="stat-meta"><?= (int)($r['ventas'] ?? 0) ?> ventas ·
       <?= (int)($r['clientes'] ?? 0) ?> clientes</div>
   </div>
   <a class="stat-card" href="<?= P::e($qs(['tramo'=>'t30'])) ?>" style="text-decoration:none;color:inherit">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['t30'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['t30'] ?? 0) ?></div>
     <div class="stat-label">1 a 30 días</div>
     <div class="stat-meta">fresco, se cobra solo</div>
   </a>
   <a class="stat-card" href="<?= P::e($qs(['tramo'=>'t60'])) ?>" style="text-decoration:none;color:inherit">
     <div class="lf-tile a"><?= W::icono('reloj','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['t60'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['t60'] ?? 0) ?></div>
     <div class="stat-label">31 a 60 días</div>
     <div class="stat-meta">hay que recordarles</div>
   </a>
   <a class="stat-card" href="<?= P::e($qs(['tramo'=>'t60mas'])) ?>" style="text-decoration:none;color:inherit">
     <div class="lf-tile r"><?= W::icono('alerta','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['t60mas'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['t60mas'] ?? 0) ?></div>
     <div class="stat-label">Más de 60 días</div>
     <div class="stat-meta"><?= (int)($r['n60mas'] ?? 0) ?> ventas · hablar hoy</div>
   </a>
@@ -103,6 +103,11 @@ $tono = function ($d) { return $d > 60 ? 'r' : ($d > 30 ? 'a' : ''); };
       </tbody>
     </table>
   </div>
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($clientes) ?> de <?= (int)($resumen['clientes'] ?? 0) ?> clientes</span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
+  </div>
 </section>
 
 <?php else: ?>
@@ -144,7 +149,12 @@ $tono = function ($d) { return $d > 60 ? 'r' : ($d > 30 ? 'a' : ''); };
       </tbody>
     </table>
   </div>
-  <div class="card-footer">
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($filas) ?> de <?= number_format($total) ?> ventas con saldo</span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
+  </div>
+  <div class="card-footer" style="border-top:none;padding-top:0">
     Los días se cuentan desde el último abono, no desde la venta. Una venta de
     hace seis meses con un abono ayer está al corriente; una de hace dos meses
     sin tocar, no.

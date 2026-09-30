@@ -33,13 +33,13 @@ $pct = ($r['cortes'] ?? 0) > 0 ? round(($r['cuadrados'] ?? 0) / $r['cortes'] * 1
   </div>
   <div class="stat-card">
     <div class="lf-tile a"><?= W::icono('mas','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['sobrantes'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['sobrantes'] ?? 0) ?></div>
     <div class="stat-label">Sobrantes acumulados</div>
     <div class="stat-meta">dinero de más en el cajón</div>
   </div>
   <div class="stat-card">
     <div class="lf-tile r"><?= W::icono('alerta','19px') ?></div>
-    <div class="stat-value"><?= D::corto($r['faltantes'] ?? 0) ?></div>
+    <div class="stat-value"><?= D::pesos($r['faltantes'] ?? 0) ?></div>
     <div class="stat-label">Faltantes acumulados</div>
     <div class="stat-meta">dinero que no apareció</div>
   </div>

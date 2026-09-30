@@ -148,4 +148,119 @@ final class GastoRepo extends Repo
                  ->execute([(int)$id]);
         return true;
     }
+
+    /**
+     * Los gastos de operación del periodo, con su venta.
+     *
+     * No se pueden editar desde aquí, pero SÍ se tienen que ver: si la
+     * pantalla solo muestra los generales y la empresa no usa esa figura,
+     * queda una lista vacía junto a una cifra de $47,361, y eso parece un
+     * error del sistema aunque sea correcto.
+     */
+    public function operacion($desde, $hasta, $tope = 100)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT g.id, g.concepto, g.monto, g.fecha, g.venta_id,
+                   v.codigo_venta, v.total AS venta_total,
+                   COALESCE(c.nombre,'Público general') AS cliente
+            FROM gastos g
+            INNER JOIN ventas v   ON v.id = g.venta_id
+            LEFT  JOIN clientes c ON c.id = v.cliente_id
+            WHERE g.fecha >= ? AND g.fecha < ?
+              AND g.tipo = 'manual' AND g.categoria <> 'Costo de venta'
+            ORDER BY g.monto DESC
+            LIMIT " . (int)$tope, [$a, $b]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // PROVEEDORES
+    //
+    // Viven aquí y no en su propia sección porque solo existen para una
+    // cosa: saber a quién se le paga. Un proveedor sin gastos asociados
+    // es un dato muerto.
+    // ─────────────────────────────────────────────────────────────
+
+    public function proveedores()
+    {
+        return $this->todos("
+            SELECT p.*, COALESCE(p.activo,1) AS activo,
+                   COALESCE(g.cuantos,0) AS gastos,
+                   COALESCE(g.monto,0)   AS pagado,
+                   g.ultimo
+            FROM proveedores p
+            LEFT JOIN ( SELECT proveedor, COUNT(*) cuantos, SUM(monto) monto,
+                               MAX(fecha) ultimo
+                        FROM gastos WHERE proveedor IS NOT NULL AND proveedor <> ''
+                        GROUP BY proveedor ) g ON g.proveedor = p.nombre
+            ORDER BY COALESCE(p.activo,1) DESC, p.nombre");
+    }
+
+    public function proveedor($id)
+    {
+        return $this->uno("SELECT * FROM proveedores WHERE id = ?", [(int)$id]);
+    }
+
+    /** Solo los activos, para el desplegable del formulario de gasto. */
+    public function proveedoresActivos()
+    {
+        return $this->todos("
+            SELECT id, nombre FROM proveedores
+            WHERE COALESCE(activo,1) = 1 ORDER BY nombre");
+    }
+
+    public function guardarProveedor($id, array $d)
+    {
+        $nombre = trim($d['nombre'] ?? '');
+        if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
+
+        $rfc = mb_strtoupper(trim($d['rfc'] ?? ''));
+        if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) {
+            throw new \InvalidArgumentException('El RFC no tiene el formato correcto');
+        }
+        $email = trim($d['email'] ?? '');
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('El correo no es válido');
+        }
+
+        $sql = "SELECT id FROM proveedores WHERE nombre = ?";
+        $p = [$nombre];
+        if ($id) { $sql .= " AND id <> ?"; $p[] = (int)$id; }
+        if ($this->valor($sql . " LIMIT 1", $p)) {
+            throw new \InvalidArgumentException('Ya existe un proveedor con ese nombre');
+        }
+
+        $tel = preg_replace('/[^0-9+]/', '', (string)($d['telefono'] ?? ''));
+        $vals = [$nombre, trim($d['contacto'] ?? '') ?: null, $tel ?: null,
+                 $email ?: null, trim($d['direccion'] ?? '') ?: null, $rfc ?: null];
+
+        if ($id) {
+            // Si cambia el nombre, los gastos que lo referencian por texto
+            // se quedarían huérfanos. Se arrastra el cambio.
+            $antes = $this->valor("SELECT nombre FROM proveedores WHERE id = ?", [(int)$id]);
+            $vals[] = (int)$id;
+            $this->db->prepare("
+                UPDATE proveedores SET nombre = ?, contacto = ?, telefono = ?, email = ?,
+                       direccion = ?, rfc = ?, fecha_actualizacion = NOW()
+                WHERE id = ?")->execute($vals);
+            if ($antes && $antes !== $nombre) {
+                $this->db->prepare("UPDATE gastos SET proveedor = ? WHERE proveedor = ?")
+                         ->execute([$nombre, $antes]);
+            }
+            return (int)$id;
+        }
+        $this->db->prepare("
+            INSERT INTO proveedores (nombre, contacto, telefono, email, direccion, rfc,
+                                     activo, fecha_creacion)
+            VALUES (?,?,?,?,?,?,1,NOW())")->execute($vals);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function alternarProveedor($id)
+    {
+        if (!$this->proveedor($id)) throw new \InvalidArgumentException('Ese proveedor no existe');
+        $this->db->prepare("UPDATE proveedores SET activo = 1 - COALESCE(activo,1) WHERE id = ?")
+                 ->execute([(int)$id]);
+        return true;
+    }
 }

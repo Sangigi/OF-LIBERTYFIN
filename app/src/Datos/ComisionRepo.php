@@ -172,4 +172,54 @@ final class ComisionRepo extends Repo
         } catch (\Throwable $e) { $this->db->rollBack(); throw $e; }
         return $col['nombre'];
     }
+
+    /**
+     * Cómo se libera la comisión: devengado contra lo que falta.
+     *
+     * Rellena la columna junto a la dona, que quedaba corta, y contesta
+     * algo que no estaba en ningún lado: cuánta comisión está atada a
+     * ventas que el cliente todavía no termina de pagar.
+     */
+    public function liberacion($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT vc.area_nombre AS area,
+                   ROUND(SUM(vc.monto_comision),2) AS asignada,
+                   ROUND(COALESCE(SUM(pc.dev),0),2) AS devengada
+            FROM venta_comisiones vc
+            INNER JOIN ventas v ON v.id = vc.venta_id
+            LEFT  JOIN ( SELECT venta_comision_id, SUM(monto) dev
+                         FROM pago_comisiones GROUP BY venta_comision_id ) pc
+                   ON pc.venta_comision_id = vc.id
+            WHERE vc.cancelada = 0 AND v.estado <> 'cancelada'
+              AND v.fecha >= ? AND v.fecha < ?
+            GROUP BY vc.area_nombre
+            ORDER BY asignada DESC", [$a, $b]);
+    }
+
+    /** Las ventas que más comisión tienen atada sin liberar. */
+    public function atadas($desde, $hasta, $tope = 5)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT v.id, v.codigo_venta, c.nombre AS cliente,
+                   ROUND(SUM(vc.monto_comision) - COALESCE(SUM(pc.dev),0), 2) AS pendiente,
+                   ROUND(v.total,2) AS total,
+                   ROUND(COALESCE(pg.cobrado,0),2) AS cobrado
+            FROM venta_comisiones vc
+            INNER JOIN ventas v   ON v.id = vc.venta_id
+            LEFT  JOIN clientes c ON c.id = v.cliente_id
+            LEFT  JOIN ( SELECT venta_comision_id, SUM(monto) dev
+                         FROM pago_comisiones GROUP BY venta_comision_id ) pc
+                   ON pc.venta_comision_id = vc.id
+            LEFT  JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                         WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            WHERE vc.cancelada = 0 AND v.estado <> 'cancelada'
+              AND v.fecha >= ? AND v.fecha < ?
+            GROUP BY v.id, v.codigo_venta, c.nombre, v.total, pg.cobrado
+            HAVING pendiente > 0.01
+            ORDER BY pendiente DESC
+            LIMIT " . (int)$tope, [$a, $b]);
+    }
 }

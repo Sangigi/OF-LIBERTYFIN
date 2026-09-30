@@ -300,6 +300,68 @@ de campos: el plan, el nombre de la base y sus credenciales NO se tocan desde
 aquí. Cambiarlos dejaría a la empresa sin poder entrar, y eso es trabajo de
 quien administra la plataforma.
 
+## Zona horaria
+
+**PHP y MySQL tienen que estar en la misma zona.** `public/index.php` fija la de
+PHP y `Conexion` la de cada sesión de MySQL, con los valores de
+`config/config.php`.
+
+Si no coinciden, `date()` arma el folio con la hora de México y `NOW()` guarda
+UTC: seis horas de diferencia. Casi siempre da igual, pero una venta de las
+18:00 del último día del mes queda registrada en el mes siguiente.
+
+Pasó de verdad. INITME Solutions, folio `20260831180937` — 31 de agosto a las
+18:09 — quedó guardada el 1 de septiembre a las 00:09. Eso movió $2,900 de venta
+y $825 de comisión al mes equivocado, y era la causa de que el sistema no
+cuadrara contra el Excel.
+
+Se pone la zona de la **sesión**, no la del servidor: así funciona aunque el
+hosting esté en UTC y no se pueda cambiar.
+
+## Proveedores
+
+Viven dentro de Gastos, como pestaña. No tienen sección propia porque solo
+existen para una cosa: saber a quién se le paga. Un proveedor sin gastos
+asociados es un dato muerto.
+
+Al registrar un gasto, el campo de proveedor sugiere los que ya existen sin
+obligar a elegirlos. Y si se le cambia el nombre a un proveedor, los gastos
+anteriores se actualizan solos: si no, quedarían apuntando a un nombre que ya
+no existe.
+
+## Notas de maqueta
+
+**La app NO carga Bootstrap.** `libertyfin.css` se escribió como capa encima de
+él y aquí se sostiene solo, así que la sección 23 del archivo trae lo que
+Bootstrap aportaba: el reset de listas, la paginación en flex, el botón como
+inline-flex.
+
+Si alguien vuelve a meter Bootstrap, esa sección se puede recortar. Mientras no
+esté, no se toca.
+
+**La paginación es un parcial único**, `parciales/paginacion.php`. Diez filas por
+página, definidas en `Peticion::POR_PAGINA`. Con veinticinco la tabla crecía
+tanto que la columna de al lado quedaba corta.
+
+**Columnas de igual altura**: `.lf-split` con `align-items:stretch` y las
+tarjetas creciendo hasta llenar su columna.
+
+**El marcador del panel dice "al corriente", no "salud".** Mide el porcentaje
+cobrado castigado por la parte del saldo que lleva más de 30 días sin abono, y
+la pantalla ahora lo explica debajo. El nombre viejo no decía nada.
+
+**El precio del servicio es editable en Caja.** Antes se releía de la base "para
+que nadie se cobre un servicio de $26,000 en $1", pero estos servicios se
+cotizan por caso y el catálogo tiene varios en cero a propósito. Ahora se acepta
+el precio capturado, se valida que no sea negativo ni absurdo, y queda
+registrado con el usuario que lo puso: el control es el rastro, no el candado.
+Un ticket que suma cero sí se rechaza, porque eso casi siempre es un dedazo.
+
+**El área del cliente necesita `12_area_cliente.sql`.** Hasta que se corra, el
+sistema funciona igual y simplemente no guarda ese campo: `ClienteRepo` pregunta
+una vez si la columna existe. Preferible a reventar con "Unknown column" en una
+instalación sin migrar.
+
 ## Lo que queda fuera, y por qué
 
 **Promociones.** No es una tabla, son cinco: `promociones`,
@@ -312,8 +374,18 @@ migración no apareció una sola venta con promoción aplicada. Escribir en esas
 cinco tablas sin entender el motor completo es la forma rápida de romper algo.
 Queda pendiente de decidir si se usa.
 
-**Inventario y proveedores.** Solo tienen sentido si llegan a vender producto
-físico. Hoy el catálogo son servicios.
+**Emida Servicios.** Vende recargas telefónicas: tiempo aire de Telcel,
+Movistar, AT&T, vía una integración SOAP con `api.emida.com`. Esta empresa no lo
+usa — cero menciones en su base — y su catálogo son servicios de marketing,
+contabilidad y legal. Es una función de la plataforma pensada para otro tipo de
+cliente.
+
+Aviso aparte: los proxies del sistema anterior llaman a
+`http://104.248.179.142` **sin cifrar**. Si por ahí viajan credenciales o datos
+de transacción, van en claro.
+
+**Inventario.** Solo tiene sentido si llegan a vender producto físico. Hoy el
+catálogo son servicios y el stock nunca se mueve.
 
 **Facturación CFDI.** Necesita definir el PAC y el flujo de timbrado.
 

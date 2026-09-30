@@ -168,7 +168,11 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
 
   <?php if ($metodos): ?>
   <section class="card">
-    <header class="card-header">Cómo cobran</header>
+    <header class="card-header">
+      <div><span>Cómo cobran</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Por método de pago</p></div>
+    </header>
     <div class="card-body">
       <?php
       $tm = 0; foreach ($metodos as $m) $tm += (float)$m['monto'];

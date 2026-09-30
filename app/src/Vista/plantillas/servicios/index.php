@@ -105,7 +105,11 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
 <div class="lf-split">
   <?php if ($top): ?>
   <section class="card">
-    <header class="card-header">Servicios que más facturan</header>
+    <header class="card-header">
+      <div><span>Servicios que más facturan</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Del periodo filtrado</p></div>
+    </header>
     <div class="card-body">
       <?php W::barrasH(array_map(function($t){
         return ['rotulo'=>$t['nombre'],'monto'=>$t['monto']]; }, $top)); ?>
@@ -169,9 +173,10 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
       </tbody>
     </table>
   </div>
-  <div class="card-footer" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">
-    <span><?= count($catalogo) ?> servicios</span>
-    <span>Cobrado en el periodo <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($tot) ?></b></span>
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($catalogo) ?> de <?= number_format($total) ?> servicios</span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
   </div>
 </section>
 

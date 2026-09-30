@@ -17,13 +17,19 @@ final class ServiciosControlador
         $hasta  = Peticion::fecha('hasta', date('Y-m-t'));
         $buscar = Peticion::texto('q');
         $editar = Peticion::entero('editar');
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = Peticion::POR_PAGINA;
+        $total  = $repo->cuantos($buscar);
 
         Plantilla::pagina('servicios/index', [
             'titulo'    => 'Servicios',
             'icono'     => 'serv',
             'subtitulo' => Fechas::rotulo($desde, $hasta) . ' · catálogo y desempeño',
             'resumen'   => $repo->resumen($desde, $hasta),
-            'catalogo'  => $repo->catalogo($desde, $hasta, $buscar),
+            'catalogo'  => $repo->catalogo($desde, $hasta, $buscar, $porPag, ($pagina-1)*$porPag),
+            'pagina'    => $pagina,
+            'paginas'   => max(1, (int)ceil($total / $porPag)),
+            'total'     => $total,
             'top'       => $repo->masFacturan($desde, $hasta, 5),
             'areas'     => $repo->porArea($desde, $hasta),
             'desde'     => $desde, 'hasta' => $hasta, 'buscar' => $buscar,

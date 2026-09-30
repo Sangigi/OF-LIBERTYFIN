@@ -18,13 +18,19 @@ final class GastosControlador
         $cat    = Peticion::opcion('cat', GastoRepo::CATEGORIAS, '');
         $buscar = Peticion::texto('q');
         $editar = Peticion::entero('editar');
+        $vista  = Peticion::opcion('t', ['generales','operacion','proveedores'], 'generales');
 
         Plantilla::pagina('gastos/index', [
             'titulo'    => 'Gastos',
             'icono'     => 'baja',
             'subtitulo' => Fechas::rotulo($desde, $hasta),
             'resumen'   => $repo->resumen($desde, $hasta),
-            'gastos'    => $repo->listado($desde, $hasta, $cat, $buscar),
+            'vista'     => $vista,
+            'gastos'    => $vista === 'generales' ? $repo->listado($desde, $hasta, $cat, $buscar) : [],
+            'operacion' => $vista === 'operacion' ? $repo->operacion($desde, $hasta) : [],
+            'proveedores'   => $vista === 'proveedores' ? $repo->proveedores() : [],
+            'prov_editando' => ($vista === 'proveedores' && $editar) ? $repo->proveedor($editar) : null,
+            'prov_lista'    => $vista === 'generales' ? $repo->proveedoresActivos() : [],
             'categorias'=> $repo->porCategoria($desde, $hasta),
             'editando'  => $editar ? $repo->uno_($editar) : null,
             'abrir'     => $editar > 0 || Peticion::texto('nuevo') !== '',
@@ -85,5 +91,41 @@ final class GastosControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /gastos'); exit;
+    }
+
+    public function guardarProveedor()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token();
+        try {
+            (new GastoRepo($db))->guardarProveedor((int)($_POST['id'] ?? 0), $_POST);
+            $this->volverA('proveedores', 'Proveedor guardado.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volverA('proveedores', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] guardar proveedor: ' . $e->getMessage());
+            $this->volverA('proveedores', 'No se pudo guardar el proveedor.', 'error');
+        }
+    }
+
+    public function alternarProveedor()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $this->token();
+        try {
+            (new GastoRepo($db))->alternarProveedor((int)($_POST['id'] ?? 0));
+            $this->volverA('proveedores', 'Estado cambiado.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volverA('proveedores', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] alternar proveedor: ' . $e->getMessage());
+            $this->volverA('proveedores', 'No se pudo cambiar el estado.', 'error');
+        }
+    }
+
+    private function volverA($pestana, $texto, $tipo)
+    {
+        $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
+        header('Location: /gastos?t=' . $pestana); exit;
     }
 }
