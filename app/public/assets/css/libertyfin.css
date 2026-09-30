@@ -1077,3 +1077,8 @@ body.lf-centro{display:flex;align-items:center;justify-content:center;
 .lf-alta > summary svg{color:var(--lf-brand)}
 .lf-alta[open] > summary{border-bottom:1px solid var(--lf-linea)}
 .lf-form{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;padding:18px 20px}
+
+/* Azulejo en rojo, para lo que de verdad urge */
+.lf-tile.r{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+a.stat-card{text-decoration:none;color:inherit;display:block}
+a.stat-card:hover{color:inherit}

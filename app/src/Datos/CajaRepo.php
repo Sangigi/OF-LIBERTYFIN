@@ -93,4 +93,40 @@ final class CajaRepo extends Repo
             WHERE c.sucursal_id = ? AND c.estado = 'cerrada'
             ORDER BY c.id DESC LIMIT " . (int)$tope, [(int)$sucursalId]);
     }
+
+    /** Historial completo, con lo que se movió en cada turno. */
+    public function historialCompleto($sucursalId, $limite = 40)
+    {
+        return $this->todos("
+            SELECT c.*, u.nombre AS usuario,
+                   COALESCE(mv.cobrado,0)  AS cobrado,
+                   COALESCE(mv.efectivo,0) AS efectivo,
+                   COALESCE(mv.cobros,0)   AS cobros
+            FROM caja c
+            LEFT JOIN usuarios u ON u.id = c.usuario_id
+            LEFT JOIN (
+                SELECT v.caja_id,
+                       SUM(p.monto) AS cobrado,
+                       SUM(CASE WHEN p.metodo_pago = 'efectivo' THEN p.monto END) AS efectivo,
+                       COUNT(*) AS cobros
+                FROM venta_pagos p
+                INNER JOIN ventas v ON v.id = p.venta_id
+                WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+                GROUP BY v.caja_id
+            ) mv ON mv.caja_id = c.id
+            WHERE c.sucursal_id = ?
+            ORDER BY c.id DESC
+            LIMIT " . (int)$limite, [(int)$sucursalId]);
+    }
+
+    /** Las cifras del historial: cuántos cuadraron y cuánto se desvió. */
+    public function resumenHistorial($sucursalId)
+    {
+        return $this->uno("
+            SELECT COUNT(*) AS cortes,
+                   SUM(CASE WHEN ABS(COALESCE(diferencia,0)) <= 0.009 THEN 1 ELSE 0 END) AS cuadrados,
+                   COALESCE(SUM(CASE WHEN diferencia > 0 THEN diferencia END),0) AS sobrantes,
+                   COALESCE(SUM(CASE WHEN diferencia < 0 THEN -diferencia END),0) AS faltantes
+            FROM caja WHERE sucursal_id = ? AND estado = 'cerrada'", [(int)$sucursalId]) ?: [];
+    }
 }

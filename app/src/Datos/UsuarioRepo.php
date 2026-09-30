@@ -1,0 +1,171 @@
+<?php
+namespace LibertyFin\Datos;
+
+/**
+ * Usuarios de la empresa.
+ *
+ * La contraseña NUNCA sale de aquí. Ningún método la devuelve, ninguna
+ * vista la recibe. Lo único que existe es cambiarla, y siempre pasa por
+ * password_hash().
+ */
+final class UsuarioRepo extends Repo
+{
+    const ROLES = ['admin' => 'Administrador', 'supervisor' => 'Supervisor',
+                   'cajero' => 'Cajero', 'vendedor' => 'Vendedor'];
+    const CLAVE_MINIMA = 8;
+
+    public function todos_()
+    {
+        return $this->todos("
+            SELECT u.id, u.username, u.nombre, u.email, u.rol, u.sucursal_id,
+                   COALESCE(u.activo,1) AS activo,
+                   s.nombre AS sucursal,
+                   (SELECT COUNT(*) FROM ventas v WHERE v.usuario_id = u.id
+                      AND v.estado <> 'cancelada') AS ventas
+            FROM usuarios u
+            LEFT JOIN sucursales s ON s.id = u.sucursal_id
+            ORDER BY COALESCE(u.activo,1) DESC, u.nombre");
+    }
+
+    public function uno_($id)
+    {
+        return $this->uno("
+            SELECT id, username, nombre, email, rol, sucursal_id, COALESCE(activo,1) AS activo
+            FROM usuarios WHERE id = ?", [(int)$id]);
+    }
+
+    public function sucursales()
+    {
+        return $this->todos("SELECT id, nombre FROM sucursales ORDER BY nombre");
+    }
+
+    /**
+     * Requisitos de la contraseña.
+     *
+     * Ocho caracteres y que no sea el nombre de usuario. Deliberadamente
+     * NO se exige mayúscula, número y símbolo: esa regla produce
+     * "Empresa2026!" pegado en un post-it, que es peor que una frase larga
+     * que la persona sí recuerda.
+     */
+    public static function revisarClave($clave, $username = '')
+    {
+        $clave = (string)$clave;
+        if (mb_strlen($clave) < self::CLAVE_MINIMA) {
+            throw new \InvalidArgumentException(
+                'La contraseña necesita al menos ' . self::CLAVE_MINIMA . ' caracteres');
+        }
+        if ($username !== '' && mb_strtolower($clave) === mb_strtolower($username)) {
+            throw new \InvalidArgumentException('La contraseña no puede ser el nombre de usuario');
+        }
+        $obvias = ['12345678','password','contrasena','qwertyui','admin123','11111111'];
+        if (in_array(mb_strtolower($clave), $obvias, true)) {
+            throw new \InvalidArgumentException('Esa contraseña es demasiado común');
+        }
+        return $clave;
+    }
+
+    private function limpiar(array $d, $idActual = null)
+    {
+        $username = mb_strtolower(trim($d['username'] ?? ''));
+        if (!preg_match('/^[a-z0-9._-]{3,40}$/', $username)) {
+            throw new \InvalidArgumentException(
+                'El usuario debe tener de 3 a 40 caracteres: letras, números, punto, guion o guion bajo');
+        }
+        $nombre = trim($d['nombre'] ?? '');
+        if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
+
+        $rol = $d['rol'] ?? '';
+        if (!isset(self::ROLES[$rol])) throw new \InvalidArgumentException('Ese rol no existe');
+
+        $email = trim($d['email'] ?? '');
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new \InvalidArgumentException('El correo no es válido');
+        }
+
+        $sql = "SELECT id FROM usuarios WHERE username = ?";
+        $p = [$username];
+        if ($idActual) { $sql .= " AND id <> ?"; $p[] = (int)$idActual; }
+        if ($this->valor($sql . " LIMIT 1", $p)) {
+            throw new \InvalidArgumentException('Ya existe un usuario llamado ' . $username);
+        }
+        return [$username, $nombre, $email ?: null, $rol,
+                (int)($d['sucursal_id'] ?? 0) ?: null];
+    }
+
+    public function crear(array $d)
+    {
+        list($username, $nombre, $email, $rol, $suc) = $this->limpiar($d);
+        $clave = self::revisarClave($d['clave'] ?? '', $username);
+        $this->db->prepare("
+            INSERT INTO usuarios (username, password, nombre, email, rol, sucursal_id)
+            VALUES (?,?,?,?,?,?)
+        ")->execute([$username, password_hash($clave, PASSWORD_DEFAULT),
+                     $nombre, $email, $rol, $suc]);
+        return (int)$this->db->lastInsertId();
+    }
+
+    public function actualizar($id, array $d)
+    {
+        list($username, $nombre, $email, $rol, $suc) = $this->limpiar($d, $id);
+        $this->db->prepare("
+            UPDATE usuarios SET username = ?, nombre = ?, email = ?, rol = ?, sucursal_id = ?
+            WHERE id = ?
+        ")->execute([$username, $nombre, $email, $rol, $suc, (int)$id]);
+        return (int)$id;
+    }
+
+    /** Restablecer: lo hace un administrador, sin pedir la anterior. */
+    public function restablecerClave($id, $clave)
+    {
+        $u = $this->uno_($id);
+        if (!$u) throw new \InvalidArgumentException('Ese usuario no existe');
+        self::revisarClave($clave, $u['username']);
+        $this->db->prepare("UPDATE usuarios SET password = ? WHERE id = ?")
+                 ->execute([password_hash($clave, PASSWORD_DEFAULT), (int)$id]);
+        return $u['nombre'];
+    }
+
+    /** Cambiarla uno mismo: hay que saber la anterior. */
+    public function cambiarClave($id, $actual, $nueva)
+    {
+        $hash = $this->valor("SELECT password FROM usuarios WHERE id = ?", [(int)$id]);
+        if (!$hash || !password_verify((string)$actual, (string)$hash)) {
+            throw new \InvalidArgumentException('La contraseña actual no es correcta');
+        }
+        $u = $this->uno_($id);
+        self::revisarClave($nueva, $u['username']);
+        if (password_verify((string)$nueva, (string)$hash)) {
+            throw new \InvalidArgumentException('La nueva contraseña es igual a la anterior');
+        }
+        $this->db->prepare("UPDATE usuarios SET password = ? WHERE id = ?")
+                 ->execute([password_hash($nueva, PASSWORD_DEFAULT), (int)$id]);
+        return true;
+    }
+
+    /**
+     * Activa o desactiva. Nunca se borra: las ventas apuntan al usuario
+     * que las hizo, y perder eso es perder el rastro de quién cobró.
+     */
+    public function alternar($id, $yo)
+    {
+        if ((int)$id === (int)$yo) {
+            throw new \InvalidArgumentException('No puedes desactivar tu propia cuenta');
+        }
+        $u = $this->uno_($id);
+        if (!$u) throw new \InvalidArgumentException('Ese usuario no existe');
+
+        // Sin administradores activos nadie puede volver a entrar a configurar.
+        if ($u['rol'] === 'admin' && $u['activo']) {
+            $otros = (int)$this->valor("
+                SELECT COUNT(*) FROM usuarios
+                WHERE rol = 'admin' AND COALESCE(activo,1) = 1 AND id <> ?", [(int)$id]);
+            if ($otros === 0) {
+                throw new \InvalidArgumentException(
+                    'Es el único administrador activo. Nombra a otro antes de desactivarlo.');
+            }
+        }
+        $this->db->prepare("UPDATE usuarios SET activo = 1 - COALESCE(activo,1) WHERE id = ?")
+                 ->execute([(int)$id]);
+        return (int)$this->valor("SELECT COALESCE(activo,1) FROM usuarios WHERE id = ?", [(int)$id]);
+    }
+}

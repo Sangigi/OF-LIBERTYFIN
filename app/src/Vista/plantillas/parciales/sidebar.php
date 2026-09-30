@@ -5,11 +5,19 @@ $menu = [
   ['ruta' => '/caja',      'icono' => 'caja',    'texto' => 'Caja'],
   ['ruta' => '/ventas',    'icono' => 'venta',   'texto' => 'Ventas'],
   ['ruta' => '/clientes',  'icono' => 'cliente', 'texto' => 'Clientes'],
-  ['ruta' => '/corte',     'icono' => 'reloj',   'texto' => 'Corte de caja'],
+  ['ruta' => '/cobranza',  'icono' => 'reloj',   'texto' => 'Cobranza'],
+  ['ruta' => '/corte',     'icono' => 'caja',    'texto' => 'Corte de caja'],
   ['grupo' => 'Administración'],
   ['ruta' => '/comisiones','icono' => 'comi',    'texto' => 'Comisiones'],
+  ['ruta' => '/gastos',    'icono' => 'baja',    'texto' => 'Gastos'],
   ['ruta' => '/servicios', 'icono' => 'serv',    'texto' => 'Servicios'],
+  ['ruta' => '/reportes',  'icono' => 'pct',     'texto' => 'Reportes'],
 ];
+// Usuarios solo lo ve un administrador. La comprobación de verdad está en
+// el controlador: esconder el enlace es cortesía, no seguridad.
+if (($_SESSION['usuario_rol'] ?? '') === 'admin') {
+    $menu[] = ['ruta' => '/ajustes', 'icono' => 'serv', 'texto' => 'Ajustes'];
+}
 $u = $_SESSION['usuario_nombre'] ?? 'Usuario';
 $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
 ?>
@@ -31,7 +39,8 @@ $ini = strtoupper(mb_substr($u, 0, 1) . mb_substr(strstr($u, ' ') ?: '', 1, 1));
   </nav>
   <div class="lf-pie">
     <div class="lf-ucard">
-      <span class="lf-av"><?= P::e($ini) ?></span>
+      <a href="/cuenta" class="lf-av" title="Mi cuenta"
+         style="text-decoration:none"><?= P::e($ini) ?></a>
       <span style="flex:1;min-width:0"><b><?= P::e($u) ?></b><small><?= P::e($_SESSION['usuario_rol'] ?? '') ?></small></span>
       <a href="/salir" class="lf-btn-ghost" title="Cerrar sesión" style="flex-shrink:0">
         <?= W::icono('baja','15px') ?></a>

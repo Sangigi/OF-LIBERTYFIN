@@ -69,6 +69,12 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/ventas/{id}` detalle | listo |
 | `/login` | listo |
 | `/corte` corte de caja | listo |
+| `/cobranza` | listo |
+| `/gastos` | listo |
+| `/reportes` | listo |
+| `/ajustes` | listo · solo admin |
+| `/usuarios` | listo · pestaña de Ajustes |
+| `/cuenta` | listo |
 
 ## Notas del esquema
 
@@ -155,9 +161,165 @@ a un producto que ya no existe.
 Las validaciones baratas van antes de consultar la base: no tiene sentido ir a
 buscar códigos duplicados para terminar rechazando un precio en cero.
 
-## Lo que falta
+## Usuarios y contraseñas
 
-- Restablecer contraseña
+**La contraseña nunca sale del repositorio.** Ningún método la devuelve,
+ninguna vista la recibe. Lo único que existe es cambiarla, y siempre pasa por
+`password_hash()` con bcrypt.
+
+**Dos caminos distintos, a propósito:**
+
+- Un administrador **restablece** la de otro sin pedir la anterior: es para
+  cuando alguien la olvidó.
+- Cada quien **cambia la suya** desde `/cuenta`, y ahí sí hay que saber la
+  actual. Al cambiarla se cierra la sesión: si alguien la cambió porque
+  sospecha que se la sabían, dejar la sesión viva no serviría de nada.
+
+**Las reglas son ocho caracteres y que no sea el nombre de usuario.**
+Deliberadamente NO se exige mayúscula, número y símbolo. Esa regla produce
+`Empresa2026!` pegado en un post-it, que es peor que una frase larga que la
+persona sí recuerda.
+
+**Un usuario no se borra, se desactiva.** Las ventas apuntan a quien las hizo;
+borrarlo sería perder el rastro de quién cobró. Y no se puede desactivar al
+único administrador activo: nadie podría volver a entrar a configurar.
+
+Al dar de alta, la contraseña se escribe en claro a propósito: la pone el
+administrador y se la dice a la persona. Después nadie puede volver a verla,
+ni él.
+
+## Cobranza
+
+Contesta "a quién le hablo hoy", no "cuánto me deben". Por eso ordena por
+antigüedad del último abono y no por monto: $18,000 parados dos meses son peor
+noticia que $30,000 que abonaron ayer.
+
+**Los días se cuentan desde el último abono, no desde la venta.** Una venta de
+hace seis meses con un abono ayer está al corriente; una de hace dos meses sin
+tocar, no.
+
+Las cuatro tarjetas de arriba son filtros: tocas "Más de 60 días" y la lista se
+reduce a eso. Y hay dos vistas: por venta, para cobrar; por cliente, para
+sentarse a negociar con alguien que debe varias.
+
+## Gastos
+
+Dos clases que NO se mezclan:
+
+- **De operación** · cuelgan de una venta y se restan de la utilidad antes de
+  comisionar. Se capturan en Caja o en el detalle de la venta.
+- **Generales** · renta, nómina, servicios. No pertenecen a ninguna venta y no
+  tocan comisiones. Son los de esta pantalla.
+
+Confundirlos repetiría un error que ya costó caro: un gasto general restado a
+una venta le baja la comisión a alguien sin razón. Por eso la pantalla muestra
+los dos totales por separado y nunca los suma en la misma cifra.
+
+Solo se pueden borrar los generales. Uno de operación cambia la base de comisión
+de su venta, y eso se toca desde el detalle de esa venta.
+
+## La arquitectura no copia la del sistema anterior
+
+El sistema viejo tenía 37 pantallas porque creció sobre la marcha: cada cosa
+nueva era un archivo nuevo. Aquí se agrupa por lo que la gente hace, no por
+cómo se fue construyendo.
+
+| Sección | Absorbe del sistema anterior |
+|---|---|
+| Panel | dashboard |
+| Caja | caja, checkout |
+| Ventas | ventas_lista, detalle, ticket (botón, no pantalla) |
+| Cobranza | cuentas_por_cobrar |
+| Corte de caja | caja_apertura, caja_cierre, caja_historial, caja_resumen |
+| Clientes | clientes, facturar_cliente |
+| Comisiones | recalcular_comisiones |
+| Gastos | gastos |
+| Servicios | productos, promociones |
+| Reportes | reportes |
+| **Ajustes** | **configuracion, sucursales, comisiones_config, categorias, usuarios** |
+
+**Ajustes** son cuatro pestañas que en el viejo eran cuatro pantallas de entre
+700 y 1,500 líneas. Son tablas chicas que se tocan una vez al mes y siempre
+juntas: darle pantalla completa a cada una solo obliga a navegar de más.
+
+## Reportes
+
+Contesta la pregunta que el sistema anterior no podía: **cuánto queda de
+verdad.**
+
+    Cobrado
+      − gastos de operación
+      − gastos generales
+      − comisiones devengadas
+    = queda
+
+Parte del **cobrado**, no de lo facturado. Lo facturado y el saldo pendiente
+aparecen abajo, en una nota aparte, con el porqué escrito: sumar lo facturado
+como ingreso fue lo que hacía que el sistema mostrara $558,057.60 cuando lo
+real eran $289,468.05.
+
+Y el IVA se señala aparte cuando lo hay: no es ingreso, es del SAT.
+
+**Los criterios de fecha no son iguales para todo, a propósito:**
+
+| Concepto | Se mide por |
+|---|---|
+| Cobrado | `venta_pagos.fecha_pago` — cuándo entró el dinero |
+| Gastos de operación | `ventas.fecha` — cuelgan de su venta |
+| Gastos generales | `gastos.fecha` — cuándo se pagó |
+| Comisiones | `ventas.fecha` — a qué venta pertenecen |
+
+El margen por área es la cifra más útil de la pantalla: un área con mucho
+cobrado y margen bajo está trabajando para pagar comisiones.
+
+**El CSV sale con BOM y punto y coma.** Sin eso, Excel en español abre el
+archivo con todo en una columna y rompe los acentos. Es un detalle tonto que
+hace la diferencia entre un reporte que se usa y uno que no.
+
+## Ticket
+
+Vive en `/ventas/{id}/ticket` y trae su propio CSS: es la única pantalla que se
+imprime, y cargar la hoja completa para tacharla al imprimir no tiene sentido.
+Ancho de 80 mm, el de las térmicas.
+
+Con `?auto=1` se manda a imprimir solo, para encadenarlo después de cobrar.
+
+## Historial de cortes
+
+Pestaña de Corte de caja. Cuenta cuántos cuadraron y acumula sobrantes y
+faltantes por separado, que es lo que revela si alguien se está equivocando
+siempre para el mismo lado.
+
+La columna "cobrado" incluye transferencias y tarjeta; la de "contado" es solo
+efectivo. Por eso casi nunca coinciden, y no tienen por qué.
+
+## Datos de la empresa
+
+Pestaña de Ajustes. Solo se editan contacto y datos fiscales, con lista blanca
+de campos: el plan, el nombre de la base y sus credenciales NO se tocan desde
+aquí. Cambiarlos dejaría a la empresa sin poder entrar, y eso es trabajo de
+quien administra la plataforma.
+
+## Lo que queda fuera, y por qué
+
+**Promociones.** No es una tabla, son cinco: `promociones`,
+`promociones_aplicables`, `promociones_sucursales`, `promociones_combo` y
+`promociones_obtener`. Es un motor de promociones de tienda — combos, 2x1,
+"compra X y llévate Y" — segmentado por categoría y sucursal.
+
+Esta empresa vende servicios con precio negociado por cliente, y en toda la
+migración no apareció una sola venta con promoción aplicada. Escribir en esas
+cinco tablas sin entender el motor completo es la forma rápida de romper algo.
+Queda pendiente de decidir si se usa.
+
+**Inventario y proveedores.** Solo tienen sentido si llegan a vender producto
+físico. Hoy el catálogo son servicios.
+
+**Facturación CFDI.** Necesita definir el PAC y el flujo de timbrado.
+
+La capa SaaS (empresas, planes, suscripciones, distribuidores) es otro sistema
+y va al final.
+
 - Comisión por producto cuando la venta tiene varios
 
 ## Ingreso

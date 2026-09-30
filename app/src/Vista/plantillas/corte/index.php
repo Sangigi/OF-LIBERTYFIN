@@ -10,6 +10,11 @@ $efe   = (float)($mov['efectivo'] ?? 0);
 $esperado = $fondo + $efe;
 ?>
 
+<div class="lf-pills" style="margin-bottom:18px">
+  <a class="lf-pill active" href="/corte">Turno actual</a>
+  <a class="lf-pill" href="/corte?t=historial">Historial</a>
+</div>
+
 <?php if ($aviso): ?>
 <div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>

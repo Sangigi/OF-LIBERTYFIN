@@ -15,6 +15,21 @@ final class CorteControlador
         $suc  = (int)($_SESSION['sucursal_id'] ?? 0);
         $usr  = (int)($_SESSION['usuario_id'] ?? 0);
 
+        $p = Peticion::opcion('t', ['turno','historial'], 'turno');
+        if ($p === 'historial') {
+            Plantilla::pagina('corte/historial', [
+                'titulo'    => 'Corte de caja',
+                'icono'     => 'caja',
+                'subtitulo' => 'Historial · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
+                'pestana'   => 'historial',
+                'cortes'    => $repo->historialCompleto($suc, 40),
+                'resumen'   => $repo->resumenHistorial($suc),
+                'aviso'     => $_SESSION['lf_aviso'] ?? null,
+            ]);
+            unset($_SESSION['lf_aviso']);
+            return;
+        }
+
         $caja = $repo->abierta($usr, $suc);
         $mov = $cobros = [];
         if ($caja) {
@@ -31,6 +46,7 @@ final class CorteControlador
             'icono'     => 'caja',
             'subtitulo' => $caja ? 'Caja abierta · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz')
                                  : 'Sin caja abierta',
+            'pestana'   => 'turno',
             'caja'      => $caja,
             'mov'       => $mov,
             'cobros'    => $cobros,
