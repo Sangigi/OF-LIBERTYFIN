@@ -2,6 +2,7 @@
 namespace LibertyFin\Servicio;
 
 use LibertyFin\Datos\AutenticacionRepo;
+use LibertyFin\Servicio\Migraciones;
 use PDO;
 
 /**
@@ -104,7 +105,18 @@ final class Autenticar
         // el armazón la pinta en cada página y consultarla cada vez sería
         // una consulta más por petición para un dato que casi nunca cambia.
         try {
-            $db  = \LibertyFin\Datos\Conexion::de($empresa['nombre_base_datos']);
+            $db = \LibertyFin\Datos\Conexion::de($empresa['nombre_base_datos']);
+
+            // La base se pone al día sola al entrar.
+            //
+            // LibertyFin crea una base por empresa, y el esquema vive como
+            // CREATE TABLE dentro de registroEmpresa.php. Sin esto, una
+            // empresa creada hoy nace sin las columnas que agregó la última
+            // versión, y falla con un error que ninguna otra empresa tiene.
+            //
+            // En una base al día cuesta una consulta.
+            if (!Migraciones::alDia($db)) Migraciones::aplicar($db);
+
             $cfg = new \LibertyFin\Datos\ConfigRepo($db);
             $color = (string)$cfg->valorDe('marca.color', '');
             if (preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $_SESSION['lf_marca_color'] = $color;

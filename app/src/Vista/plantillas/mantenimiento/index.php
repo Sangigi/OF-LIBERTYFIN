@@ -25,6 +25,81 @@ $hora_ok = abs(strtotime($d['hora_php']) - strtotime($d['hora_sql'])) <= 60;
 </div>
 <?php endif; ?>
 
+<?php
+$atrasadas = 0;
+foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema['ultima']) $atrasadas++;
+?>
+
+<section class="card" style="<?= $atrasadas ? 'border-color:color-mix(in srgb,var(--lf-amb) 34%,transparent)' : '' ?>">
+  <header class="card-header">
+    <div><span>Esquema de las bases</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        LibertyFin crea una base por empresa. Cada una tiene que estar en la misma versión.</p></div>
+    <span class="badge <?= $atrasadas ? 'bg-warning' : 'bg-success' ?>">
+      <?= $atrasadas ? $atrasadas . ' atrasada' . ($atrasadas==1?'':'s') : 'Todas al día' ?></span>
+  </header>
+
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr><th>Empresa</th><th>Base</th><th class="text-end">Versión</th><th>Estado</th></tr></thead>
+      <tbody>
+      <?php if (!$empresas): ?>
+        <tr><td colspan="4" style="text-align:center;color:var(--lf-tinta-4);padding:28px">
+          No se pudo leer la lista de empresas.</td></tr>
+      <?php endif; ?>
+      <?php foreach ($empresas as $e):
+        $atras = $e['version'] !== null && $e['version'] < $esquema['ultima']; ?>
+        <tr style="<?= $e['activo'] ? '' : 'opacity:.6' ?>">
+          <td data-label="Empresa"><b style="font-weight:600"><?= P::e($e['nombre']) ?></b>
+            <?php if (!$e['activo']): ?>
+              <span class="badge bg-secondary" style="margin-left:6px">Inactiva</span><?php endif; ?></td>
+          <td data-label="Base" class="lf-mono" style="font-size:12px"><?= P::e($e['base']) ?></td>
+          <td data-label="Versión" class="text-end lf-mono">
+            <?= $e['version'] === null ? '—' : (int)$e['version'] ?> / <?= (int)$esquema['ultima'] ?></td>
+          <td data-label="Estado">
+            <?php if ($e['error']): ?>
+              <span class="badge bg-danger"><?= P::e($e['error']) ?></span>
+            <?php elseif ($atras): ?>
+              <span class="badge bg-warning">Le faltan <?= $esquema['ultima'] - $e['version'] ?></span>
+            <?php else: ?>
+              <span class="badge bg-success">Al día</span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card-body" style="border-top:1px solid var(--lf-linea)">
+    <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start">
+      <div style="flex:1;min-width:250px">
+        <b style="font-size:13px;font-weight:600;display:block;margin-bottom:8px">
+          Qué trae cada versión</b>
+        <?php foreach ($esquema['que_hace'] as $v => $q): ?>
+          <div style="display:flex;gap:9px;padding:3px 0;font-size:12.5px;color:var(--lf-tinta-3)">
+            <span class="lf-mono" style="color:var(--lf-tinta-4);min-width:18px"><?= $v ?></span>
+            <span><?= P::e($q) ?></span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <div style="flex:1;min-width:250px">
+        <form method="post" action="/mantenimiento/migrar">
+          <input type="hidden" name="token" value="<?= P::e($token) ?>">
+          <button class="btn <?= $atrasadas ? 'btn-primary' : 'btn-secondary' ?>" type="submit"
+                  style="width:100%"<?= $atrasadas ? '' : ' disabled' ?>>
+            <?= W::icono('cobro','15px') ?>Poner todas al día</button>
+        </form>
+        <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px;line-height:1.55">
+          Cada base se pone al día sola cuando alguien entra, así que esto casi
+          nunca hace falta. Sirve para empresas donde nadie ha entrado todavía.
+          Las migraciones son repetibles: correrlas dos veces no hace nada.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="card">
   <header class="card-header">
     <div><span>Revisión de la base</span>

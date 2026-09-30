@@ -381,6 +381,41 @@ La configuración vive en `sistema_config` dentro de la base de cada empresa.
 **Las credenciales no van ahí**: una contraseña en una tabla la ve cualquiera con
 acceso a la base, y todo respaldo se la lleva.
 
+## Migraciones · una base por empresa
+
+LibertyFin crea una base de datos por empresa, y en el sistema anterior el
+esquema vive como 36 `CREATE TABLE` escritos dentro de `registroEmpresa.php`.
+
+Eso significa que cada columna nueva hay que agregarla a mano en TODAS las bases
+existentes, y además acordarse de meterla en ese archivo para las que nazcan
+después. Nadie se acuerda, y el síntoma es el peor posible: **una empresa nueva
+estrena el sistema y le falta una columna**, con un error que ningún otro
+cliente tiene.
+
+`Servicio\Migraciones` lo resuelve. Cada migración tiene número y es
+**idempotente**: correrla dos veces no hace nada la segunda. La versión aplicada
+se guarda en `sistema_config` de cada empresa.
+
+**Se ejecutan solas al entrar**, si la base está atrasada. En una base al día el
+costo es una consulta.
+
+Y en Mantenimiento hay una tabla con la versión de cada empresa y un botón para
+poner al día las que nadie ha abierto todavía.
+
+| Versión | Qué trae |
+|---|---|
+| 1 | Tabla de configuración por empresa |
+| 2 | Área del cliente |
+| 3 | Foto de perfil e imagen del servicio |
+| 4 | Índices de rendimiento |
+
+**Al agregar una migración:** escribe el método `vN`, súbelo a
+`Migraciones::VERSION` y descríbelo en `DESCRIPCIONES`. Nada más.
+
+Los índices se aplican desde la versión 1 de cada empresa a propósito: en una
+base recién creada no se notan, pero ponerlos desde el día uno evita descubrir
+tarde que el listado recorre la tabla entera.
+
 ## Personalización
 
 **Color de la marca.** Se elige en Ajustes → Empresa y cambia el sistema entero.

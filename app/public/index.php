@@ -89,6 +89,7 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
 $r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
 $r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
+$r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
 $r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
@@ -148,6 +149,7 @@ $permisos = [
   '/recargas/vender'        => 'vender.recarga',
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
+  '/mantenimiento/migrar'   => 'secciones',
   // /cuenta no lleva permiso: cualquiera administra su propia clave.
 ];
 
