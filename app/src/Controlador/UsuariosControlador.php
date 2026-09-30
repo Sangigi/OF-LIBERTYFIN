@@ -337,4 +337,21 @@ final class UsuariosControlador
         $_SESSION['lf_mostrar_guia'] = true;
         header('Location: /'); exit;
     }
+
+    /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
+    private function miCuentaPlataforma()
+    {
+        Plantilla::pagina('usuarios/cuenta', [
+            'titulo'    => 'Mi cuenta',
+            'icono'     => 'cliente',
+            'subtitulo' => 'Mi perfil',
+            'pestana'   => 'perfil',
+            'pestanas'  => ['perfil' => 'Mi perfil'],
+            'foto'      => '',
+            'aviso'     => $_SESSION['lf_aviso'] ?? null,
+            'empresa'   => null, 'fiscales' => [], 'comercio' => [], 'documentos' => [],
+            'estadoDocs'=> ['estado' => 'aprobada', 'faltan' => [], 'aprobados' => 0, 'total' => 0],
+        ]);
+        unset($_SESSION['lf_aviso']);
+    }
 }

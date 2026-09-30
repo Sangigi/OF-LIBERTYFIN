@@ -82,6 +82,16 @@ final class UsuarioRepo extends Repo
         if (!isset(\LibertyFin\Dominio\Permisos::ROLES[$rol])) {
             throw new \InvalidArgumentException('Ese rol no existe');
         }
+        // Se comprueba AQUÍ y no solo en el desplegable. Esconder una
+        // opción del formulario no impide nada: el POST se escribe a
+        // mano en diez segundos.
+        if (!\LibertyFin\Dominio\Permisos::puedeAsignar($rol)) {
+            throw new \InvalidArgumentException(
+                'No puedes asignar el rol "' . \LibertyFin\Dominio\Permisos::rotulo($rol)
+                . '". Tu rol solo puede crear: '
+                . implode(', ', array_map(function ($r) { return $r['rotulo']; },
+                    \LibertyFin\Dominio\Permisos::rolesQuePuedeAsignar())));
+        }
         // La columna `rol` es un ENUM en el esquema original. MySQL NO
         // falla al escribir un valor fuera de la lista en modo relajado:
         // guarda cadena vacía. En modo estricto sí falla, pero con un

@@ -54,6 +54,26 @@ final class Autenticar
         }
 
         $inicio = microtime(true);
+
+        // Primero la tabla de plataforma. Soporte, validación y
+        // superadministración no pertenecen a ninguna empresa, así que no
+        // se buscan entre sus usuarios.
+        $plataforma = $this->repo->usuarioPlataforma($identificador);
+        if ($plataforma) {
+            $ok = password_verify((string)$clave, (string)$plataforma['password']);
+            $gastado = microtime(true) - $inicio;
+            if ($gastado < 0.35) usleep((int)((0.35 - $gastado) * 1000000));
+            if (!$ok) {
+                $_SESSION['lf_intentos'] = ($_SESSION['lf_intentos'] ?? 0) + 1;
+                $_SESSION['lf_ultimo_intento'] = time();
+                throw new \RuntimeException('Usuario o contraseña incorrectos.');
+            }
+            if (empty($plataforma['activo'])) {
+                throw new \RuntimeException('Esta cuenta está desactivada.');
+            }
+            return $this->abrirPlataforma($plataforma);
+        }
+
         $hallazgo = $this->repo->buscar($identificador);
         $ok = $hallazgo && password_verify((string)$clave, (string)$hallazgo['usuario']['password']);
 
@@ -141,7 +161,10 @@ final class Autenticar
      */
     public static function sesionValida()
     {
-        if (empty($_SESSION['logged_in']) || empty($_SESSION['empresa_db'])) return false;
+        if (empty($_SESSION['logged_in'])) return false;
+        // Un usuario de empresa sin base es una sesión rota; uno de
+        // plataforma no tiene base y es lo normal.
+        if (empty($_SESSION['plataforma']) && empty($_SESSION['empresa_db'])) return false;
         if (time() - ($_SESSION['login_time'] ?? 0) > self::VIDA_SESION) return false;
         if (($_SESSION['user_agent'] ?? '') !== ($_SERVER['HTTP_USER_AGENT'] ?? '')) return false;
         if (($_SESSION['ip_address'] ?? '') !== ($_SERVER['REMOTE_ADDR'] ?? '')) {
@@ -160,5 +183,35 @@ final class Autenticar
                 $p['path'], $p['domain'], $p['secure'], $p['httponly']);
         }
         session_destroy();
+    }
+
+    /**
+     * Abre la sesión de un usuario de plataforma.
+     *
+     * NO lleva `empresa_db`: no pertenece a ninguna. Todo lo que este
+     * rol usa —tickets, empresas, conocimiento— vive en la base
+     * principal, y para mirar dentro de una empresa entra por su ficha,
+     * que abre esa base explícitamente y dice de quién son los datos.
+     */
+    private function abrirPlataforma(array $u)
+    {
+        session_regenerate_id(true);
+        unset($_SESSION['lf_intentos'], $_SESSION['lf_ultimo_intento']);
+
+        $_SESSION['logged_in']      = true;
+        $_SESSION['plataforma']     = true;
+        $_SESSION['usuario_id']     = (int)$u['id'];
+        $_SESSION['usuario_nombre'] = $u['nombre'];
+        $_SESSION['usuario_rol']    = $u['rol'];
+        $_SESSION['usuario_email']  = $u['email'] ?? '';
+        $_SESSION['empresa_nombre'] = 'LibertyFin';
+        $_SESSION['sucursal_nombre']= 'Plataforma';
+        $_SESSION['login_time']     = time();
+        $_SESSION['user_agent']     = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        // Sin empresa: es la marca de que estas claves NO deben existir.
+        unset($_SESSION['empresa_db'], $_SESSION['empresa_id'], $_SESSION['sucursal_id']);
+
+        $this->repo->marcarAccesoPlataforma((int)$u['id']);
+        return true;
     }
 }

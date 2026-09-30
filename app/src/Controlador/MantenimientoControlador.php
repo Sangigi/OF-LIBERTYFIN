@@ -29,13 +29,16 @@ final class MantenimientoControlador
 {
     public function index()
     {
-        $db   = Conexion::de($_SESSION['empresa_db']);
-        $repo = new ConfigRepo($db);
+        // Un rol de plataforma no tiene base de empresa. Las secciones
+        // apagables y el diagnóstico son POR empresa: se miran desde la
+        // ficha de cada una, no aquí.
+        $db   = !empty($_SESSION['empresa_db']) ? Conexion::de($_SESSION['empresa_db']) : null;
+        $repo = $db ? new ConfigRepo($db) : null;
 
         // Quien solo valida documentos no necesita el diagnóstico, ni las
         // secciones, ni el alta de empresas: cargarlos sería trabajo y
         // superficie de más para alguien que viene a otra cosa.
-        $todo = Permisos::puede('diagnostico');
+        $todo = Permisos::puede('diagnostico') && $repo !== null;
 
         Plantilla::pagina('mantenimiento/index', [
             'todo'         => $todo,
@@ -44,7 +47,7 @@ final class MantenimientoControlador
             'subtitulo'    => $_SESSION['empresa_nombre'] ?? '',
             'secciones'    => $todo ? $repo->secciones() : [],
             'diagnostico'  => $todo ? $repo->diagnostico() : [],
-            'integraciones'=> $todo ? Integraciones::estado() : [],
+            'integraciones'=> Permisos::puede('diagnostico') ? Integraciones::estado() : [],
             'roles'        => Permisos::ROLES,
             'esquema'      => $todo ? [
                 'actual'   => Migraciones::versionDe($db),
@@ -56,6 +59,7 @@ final class MantenimientoControlador
             'solicitudes'  => Permisos::puede('alta.empresas') ? $this->solicitudes() : [],
             'puedeAlta'    => Permisos::puede('alta.empresas'),
             'correoListo'  => Avisos::activos(),
+            'sinEmpresa'   => $repo === null,
             'correoPrueba' => $_SESSION['lf_correo_prueba'] ?? null,
             'miCorreo'     => $_SESSION['usuario_email'] ?? '',
             'altaLista'    => Integraciones::activa('cpanel'),
@@ -66,6 +70,9 @@ final class MantenimientoControlador
 
     public function secciones()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('Las secciones se apagan desde la ficha de cada empresa.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         if (empty($_SESSION['lf_token']) || empty($_POST['token'])
             || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {

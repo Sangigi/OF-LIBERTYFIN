@@ -44,6 +44,8 @@ $deEmpresa = [
    'si' => 'facturapi', 'sec' => 'facturacion'],
   ['ruta' => '/auditoria',  'icono' => 'reloj',   'texto' => 'Bitácora',      'p' => 'ver.auditoria'],
   ['ruta' => '/ajustes',    'icono' => 'serv',    'texto' => 'Ajustes',       'p' => 'ver.ajustes'],
+  ['grupo' => 'Soporte'],
+  ['ruta' => '/ayuda',      'icono' => 'alerta',  'texto' => 'Ayuda',         'p' => 'abrir.ticket'],
 ];
 
 $dePlataforma = [
@@ -55,6 +57,7 @@ $dePlataforma = [
   ['grupo' => 'Plataforma'],
   ['ruta' => '/informes',     'icono' => 'pct',     'texto' => 'Informes',       'p' => 'ver.informes'],
   ['ruta' => '/mantenimiento','icono' => 'alerta',  'texto' => 'Mantenimiento',  'p' => 'ver.mantenimiento'],
+  ['ruta' => '/plataforma',   'icono' => 'cliente', 'texto' => 'Cuentas',        'p' => 'usuarios.plataforma'],
 ];
 
 $secciones = Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '') ? $dePlataforma : $deEmpresa;

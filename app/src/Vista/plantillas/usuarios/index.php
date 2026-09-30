@@ -47,7 +47,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     <div style="width:150px">
       <label class="form-label">Rol</label>
       <select class="form-select" name="rol" id="selRol" required>
-        <?php foreach (Perm::ROLES as $k => $v): ?>
+        <?php foreach (Perm::rolesQuePuedeAsignar() as $k => $v): ?>
           <option value="<?= $k ?>" data-para="<?= P::e($v['para']) ?>"
             <?= (isset($e['rol']) && $e['rol']===$k)?'selected':'' ?>><?= P::e($v['rotulo']) ?></option>
         <?php endforeach; ?>
@@ -154,7 +154,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         El permiso se verifica en el servidor, no escondiendo el enlace</p></div>
   </header>
   <div class="lf-equipo" style="padding:4px 20px 18px">
-    <?php foreach (Perm::ROLES as $k => $r): $res = Perm::resumen($k); ?>
+    <?php foreach (Perm::rolesQuePuedeAsignar() as $k => $r): $res = Perm::resumen($k); ?>
       <div class="lf-pers" style="align-items:flex-start">
         <span class="lf-av <?= $k==='admin' ? '' : 'gris' ?>" style="flex-shrink:0">
           <?= P::e(mb_strtoupper(mb_substr($r['rotulo'],0,2))) ?></span>

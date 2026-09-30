@@ -1,0 +1,130 @@
+<?php
+use LibertyFin\Vista\Plantilla as P;
+use LibertyFin\Vista\Widget as W;
+use LibertyFin\Datos\TicketRepo as T;
+
+if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
+$token = $_SESSION['lf_token'];
+$ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
+// Al cliente se le dice en qué va, no el nombre técnico del estado.
+$comoVa = [
+  'abierto'   => ['Lo estamos viendo',        'bg-secondary'],
+  'en_curso'  => ['Trabajando en ello',       'bg-warning'],
+  'esperando' => ['Esperamos tu respuesta',   'bg-danger'],
+  'resuelto'  => ['Resuelto',                 'bg-success'],
+  'cerrado'   => ['Cerrado',                  'bg-secondary'],
+];
+?>
+
+<?php if ($aviso): ?>
+<div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>
+</div>
+<?php endif; ?>
+
+<?php if ($abierto): $t = $abierto; ?>
+<div style="margin-bottom:18px">
+  <a class="btn btn-secondary btn-sm" href="/ayuda">Volver a mis reportes</a>
+</div>
+
+<section class="card">
+  <header class="card-header">
+    <div><span><?= P::e($t['asunto']) ?></span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:3px;font-weight:400;
+                font-family:var(--lf-mono)"><?= P::e($t['folio']) ?> ·
+        abierto el <?= date('d/m/Y', strtotime($t['creado_en'])) ?></p></div>
+    <span class="badge <?= $comoVa[$t['estado']][1] ?? 'bg-secondary' ?>">
+      <?= P::e($comoVa[$t['estado']][0] ?? $t['estado']) ?></span>
+  </header>
+  <div class="card-body">
+    <?php foreach ($mensajes as $m):
+      $mio = (int)$m['autor_id'] === (int)($_SESSION['usuario_id'] ?? 0); ?>
+      <div class="lf-msj">
+        <span class="lf-av <?= $mio ? 'gris' : '' ?>"><?= P::e($ini($m['autor_nombre'])) ?></span>
+        <div class="cuerpo">
+          <div class="cab">
+            <b><?= $mio ? 'Tú' : P::e($m['autor_nombre'] ?: 'LibertyFin') ?></b>
+            <span class="fecha"><?= date('d/m/Y H:i', strtotime($m['creado_en'])) ?></span>
+          </div>
+          <p><?= nl2br(P::e($m['cuerpo'])) ?></p>
+          <?php if ($m['adjunto']): ?>
+            <a href="<?= P::e($m['adjunto']) ?>" target="_blank" rel="noopener" class="adj">
+              <?= W::icono('serv','14px') ?>Ver archivo</a>
+          <?php endif; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+  </div>
+
+  <?php if ($t['estado'] !== 'cerrado'): ?>
+  <div class="card-body" style="border-top:1px solid var(--lf-linea)">
+    <form method="post" action="/ayuda/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data">
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
+                placeholder="Agrega algo al reporte"></textarea>
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
+        <input type="file" name="adjunto" style="font-size:11.5px;flex:1;min-width:180px"
+               accept="image/png,image/jpeg,image/webp,application/pdf">
+        <button class="btn btn-primary" type="submit">Enviar</button>
+      </div>
+    </form>
+  </div>
+  <?php endif; ?>
+</section>
+
+<?php else: ?>
+
+<details class="lf-alta" open>
+  <summary><?= W::icono('mas','16px') ?>Reportar un problema</summary>
+  <form method="post" action="/ayuda/crear" class="lf-form">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <div style="flex:2;min-width:250px"><label class="form-label">¿Qué pasa?</label>
+      <input class="form-control" name="asunto" required
+             placeholder="En una línea, como se lo dirías a alguien"></div>
+    <div style="width:220px"><label class="form-label">¿Con qué tiene que ver?</label>
+      <select class="form-select" name="categoria">
+        <?php foreach (T::CATEGORIAS as $k=>$v): ?>
+          <option value="<?= $k ?>"><?= P::e($v) ?></option><?php endforeach; ?>
+      </select></div>
+    <div style="width:100%"><label class="form-label">Cuéntanos con detalle</label>
+      <textarea class="form-control lf-desc" name="cuerpo" rows="4" required
+                placeholder="Qué hiciste, qué viste y qué esperabas ver. Si hay un número que no cuadra, dinos cuál y cuánto debería ser."></textarea></div>
+    <button class="btn btn-primary" type="submit">Enviar reporte</button>
+    <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.55">
+      Entre más concreto, más rápido se resuelve. "No funciona" obliga a preguntarte
+      tres veces antes de poder empezar.
+    </p>
+  </form>
+</details>
+
+<section class="card">
+  <header class="card-header">
+    <div><span>Tus reportes</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Los de tu empresa, del más reciente al más viejo</p></div>
+  </header>
+  <div style="padding:0 10px 8px">
+    <?php if (!$tickets): ?>
+      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:30px">
+        Todavía no has reportado nada.</p>
+    <?php endif; ?>
+    <?php foreach ($tickets as $t): ?>
+      <a class="lf-row" href="/ayuda?ver=<?= (int)$t['id'] ?>">
+        <span style="flex:1;min-width:0">
+          <b style="display:block;font-size:13.5px"><?= P::e($t['asunto']) ?></b>
+          <small style="color:var(--lf-tinta-4);font-size:11.5px">
+            <?= P::e($t['folio']) ?> ·
+            <?= date('d/m/Y', strtotime($t['creado_en'])) ?> ·
+            <?= (int)$t['mensajes'] ?> mensaje<?= $t['mensajes']==1?'':'s' ?></small>
+        </span>
+        <span class="badge <?= $comoVa[$t['estado']][1] ?? 'bg-secondary' ?>">
+          <?= P::e($comoVa[$t['estado']][0] ?? $t['estado']) ?></span>
+      </a>
+    <?php endforeach; ?>
+  </div>
+  <div class="card-footer">
+    Te avisamos por correo en cuanto te contestemos. No hace falta que estés
+    revisando aquí.
+  </div>
+</section>
+<?php endif; ?>

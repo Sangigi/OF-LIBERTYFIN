@@ -123,6 +123,11 @@ final class Permisos
         'editar.empresa'   => ['admin'],
 
         // ── Secciones de PLATAFORMA ──
+        // Cualquiera de la empresa puede abrir un ticket. Si la única
+        // puerta fuera el correo, media queja se pierde y la otra media
+        // llega sin folio ni contexto.
+        'abrir.ticket'     => ['admin','cajero','inventario'],
+
         'ver.soporte'      => ['superadmin','soporte','validador'],
         'ver.tickets'      => ['superadmin','soporte','validador'],
         'ver.empresas'     => ['superadmin','soporte','validador'],
@@ -140,7 +145,10 @@ final class Permisos
 
         // Solo el superadministrador. Entrar a la sesión de una empresa
         // es la llave maestra: se deja fuera de soporte a propósito.
-        'suplantar'        => ['superadmin'],
+        // Cuentas de plataforma: solo el superadministrador.
+        'usuarios.plataforma' => ['superadmin'],
+        // Suspender una empresa la deja sin entrar, pero conserva todo.
+        'suspender.empresa'   => ['superadmin'],
     ];
 
     /**
@@ -213,6 +221,41 @@ final class Permisos
             if (in_array($rol, $roles, true)) $r[] = $p;
         }
         return $r;
+    }
+
+    /**
+     * Qué roles puede ASIGNAR cada rol.
+     *
+     * Esto es lo que impide una escalada de privilegios silenciosa: sin
+     * este límite, un administrador de empresa podía crear un usuario
+     * con rol `soporte` y con eso ver los datos de TODOS los clientes.
+     * No hacía falta ningún truco, solo elegir del desplegable.
+     *
+     * Nadie puede repartir un poder que no tiene. Un administrador
+     * reparte roles de su empresa; los de plataforma solo los da el
+     * superadministrador, y esos ni siquiera viven en una empresa.
+     */
+    const PUEDE_ASIGNAR = [
+        'superadmin' => ['superadmin','soporte','validador','admin','cajero','inventario'],
+        'soporte'    => [],
+        'validador'  => [],
+        'admin'      => ['admin','cajero','inventario'],
+        'cajero'     => [],
+        'inventario' => [],
+    ];
+
+    public static function rolesQuePuedeAsignar($rol = null)
+    {
+        $rol = self::normalizar($rol ?? ($_SESSION['usuario_rol'] ?? ''));
+        $lista = self::PUEDE_ASIGNAR[$rol] ?? [];
+        $r = [];
+        foreach ($lista as $k) if (isset(self::ROLES[$k])) $r[$k] = self::ROLES[$k];
+        return $r;
+    }
+
+    public static function puedeAsignar($rolDestino, $rol = null)
+    {
+        return array_key_exists($rolDestino, self::rolesQuePuedeAsignar($rol));
     }
 
     /** ¿Es un rol de plataforma? Esos no pertenecen a una empresa. */

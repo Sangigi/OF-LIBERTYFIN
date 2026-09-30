@@ -108,6 +108,14 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/ayuda',                 ['LibertyFin\Controlador\AyudaControlador', 'index']);
+$r->post('/ayuda/crear',          ['LibertyFin\Controlador\AyudaControlador', 'crear']);
+$r->post('/ayuda/{id}/responder', ['LibertyFin\Controlador\AyudaControlador', 'responder']);
+$r->get('/plataforma',            ['LibertyFin\Controlador\PlataformaControlador', 'index']);
+$r->post('/plataforma/usuario',   ['LibertyFin\Controlador\PlataformaControlador', 'guardarUsuario']);
+$r->post('/plataforma/alternar',  ['LibertyFin\Controlador\PlataformaControlador', 'alternarUsuario']);
+$r->post('/plataforma/clave',     ['LibertyFin\Controlador\PlataformaControlador', 'claveUsuario']);
+$r->post('/plataforma/empresa',   ['LibertyFin\Controlador\PlataformaControlador', 'suspenderEmpresa']);
 $r->get('/informes',              ['LibertyFin\Controlador\InformesControlador', 'index']);
 $r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlador', 'index']);
 $r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
@@ -194,6 +202,14 @@ $permisos = [
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/probar'        => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
+  '/ayuda'                  => 'abrir.ticket',
+  '/ayuda/crear'            => 'abrir.ticket',
+  '/ayuda/{id}/responder'   => 'abrir.ticket',
+  '/plataforma'             => 'usuarios.plataforma',
+  '/plataforma/usuario'     => 'usuarios.plataforma',
+  '/plataforma/alternar'    => 'usuarios.plataforma',
+  '/plataforma/clave'       => 'usuarios.plataforma',
+  '/plataforma/empresa'     => 'suspender.empresa',
   '/informes'               => 'ver.informes',
   '/conocimiento'           => 'ver.conocimiento',
   '/conocimiento/guardar'   => 'editar.conocimiento',
@@ -236,6 +252,8 @@ $hallazgo = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 
 // La bitácora escribe en la base de la empresa de la sesión. Se fija una
 // vez aquí para que ningún controlador tenga que acordarse.
+// Un usuario de plataforma no tiene base de empresa: su bitácora se
+// escribe en la base de la empresa sobre la que actúa, no aquí.
 if (!empty($_SESSION['empresa_db'])) {
     try { \LibertyFin\Servicio\Auditoria::en(\LibertyFin\Datos\Conexion::de($_SESSION['empresa_db'])); }
     catch (\Throwable $e) { /* sin bitácora se opera igual */ }

@@ -31,6 +31,16 @@ $atrasadas = 0;
 foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema['ultima']) $atrasadas++;
 ?>
 
+<?php if (!empty($sinEmpresa)): ?>
+<div class="alert alert-info" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span>Entraste con una cuenta de plataforma, que <b>no pertenece a ninguna
+    empresa</b>. Por eso no ves aquí las secciones apagables ni el diagnóstico:
+    esos son de cada empresa y se miran desde su ficha, en
+    <a href="/soporte">Empresas</a>.</span>
+</div>
+<?php endif; ?>
+
 <?php if ($todo && $esquema['actual'] < $esquema['ultima']): ?>
 <div class="alert alert-danger" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?>

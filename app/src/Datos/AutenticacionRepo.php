@@ -129,4 +129,71 @@ final class AutenticacionRepo
             return $st->fetch() ?: null;
         } catch (\Throwable $e) { return null; }
     }
+
+    // ── USUARIOS DE PLATAFORMA ──────────────────────────────────
+    //
+    // Soporte, validación y superadministración NO pertenecen a ninguna
+    // empresa. Tenerlos dentro de la base de una —como estaban— provoca
+    // tres cosas malas:
+    //
+    //   · Aparecen en la lista de "Equipo" de esa empresa, que no los
+    //     contrató y no debería administrarlos.
+    //   · Su administrador puede bloquearlos o cambiarles la contraseña.
+    //   · Si esa empresa se da de baja, soporte se queda sin cuentas.
+    //
+    // Por eso viven en la base principal, en su propia tabla.
+
+    public function asegurarPlataforma()
+    {
+        try {
+            $this->principal->exec("
+                CREATE TABLE IF NOT EXISTS usuarios_plataforma (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    username VARCHAR(60) NOT NULL,
+                    password VARCHAR(255) NOT NULL,
+                    nombre VARCHAR(160) NOT NULL,
+                    email VARCHAR(160) NULL,
+                    rol VARCHAR(30) NOT NULL DEFAULT 'soporte',
+                    activo TINYINT(1) NOT NULL DEFAULT 1,
+                    creado_en DATETIME NOT NULL,
+                    ultimo_acceso DATETIME NULL,
+                    UNIQUE KEY ix_up_user (username),
+                    KEY ix_up_activo (activo)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] usuarios_plataforma: ' . $e->getMessage());
+        }
+    }
+
+    /** Busca en la tabla de plataforma. Se consulta ANTES que las empresas. */
+    public function usuarioPlataforma($identificador)
+    {
+        $this->asegurarPlataforma();
+        try {
+            $st = $this->principal->prepare("
+                SELECT * FROM usuarios_plataforma
+                WHERE (username = ? OR email = ?) LIMIT 1");
+            $st->execute([$identificador, $identificador]);
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) { return null; }
+    }
+
+    public function marcarAccesoPlataforma($id)
+    {
+        try {
+            $this->principal->prepare(
+                "UPDATE usuarios_plataforma SET ultimo_acceso = NOW() WHERE id = ?")
+                ->execute([(int)$id]);
+        } catch (\Throwable $e) { /* no es grave */ }
+    }
+
+    public function listaPlataforma()
+    {
+        $this->asegurarPlataforma();
+        try {
+            return $this->principal->query("
+                SELECT id, username, nombre, email, rol, activo, creado_en, ultimo_acceso
+                FROM usuarios_plataforma ORDER BY activo DESC, nombre")->fetchAll();
+        } catch (\Throwable $e) { return []; }
+    }
 }
