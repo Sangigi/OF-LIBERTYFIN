@@ -33,6 +33,8 @@ $secciones = [
   ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Servicios',     'p' => 'ver.servicios'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
+  ['ruta' => '/facturacion','icono' => 'serv',    'texto' => 'Facturación',   'p' => 'ver.facturacion',
+   'si' => 'facturapi'],
   ['ruta' => '/ajustes',    'icono' => 'serv',    'texto' => 'Ajustes',       'p' => 'ver.ajustes'],
   ['ruta' => '/mantenimiento','icono'=> 'alerta', 'texto' => 'Mantenimiento', 'p' => 'ver.mantenimiento'],
 ];

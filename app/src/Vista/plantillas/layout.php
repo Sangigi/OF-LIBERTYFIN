@@ -46,6 +46,9 @@ if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
     <?php P::parcial('parciales/topbar', ['titulo' => $titulo ?? '', 'icono' => $icono ?? 'panel', 'subtitulo' => $subtitulo ?? '']); ?>
     <div class="lf-cont"><?= $contenido ?></div>
   </div>
+  <?php if (!empty($_SESSION['lf_mostrar_guia'])): unset($_SESSION['lf_mostrar_guia']);
+        P::parcial('parciales/guia'); endif; ?>
+  </div>
 </div>
 </body>
 </html>

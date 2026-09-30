@@ -211,13 +211,67 @@ final class CuentaRepo extends Repo
             else $pendientes++;
         }
         $obligatorios = count(array_filter(self::DOCUMENTOS, function ($d) { return $d[1]; }));
-        if ($faltan)      return ['estado' => 'sin_enviar', 'faltan' => $faltan,
-                                  'aprobados' => $aprobados, 'total' => $obligatorios];
-        if ($rechazados)  return ['estado' => 'rechazada', 'faltan' => $rechazados,
-                                  'aprobados' => $aprobados, 'total' => $obligatorios];
-        if ($pendientes)  return ['estado' => 'en_revision', 'faltan' => [],
-                                  'aprobados' => $aprobados, 'total' => $obligatorios];
-        return ['estado' => 'aprobada', 'faltan' => [],
+        if ($faltan)          $estado = 'sin_enviar';
+        elseif ($rechazados)  $estado = 'rechazada';
+        elseif ($pendientes)  $estado = 'en_revision';
+        else                  $estado = 'aprobada';
+
+        // `sistema_config.documentacion_estado` ya existía en el esquema y
+        // el sistema anterior la lee. Se mantiene al día para que las dos
+        // versiones cuenten lo mismo mientras convivan.
+        try {
+            $this->db->prepare("UPDATE sistema_config SET documentacion_estado = ?")
+                     ->execute([$estado]);
+        } catch (\Throwable $e) { /* si no existe la columna, da igual */ }
+
+        return ['estado' => $estado,
+                'faltan' => $faltan ?: $rechazados,
                 'aprobados' => $aprobados, 'total' => $obligatorios];
+    }
+
+    // ── REVISIÓN · lo hace soporte ───────────────────────────────
+
+    /**
+     * Revisa un documento.
+     *
+     * Rechazar SIN motivo está prohibido a propósito: lo que se escriba
+     * aquí es lo único que el negocio tiene para saber qué corregir. Un
+     * "rechazado" a secas garantiza que vuelvan a subir lo mismo.
+     */
+    public function revisar($id, $decision, $motivo, $revisorId)
+    {
+        $this->asegurar();
+        if (!in_array($decision, ['aprobado','rechazado'], true)) {
+            throw new \InvalidArgumentException('Decisión no válida');
+        }
+        $motivo = trim((string)$motivo);
+        if ($decision === 'rechazado' && mb_strlen($motivo) < 10) {
+            throw new \InvalidArgumentException(
+                'Escribe por qué se rechaza, al menos una frase: es lo único que '
+                . 'el negocio tiene para saber qué corregir');
+        }
+        $doc = $this->uno("SELECT id, tipo FROM documentos_comercio WHERE id = ?", [(int)$id]);
+        if (!$doc) throw new \InvalidArgumentException('Ese documento no existe');
+
+        $this->db->prepare("
+            UPDATE documentos_comercio
+            SET estado = ?, motivo_rechazo = ?, revisado_por = ?, revisado_en = NOW()
+            WHERE id = ?
+        ")->execute([$decision, $decision === 'rechazado' ? $motivo : null,
+                     $revisorId ?: null, (int)$id]);
+        return $doc['tipo'];
+    }
+
+    /** Todo lo que está esperando revisión, con su antigüedad. */
+    public function porRevisar()
+    {
+        $this->asegurar();
+        return $this->todos("
+            SELECT d.*, u.nombre AS quien,
+                   TIMESTAMPDIFF(HOUR, d.subido_en, NOW()) AS horas
+            FROM documentos_comercio d
+            LEFT JOIN usuarios u ON u.id = d.subido_por
+            WHERE d.estado = 'pendiente'
+            ORDER BY d.subido_en");
     }
 }

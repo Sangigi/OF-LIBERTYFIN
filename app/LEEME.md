@@ -76,6 +76,7 @@ $r->get('/clientes', ['LibertyFin\Controlador\ClientesControlador', 'index']);
 | `/mantenimiento` | listo · solo soporte |
 | `/usuarios` | listo · pestaña de Ajustes |
 | `/cuenta` | listo · 5 pestañas |
+| `/facturacion` | pantalla lista · timbrado pendiente |
 
 ## Notas del esquema
 
@@ -449,6 +450,57 @@ Los documentos aceptan **PDF además de imagen**, y el PDF se valida por su firm
 —los cuatro bytes `%PDF`— no por la extensión. El tope es de 10 MB y no de 3:
 un estado de cuenta escaneado pasa fácil de 3 MB, y rechazarlo obliga a la gente
 a comprimirlo, que es justo donde se rinden.
+
+## Revisión de documentos
+
+Antes los documentos se subían y quedaban en "pendiente" para siempre, porque no
+existía dónde revisarlos. Ahora Mantenimiento trae la bandeja con los de **todas
+las empresas**, lo más viejo primero, con su antigüedad en horas o días.
+
+Si soporte tuviera que entrar empresa por empresa a buscarlos, nadie los
+revisaría. Por eso la bandeja es transversal.
+
+**Rechazar sin motivo está prohibido**, y se pide al menos una frase. Lo que se
+escriba es lo único que el negocio tiene para saber qué corregir: un "rechazado"
+a secas garantiza que vuelvan a subir lo mismo.
+
+## Facturación
+
+La pantalla solo existe si hay credenciales de Facturapi, igual que Recargas con
+Emida.
+
+**Y antes de dejar timbrar, comprueba lo que falta:** datos fiscales completos y
+documentación aprobada. Se revisa al abrir y no al enviar, porque descubrirlo con
+la factura a medias es peor.
+
+También distingue qué venta se puede facturar: una **sin cliente** no, porque el
+CFDI necesita el RFC de quien recibe; una **sin liquidar** tampoco, porque el SAT
+timbra el pago, no la promesa.
+
+El timbrado en sí queda marcado y sin implementar hasta tener cuenta con la que
+probarlo contra el SAT.
+
+## Guía de primer uso
+
+Señala la sección real del menú e ilustra al lado cómo se ve esa pantalla **con
+datos**.
+
+No lleva al usuario a cada sección de verdad a propósito: corre en el primer
+ingreso, cuando la empresa no tiene una sola venta ni un servicio. Ventas sale
+vacía, Reportes en ceros. **Enseñar pantallas vacías no enseña el sistema:
+enseña que el sistema está vacío.**
+
+Los pasos se filtran por permiso: a un cajero no se le explica Comisiones.
+
+**La marca vive en `usuarios.guia_vista_en`, no en localStorage.** localStorage
+es por navegador: dos personas de la misma empresa en la misma computadora
+compartirían el estado y la segunda nunca la vería; y la misma persona desde su
+celular la volvería a ver.
+
+Es DATETIME y no un booleano: saber cuándo la vio permite responder "¿esta
+empresa se atoró el primer día?" sin otra columna después.
+
+Se puede volver a ver desde Mi cuenta.
 
 ## Personalización
 

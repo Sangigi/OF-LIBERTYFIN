@@ -47,6 +47,9 @@ $token = $_SESSION['lf_token'];
 
   <p class="lf-acceso-pie">
     ¿Olvidaste tu contraseña? Pídele a un administrador que te la restablezca.
+    <?php if (\LibertyFin\Servicio\Integraciones::activa('cpanel')): ?>
+      <br>¿No tienes cuenta? <a href="/registro">Registra tu negocio</a>.
+    <?php endif; ?>
   </p>
 </main>
 

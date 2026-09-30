@@ -30,15 +30,23 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 4;
+    const VERSION = 5;
 
+    /**
+     * La versión vive en `lf_ajustes`, no en `sistema_config`.
+     *
+     * `sistema_config` ya existía en el esquema del sistema anterior con
+     * columnas fijas —logo, color, datos fiscales— y no tiene forma de
+     * clave-valor. Meter ahí la versión obligaba a agregarle una columna
+     * más a una tabla que no es nuestra.
+     */
     public static function versionDe(PDO $db)
     {
         try {
-            $st = $db->query("SELECT valor FROM sistema_config WHERE clave = 'esquema.version'");
+            $st = $db->query("SELECT valor FROM lf_ajustes WHERE clave = 'esquema.version'");
             return (int)($st->fetchColumn() ?: 0);
         } catch (\Throwable $e) {
-            return 0;   // sin tabla de config, la base está en cero
+            return 0;   // sin tabla, la base está en cero
         }
     }
 
@@ -71,7 +79,7 @@ final class Migraciones
     private static function marcar(PDO $db, $v)
     {
         $db->prepare("
-            INSERT INTO sistema_config (clave, valor, actualizado) VALUES ('esquema.version',?,NOW())
+            INSERT INTO lf_ajustes (clave, valor, actualizado) VALUES ('esquema.version',?,NOW())
             ON DUPLICATE KEY UPDATE valor = VALUES(valor), actualizado = NOW()
         ")->execute([(string)$v]);
     }
@@ -109,15 +117,26 @@ final class Migraciones
     // LAS MIGRACIONES
     // ══════════════════════════════════════════════════════════════
 
-    /** 1 · La tabla de configuración. Todo lo demás depende de ella. */
+    /**
+     * 1 · La tabla clave-valor de este sistema.
+     *
+     * Se llama `lf_ajustes` y no `sistema_config` a propósito: esa ya
+     * existe con otra forma. Un nombre propio evita que dos esquemas
+     * peleen por la misma tabla.
+     */
     private static function v1(PDO $db)
     {
         $db->exec("
-            CREATE TABLE IF NOT EXISTS sistema_config (
+            CREATE TABLE IF NOT EXISTS lf_ajustes (
                 clave VARCHAR(80) NOT NULL PRIMARY KEY,
                 valor TEXT NULL,
                 actualizado DATETIME NULL
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        // Y el renglón único de sistema_config, si la empresa no lo trae.
+        try {
+            $n = (int)$db->query("SELECT COUNT(*) FROM sistema_config")->fetchColumn();
+            if ($n === 0) $db->exec("INSERT INTO sistema_config (nombre_empresa) VALUES ('Mi Empresa')");
+        } catch (\Throwable $e) { /* la empresa no tiene esa tabla: nada que hacer */ }
     }
 
     /** 2 · Área del cliente. Antes salía de su última venta y no se editaba. */
@@ -176,11 +195,33 @@ final class Migraciones
         }
     }
 
+    /**
+     * 5 · Marca de guía vista.
+     *
+     * No va en localStorage a propósito: eso es por NAVEGADOR, no por
+     * usuario. Dos personas de la misma empresa en la misma computadora
+     * compartirían el estado y la segunda nunca vería la guía; y la misma
+     * persona desde su celular la volvería a ver.
+     *
+     * Es DATETIME y no un booleano: saber CUÁNDO la vio permite responder
+     * "¿esta empresa se atoró el primer día?" sin otra columna después.
+     */
+    private static function v5(PDO $db)
+    {
+        if (!self::hayColumna($db, 'usuarios', 'guia_vista_en')) {
+            $db->exec("ALTER TABLE usuarios ADD COLUMN guia_vista_en DATETIME NULL DEFAULT NULL");
+            // Las cuentas que YA existen no deberían recibir una guía de
+            // bienvenida: llevan tiempo usando el sistema y sería ruido.
+            $db->exec("UPDATE usuarios SET guia_vista_en = NOW() WHERE guia_vista_en IS NULL");
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
-        1 => 'Tabla de configuración por empresa',
+        1 => 'Tabla de ajustes propia (lf_ajustes)',
         2 => 'Área del cliente',
         3 => 'Foto de perfil e imagen del servicio',
         4 => 'Índices de rendimiento',
+        5 => 'Marca de guía de primer uso',
     ];
 }

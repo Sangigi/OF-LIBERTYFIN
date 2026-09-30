@@ -122,8 +122,11 @@ final class Autenticar
             if (preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $_SESSION['lf_marca_color'] = $color;
             $logo = (string)$cfg->valorDe('marca.logo', '');
             if ($logo) $_SESSION['lf_marca_logo'] = $logo;
-            $foto = (new \LibertyFin\Datos\UsuarioRepo($db))->foto($usuario['id']);
+            $ur = new \LibertyFin\Datos\UsuarioRepo($db);
+            $foto = $ur->foto($usuario['id']);
             if ($foto) $_SESSION['lf_foto'] = $foto;
+            // La guía se muestra una sola vez, en el primer ingreso.
+            if (!$ur->vioGuia($usuario['id'])) $_SESSION['lf_mostrar_guia'] = true;
         } catch (\Throwable $e) { /* sin personalización se ve el tema base */ }
 
         return $_SESSION;

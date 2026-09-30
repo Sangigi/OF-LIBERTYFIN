@@ -2,10 +2,12 @@
 namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\ConfigRepo;
+use LibertyFin\Datos\CuentaRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Dominio\Permisos;
 use LibertyFin\Datos\AutenticacionRepo;
 use LibertyFin\Servicio\Integraciones;
+use LibertyFin\Servicio\CrearEmpresa;
 use LibertyFin\Servicio\Migraciones;
 use LibertyFin\Vista\Plantilla;
 
@@ -42,6 +44,9 @@ final class MantenimientoControlador
                 'que_hace' => Migraciones::DESCRIPCIONES,
             ],
             'empresas'     => $this->estadoDeLasEmpresas(),
+            'porRevisar'   => $this->documentosPorRevisar(),
+            'solicitudes'  => $this->solicitudes(),
+            'altaLista'    => Integraciones::activa('cpanel'),
             'aviso'        => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);
@@ -130,5 +135,115 @@ final class MantenimientoControlador
         $this->volver($hechas . ' empresa' . ($hechas==1?'':'s') . ' al día'
             . ($fallaron ? ', ' . $fallaron . ' con problema (revisa el log)' : '.'),
             $fallaron ? 'error' : 'ok');
+    }
+
+    /**
+     * Documentos esperando revisión, de TODAS las empresas.
+     *
+     * Soporte no entra empresa por empresa a buscarlos: si hubiera que
+     * hacerlo, nadie los revisaría y quedarían en "pendiente" para
+     * siempre — que es exactamente lo que pasaba antes de esta pantalla.
+     */
+    private function documentosPorRevisar()
+    {
+        $r = [];
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+            foreach ((new AutenticacionRepo($principal))->empresas() as $e) {
+                $base = $e['nombre_base_datos'];
+                if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$base)) continue;
+                try {
+                    foreach ((new CuentaRepo(Conexion::de($base)))->porRevisar() as $d) {
+                        $d['empresa'] = $e['nombre_empresa'];
+                        $d['base']    = $base;
+                        $r[] = $d;
+                    }
+                } catch (\Throwable $ex) { /* una base caída no tumba la bandeja */ }
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] bandeja: ' . $e->getMessage());
+        }
+        // Lo más viejo primero: es lo que lleva más tiempo esperando.
+        usort($r, function ($a, $b) { return (int)$b['horas'] - (int)$a['horas']; });
+        return $r;
+    }
+
+    public function revisar()
+    {
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        $base = $_POST['base'] ?? '';
+        if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$base)) {
+            $this->volver('Base no válida.', 'error');
+        }
+        try {
+            $tipo = (new CuentaRepo(Conexion::de($base)))->revisar(
+                (int)($_POST['id'] ?? 0), $_POST['decision'] ?? '',
+                $_POST['motivo'] ?? '', $_SESSION['usuario_id'] ?? 0);
+            $this->volver(($_POST['decision'] === 'aprobado' ? 'Aprobado' : 'Rechazado')
+                . ': ' . $tipo . '.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] revisar: ' . $e->getMessage());
+            $this->volver('No se pudo registrar la revisión.', 'error');
+        }
+    }
+
+    private function solicitudes()
+    {
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+            return (new CrearEmpresa($principal))->pendientes();
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] solicitudes: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /** Aprueba una solicitud y crea la empresa. */
+    public function aprobarEmpresa()
+    {
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+            $r = (new CrearEmpresa($principal))->aprobar(
+                (int)($_POST['id'] ?? 0), dirname(__DIR__, 2), $_SESSION['usuario_id'] ?? 0);
+            // La contraseña se muestra UNA vez. No se guarda en claro en
+            // ningún lado: quien aprueba la entrega y se acabó.
+            $this->volver('Empresa creada. Base ' . $r['base']
+                . ' · usuario ' . $r['usuario']
+                . ' · contraseña ' . $r['clave']
+                . ' — anótala, no se vuelve a mostrar.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] aprobar empresa: ' . $e->getMessage());
+            $this->volver('No se pudo crear la empresa: ' . $e->getMessage(), 'error');
+        }
+    }
+
+    public function rechazarEmpresa()
+    {
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+            (new CrearEmpresa($principal))->rechazar(
+                (int)($_POST['id'] ?? 0), $_POST['motivo'] ?? '', $_SESSION['usuario_id'] ?? 0);
+            $this->volver('Solicitud rechazada.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] rechazar empresa: ' . $e->getMessage());
+            $this->volver('No se pudo rechazar.', 'error');
+        }
     }
 }

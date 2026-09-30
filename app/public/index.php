@@ -53,6 +53,13 @@ $r = new Router();
 $r->get('/login',  ['LibertyFin\Controlador\LoginControlador', 'mostrar']);
 $r->post('/login', ['LibertyFin\Controlador\LoginControlador', 'entrar']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
+// El registro solo existe si hay credenciales de cPanel: sin ellas no se
+// puede crear la base de una empresa nueva, y un formulario que no lleva
+// a ningún lado es peor que no tenerlo.
+if (\LibertyFin\Servicio\Integraciones::activa('cpanel')) {
+    $r->get('/registro',  ['LibertyFin\Controlador\RegistroControlador', 'formulario']);
+    $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
+}
 
 // Privadas
 $r->get('/',        ['LibertyFin\Controlador\PanelControlador',  'index']);
@@ -80,6 +87,12 @@ $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
+// Facturación: igual que recargas, solo existe con credenciales.
+if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
+    $r->get('/facturacion',              ['LibertyFin\Controlador\FacturacionControlador', 'index']);
+    $r->get('/facturacion/{id}/timbrar', ['LibertyFin\Controlador\FacturacionControlador', 'timbrar']);
+}
+
 // Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
 if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
@@ -90,6 +103,9 @@ $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
 $r->get('/mantenimiento',           ['LibertyFin\Controlador\MantenimientoControlador', 'index']);
 $r->post('/mantenimiento/secciones',['LibertyFin\Controlador\MantenimientoControlador', 'secciones']);
 $r->post('/mantenimiento/migrar',   ['LibertyFin\Controlador\MantenimientoControlador', 'migrar']);
+$r->post('/mantenimiento/revisar',  ['LibertyFin\Controlador\MantenimientoControlador', 'revisar']);
+$r->post('/mantenimiento/empresa/aprobar',  ['LibertyFin\Controlador\MantenimientoControlador', 'aprobarEmpresa']);
+$r->post('/mantenimiento/empresa/rechazar', ['LibertyFin\Controlador\MantenimientoControlador', 'rechazarEmpresa']);
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
 $r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
@@ -103,6 +119,8 @@ $r->post('/cuenta/foto',         ['LibertyFin\Controlador\UsuariosControlador', 
 $r->post('/cuenta/fiscales',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarFiscales']);
 $r->post('/cuenta/comercio',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarComercio']);
 $r->post('/cuenta/documento',    ['LibertyFin\Controlador\UsuariosControlador', 'subirDocumento']);
+$r->post('/guia/vista',          ['LibertyFin\Controlador\UsuariosControlador', 'guiaVista']);
+$r->get('/guia',                 ['LibertyFin\Controlador\UsuariosControlador', 'verGuia']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);
 $r->post('/corte/abrir', ['LibertyFin\Controlador\CorteControlador', 'abrir']);
 $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
@@ -147,12 +165,17 @@ $permisos = [
   '/usuarios/guardar'       => 'editar.usuarios',
   '/usuarios/restablecer'   => 'editar.usuarios',
   '/usuarios/alternar'      => 'editar.usuarios',
+  '/facturacion'            => 'ver.facturacion',
+  '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',
+  '/mantenimiento/revisar'  => 'diagnostico',
+  '/mantenimiento/empresa/aprobar'  => 'alta.empresas',
+  '/mantenimiento/empresa/rechazar' => 'alta.empresas',
   // El perfil y la clave son de cada quien, sin permiso. Los datos
   // fiscales, el alta de comercio y los documentos comprometen a la
   // empresa entera: esos sí son de administrador.
@@ -161,7 +184,7 @@ $permisos = [
   '/cuenta/documento' => 'editar.empresa',
 ];
 
-$publicas = ['/login', '/salir'];
+$publicas = ['/login', '/salir', '/registro'];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 
 // El portero: una sola línea decide quién pasa, en vez de repetir la

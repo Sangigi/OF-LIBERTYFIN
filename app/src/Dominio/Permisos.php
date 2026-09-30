@@ -69,6 +69,7 @@ final class Permisos
         'ver.reportes'     => ['admin','soporte'],
         'ver.corte'        => ['admin','cajero','soporte'],
         'ver.recargas'     => ['admin','cajero','soporte'],
+        'ver.facturacion'  => ['admin','soporte'],
         'ver.ajustes'      => ['admin','soporte'],
         'ver.usuarios'     => ['admin','soporte'],
         'ver.mantenimiento'=> ['soporte'],
@@ -80,6 +81,7 @@ final class Permisos
         'abrir.caja'       => ['admin','cajero'],
         'cerrar.caja'      => ['admin','cajero'],
         'vender.recarga'   => ['admin','cajero'],
+        'timbrar'          => ['admin'],
 
         // ── Catálogos ──
         'editar.clientes'  => ['admin','cajero'],
@@ -99,6 +101,7 @@ final class Permisos
         // ── Soporte ──
         'secciones'        => ['admin','soporte'],
         'diagnostico'      => ['soporte'],
+        'alta.empresas'    => ['soporte'],
     ];
 
     /**

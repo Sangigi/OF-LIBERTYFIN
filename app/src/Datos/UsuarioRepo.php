@@ -207,4 +207,27 @@ final class UsuarioRepo extends Repo
                  ->execute([$ruta ?: null, (int)$id]);
         return true;
     }
+
+    /** ¿Este usuario ya vio la guía? Sin la columna, se asume que sí. */
+    public function vioGuia($id)
+    {
+        try {
+            $v = $this->valor("SELECT guia_vista_en FROM usuarios WHERE id = ?", [(int)$id]);
+            return $v !== null && $v !== false;
+        } catch (\Throwable $e) { return true; }
+    }
+
+    /**
+     * Marca la guía como vista. Solo si sigue en NULL: así la fecha es la
+     * de la PRIMERA vez que la cerró, no la de la última.
+     */
+    public function marcarGuia($id)
+    {
+        try {
+            $this->db->prepare("
+                UPDATE usuarios SET guia_vista_en = NOW()
+                WHERE id = ? AND guia_vista_en IS NULL")->execute([(int)$id]);
+            return true;
+        } catch (\Throwable $e) { return false; }
+    }
 }

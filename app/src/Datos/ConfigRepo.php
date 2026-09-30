@@ -2,79 +2,150 @@
 namespace LibertyFin\Datos;
 
 /**
- * Configuración por empresa, en `sistema_config`.
+ * Configuración de la empresa.
  *
- * Aquí viven las decisiones que cambian de una empresa a otra y que no
- * son credenciales: qué secciones están encendidas, sobre todo.
+ * VIVE EN DOS TABLAS, Y NO ES CAPRICHO:
  *
- * Las credenciales NO van aquí: van en config/integraciones.php, fuera
- * de la base y fuera del repositorio. Una contraseña en una tabla la ve
- * cualquiera con acceso a la base, y todo respaldo se la lleva.
+ *  · `sistema_config` ya existe en el esquema del sistema anterior. Es de
+ *    UN SOLO RENGLÓN con columnas fijas, y trae justo lo que hace falta:
+ *    logo, color_primario, rfc, tipo_persona, razon_social,
+ *    regimen_fiscal, cp_fiscal, documentacion_estado. Se usa tal cual.
+ *
+ *  · `lf_ajustes` es clave-valor y la crea este sistema. Guarda lo que no
+ *    tiene columna propia: la versión del esquema y qué secciones están
+ *    apagadas.
+ *
+ * Intenté meter todo en una tabla clave-valor llamada `sistema_config` y
+ * chocó de frente con la que ya existía: el CREATE IF NOT EXISTS no hizo
+ * nada y cada escritura fallaba con "Unknown column 'clave'". Pelearse
+ * con el esquema que ya está siempre sale más caro que adaptarse a él.
  */
 final class ConfigRepo extends Repo
 {
-    private static $cache = null;
+    /** Lo que sí tiene columna en `sistema_config`. */
+    const COLUMNAS = [
+        'marca.color'         => 'color_primario',
+        'marca.color2'        => 'color_secundario',
+        'marca.logo'          => 'logo',
+        'fiscal.tipo_persona' => 'tipo_persona',
+        'fiscal.rfc_fiscal'   => 'rfc',
+        'fiscal.cp_fiscal'    => 'cp_fiscal',
+        'fiscal.razon_social' => 'razon_social',
+        'fiscal.regimen_sat'  => 'regimen_fiscal',
+        'documentacion'       => 'documentacion_estado',
+    ];
 
-    private function asegurar()
+    private static $fila = null;
+    private static $kv   = null;
+
+    // ── sistema_config · un renglón, columnas fijas ─────────────
+
+    private function fila()
+    {
+        if (self::$fila !== null) return self::$fila;
+        try {
+            $f = $this->uno("SELECT * FROM sistema_config ORDER BY id LIMIT 1");
+            if (!$f) {
+                // Sin renglón no hay dónde escribir: se crea el primero.
+                $this->db->exec("INSERT INTO sistema_config (nombre_empresa) VALUES ('Mi Empresa')");
+                $f = $this->uno("SELECT * FROM sistema_config ORDER BY id LIMIT 1");
+            }
+            self::$fila = $f ?: [];
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] sistema_config: ' . $e->getMessage());
+            self::$fila = [];
+        }
+        return self::$fila;
+    }
+
+    // ── lf_ajustes · clave-valor, de este sistema ───────────────
+
+    private function asegurarKv()
     {
         try {
             $this->db->exec("
-                CREATE TABLE IF NOT EXISTS sistema_config (
+                CREATE TABLE IF NOT EXISTS lf_ajustes (
                     clave VARCHAR(80) NOT NULL PRIMARY KEY,
                     valor TEXT NULL,
                     actualizado DATETIME NULL
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (\Throwable $e) {
-            error_log('[LibertyFin] sistema_config: ' . $e->getMessage());
+            error_log('[LibertyFin] lf_ajustes: ' . $e->getMessage());
         }
     }
 
-    public function todo()
+    private function kv()
     {
-        if (self::$cache !== null) return self::$cache;
+        if (self::$kv !== null) return self::$kv;
         try {
-            $f = $this->todos("SELECT clave, valor FROM sistema_config");
-            self::$cache = array_column($f, 'valor', 'clave');
-        } catch (\Throwable $e) { self::$cache = []; }
-        return self::$cache;
+            $f = $this->todos("SELECT clave, valor FROM lf_ajustes");
+            self::$kv = array_column($f, 'valor', 'clave');
+        } catch (\Throwable $e) { self::$kv = []; }
+        return self::$kv;
     }
+
+    // ── La interfaz: una sola, sin importar dónde viva el dato ──
 
     public function valorDe($clave, $porDefecto = null)
     {
-        $t = $this->todo();
-        return array_key_exists($clave, $t) ? $t[$clave] : $porDefecto;
+        if (isset(self::COLUMNAS[$clave])) {
+            $f = $this->fila();
+            $col = self::COLUMNAS[$clave];
+            $v = $f[$col] ?? null;
+            return ($v === null || $v === '') ? $porDefecto : $v;
+        }
+        $kv = $this->kv();
+        return array_key_exists($clave, $kv) && $kv[$clave] !== null ? $kv[$clave] : $porDefecto;
     }
 
     public function guardar($clave, $valor)
     {
-        $this->asegurar();
+        if (isset(self::COLUMNAS[$clave])) {
+            $col = self::COLUMNAS[$clave];
+            $f = $this->fila();
+            if (!$f) throw new \RuntimeException('No se pudo leer sistema_config');
+            // El nombre de columna sale de una lista fija, nunca del
+            // llamador: por eso se puede interpolar sin riesgo.
+            $this->db->prepare("UPDATE sistema_config SET `$col` = ? WHERE id = ?")
+                     ->execute([$valor === '' ? null : $valor, $f['id']]);
+            self::$fila = null;
+            return true;
+        }
+        $this->asegurarKv();
         $this->db->prepare("
-            INSERT INTO sistema_config (clave, valor, actualizado) VALUES (?,?,NOW())
+            INSERT INTO lf_ajustes (clave, valor, actualizado) VALUES (?,?,NOW())
             ON DUPLICATE KEY UPDATE valor = VALUES(valor), actualizado = NOW()
         ")->execute([$clave, (string)$valor]);
-        self::$cache = null;
+        self::$kv = null;
         return true;
     }
 
-    // ── Secciones encendidas o apagadas ──
+    /** Todo junto, para quien lo quiera de un jalón. */
+    public function todo()
+    {
+        $r = $this->kv();
+        foreach (self::COLUMNAS as $k => $col) {
+            $f = $this->fila();
+            if (isset($f[$col])) $r[$k] = $f[$col];
+        }
+        return $r;
+    }
 
-    /**
-     * Las que se pueden apagar. Panel, Caja y Ventas NO están aquí:
-     * apagarlas dejaría un sistema donde no se puede trabajar, y el
-     * usuario pensaría que se rompió.
-     */
+    // ── Secciones encendidas o apagadas ─────────────────────────
+
     const APAGABLES = [
-        'cobranza'   => 'Cobranza',
-        'corte'      => 'Corte de caja',
-        'comisiones' => 'Comisiones',
-        'gastos'     => 'Gastos',
-        'reportes'   => 'Reportes',
-        'recargas'   => 'Recargas',
+        'cobranza'    => 'Cobranza',
+        'corte'       => 'Corte de caja',
+        'comisiones'  => 'Comisiones',
+        'gastos'      => 'Gastos',
+        'reportes'    => 'Reportes',
+        'recargas'    => 'Recargas',
+        'facturacion' => 'Facturación',
     ];
 
     public function seccionActiva($clave)
     {
-        if (!isset(self::APAGABLES[$clave])) return true;   // no se puede apagar
+        if (!isset(self::APAGABLES[$clave])) return true;
         return $this->valorDe('seccion.' . $clave, '1') !== '0';
     }
 
@@ -95,20 +166,18 @@ final class ConfigRepo extends Repo
         return $this->guardar('seccion.' . $clave, $this->seccionActiva($clave) ? '0' : '1');
     }
 
-    // ── Diagnóstico ──
+    // ── Diagnóstico ─────────────────────────────────────────────
 
-    /** Qué tan sana está la base. Lo que soporte necesita ver primero. */
     public function diagnostico()
     {
         $r = [];
-        $r['php']     = PHP_VERSION;
-        $r['mysql']   = (string)$this->valor("SELECT VERSION()");
-        $r['zona_php']= date_default_timezone_get() . ' (UTC' . date('P') . ')';
-        $r['zona_sql']= (string)$this->valor("SELECT @@session.time_zone");
-        $r['hora_php']= date('Y-m-d H:i:s');
-        $r['hora_sql']= (string)$this->valor("SELECT NOW()");
+        $r['php']      = PHP_VERSION;
+        $r['mysql']    = (string)$this->valor("SELECT VERSION()");
+        $r['zona_php'] = date_default_timezone_get() . ' (UTC' . date('P') . ')';
+        $r['zona_sql'] = (string)$this->valor("SELECT @@session.time_zone");
+        $r['hora_php'] = date('Y-m-d H:i:s');
+        $r['hora_sql'] = (string)$this->valor("SELECT NOW()");
 
-        // Las señales que de verdad avisan de un problema
         $r['ventas_sin_area'] = (int)$this->valor("
             SELECT COUNT(*) FROM ventas
             WHERE estado <> 'cancelada' AND (area_nombre IS NULL OR area_nombre = '')");

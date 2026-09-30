@@ -26,9 +26,193 @@ $hora_ok = abs(strtotime($d['hora_php']) - strtotime($d['hora_sql'])) <= 60;
 <?php endif; ?>
 
 <?php
+use LibertyFin\Datos\CuentaRepo as C;
 $atrasadas = 0;
 foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema['ultima']) $atrasadas++;
 ?>
+
+<?php /* ═══ SOLICITUDES DE ALTA ═══ */ ?>
+<?php if (!$altaLista): ?>
+<div class="alert alert-info" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span>El registro de empresas está apagado: faltan las credenciales de
+    <b>cPanel</b> en <code>config/integraciones.php</code>. Sin ellas no se puede
+    crear la base de una empresa nueva, así que la página pública de registro
+    tampoco existe.</span>
+</div>
+<?php endif; ?>
+
+<section class="card" style="<?= $solicitudes
+    ? 'border-color:color-mix(in srgb,var(--lf-brand) 36%,transparent)' : '' ?>">
+  <header class="card-header">
+    <div><span>Empresas por dar de alta</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Al aprobar se crea su base de datos, se carga el esquema y queda lista para entrar</p></div>
+    <span class="badge <?= $solicitudes ? 'bg-warning' : 'bg-success' ?>">
+      <?= $solicitudes ? count($solicitudes) . ' esperando' : 'Nada pendiente' ?></span>
+  </header>
+
+  <?php if (!$solicitudes): ?>
+    <div class="card-body">
+      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:14px 0">
+        No hay solicitudes de registro.</p>
+    </div>
+  <?php else: ?>
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr><th>Negocio</th><th>Contacto</th><th>Distribuidor</th>
+        <th>Esperando</th><th style="width:220px">Decisión</th></tr></thead>
+      <tbody>
+      <?php foreach ($solicitudes as $s): $h = (int)$s['horas']; ?>
+        <tr>
+          <td data-label="Negocio"><b style="font-weight:600"><?= P::e($s['nombre_empresa']) ?></b>
+            <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
+              <?= P::e($s['giro_comercial'] ?: 'sin giro') ?>
+              <?= $s['rfc'] ? ' · ' . P::e($s['rfc']) : '' ?></span></td>
+          <td data-label="Contacto" style="font-size:12.5px">
+            <?= P::e($s['nombre_contacto']) ?>
+            <a style="display:block;font-size:11.5px" href="mailto:<?= P::e($s['email_admin']) ?>">
+              <?= P::e($s['email_admin']) ?></a></td>
+          <td data-label="Distribuidor" style="font-size:12px">
+            <?= $s['no_distribuidor'] ? P::e($s['no_distribuidor'])
+                : '<span style="color:var(--lf-tinta-4)">directo</span>' ?></td>
+          <td data-label="Esperando">
+            <span class="badge <?= $h > 72 ? 'bg-danger' : ($h > 24 ? 'bg-warning' : 'bg-secondary') ?>">
+              <?= $h < 24 ? $h . ' h' : floor($h/24) . ' d' ?></span></td>
+          <td data-label="Decisión">
+            <div style="display:flex;gap:6px">
+              <form method="post" action="/mantenimiento/empresa/aprobar" style="flex:1"
+                    onsubmit="return confirm('Se va a crear la base de datos de &quot;<?= P::e($s['nombre_empresa']) ?>&quot;.\n\nEsto no se deshace solo.');">
+                <input type="hidden" name="token" value="<?= P::e($token) ?>">
+                <input type="hidden" name="id" value="<?= (int)$s['id'] ?>">
+                <button class="btn btn-primary btn-sm" type="submit" style="width:100%"
+                        <?= $altaLista ? '' : 'disabled' ?>>Aprobar</button>
+              </form>
+              <button type="button" class="btn btn-secondary btn-sm lf-rech-emp" style="flex:1"
+                      data-id="<?= (int)$s['id'] ?>" data-n="<?= P::e($s['nombre_empresa']) ?>">Rechazar</button>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    La contraseña del administrador se genera al aprobar y <b>se muestra una sola
+    vez</b>. No se guarda en claro: anótala y entrégala tú.
+  </div>
+  <?php endif; ?>
+</section>
+
+<form method="post" action="/mantenimiento/empresa/rechazar" id="formRechEmp" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="id" id="reId">
+  <input type="hidden" name="motivo" id="reMotivo">
+</form>
+<script>
+document.querySelectorAll('.lf-rech-emp').forEach(function(b){
+  b.addEventListener('click', function(){
+    var m = prompt('¿Por qué se rechaza la solicitud de "' + b.dataset.n + '"?');
+    if (!m || m.trim().length < 10) { if (m !== null) alert('Escribe al menos una frase.'); return; }
+    document.getElementById('reId').value = b.dataset.id;
+    document.getElementById('reMotivo').value = m.trim();
+    document.getElementById('formRechEmp').submit();
+  });
+});
+</script>
+
+<?php /* ═══ BANDEJA DE REVISIÓN ═══ */ ?>
+<section class="card" style="<?= $porRevisar
+    ? 'border-color:color-mix(in srgb,var(--lf-amb) 40%,transparent)' : '' ?>">
+  <header class="card-header">
+    <div><span>Documentos por revisar</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        De todas las empresas. Hasta que se aprueben, el negocio no puede cobrar con tarjeta.</p></div>
+    <span class="badge <?= $porRevisar ? 'bg-warning' : 'bg-success' ?>">
+      <?= $porRevisar ? count($porRevisar) . ' esperando' : 'Nada pendiente' ?></span>
+  </header>
+
+  <?php if (!$porRevisar): ?>
+    <div class="card-body">
+      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:14px 0">
+        No hay documentos esperando revisión.</p>
+    </div>
+  <?php else: ?>
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr><th>Empresa</th><th>Documento</th><th>Esperando</th>
+        <th>Archivo</th><th style="width:230px">Revisión</th></tr></thead>
+      <tbody>
+      <?php foreach ($porRevisar as $d):
+        $h = (int)$d['horas'];
+        $urge = $h > 72; ?>
+        <tr>
+          <td data-label="Empresa"><b style="font-weight:600"><?= P::e($d['empresa']) ?></b>
+            <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
+              <?= P::e($d['quien'] ?: '') ?></span></td>
+          <td data-label="Documento" style="font-size:12.5px">
+            <?= P::e(C::DOCUMENTOS[$d['tipo']][0] ?? $d['tipo']) ?></td>
+          <td data-label="Esperando">
+            <span class="badge <?= $urge ? 'bg-danger' : ($h > 24 ? 'bg-warning' : 'bg-secondary') ?>">
+              <?= $h < 24 ? $h . ' h' : floor($h/24) . ' d' ?></span></td>
+          <td data-label="Archivo">
+            <a href="<?= P::e($d['ruta_archivo']) ?>" target="_blank" rel="noopener"
+               style="font-size:12.5px;font-weight:600">Abrir</a>
+            <?php if ($d['tamano_bytes']): ?>
+              <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
+                <?= round($d['tamano_bytes']/1024) ?> KB</span>
+            <?php endif; ?>
+          </td>
+          <td data-label="Revisión">
+            <div style="display:flex;gap:6px">
+              <form method="post" action="/mantenimiento/revisar" style="flex:1">
+                <input type="hidden" name="token" value="<?= P::e($token) ?>">
+                <input type="hidden" name="base" value="<?= P::e($d['base']) ?>">
+                <input type="hidden" name="id" value="<?= (int)$d['id'] ?>">
+                <input type="hidden" name="decision" value="aprobado">
+                <button class="btn btn-primary btn-sm" type="submit" style="width:100%">Aprobar</button>
+              </form>
+              <button type="button" class="btn btn-secondary btn-sm lf-rechazar"
+                      data-base="<?= P::e($d['base']) ?>" data-id="<?= (int)$d['id'] ?>"
+                      data-doc="<?= P::e(C::DOCUMENTOS[$d['tipo']][0] ?? $d['tipo']) ?>"
+                      style="flex:1">Rechazar</button>
+            </div>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    Al rechazar hay que escribir el motivo. Es lo único que el negocio tiene para
+    saber qué corregir: un "rechazado" a secas garantiza que vuelvan a subir lo mismo.
+  </div>
+  <?php endif; ?>
+</section>
+
+<form method="post" action="/mantenimiento/revisar" id="formRechazo" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="decision" value="rechazado">
+  <input type="hidden" name="base" id="rzBase">
+  <input type="hidden" name="id" id="rzId">
+  <input type="hidden" name="motivo" id="rzMotivo">
+</form>
+<script>
+document.querySelectorAll('.lf-rechazar').forEach(function(b){
+  b.addEventListener('click', function(){
+    var m = prompt('¿Por qué se rechaza "' + b.dataset.doc + '"?\n\n'
+      + 'Esto le llega al negocio y es lo único que tiene para corregirlo.');
+    if (!m || m.trim().length < 10) {
+      if (m !== null) alert('Escribe al menos una frase.');
+      return;
+    }
+    document.getElementById('rzBase').value = b.dataset.base;
+    document.getElementById('rzId').value = b.dataset.id;
+    document.getElementById('rzMotivo').value = m.trim();
+    document.getElementById('formRechazo').submit();
+  });
+});
+</script>
 
 <section class="card" style="<?= $atrasadas ? 'border-color:color-mix(in srgb,var(--lf-amb) 34%,transparent)' : '' ?>">
   <header class="card-header">

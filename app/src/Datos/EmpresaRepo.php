@@ -25,6 +25,12 @@ final class EmpresaRepo
      * empresa, no en la principal: son operativos, los captura el propio
      * negocio y cambian sin que la plataforma se entere.
      */
+    /**
+     * Claves lógicas de los datos fiscales. ConfigRepo las traduce a las
+     * columnas reales de `sistema_config`, que se llaman distinto
+     * (`rfc`, `regimen_fiscal`): así el formulario no depende del nombre
+     * que tengan en la base.
+     */
     const FISCALES = ['tipo_persona','rfc_fiscal','cp_fiscal','razon_social','regimen_sat'];
 
     public function uno($id)

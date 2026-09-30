@@ -110,6 +110,8 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
                   font-size:11.5px;color:var(--lf-tinta-4)">
           Para cambiar tu nombre, rol o sucursal, pídeselo a un administrador.
         </p>
+        <a class="btn btn-secondary btn-sm" href="/guia" style="width:100%;margin-top:10px">
+          <?= W::icono('panel','15px') ?>Volver a ver la guía</a>
       </div>
     </section>
   </div>

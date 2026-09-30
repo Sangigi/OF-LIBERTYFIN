@@ -293,4 +293,22 @@ final class UsuariosControlador
             $this->volver('/cuenta', 'No se pudo guardar la foto.', 'error');
         }
     }
+
+    /** Marca la guía como vista. De autoservicio: cada quien la suya. */
+    public function guiaVista()
+    {
+        try {
+            $db = Conexion::de($_SESSION['empresa_db']);
+            (new UsuarioRepo($db))->marcarGuia($_SESSION['usuario_id'] ?? 0);
+        } catch (\Throwable $e) { /* que no se marque es molesto, no grave */ }
+        http_response_code(204);
+        exit;
+    }
+
+    /** Volver a verla desde Mi cuenta. */
+    public function verGuia()
+    {
+        $_SESSION['lf_mostrar_guia'] = true;
+        header('Location: /'); exit;
+    }
 }
