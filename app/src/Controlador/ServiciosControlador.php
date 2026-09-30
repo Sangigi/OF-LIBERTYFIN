@@ -54,7 +54,7 @@ final class ServiciosControlador
                 // Solo se audita el PRECIO. Corregir una falta de ortografía
                 // en el nombre no le interesa a nadie dentro de seis meses;
                 // que alguien bajó un servicio de $26,000 a $1, sí.
-                $antes = $repo->uno($id);
+                $antes = $repo->porId($id);
                 $repo->actualizar($id, $_POST);
                 $msg = 'Servicio actualizado.';
                 if ($antes && (float)($antes['precio'] ?? 0) !== (float)($_POST['precio'] ?? 0)) {

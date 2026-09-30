@@ -198,4 +198,15 @@ final class ServicioRepo extends Repo
                               $l = '%'.$buscar.'%'; $p[] = $l; $p[] = $l; }
         return (int)$this->valor("SELECT COUNT(*) FROM productos p WHERE " . implode(' AND ', $w), $p);
     }
+
+    /** Un servicio por su id. */
+    public function porId($id)
+    {
+        return $this->uno("
+            SELECT p.*, COALESCE(NULLIF(p.subprecio,0), p.precio) AS precio,
+                   c.nombre AS categoria
+            FROM productos p
+            LEFT JOIN categorias c ON c.id = p.categoria_id
+            WHERE p.id = ?", [(int)$id]);
+    }
 }

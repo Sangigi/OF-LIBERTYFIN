@@ -41,7 +41,7 @@ final class AuditoriaControlador
             'filas'      => Auditoria::listado($db, $filtros, $porPag, ($pagina - 1) * $porPag),
             'porUsuario' => Auditoria::porUsuario($db, $desde, $hasta),
             'porAccion'  => Auditoria::porAccion($db, $desde, $hasta),
-            'usuarios'   => (new UsuarioRepo($db))->listado(),
+            'usuarios'   => (new UsuarioRepo($db))->todos_(),
             'filtros'    => $filtros,
             'total'      => $total,
             'pagina'     => $pagina,

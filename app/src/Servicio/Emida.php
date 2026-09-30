@@ -153,8 +153,27 @@ final class Emida
         $ok = true;
         foreach ($r as $x) if (!$x[1]) { $ok = false; break; }
         if ($ok) {
-            try { $this->cliente(); $r[] = ['Descarga del WSDL', true, 'el XML se leyó bien']; }
-            catch (\Throwable $e) { $r[] = ['Descarga del WSDL', false, $e->getMessage()]; }
+            try {
+                $this->cliente();
+                $r[] = ['Descarga del WSDL', true, 'el XML se leyó bien'];
+                $ops = $this->operaciones();
+                if ($ops['ok']) {
+                    $nombres = array_keys($ops['operaciones']);
+                    $r[] = ['Operaciones que ofrece', count($nombres) > 0,
+                            implode(', ', $nombres) ?: 'ninguna'];
+                    foreach ([['saldo', ['Balance','Saldo','Funds']],
+                              ['validar número', ['Lookup','Validate','Inquiry','Consulta']],
+                              ['recargar', ['Submit','Topup','Recharge','Sale','Payment']]] as $par) {
+                        $hay = null;
+                        foreach ($nombres as $n) foreach ($par[1] as $p)
+                            if (stripos($n, $p) !== false) { $hay = $n; break 2; }
+                        $r[] = ['Operación de ' . $par[0], (bool)$hay,
+                                $hay ?: 'no se encontró: dime cuál de las de arriba es'];
+                    }
+                } else {
+                    $r[] = ['Operaciones que ofrece', false, $ops['error']];
+                }
+            } catch (\Throwable $e) { $r[] = ['Descarga del WSDL', false, $e->getMessage()]; }
         }
         return $r;
     }
@@ -170,12 +189,68 @@ final class Emida
         ];
     }
 
+    /**
+     * Qué operaciones ofrece de verdad este WSDL.
+     *
+     * Los nombres que yo usaba —GetBalance, LookupTransaction,
+     * SubmitTransaction— salieron de la documentación general de Emida,
+     * no de ESTE servicio. El WSDL es la única fuente que no se
+     * equivoca: se le pregunta y se acabó la adivinanza.
+     */
+    public function operaciones()
+    {
+        try {
+            $fns = $this->cliente()->__getFunctions();
+            $r = [];
+            foreach ((array)$fns as $f) {
+                // Vienen como "TipoRespuesta Nombre(TipoPeticion $p)"
+                if (preg_match('/\s(\w+)\(/', (string)$f, $m)) $r[$m[1]] = (string)$f;
+            }
+            return ['ok' => true, 'operaciones' => $r];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /** Los tipos que espera cada operación, para saber qué campos mandar. */
+    public function tipos()
+    {
+        try { return ['ok' => true, 'tipos' => (array)$this->cliente()->__getTypes()]; }
+        catch (\Throwable $e) { return ['ok' => false, 'error' => $e->getMessage()]; }
+    }
+
+    /**
+     * Busca la operación que sirve para algo, por lo que su nombre
+     * contiene. Así funciona aunque el proveedor la llame distinto:
+     * GetBalance, ObtenerSaldo, BalanceInquiry…
+     */
+    private function operacionQueSirvePara(array $pistas)
+    {
+        $ops = $this->operaciones();
+        if (!$ops['ok']) return null;
+        foreach ($ops['operaciones'] as $nombre => $_) {
+            foreach ($pistas as $p) {
+                if (stripos($nombre, $p) !== false) return $nombre;
+            }
+        }
+        return null;
+    }
+
     /** El saldo disponible con el proveedor. */
     public function saldo()
     {
         try {
-            $r = $this->cliente()->__soapCall('GetBalance', [$this->base()]);
-            return ['ok' => true, 'saldo' => $r->Balance ?? $r->balance ?? null, 'crudo' => $r];
+            $op = $this->operacionQueSirvePara(['Balance', 'Saldo', 'Funds']);
+            if (!$op) {
+                $ops = $this->operaciones();
+                return ['ok' => false, 'error' =>
+                    'Este WSDL no tiene una operación de saldo. Las que ofrece son: '
+                    . implode(', ', array_keys($ops['operaciones'] ?? []))
+                    . '. Dime cuál corresponde y la conecto.'];
+            }
+            $r = $this->cliente()->__soapCall($op, [$this->base()]);
+            return ['ok' => true, 'saldo' => $r->Balance ?? $r->balance ?? $r->Amount ?? null,
+                    'operacion' => $op, 'crudo' => $r];
         } catch (\SoapFault $e) {
             return ['ok' => false, 'error' => self::explicar(
                 (string)($this->cfg['wsdl'] ?? ''), $e->getMessage())];
@@ -194,11 +269,17 @@ final class Emida
     public function validar($numero, $productoId)
     {
         try {
-            $r = $this->cliente()->__soapCall('LookupTransaction', [array_merge($this->base(), [
+            $op = $this->operacionQueSirvePara(['Lookup', 'Validate', 'Inquiry', 'Consulta']);
+            if (!$op) {
+                // Sin validación previa se puede seguir: es una protección,
+                // no un requisito. Pero se avisa, porque cambia el riesgo.
+                return ['ok' => true, 'sin_validar' => true];
+            }
+            $r = $this->cliente()->__soapCall($op, [array_merge($this->base(), [
                 'AccountId' => $numero,
                 'ProductId' => $productoId,
             ])]);
-            return ['ok' => true, 'crudo' => $r];
+            return ['ok' => true, 'operacion' => $op, 'crudo' => $r];
         } catch (\Throwable $e) {
             return ['ok' => false, 'error' => $e->getMessage()];
         }
@@ -218,7 +299,15 @@ final class Emida
             error_log('[LibertyFin] Emida sobre HTTP sin cifrar: ' . ($this->cfg['wsdl'] ?? ''));
         }
         try {
-            $r = $this->cliente()->__soapCall('SubmitTransaction', [array_merge($this->base(), [
+            $op = $this->operacionQueSirvePara(['Submit', 'Topup', 'Recharge', 'Sale', 'Payment']);
+            if (!$op) {
+                $ops = $this->operaciones();
+                return ['ok' => false, 'error' =>
+                    'Este WSDL no tiene una operación de recarga reconocible. Ofrece: '
+                    . implode(', ', array_keys($ops['operaciones'] ?? []))
+                    . '. Dime cuál es la de vender y la conecto.'];
+            }
+            $r = $this->cliente()->__soapCall($op, [array_merge($this->base(), [
                 'AccountId' => $numero,
                 'ProductId' => $productoId,
                 'Amount'    => number_format((float)$monto, 2, '.', ''),

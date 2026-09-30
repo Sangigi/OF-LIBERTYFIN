@@ -273,4 +273,10 @@ final class GastoRepo extends Repo
                  ->execute([(int)$id]);
         return true;
     }
+
+    /** Un gasto por su id. */
+    public function porId($id)
+    {
+        return $this->uno("SELECT * FROM gastos WHERE id = ?", [(int)$id]);
+    }
 }

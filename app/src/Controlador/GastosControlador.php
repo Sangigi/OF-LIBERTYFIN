@@ -77,7 +77,7 @@ final class GastosControlador
         }
         $this->token();
         try {
-            $g = (new GastoRepo($db))->uno((int)($_POST['id'] ?? 0));
+            $g = (new GastoRepo($db))->porId((int)($_POST['id'] ?? 0));
             (new GastoRepo($db))->borrar((int)($_POST['id'] ?? 0));
             // Se guarda el gasto COMPLETO en 'antes'. Un gasto borrado no
             // se puede volver a mirar: si no queda aquí, no queda en ningún

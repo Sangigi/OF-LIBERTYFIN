@@ -42,7 +42,7 @@ final class UsuariosControlador
         $id   = (int)($_POST['id'] ?? 0);
         try {
             if ($id) {
-                $antes = $repo->uno($id);
+                $antes = $repo->porId($id);
                 $repo->actualizar($id, $_POST);
                 $m = 'Usuario actualizado.';
                 // El cambio de ROL va aparte: es el único de esta pantalla

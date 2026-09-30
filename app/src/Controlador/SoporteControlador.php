@@ -86,7 +86,7 @@ final class SoporteControlador
         }
         try {
             $repo  = new UsuarioRepo(Conexion::de($base));
-            $clave = $repo->restablecer((int)($_POST['id'] ?? 0));
+            $clave = $repo->restablecerGenerando((int)($_POST['id'] ?? 0));
             $this->volver($emp, 'Contraseña nueva: ' . $clave
                 . ' — anótala, no se vuelve a mostrar.', 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -106,7 +106,11 @@ final class SoporteControlador
             $this->volver($emp, 'Base no válida.', 'error');
         }
         try {
-            (new UsuarioRepo(Conexion::de($base)))->alternar((int)($_POST['id'] ?? 0));
+            // El segundo argumento es quién lo hace, para que el repo
+            // impida que alguien se desactive a sí mismo. Soporte no
+            // pertenece a esa empresa, así que va en cero: ningún usuario
+            // de ahí puede coincidir.
+            (new UsuarioRepo(Conexion::de($base)))->alternar((int)($_POST['id'] ?? 0), 0);
             $this->volver($emp, 'Estado de la cuenta cambiado.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($emp, $e->getMessage(), 'error');

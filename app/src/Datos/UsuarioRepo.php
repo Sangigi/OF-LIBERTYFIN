@@ -266,4 +266,46 @@ final class UsuarioRepo extends Repo
         if (stripos($tipo, 'enum') !== 0) return true;   // no es ENUM: cabe
         return stripos($tipo, "'" . $rol . "'") !== false;
     }
+
+    /**
+     * Un usuario por su id.
+     *
+     * `Repo::uno()` es protegido y recibe SQL: no es un buscador por id.
+     * Llamarlo desde un controlador rompía con "Call to protected
+     * method", y peor, solo al llegar a esa línea.
+     */
+    public function porId($id)
+    {
+        return $this->uno("
+            SELECT u.*, s.nombre AS sucursal
+            FROM usuarios u
+            LEFT JOIN sucursales s ON s.id = u.sucursal_id
+            WHERE u.id = ?", [(int)$id]);
+    }
+
+    /**
+     * Restablece una contraseña generando una nueva.
+     *
+     * A diferencia de `restablecerClave()`, que recibe la clave que el
+     * administrador escribió, esta la INVENTA. La usa soporte, que no
+     * debería estar eligiendo contraseñas para nadie.
+     *
+     * Se devuelve una sola vez y no se guarda en claro: quien restablece
+     * la entrega y ahí termina.
+     */
+    public function restablecerGenerando($id)
+    {
+        $u = $this->porId($id);
+        if (!$u) throw new \InvalidArgumentException('Ese usuario no existe');
+
+        // Sin l, I, 1, O ni 0: esta clave casi siempre se dicta por
+        // teléfono, y esos caracteres no se distinguen en una llamada.
+        $abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+        $clave = '';
+        for ($i = 0; $i < 12; $i++) $clave .= $abc[random_int(0, strlen($abc) - 1)];
+
+        $this->db->prepare("UPDATE usuarios SET password = ? WHERE id = ?")
+                 ->execute([password_hash($clave, PASSWORD_DEFAULT), (int)$id]);
+        return $clave;
+    }
 }
