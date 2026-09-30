@@ -13,7 +13,14 @@ use LibertyFin\Datos\ConfigRepo;
  * matriz que usa el portero de public/index.php. Así no puede pasar que
  * el enlace aparezca y la ruta rechace, ni al revés.
  */
-$secciones = [
+// DOS MENÚS, no uno filtrado.
+//
+// Las secciones de empresa muestran los datos de UNA empresa: la de la
+// sesión. Mezclarlas con las de plataforma haría que soporte viera
+// "Ventas" y leyera ahí las de quien le prestó la cuenta, creyendo que
+// son las del cliente que llamó. Para mirar dentro de una empresa está
+// su ficha, que sí dice de quién son los números.
+$deEmpresa = [
   ['grupo' => 'Operación'],
   ['ruta' => '/',           'icono' => 'panel',   'texto' => 'Panel',         'p' => 'ver.panel'],
   ['ruta' => '/caja',       'icono' => 'caja',    'texto' => 'Caja',          'p' => 'cobrar'],
@@ -33,15 +40,24 @@ $secciones = [
   ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Servicios',     'p' => 'ver.servicios'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
-  ['ruta' => '/auditoria',  'icono' => 'reloj',   'texto' => 'Bitácora',      'p' => 'ver.auditoria'],
   ['ruta' => '/facturacion','icono' => 'serv',    'texto' => 'Facturación',   'p' => 'ver.facturacion',
-   'si' => 'facturapi'],
+   'si' => 'facturapi', 'sec' => 'facturacion'],
+  ['ruta' => '/auditoria',  'icono' => 'reloj',   'texto' => 'Bitácora',      'p' => 'ver.auditoria'],
   ['ruta' => '/ajustes',    'icono' => 'serv',    'texto' => 'Ajustes',       'p' => 'ver.ajustes'],
-  ['ruta' => '/tickets',    'icono' => 'alerta',  'texto' => 'Tickets',       'p' => 'ver.tickets'],
-  ['ruta' => '/soporte',    'icono' => 'cliente', 'texto' => 'Empresas',      'p' => 'ver.empresas'],
-  ['ruta' => '/conocimiento','icono'=> 'serv',    'texto' => 'Conocimiento',  'p' => 'ver.conocimiento'],
-  ['ruta' => '/mantenimiento','icono'=> 'alerta', 'texto' => 'Mantenimiento', 'p' => 'ver.mantenimiento'],
 ];
+
+$dePlataforma = [
+  ['grupo' => 'Soporte'],
+  ['ruta' => '/',             'icono' => 'panel',   'texto' => 'Panel',          'p' => 'ver.soporte'],
+  ['ruta' => '/tickets',      'icono' => 'alerta',  'texto' => 'Tickets',        'p' => 'ver.tickets'],
+  ['ruta' => '/soporte',      'icono' => 'cliente', 'texto' => 'Empresas',       'p' => 'ver.empresas'],
+  ['ruta' => '/conocimiento', 'icono' => 'serv',    'texto' => 'Conocimiento',   'p' => 'ver.conocimiento'],
+  ['grupo' => 'Plataforma'],
+  ['ruta' => '/informes',     'icono' => 'pct',     'texto' => 'Informes',       'p' => 'ver.informes'],
+  ['ruta' => '/mantenimiento','icono' => 'alerta',  'texto' => 'Mantenimiento',  'p' => 'ver.mantenimiento'],
+];
+
+$secciones = Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '') ? $dePlataforma : $deEmpresa;
 
 // Se filtra por permiso y por integración. Un grupo cuyas entradas
 // desaparecieron tampoco se muestra: un encabezado suelto se ve roto.

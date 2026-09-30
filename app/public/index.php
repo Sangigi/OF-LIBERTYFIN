@@ -62,7 +62,14 @@ if (\LibertyFin\Servicio\Integraciones::activa('cpanel')) {
 }
 
 // Privadas
-$r->get('/',        ['LibertyFin\Controlador\PanelControlador',  'index']);
+// La raíz lleva a un panel u otro según el nivel del rol. Un rol de
+// plataforma en el panel de empresa vería las ventas de quien le prestó
+// la sesión, y las leería como del cliente que llamó.
+if (\LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '')) {
+    $r->get('/',    ['LibertyFin\Controlador\SoporteControlador', 'panel']);
+} else {
+    $r->get('/',    ['LibertyFin\Controlador\PanelControlador',  'index']);
+}
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
 $r->get('/ventas/{id}/ticket',        ['LibertyFin\Controlador\VentasControlador', 'ticket']);
@@ -101,6 +108,7 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/informes',              ['LibertyFin\Controlador\InformesControlador', 'index']);
 $r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlador', 'index']);
 $r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
 $r->post('/conocimiento/alternar',['LibertyFin\Controlador\ConocimientoControlador', 'alternar']);
@@ -143,7 +151,7 @@ $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
 // El router ya no solo dice si la ruta existe: dice quién puede entrar.
 // Esconder el enlace del menú es cortesía; esto es la puerta.
 $permisos = [
-  '/'                       => 'ver.panel',
+  // La raíz no lleva permiso: cada rol va a su propio panel.
   '/ventas'                 => 'ver.ventas',
   '/ventas/{id}'            => 'ver.ventas',
   '/ventas/{id}/ticket'     => 'ver.ventas',
@@ -185,6 +193,7 @@ $permisos = [
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/probar'        => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
+  '/informes'               => 'ver.informes',
   '/conocimiento'           => 'ver.conocimiento',
   '/conocimiento/guardar'   => 'editar.conocimiento',
   '/conocimiento/alternar'  => 'editar.conocimiento',

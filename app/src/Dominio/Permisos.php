@@ -71,79 +71,76 @@ final class Permisos
      *    en la pantalla donde atiende clientes es una fuga de información
      *    que nadie pidió.
      */
+    /**
+     * Quién puede qué.
+     *
+     * DOS NIVELES, Y NO SE MEZCLAN
+     *
+     * Las secciones de EMPRESA —Panel, Caja, Ventas, Reportes— muestran
+     * los datos de UNA empresa: la de la sesión. Dárselas a soporte no
+     * le sirve y además engaña: vería las ventas de quien le prestó su
+     * cuenta y creería que son las del cliente que llamó.
+     *
+     * Para mirar dentro de una empresa, soporte entra por su ficha en
+     * /soporte/{id}, que sí dice de quién son los números.
+     *
+     * Por eso ningún rol de plataforma tiene permisos de empresa, ni
+     * superadmin. No es una limitación: es que ese permiso no significa
+     * nada sin decir de qué empresa.
+     */
     const MATRIZ = [
-        // ── Ver ──
-        'ver.panel'        => ['superadmin','admin','cajero','inventario','soporte'],
-        'ver.ventas'       => ['superadmin','admin','cajero','soporte'],
-        'ver.clientes'     => ['superadmin','admin','cajero','soporte'],
-        'ver.cobranza'     => ['superadmin','admin','soporte'],
-        'ver.servicios'    => ['superadmin','admin','cajero','inventario','soporte'],
-        'ver.comisiones'   => ['superadmin','admin','soporte'],
-        'ver.gastos'       => ['superadmin','admin','inventario','soporte'],
-        'ver.reportes'     => ['superadmin','admin','soporte'],
-        'ver.corte'        => ['superadmin','admin','cajero','soporte'],
-        'ver.recargas'     => ['superadmin','admin','cajero','soporte'],
-        'ver.facturacion'  => ['superadmin','admin','soporte'],
-        'ver.ajustes'      => ['superadmin','admin','soporte'],
-        'ver.usuarios'     => ['superadmin','admin','soporte'],
-        'ver.mantenimiento'=> ['superadmin','soporte','validador'],
-        // La bitácora la ve el administrador de la empresa, no solo la
-        // plataforma: es SU historial, sobre SUS datos. Esconderla haría
-        // que para saber quién canceló un pago tuviera que pedirlo a
-        // soporte, y eso no es auditar, es depender.
-        'ver.auditoria'    => ['superadmin','admin','soporte'],
+        // ── Secciones de EMPRESA ──
+        'ver.panel'        => ['admin','cajero','inventario'],
+        'ver.ventas'       => ['admin','cajero'],
+        'ver.clientes'     => ['admin','cajero'],
+        'ver.cobranza'     => ['admin'],
+        'ver.servicios'    => ['admin','cajero','inventario'],
+        'ver.comisiones'   => ['admin'],
+        'ver.gastos'       => ['admin','inventario'],
+        'ver.reportes'     => ['admin'],
+        'ver.corte'        => ['admin','cajero'],
+        'ver.recargas'     => ['admin','cajero'],
+        'ver.facturacion'  => ['admin'],
+        'ver.ajustes'      => ['admin'],
+        'ver.usuarios'     => ['admin'],
+        'ver.auditoria'    => ['admin'],
 
-        // ── Mover dinero ──
-        'cobrar'           => ['superadmin','admin','cajero'],
-        'abonar'           => ['superadmin','admin','cajero'],
-        'cancelar.pago'    => ['superadmin','admin'],
-        'abrir.caja'       => ['superadmin','admin','cajero'],
-        'cerrar.caja'      => ['superadmin','admin','cajero'],
-        'vender.recarga'   => ['superadmin','admin','cajero'],
-        'timbrar'          => ['superadmin','admin'],
+        'cobrar'           => ['admin','cajero'],
+        'abonar'           => ['admin','cajero'],
+        'cancelar.pago'    => ['admin'],
+        'abrir.caja'       => ['admin','cajero'],
+        'cerrar.caja'      => ['admin','cajero'],
+        'vender.recarga'   => ['admin','cajero'],
+        'timbrar'          => ['admin'],
+        'editar.clientes'  => ['admin','cajero'],
+        'editar.servicios' => ['admin','inventario'],
+        'editar.gastos'    => ['admin','inventario'],
+        'borrar.gastos'    => ['admin'],
+        'asignar.comision' => ['admin'],
+        'quitar.comision'  => ['admin'],
+        'editar.ajustes'   => ['admin'],
+        'editar.usuarios'  => ['admin'],
+        'editar.empresa'   => ['admin'],
 
-        // ── Catálogos ──
-        'editar.clientes'  => ['superadmin','admin','cajero'],
-        'editar.servicios' => ['superadmin','admin','inventario'],
-        'editar.gastos'    => ['superadmin','admin','inventario'],
-        'borrar.gastos'    => ['superadmin','admin'],
-
-        // ── Comisiones ──
-        'asignar.comision' => ['superadmin','admin'],
-        'quitar.comision'  => ['superadmin','admin'],
-
-        // ── Configuración ──
-        'editar.ajustes'   => ['superadmin','admin'],
-        'editar.usuarios'  => ['superadmin','admin'],
-        'editar.empresa'   => ['superadmin','admin'],
-
-        // ── Plataforma ──
-        // Validación SOLO revisa papeles. No toca secciones, no ve
-        // diagnóstico y no da de alta empresas: quien revisa documentos
-        // no necesita nada de eso, y dárselo agranda sin razón lo que se
-        // pierde si esa cuenta se compromete.
-        // Soporte ve todas las empresas y puede destrabar una cuenta.
-        // Lo que NO puede es cambiar roles: si pudiera volver admin a
-        // cualquiera, comprometer una cuenta de soporte daría acceso
-        // total a todos los clientes. El límite no mide confianza en la
-        // persona, mide el daño si esa cuenta se pierde.
-        'ver.empresas'     => ['superadmin','soporte'],
-        // Validación también entra a tickets: los de documentación son
-        // suyos, y mandarla a otro sistema para contestarlos sería
-        // exactamente el problema que estos tickets vienen a resolver.
+        // ── Secciones de PLATAFORMA ──
+        'ver.soporte'      => ['superadmin','soporte','validador'],
         'ver.tickets'      => ['superadmin','soporte','validador'],
-        // La base de conocimientos la LEE cualquiera del equipo de
-        // plataforma; escribirla también, a propósito: quien resuelve un
-        // caso raro es quien sabe explicarlo, y si tiene que pedir permiso
-        // para documentarlo, no lo documenta.
-        'ver.conocimiento'    => ['superadmin','soporte','validador'],
+        'ver.empresas'     => ['superadmin','soporte','validador'],
+        'ver.conocimiento' => ['superadmin','soporte','validador'],
         'editar.conocimiento' => ['superadmin','soporte','validador'],
+        'ver.mantenimiento'=> ['superadmin','soporte'],
+        'ver.informes'     => ['superadmin','soporte'],
+
+        'revisar.docs'     => ['superadmin','soporte','validador'],
         'clave.ajena'      => ['superadmin','soporte'],
         'bloquear.cuenta'  => ['superadmin','soporte'],
-        'revisar.docs'     => ['superadmin','soporte','validador'],
         'secciones'        => ['superadmin','soporte','admin'],
         'diagnostico'      => ['superadmin','soporte'],
         'alta.empresas'    => ['superadmin','soporte'],
+
+        // Solo el superadministrador. Entrar a la sesión de una empresa
+        // es la llave maestra: se deja fuera de soporte a propósito.
+        'suplantar'        => ['superadmin'],
     ];
 
     /**

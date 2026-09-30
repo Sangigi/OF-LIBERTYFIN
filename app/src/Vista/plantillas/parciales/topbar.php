@@ -20,7 +20,10 @@ $acciones = [
   // Reportes sí exporta de verdad: baja el detalle en CSV.
   'pct'     => [['/reportes/csv', 'baja', 'Descargar CSV', 'secondary']],
 ];
-$aqui = $acciones[$icono] ?? [];
+// Un rol de plataforma no vende ni da de alta clientes: esas acciones
+// operarían sobre la empresa de la sesión, que no es la suya.
+$aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '')
+      ? [] : ($acciones[$icono] ?? []);
 ?>
 <header class="lf-top">
   <div class="lf-top-tit">

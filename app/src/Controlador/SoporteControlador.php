@@ -3,6 +3,8 @@ namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\PlataformaRepo;
+use LibertyFin\Datos\TicketRepo;
+use LibertyFin\Servicio\CrearEmpresa;
 use LibertyFin\Datos\UsuarioRepo;
 use LibertyFin\Http\Peticion;
 use LibertyFin\Servicio\Migraciones;
@@ -131,5 +133,112 @@ final class SoporteControlador
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: ' . ($empresaId ? '/soporte/' . (int)$empresaId : '/soporte'));
         exit;
+    }
+
+    /**
+     * El panel de soporte.
+     *
+     * Es la primera pantalla de un rol de plataforma, en lugar del panel
+     * de empresa: ese muestra las ventas de UNA empresa —la de quien
+     * prestó la sesión— y para soporte eso no significa nada.
+     *
+     * Lo que sí significa algo es qué está esperando: tickets sin
+     * responder, documentos sin revisar, empresas sin dar de alta y
+     * cuáles están a punto de vencer.
+     */
+    public function panel()
+    {
+        $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+        $plat = new PlataformaRepo($principal);
+        $tk   = new TicketRepo($principal);
+        $yo   = (int)($_SESSION['usuario_id'] ?? 0);
+
+        $activos = $tk->bandeja(['estado' => 'activos'], 200);
+        $vencidos = array_values(array_filter($activos, function ($t) {
+            return TicketRepo::vencido($t) && empty($t['primera_respuesta_en']);
+        }));
+        $sinAsignar = array_values(array_filter($activos, function ($t) {
+            return empty($t['asignado_a']);
+        }));
+        $mios = array_values(array_filter($activos, function ($t) use ($yo) {
+            return (int)$t['asignado_a'] === $yo && $yo > 0;
+        }));
+
+        // Documentos y solicitudes esperando, solo si le toca a este rol.
+        $docs = \LibertyFin\Dominio\Permisos::puede('revisar.docs')
+              ? $this->contarDocumentos() : null;
+        $altas = \LibertyFin\Dominio\Permisos::puede('alta.empresas')
+               ? count((new CrearEmpresa($principal))->pendientes()) : null;
+
+        Plantilla::pagina('soporte/panel', [
+            'titulo'     => 'Panel de soporte',
+            'icono'      => 'panel',
+            'subtitulo'  => \LibertyFin\Dominio\Permisos::rotulo($_SESSION['usuario_rol'] ?? ''),
+            'resumen'    => $plat->resumen(),
+            'cifras'     => $tk->cifras(),
+            'activos'    => $activos,
+            'vencidos'   => $vencidos,
+            'sinAsignar' => $sinAsignar,
+            'mios'       => $mios,
+            'categorias' => $tk->porCategoria(),
+            'docs'       => $docs,
+            'altas'      => $altas,
+            'alertas'    => $this->empresasConProblemas($plat),
+            'aviso'      => $_SESSION['lf_aviso'] ?? null,
+        ]);
+        unset($_SESSION['lf_aviso']);
+    }
+
+    private function contarDocumentos()
+    {
+        $n = 0;
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+            foreach ((new \LibertyFin\Datos\AutenticacionRepo($principal))->empresas() as $e) {
+                $base = $e['nombre_base_datos'];
+                if (!preg_match('/^[A-Za-z0-9_]+$/', (string)$base)) continue;
+                try { $n += count((new \LibertyFin\Datos\CuentaRepo(Conexion::de($base)))->porRevisar()); }
+                catch (\Throwable $ex) { /* una base caída no cuenta */ }
+            }
+        } catch (\Throwable $e) { return null; }
+        return $n;
+    }
+
+    /**
+     * Empresas que van a llamar pronto.
+     *
+     * No lista todas: solo las que tienen una señal concreta —esquema
+     * atrasado, suscripción vencida, caja sin cerrar desde hace días—
+     * porque esas son las que generan la llamada.
+     */
+    private function empresasConProblemas(PlataformaRepo $plat)
+    {
+        $r = [];
+        try {
+            foreach ($plat->empresas() as $e) {
+                if (empty($e['activo'])) continue;
+                $venc = !empty($e['fecha_vencimiento']) ? strtotime($e['fecha_vencimiento']) : null;
+                $dias = $venc ? floor(($venc - strtotime('today')) / 86400) : null;
+                $pu = $plat->pulso($e['nombre_base_datos']);
+
+                $porque = [];
+                if ($dias !== null && $dias < 0)  $porque[] = 'venció hace ' . abs($dias) . ' días';
+                elseif ($dias !== null && $dias < 15) $porque[] = 'vence en ' . $dias . ' días';
+                if ($pu === null)                 $porque[] = 'su base no responde';
+                elseif ($pu['esquema'] < \LibertyFin\Servicio\Migraciones::VERSION)
+                                                  $porque[] = 'esquema v' . $pu['esquema'];
+                if ($pu && (int)$pu['cajas'] > 0 && !empty($pu['ultima'])
+                    && strtotime($pu['ultima']) < strtotime('-2 days'))
+                                                  $porque[] = 'caja abierta sin ventas hace días';
+
+                if ($porque) {
+                    $r[] = ['id' => $e['id'], 'nombre' => $e['nombre_empresa'],
+                            'porque' => $porque];
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] alertas: ' . $e->getMessage());
+        }
+        return array_slice($r, 0, 8);
     }
 }
