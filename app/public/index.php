@@ -173,7 +173,7 @@ $permisos = [
   '/mantenimiento'          => 'ver.mantenimiento',
   '/mantenimiento/secciones'=> 'secciones',
   '/mantenimiento/migrar'   => 'secciones',
-  '/mantenimiento/revisar'  => 'diagnostico',
+  '/mantenimiento/revisar'  => 'revisar.docs',
   '/mantenimiento/empresa/aprobar'  => 'alta.empresas',
   '/mantenimiento/empresa/rechazar' => 'alta.empresas',
   // El perfil y la clave son de cada quien, sin permiso. Los datos

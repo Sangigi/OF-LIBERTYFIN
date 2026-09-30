@@ -24,21 +24,35 @@ final class Permisos
      * se queda atrás.
      */
     const ROLES = [
+        'superadmin' => [
+            'rotulo' => 'Superadministrador',
+            'para'   => 'Dueño de LibertyFin. Puede todo, en todas las empresas.',
+            'nivel'  => 'plataforma',
+        ],
+        'soporte' => [
+            'rotulo' => 'Soporte',
+            'para'   => 'Mantenimiento y diagnóstico. Ve todo, no mueve dinero.',
+            'nivel'  => 'plataforma',
+        ],
+        'validador' => [
+            'rotulo' => 'Validación',
+            'para'   => 'Revisa la documentación de las empresas. No ve ventas ni dinero.',
+            'nivel'  => 'plataforma',
+        ],
         'admin' => [
             'rotulo' => 'Administrador',
-            'para'   => 'Dueño o gerente. Ve el dinero y configura el sistema.',
+            'para'   => 'Dueño o gerente del negocio. Ve el dinero y configura.',
+            'nivel'  => 'empresa',
         ],
         'cajero' => [
             'rotulo' => 'Cajero',
             'para'   => 'Cobra, abre y cierra su caja. No ve las comisiones de nadie.',
+            'nivel'  => 'empresa',
         ],
         'inventario' => [
             'rotulo' => 'Inventario',
             'para'   => 'Mantiene el catálogo y los proveedores. No cobra ni ve el dinero.',
-        ],
-        'soporte' => [
-            'rotulo' => 'Soporte',
-            'para'   => 'Mantenimiento y diagnóstico de LibertyFin. Ve todo, no mueve dinero.',
+            'nivel'  => 'empresa',
         ],
     ];
 
@@ -59,49 +73,54 @@ final class Permisos
      */
     const MATRIZ = [
         // ── Ver ──
-        'ver.panel'        => ['admin','cajero','inventario','soporte'],
-        'ver.ventas'       => ['admin','cajero','soporte'],
-        'ver.clientes'     => ['admin','cajero','soporte'],
-        'ver.cobranza'     => ['admin','soporte'],
-        'ver.servicios'    => ['admin','cajero','inventario','soporte'],
-        'ver.comisiones'   => ['admin','soporte'],
-        'ver.gastos'       => ['admin','inventario','soporte'],
-        'ver.reportes'     => ['admin','soporte'],
-        'ver.corte'        => ['admin','cajero','soporte'],
-        'ver.recargas'     => ['admin','cajero','soporte'],
-        'ver.facturacion'  => ['admin','soporte'],
-        'ver.ajustes'      => ['admin','soporte'],
-        'ver.usuarios'     => ['admin','soporte'],
-        'ver.mantenimiento'=> ['soporte'],
+        'ver.panel'        => ['superadmin','admin','cajero','inventario','soporte'],
+        'ver.ventas'       => ['superadmin','admin','cajero','soporte'],
+        'ver.clientes'     => ['superadmin','admin','cajero','soporte'],
+        'ver.cobranza'     => ['superadmin','admin','soporte'],
+        'ver.servicios'    => ['superadmin','admin','cajero','inventario','soporte'],
+        'ver.comisiones'   => ['superadmin','admin','soporte'],
+        'ver.gastos'       => ['superadmin','admin','inventario','soporte'],
+        'ver.reportes'     => ['superadmin','admin','soporte'],
+        'ver.corte'        => ['superadmin','admin','cajero','soporte'],
+        'ver.recargas'     => ['superadmin','admin','cajero','soporte'],
+        'ver.facturacion'  => ['superadmin','admin','soporte'],
+        'ver.ajustes'      => ['superadmin','admin','soporte'],
+        'ver.usuarios'     => ['superadmin','admin','soporte'],
+        'ver.mantenimiento'=> ['superadmin','soporte','validador'],
 
         // ── Mover dinero ──
-        'cobrar'           => ['admin','cajero'],
-        'abonar'           => ['admin','cajero'],
-        'cancelar.pago'    => ['admin'],
-        'abrir.caja'       => ['admin','cajero'],
-        'cerrar.caja'      => ['admin','cajero'],
-        'vender.recarga'   => ['admin','cajero'],
-        'timbrar'          => ['admin'],
+        'cobrar'           => ['superadmin','admin','cajero'],
+        'abonar'           => ['superadmin','admin','cajero'],
+        'cancelar.pago'    => ['superadmin','admin'],
+        'abrir.caja'       => ['superadmin','admin','cajero'],
+        'cerrar.caja'      => ['superadmin','admin','cajero'],
+        'vender.recarga'   => ['superadmin','admin','cajero'],
+        'timbrar'          => ['superadmin','admin'],
 
         // ── Catálogos ──
-        'editar.clientes'  => ['admin','cajero'],
-        'editar.servicios' => ['admin','inventario'],
-        'editar.gastos'    => ['admin','inventario'],
-        'borrar.gastos'    => ['admin'],
+        'editar.clientes'  => ['superadmin','admin','cajero'],
+        'editar.servicios' => ['superadmin','admin','inventario'],
+        'editar.gastos'    => ['superadmin','admin','inventario'],
+        'borrar.gastos'    => ['superadmin','admin'],
 
         // ── Comisiones ──
-        'asignar.comision' => ['admin'],
-        'quitar.comision'  => ['admin'],
+        'asignar.comision' => ['superadmin','admin'],
+        'quitar.comision'  => ['superadmin','admin'],
 
         // ── Configuración ──
-        'editar.ajustes'   => ['admin'],
-        'editar.usuarios'  => ['admin'],
-        'editar.empresa'   => ['admin'],
+        'editar.ajustes'   => ['superadmin','admin'],
+        'editar.usuarios'  => ['superadmin','admin'],
+        'editar.empresa'   => ['superadmin','admin'],
 
-        // ── Soporte ──
-        'secciones'        => ['admin','soporte'],
-        'diagnostico'      => ['soporte'],
-        'alta.empresas'    => ['soporte'],
+        // ── Plataforma ──
+        // Validación SOLO revisa papeles. No toca secciones, no ve
+        // diagnóstico y no da de alta empresas: quien revisa documentos
+        // no necesita nada de eso, y dárselo agranda sin razón lo que se
+        // pierde si esa cuenta se compromete.
+        'revisar.docs'     => ['superadmin','soporte','validador'],
+        'secciones'        => ['superadmin','soporte','admin'],
+        'diagnostico'      => ['superadmin','soporte'],
+        'alta.empresas'    => ['superadmin','soporte'],
     ];
 
     /**
@@ -174,6 +193,13 @@ final class Permisos
             if (in_array($rol, $roles, true)) $r[] = $p;
         }
         return $r;
+    }
+
+    /** ¿Es un rol de plataforma? Esos no pertenecen a una empresa. */
+    public static function esPlataforma($rol)
+    {
+        $n = self::normalizar($rol);
+        return (self::ROLES[$n]['nivel'] ?? 'empresa') === 'plataforma';
     }
 
     /** Un resumen legible del rol, para la pantalla de usuarios. */

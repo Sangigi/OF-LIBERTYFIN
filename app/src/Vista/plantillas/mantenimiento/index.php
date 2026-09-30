@@ -32,6 +32,7 @@ foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema
 ?>
 
 <?php /* ═══ SOLICITUDES DE ALTA ═══ */ ?>
+<?php if ($puedeAlta): ?>
 <?php if (!$altaLista): ?>
 <div class="alert alert-info" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?>
@@ -120,6 +121,8 @@ document.querySelectorAll('.lf-rech-emp').forEach(function(b){
   });
 });
 </script>
+
+<?php endif; /* fin de solicitudes de alta */ ?>
 
 <?php /* ═══ BANDEJA DE REVISIÓN ═══ */ ?>
 <section class="card" style="<?= $porRevisar
@@ -214,6 +217,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
 });
 </script>
 
+<?php if ($todo): ?>
 <section class="card" style="<?= $atrasadas ? 'border-color:color-mix(in srgb,var(--lf-amb) 34%,transparent)' : '' ?>">
   <header class="card-header">
     <div><span>Esquema de las bases</span>
@@ -418,6 +422,8 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
   </div>
 </section>
 
+<?php endif; /* fin de lo que solo ve soporte */ ?>
+
 <section class="card">
   <header class="card-header">Qué puede cada rol</header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
@@ -429,7 +435,10 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
         <tr>
           <td data-label="Rol"><b style="font-weight:600"><?= P::e($r['rotulo']) ?></b>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px;
-                  font-family:var(--lf-mono)"><?= P::e($k) ?></span></td>
+                  font-family:var(--lf-mono)"><?= P::e($k) ?>
+              <?php if (($r['nivel'] ?? '') === 'plataforma'): ?>
+                <span class="badge bg-secondary" style="margin-left:4px">plataforma</span>
+              <?php endif; ?></span></td>
           <td data-label="Para quién" style="font-size:12.5px;color:var(--lf-tinta-3)">
             <?= P::e($r['para']) ?></td>
           <td data-label="Ve" class="text-end lf-mono"><?= $s['ve'] ?></td>

@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 5;
+    const VERSION = 6;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -216,6 +216,40 @@ final class Migraciones
         }
     }
 
+    /**
+     * 6 · Los roles nuevos en el ENUM de `usuarios.rol`.
+     *
+     * La columna era ENUM('admin','cajero','inventario'). MySQL NO falla
+     * al escribir un valor fuera de la lista: guarda cadena vacía y sigue.
+     * Por eso asignar "soporte" parecía funcionar y el usuario quedaba sin
+     * rol y sin permisos, sin un solo error en ningún lado.
+     *
+     * Es el peor tipo de fallo: silencioso y con apariencia de éxito.
+     *
+     * Se agregan los valores nuevos conservando los tres que ya existían,
+     * para no invalidar a nadie.
+     */
+    private static function v6(PDO $db)
+    {
+        try {
+            $st = $db->query("
+                SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios'
+                  AND COLUMN_NAME = 'rol'");
+            $tipo = (string)$st->fetchColumn();
+            // Si ya no es ENUM (alguien lo pasó a VARCHAR), no hay nada que hacer.
+            if (stripos($tipo, 'enum') !== 0) return;
+            if (stripos($tipo, "'soporte'") !== false) return;
+
+            $db->exec("
+                ALTER TABLE usuarios MODIFY COLUMN rol
+                ENUM('admin','cajero','inventario','soporte','superadmin','validador')
+                NOT NULL DEFAULT 'cajero'");
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] migración 6: ' . $e->getMessage());
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -223,5 +257,6 @@ final class Migraciones
         3 => 'Foto de perfil e imagen del servicio',
         4 => 'Índices de rendimiento',
         5 => 'Marca de guía de primer uso',
+        6 => 'Roles nuevos en la columna usuarios.rol',
     ];
 }

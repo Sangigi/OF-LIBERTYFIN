@@ -30,22 +30,29 @@ final class MantenimientoControlador
         $db   = Conexion::de($_SESSION['empresa_db']);
         $repo = new ConfigRepo($db);
 
+        // Quien solo valida documentos no necesita el diagnóstico, ni las
+        // secciones, ni el alta de empresas: cargarlos sería trabajo y
+        // superficie de más para alguien que viene a otra cosa.
+        $todo = Permisos::puede('diagnostico');
+
         Plantilla::pagina('mantenimiento/index', [
+            'todo'         => $todo,
             'titulo'       => 'Mantenimiento',
             'icono'        => 'alerta',
             'subtitulo'    => $_SESSION['empresa_nombre'] ?? '',
-            'secciones'    => $repo->secciones(),
-            'diagnostico'  => $repo->diagnostico(),
-            'integraciones'=> Integraciones::estado(),
+            'secciones'    => $todo ? $repo->secciones() : [],
+            'diagnostico'  => $todo ? $repo->diagnostico() : [],
+            'integraciones'=> $todo ? Integraciones::estado() : [],
             'roles'        => Permisos::ROLES,
-            'esquema'      => [
+            'esquema'      => $todo ? [
                 'actual'   => Migraciones::versionDe($db),
                 'ultima'   => Migraciones::VERSION,
                 'que_hace' => Migraciones::DESCRIPCIONES,
-            ],
-            'empresas'     => $this->estadoDeLasEmpresas(),
+            ] : ['actual'=>0,'ultima'=>0,'que_hace'=>[]],
+            'empresas'     => $todo ? $this->estadoDeLasEmpresas() : [],
             'porRevisar'   => $this->documentosPorRevisar(),
-            'solicitudes'  => $this->solicitudes(),
+            'solicitudes'  => Permisos::puede('alta.empresas') ? $this->solicitudes() : [],
+            'puedeAlta'    => Permisos::puede('alta.empresas'),
             'altaLista'    => Integraciones::activa('cpanel'),
             'aviso'        => $_SESSION['lf_aviso'] ?? null,
         ]);

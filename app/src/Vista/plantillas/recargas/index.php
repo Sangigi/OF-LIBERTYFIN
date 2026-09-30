@@ -11,6 +11,16 @@ $token = $_SESSION['lf_token'];
 </div>
 <?php endif; ?>
 
+<?php if (!$cifrado): ?>
+<div class="alert alert-danger" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b>La conexión con Emida va sin cifrar.</b> El usuario, la clave y el
+    número del cliente viajan en claro por la red. Es el único endpoint que
+    entregó el proveedor; en cuanto den uno con HTTPS, se cambia
+    <code>wsdl</code> en <code>config/integraciones.php</code>.</span>
+</div>
+<?php endif; ?>
+
 <?php if ($sandbox): ?>
 <div class="alert alert-warning" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?>
@@ -31,10 +41,15 @@ $token = $_SESSION['lf_token'];
         <input type="hidden" name="token" value="<?= P::e($token) ?>">
         <div style="flex:1;min-width:170px">
           <label class="form-label">Compañía</label>
-          <select class="form-select" name="carrier" required>
+          <select class="form-select" name="producto" required>
             <option value="">Elegir…</option>
-            <option>Telcel</option><option>Movistar</option>
-            <option>AT&amp;T</option><option>Unefon</option>
+            <?php
+            // Los identificadores los da Emida por compañía y monto. Estos
+            // son de ejemplo: pídele a tu asesor el catálogo real y
+            // cámbialos aquí, o se rechazará con el código 51.
+            foreach (['Telcel','Movistar','AT&T','Unefon','Bait','Virgin'] as $c): ?>
+              <option value="<?= P::e($c) ?>"><?= P::e($c) ?></option>
+            <?php endforeach; ?>
           </select>
         </div>
         <div style="flex:1;min-width:170px">
@@ -51,8 +66,10 @@ $token = $_SESSION['lf_token'];
           <?= W::icono('cobro','15px') ?>Recargar</button>
       </form>
       <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:14px;line-height:1.5">
-        El número se valida con la compañía antes de cobrar. Una recarga no se
-        puede cancelar después de enviada: el saldo ya llegó al teléfono.
+        El número se valida con la compañía <b>antes</b> de cobrar. Cobrar primero
+        dejaría el caso donde la recarga falla y hay que devolver efectivo de una
+        caja que ya cuadró.<br>
+        Una recarga enviada no se puede cancelar: el saldo ya llegó al teléfono.
       </p>
     </div>
   </section>
@@ -64,6 +81,14 @@ $token = $_SESSION['lf_token'];
         Las recargas se pagan de un saldo precargado con el proveedor. Si se
         agota, las ventas se rechazan aunque el cliente ya haya pagado.
       </p>
+      <?php if ($saldo !== null): ?>
+        <div style="padding:16px;border-radius:var(--lf-r);background:var(--lf-brand-soft);
+             margin-bottom:16px;text-align:center">
+          <b class="lf-mono" style="font-size:25px;font-weight:700;letter-spacing:-.8px;
+             color:var(--lf-brand-2);display:block"><?= P::e($saldo) ?></b>
+          <small style="font-size:11.5px;color:var(--lf-tinta-3)">al momento de consultar</small>
+        </div>
+      <?php endif; ?>
       <form method="post" action="/recargas/consultar">
         <input type="hidden" name="token" value="<?= P::e($token) ?>">
         <button class="btn btn-secondary" type="submit" style="width:100%">
