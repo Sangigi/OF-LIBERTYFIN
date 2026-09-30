@@ -29,7 +29,7 @@ $token = $_SESSION['lf_token'];
       </form>
     </header>
 
-    <div style="padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap">
+    <div class="lf-cat-fila">
       <a class="lf-pill <?= $area === '' ? 'active' : '' ?>" href="/caja<?= $buscar ? '?q='.urlencode($buscar) : '' ?>">Todos</a>
       <?php foreach ($areas as $a): ?>
         <a class="lf-pill <?= (string)$area === (string)$a['id'] ? 'active' : '' ?>"
