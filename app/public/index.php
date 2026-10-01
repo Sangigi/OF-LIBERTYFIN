@@ -117,7 +117,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->post('/recargas/pegar',   ['LibertyFin\Controlador\RecargasControlador', 'pegarCatalogo']);
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
-$r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
+$r->get('/reportes/excel',    ['LibertyFin\Controlador\ReportesControlador', 'excel']);
+$r->get('/reportes/imprimir', ['LibertyFin\Controlador\ReportesControlador', 'imprimir']);
 $r->get('/ayuda',                 ['LibertyFin\Controlador\AyudaControlador', 'index']);
 $r->post('/ayuda/crear',          ['LibertyFin\Controlador\AyudaControlador', 'crear']);
 $r->post('/ayuda/{id}/responder', ['LibertyFin\Controlador\AyudaControlador', 'responder']);
@@ -200,7 +201,8 @@ $permisos = [
   '/servicios/guardar'      => 'editar.servicios',
   '/servicios/alternar'     => 'editar.servicios',
   '/reportes'               => 'ver.reportes',
-  '/reportes/csv'           => 'ver.reportes',
+  '/reportes/excel'         => 'ver.reportes',
+  '/reportes/imprimir'      => 'ver.reportes',
   '/ajustes'                => 'ver.ajustes',
   '/ajustes/guardar'        => 'editar.ajustes',
   '/ajustes/alternar'       => 'editar.ajustes',

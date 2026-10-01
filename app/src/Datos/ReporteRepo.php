@@ -90,22 +90,55 @@ final class ReporteRepo extends Repo
     public function porArea($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+
+        // EL ÁREA SALE DEL PRODUCTO, NO DE LA VENTA NI DEL CLIENTE.
+        //
+        // `ventas.area_nombre` guarda UN área por venta, y eso está mal
+        // en cuanto alguien contrata dos cosas: un cliente que pide un
+        // juicio y su contabilidad genera una sola venta, y todo el
+        // dinero se le cargaba a un área sola. El mismo cliente aparecía
+        // en Legal un mes y en Contabilidad el siguiente, según qué se
+        // capturó primero.
+        //
+        // Aquí cada RENGLÓN lleva el área de su producto, y el dinero de
+        // la venta —lo cobrado, los gastos y las comisiones— se reparte
+        // entre sus renglones en proporción a lo que pesa cada uno.
+        //
+        // Si un producto no tiene categoría se cae al área de la venta, y
+        // si tampoco, a "Sin área": es preferible un renglón honesto que
+        // perder la venta del reporte.
         return $this->todos("
-            SELECT COALESCE(NULLIF(v.area_nombre,''),'Sin área') AS area,
-                   COUNT(DISTINCT v.id)        AS ventas,
-                   COALESCE(SUM(v.total),0)    AS vendido,
-                   COALESCE(SUM(pg.cobrado),0) AS cobrado,
-                   COALESCE(SUM(g.gastos),0)   AS gastos,
-                   COALESCE(SUM(cm.comision),0) AS comisiones
-            FROM ventas v
-            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
-                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
-                        WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
-                        GROUP BY venta_id ) g ON g.venta_id = v.id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
-                        GROUP BY venta_id ) cm ON cm.venta_id = v.id
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            SELECT area,
+                   COUNT(DISTINCT venta_id)  AS ventas,
+                   ROUND(SUM(vendido),2)     AS vendido,
+                   ROUND(SUM(cobrado),2)     AS cobrado,
+                   ROUND(SUM(gastos),2)      AS gastos,
+                   ROUND(SUM(comisiones),2)  AS comisiones
+            FROM (
+                SELECT v.id AS venta_id,
+                       COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                       -- El peso del renglón dentro de su venta
+                       (d.subtotal * 1.0 / NULLIF(tot.suma,0))                   AS peso,
+                       d.subtotal                                               AS vendido,
+                       COALESCE(pg.cobrado,0) * (d.subtotal / NULLIF(tot.suma,0)) AS cobrado,
+                       COALESCE(g.gastos,0)   * (d.subtotal / NULLIF(tot.suma,0)) AS gastos,
+                       COALESCE(cm.comision,0)* (d.subtotal / NULLIF(tot.suma,0)) AS comisiones
+                FROM venta_detalles d
+                INNER JOIN ventas v   ON v.id = d.venta_id
+                LEFT  JOIN productos p ON p.id = d.producto_id
+                LEFT  JOIN categorias cat ON cat.id = p.categoria_id
+                INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
+                             FROM venta_detalles GROUP BY venta_id ) tot
+                       ON tot.venta_id = v.id
+                LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                            WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+                LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
+                            WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
+                            GROUP BY venta_id ) g ON g.venta_id = v.id
+                LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
+                            GROUP BY venta_id ) cm ON cm.venta_id = v.id
+                WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            ) x
             GROUP BY area ORDER BY cobrado DESC", [$a, $b]);
     }
 
@@ -156,7 +189,15 @@ final class ReporteRepo extends Repo
         return $this->todos("
             SELECT v.codigo_venta AS folio, DATE(v.fecha) AS fecha,
                    COALESCE(c.nombre,'Público general') AS cliente,
-                   COALESCE(NULLIF(v.area_nombre,''),'Sin área') AS area,
+                   -- Mismo criterio que el resumen: el área del producto
+                   -- de la línea, no la de la venta.
+                   COALESCE(NULLIF((
+                       SELECT cat.nombre FROM venta_detalles d2
+                       LEFT JOIN productos p2  ON p2.id = d2.producto_id
+                       LEFT JOIN categorias cat ON cat.id = p2.categoria_id
+                       WHERE d2.venta_id = v.id AND cat.nombre IS NOT NULL
+                       GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1
+                   ),''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
                    v.subtotal, v.iva, v.total,
                    COALESCE(pg.cobrado,0) AS cobrado,
                    v.total - COALESCE(pg.cobrado,0) AS saldo,
@@ -174,5 +215,79 @@ final class ReporteRepo extends Repo
                         GROUP BY venta_id ) cm ON cm.venta_id = v.id
             WHERE v.fecha >= ? AND v.fecha < ?
             ORDER BY v.fecha", [$a, $b]);
+    }
+
+    /**
+     * Qué compró cada cliente y qué debe.
+     *
+     * El área es la de mayor peso en dinero entre lo que contrató, no un
+     * dato capturado: un cliente que pidió un juicio y su contabilidad
+     * pertenece a las dos, y lo honesto es decir cuál pesa más.
+     */
+    public function porCliente($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT COALESCE(c.nombre,'Público general') AS cliente,
+                   (SELECT cat.nombre
+                    FROM venta_detalles d2
+                    INNER JOIN ventas v2    ON v2.id = d2.venta_id
+                    LEFT  JOIN productos p2 ON p2.id = d2.producto_id
+                    LEFT  JOIN categorias cat ON cat.id = p2.categoria_id
+                    WHERE v2.cliente_id = v.cliente_id AND v2.estado <> 'cancelada'
+                      AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                    GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1) AS area,
+                   COUNT(DISTINCT v.id)        AS compras,
+                   COALESCE(SUM(v.total),0)    AS vendido,
+                   COALESCE(SUM(pg.cobrado),0) AS cobrado
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            GROUP BY v.cliente_id, cliente
+            ORDER BY vendido DESC", [$a, $b]);
+    }
+
+    /**
+     * Lo que falta por cobrar.
+     *
+     * De lo más viejo a lo más nuevo: una deuda de noventa días necesita
+     * otra conversación que una de tres, y ordenarla por monto esconde
+     * justo las que llevan más tiempo.
+     */
+    public function cobranza($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT v.codigo_venta, v.fecha,
+                   COALESCE(c.nombre,'Público general') AS cliente,
+                   v.total,
+                   COALESCE(pg.cobrado,0) AS cobrado,
+                   ROUND(v.total - COALESCE(pg.cobrado,0), 2) AS saldo,
+                   DATEDIFF(CURDATE(), COALESCE(pg.ultimo, v.fecha)) AS dias
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo
+                        FROM venta_pagos WHERE cancelado = 0 GROUP BY venta_id ) pg
+                   ON pg.venta_id = v.id
+            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+              AND v.total - COALESCE(pg.cobrado,0) > 0.01
+            ORDER BY dias DESC, saldo DESC", [$a, $b]);
+    }
+
+    /** Lo cobrado día por día. */
+    public function porDia($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT DATE(p.fecha_pago) AS dia,
+                   COUNT(*) AS pagos,
+                   COALESCE(SUM(p.monto),0) AS cobrado
+            FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+              AND p.fecha_pago >= ? AND p.fecha_pago < ?
+            GROUP BY dia ORDER BY dia", [$a, $b]);
     }
 }

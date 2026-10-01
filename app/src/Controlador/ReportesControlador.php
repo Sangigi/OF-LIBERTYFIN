@@ -37,38 +37,72 @@ final class ReportesControlador
      * con todo en una columna y rompe los acentos. Es un detalle tonto
      * que hace la diferencia entre un reporte que se usa y uno que no.
      */
-    public function csv()
-    {
-        $db   = Conexion::de($_SESSION['empresa_db']);
-        $repo = new ReporteRepo($db);
 
+    /**
+     * Descarga el periodo en Excel, un reporte por hoja.
+     *
+     * Reemplaza al CSV. Un CSV manda "$1,234.00" como texto: Excel no lo
+     * suma, no lo ordena y no lo grafica, y quien lo recibe termina
+     * reescribiéndolo a mano. Aquí los montos son números con formato de
+     * moneda, las fechas son fechas, y la fila de encabezados queda
+     * congelada.
+     */
+    public function excel()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
         $desde = Peticion::fecha('desde', date('Y-m-01'));
         $hasta = Peticion::fecha('hasta', date('Y-m-t'));
-        $filas = $repo->detalle($desde, $hasta);
 
-        $nombre = 'libertyfin_' . $desde . '_a_' . $hasta . '.csv';
-        header('Content-Type: text/csv; charset=utf-8');
+        $libro = (new \LibertyFin\Servicio\Reportes($db))->libroCompleto($desde, $hasta);
+        $tmp = tempnam(sys_get_temp_dir(), 'lf') . '.xlsx';
+        $libro->guardar($tmp);
+
+        $nombre = 'libertyfin-reportes-' . date('Ymd', strtotime($desde))
+                . '-' . date('Ymd', strtotime($hasta)) . '.xlsx';
+
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         header('Content-Disposition: attachment; filename="' . $nombre . '"');
+        header('Content-Length: ' . filesize($tmp));
         header('Cache-Control: no-store');
-
-        $s = fopen('php://output', 'w');
-        fwrite($s, "\xEF\xBB\xBF");   // BOM para Excel
-        fputcsv($s, ['Folio','Fecha','Cliente','Área','Subtotal','IVA','Total',
-                     'Cobrado','Saldo','Gastos','Comisión','Estado'], ';');
-        foreach ($filas as $f) {
-            fputcsv($s, [
-                $f['folio'], $f['fecha'], $f['cliente'], $f['area'],
-                number_format($f['subtotal'], 2, '.', ''),
-                number_format($f['iva'], 2, '.', ''),
-                number_format($f['total'], 2, '.', ''),
-                number_format($f['cobrado'], 2, '.', ''),
-                number_format($f['saldo'], 2, '.', ''),
-                number_format($f['gastos'], 2, '.', ''),
-                number_format($f['comision'], 2, '.', ''),
-                $f['estado'],
-            ], ';');
-        }
-        fclose($s);
+        readfile($tmp);
+        @unlink($tmp);
         exit;
+    }
+
+    /**
+     * La hoja imprimible, que el navegador convierte en PDF.
+     *
+     * POR QUÉ NO SE ESCRIBE UN PDF
+     *
+     * Generar PDF en PHP sin librerías significa dibujar texto a mano,
+     * sin acentos decentes ni control de saltos de página. Con una hoja
+     * HTML y `@media print`, el navegador lo convierte en un PDF que se
+     * ve bien, respeta los acentos, repite el encabezado en cada página y
+     * numera. Y se imprime directo, que es lo que casi siempre quieren.
+     */
+    public function imprimir()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $desde = Peticion::fecha('desde', date('Y-m-01'));
+        $hasta = Peticion::fecha('hasta', date('Y-m-t'));
+        $tipo = Peticion::opcion('tipo',
+            array_keys(\LibertyFin\Servicio\Reportes::TIPOS), 'area');
+
+        $srv = new \LibertyFin\Servicio\Reportes($db);
+        // "todos" imprime los ocho, uno tras otro: es el paquete que se
+        // manda al contador a fin de mes.
+        $reps = Peticion::texto('todos', '') === '1'
+              ? array_map(function ($t) use ($srv, $desde, $hasta) {
+                    return $srv->armar($t, $desde, $hasta); },
+                  array_keys(\LibertyFin\Servicio\Reportes::TIPOS))
+              : [$srv->armar($tipo, $desde, $hasta)];
+
+        Plantilla::pagina('reportes/imprimir', [
+            'titulo'   => 'Reportes',
+            'reportes' => $reps,
+            'periodo'  => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+            'empresa'  => $_SESSION['empresa_nombre'] ?? 'LibertyFin',
+            'auto'     => Peticion::texto('auto', '') === '1',
+        ], 'layout-limpio');
     }
 }

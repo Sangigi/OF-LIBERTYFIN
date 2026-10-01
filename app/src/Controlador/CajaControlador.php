@@ -31,11 +31,12 @@ final class CajaControlador
             'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
                          && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
             'formasLiga'=> \LibertyFin\Servicio\LigaPago::METODOS,
+            'ligaLista' => $_SESSION['lf_liga'] ?? null,
             'area'      => $area,
             'buscar'    => $buscar,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
-        unset($_SESSION['lf_aviso']);
+        unset($_SESSION['lf_aviso'], $_SESSION['lf_liga']);
     }
 
     /** Búsqueda de clientes para el ticket. Devuelve JSON. */
@@ -188,11 +189,14 @@ final class CajaControlador
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
             ]);
+            // Se vuelve a CAJA, no a Ligas. El cajero tiene al cliente
+            // enfrente: mandarlo a otra pantalla lo obliga a volver a
+            // empezar para la siguiente venta.
             $_SESSION['lf_liga'] = (new \LibertyFin\Datos\LigaRepo($db))->porId($id);
             $_SESSION['lf_aviso'] = ['texto' =>
-                'Venta ' . $venta['codigo_venta'] . ' registrada. Comparte la liga con el cliente; '
-                . 'el abono entra cuando pague.', 'tipo' => 'ok'];
-            header('Location: /ligas'); exit;
+                'Venta ' . $venta['codigo_venta'] . ' registrada. Muéstrale el código o '
+                . 'mándale la liga; el abono entra cuando pague.', 'tipo' => 'ok'];
+            header('Location: /caja'); exit;
         } catch (\Throwable $e) {
             error_log('[LibertyFin] liga en caja: ' . $e->getMessage());
             $this->volver('Venta registrada, pero la liga no se guardó: ' . $e->getMessage(), 'error');

@@ -1865,3 +1865,36 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
    tarjeta se estire con un hueco abajo. */
 .lf-split > .card > .card-body{display:flex;flex-direction:column}
 .lf-split > .card > .card-body > :last-child{margin-bottom:0}
+
+
+/* ══════════════════════════════════════════════════════
+   38 · PANEL DE PAGO
+   Las tres formas, una al lado de la otra. Se usa igual
+   dentro de Caja, en Ligas y en la hoja imprimible.
+   ══════════════════════════════════════════════════════ */
+.lf-pagar{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}
+.lf-pagar .via{display:flex;flex-direction:column;padding:16px;border-radius:var(--lf-r);
+  border:1px solid var(--lf-linea);background:var(--lf-sup-2)}
+.lf-pagar .cab{display:flex;align-items:center;gap:8px;margin-bottom:10px;color:var(--lf-tinta)}
+.lf-pagar .cab b{font-size:13px;font-weight:600}
+.lf-pagar .ind{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5;margin:8px 0 0}
+.lf-pagar .qr{display:flex;justify-content:center;padding:6px 0}
+.lf-pagar .qr svg{border-radius:8px;max-width:100%;height:auto}
+.lf-pagar .barras{padding:8px 0}
+.lf-pagar .barras svg{width:100%;height:auto;border-radius:6px}
+.lf-pagar .dato{font-size:16px;font-weight:700;letter-spacing:1px;text-align:center;
+  padding:11px;background:var(--lf-sup);border-radius:var(--lf-r-sm);margin:4px 0;
+  overflow-wrap:anywhere}
+.lf-pagar .copiar{display:flex;gap:7px;margin-top:10px}
+.lf-pagar .copiar input{flex:1;min-width:0;padding:8px 11px;font-size:11.5px;
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
+  color:var(--lf-tinta);outline:none;text-overflow:ellipsis}
+.lf-pagar .abrir{display:inline-flex;align-items:center;gap:6px;margin-top:10px;
+  font-size:11.5px;font-weight:600}
+.lf-pagar-nota{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.6;margin-top:16px;
+  padding-top:14px;border-top:1px solid var(--lf-linea)}
+
+/* Dentro de Caja va más apretado: comparte pantalla con el ticket */
+.lf-pagar.compacto{grid-template-columns:1fr;gap:10px}
+.lf-pagar.compacto .via{padding:13px}
+.lf-pagar.compacto .dato{font-size:14px;padding:9px}

@@ -68,7 +68,20 @@ final class ClienteRepo extends Repo
                    COALESCE(SUM(pg.cobrado),0)             AS cobrado,
                    COALESCE(SUM(v.total - COALESCE(pg.cobrado,0)),0) AS saldo,
                    MAX(v.fecha)                            AS ultima,
-                   COALESCE(MAX(c.area), MAX(v.area_nombre)) AS area
+                   -- El área de un cliente no es un dato suyo: es un
+                   -- resumen de lo que ha contratado. Se toma la de mayor
+                   -- peso en dinero, y lo escrito a mano manda solo si
+                   -- nunca ha comprado nada.
+                   COALESCE(
+                       (SELECT cat.nombre
+                        FROM venta_detalles d2
+                        INNER JOIN ventas v2    ON v2.id = d2.venta_id
+                        LEFT  JOIN productos p2 ON p2.id = d2.producto_id
+                        LEFT  JOIN categorias cat ON cat.id = p2.categoria_id
+                        WHERE v2.cliente_id = c.id AND v2.estado <> 'cancelada'
+                          AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                        GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1),
+                       MAX(c.area), MAX(v.area_nombre)) AS area
             FROM ventas v
             INNER JOIN clientes c ON c.id = v.cliente_id
             LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
@@ -232,8 +245,14 @@ final class ClienteRepo extends Repo
     public function areasUsadas()
     {
         $r = $this->todos("
-            SELECT DISTINCT area_nombre AS area FROM ventas
-            WHERE area_nombre IS NOT NULL AND area_nombre <> '' ORDER BY area_nombre");
+            -- Las áreas que existen de verdad: las categorías con
+            -- productos, más las que quedaron escritas en ventas viejas.
+            SELECT area FROM (
+                SELECT nombre AS area FROM categorias WHERE nombre <> ''
+                UNION
+                SELECT DISTINCT area_nombre FROM ventas
+                WHERE area_nombre IS NOT NULL AND area_nombre <> ''
+            ) a ORDER BY area");
         return array_column($r, 'area');
     }
 }

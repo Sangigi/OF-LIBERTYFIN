@@ -42,46 +42,11 @@ $qs = function ($x = []) use ($estado, $q) {
     <a class="btn btn-secondary btn-sm" href="/ligas">Cerrar</a>
   </header>
   <div class="card-body">
-    <div class="lf-formas">
-      <?php if ($r['liga']): ?>
-        <div class="f">
-          <b><?= W::icono('cobro','16px') ?>Tarjeta o pago en línea</b>
-          <p>Mándale esta dirección. Ahí elige cómo pagar.</p>
-          <div class="copiar">
-            <input type="text" readonly value="<?= P::e($r['liga']) ?>" id="cLiga">
-            <button type="button" class="btn btn-primary btn-sm" data-copiar="cLiga">Copiar</button>
-          </div>
-          <a href="<?= P::e($r['liga']) ?>" target="_blank" rel="noopener" class="abrir">Abrirla</a>
-        </div>
-      <?php endif; ?>
-
-      <?php if ($r['clabe']): ?>
-        <div class="f">
-          <b><?= W::icono('venta','16px') ?>Transferencia SPEI</b>
-          <p>Que transfiera a esta CLABE desde su banco. Se acredita en minutos.</p>
-          <div class="copiar">
-            <input type="text" readonly value="<?= P::e($r['clabe']) ?>" id="cClabe" class="lf-mono">
-            <button type="button" class="btn btn-primary btn-sm" data-copiar="cClabe">Copiar</button>
-          </div>
-        </div>
-      <?php endif; ?>
-
-      <?php if ($r['barras']): ?>
-        <div class="f">
-          <b><?= W::icono('caja','16px') ?>Efectivo en tiendas</b>
-          <p>Con esta referencia paga en OXXO y tiendas participantes.</p>
-          <div class="copiar">
-            <input type="text" readonly value="<?= P::e($r['barras']) ?>" id="cBarras" class="lf-mono">
-            <button type="button" class="btn btn-primary btn-sm" data-copiar="cBarras">Copiar</button>
-          </div>
-        </div>
-      <?php endif; ?>
-    </div>
+    <?php P::parcial('ligas/panel', ['l' => $r]); ?>
     <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:16px;padding-top:14px;
               border-top:1px solid var(--lf-linea);line-height:1.6">
       <b>Todavía no entró el dinero.</b> La venta sigue con saldo hasta que el
-      proveedor confirme el pago. Dale a <b>Revisar pagos</b> para preguntar, o
-      espera a que alguien lo haga.
+      proveedor confirme. Dale a <b>Revisar pagos</b> para preguntar.
       <?php if ($r['vence']): ?>
         La liga vence el <?= date('d/m/Y', strtotime($r['vence'])) ?>.
       <?php endif; ?>

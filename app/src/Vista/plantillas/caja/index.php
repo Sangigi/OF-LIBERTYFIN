@@ -13,6 +13,26 @@ $token = $_SESSION['lf_token'];
 </div>
 <?php endif; ?>
 
+<?php if (!empty($ligaLista)): $l = $ligaLista; ?>
+<section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 46%,transparent);
+         margin-bottom:18px">
+  <header class="card-header">
+    <div><span>Cómo puede pagar</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        <?= P::e($l['cliente_nombre'] ?: $l['descripcion']) ?> ·
+        <b style="color:var(--lf-brand-2)"><?= D::pesos($l['monto']) ?></b></p></div>
+    <div style="display:flex;gap:8px;flex-shrink:0">
+      <a class="btn btn-secondary btn-sm" href="/ligas/<?= (int)$l['id'] ?>/documento"
+         target="_blank"><?= W::icono('baja','14px') ?>Imprimir</a>
+      <a class="btn btn-secondary btn-sm" href="/caja">Siguiente venta</a>
+    </div>
+  </header>
+  <div class="card-body">
+    <?php P::parcial('ligas/panel', ['l' => $l]); ?>
+  </div>
+</section>
+<?php endif; ?>
+
 <div class="lf-pos">
   <section class="card">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">

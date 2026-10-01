@@ -14,7 +14,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
-  <a class="btn btn-secondary btn-sm" href="/reportes/csv?<?= P::e($qs) ?>" style="margin-left:auto">
+  <a class="btn btn-secondary btn-sm" href="/reportes/excel?<?= P::e($qs) ?>" style="margin-left:auto">
     <?= W::icono('baja','15px') ?>Descargar detalle</a>
 </form>
 
@@ -212,3 +212,84 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
   </div>
 </section>
 <?php endif; ?>
+
+<?php /* ═══ LOS OCHO REPORTES ═══ */ ?>
+<section class="card">
+  <header class="card-header">
+    <div><span>Reportes del periodo</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Mismo dato en los tres lados: pantalla, Excel e impresión</p></div>
+    <div style="display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap">
+      <a class="btn btn-primary btn-sm"
+         href="/reportes/excel?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta]) ?>">
+        <?= W::icono('baja','14px') ?>Excel completo</a>
+      <a class="btn btn-secondary btn-sm" target="_blank"
+         href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'todos'=>1]) ?>">
+        Imprimir todos</a>
+    </div>
+  </header>
+
+  <div class="lf-pills" style="padding:4px 20px 14px">
+    <?php foreach ($tipos as $k => $t): ?>
+      <a class="lf-pill <?= $tipo===$k?'active':'' ?>"
+         href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$k]) ?>">
+        <?= P::e($t['rotulo']) ?></a>
+    <?php endforeach; ?>
+  </div>
+
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr>
+        <?php foreach ($reporte['columnas'] as $c): ?>
+          <th<?= in_array($c[1], ['$','n','%'], true) ? ' class="text-end"' : '' ?>>
+            <?= P::e($c[0]) ?></th>
+        <?php endforeach; ?>
+      </tr></thead>
+      <tbody>
+      <?php if (!$reporte['filas']): ?>
+        <tr><td colspan="<?= count($reporte['columnas']) ?>"
+            style="text-align:center;color:var(--lf-tinta-4);padding:32px">
+          No hay datos en este periodo.</td></tr>
+      <?php endif; ?>
+      <?php foreach (array_slice($reporte['filas'], 0, 50) as $f): ?>
+        <tr>
+          <?php foreach ($reporte['columnas'] as $k => $c):
+            $v = $f[$k] ?? null;
+            $txt = ($v === null || $v === '') ? '–'
+                 : ($c[1] === '$' ? D::pesos($v)
+                 : ($c[1] === 'n' ? number_format((float)$v)
+                 : ($c[1] === '%' ? number_format((float)$v * (abs($v) <= 1.5 ? 100 : 1), 1) . '%'
+                 : ($c[1] === 'f' ? date('d/m/Y', strtotime((string)$v)) : $v)))); ?>
+            <td data-label="<?= P::e($c[0]) ?>"
+                <?= in_array($c[1], ['$','n','%'], true) ? 'class="text-end lf-mono"' : '' ?>>
+              <?= P::e($txt) ?></td>
+          <?php endforeach; ?>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+      <?php if ($reporte['filas']): ?>
+      <tfoot><tr style="border-top:2px solid var(--lf-brand)">
+        <?php foreach ($reporte['columnas'] as $k => $c):
+          $v = $reporte['totales'][$k] ?? '';
+          $txt = ($v === null || $v === '') ? ''
+               : ($c[1] === '$' ? D::pesos($v)
+               : ($c[1] === 'n' ? number_format((float)$v)
+               : ($c[1] === '%' ? number_format((float)$v * 100, 1) . '%' : $v))); ?>
+          <td <?= in_array($c[1], ['$','n','%'], true) ? 'class="text-end lf-mono"' : '' ?>
+              style="font-weight:700"><?= P::e($txt) ?></td>
+        <?php endforeach; ?>
+      </tr></tfoot>
+      <?php endif; ?>
+    </table>
+  </div>
+
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <span style="flex:1;min-width:220px"><?= P::e($reporte['nota']) ?>
+      <?php if (count($reporte['filas']) > 50): ?>
+        <b>Se muestran 50 de <?= count($reporte['filas']) ?>; el Excel los trae todos.</b>
+      <?php endif; ?></span>
+    <a class="btn btn-secondary btn-sm" target="_blank"
+       href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$tipo]) ?>">
+      Imprimir este</a>
+  </div>
+</section>
