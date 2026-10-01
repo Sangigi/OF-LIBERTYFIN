@@ -122,7 +122,16 @@ final class CajaControlador
                 'usuario_id'     => $_SESSION['usuario_id'] ?? null,
                 'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
                 'caja_id'        => $_SESSION['caja_id'] ?? null,
-                'anticipo'       => (float)($_POST['anticipo'] ?? 0),
+                // EN UN PAGO EN LINEA NO HAY ANTICIPO.
+                //
+                // El cliente todavia no ha pagado nada: va a pasar su
+                // tarjeta, transferir o ir a la tienda. Anotar un
+                // anticipo seria decir que entro dinero que no entro, y
+                // ademas dejaba la venta liquidada: al ir a generar el
+                // cobro no quedaba saldo que cobrar y el sistema
+                // contestaba "no hizo falta".
+                'anticipo'       => self::formaEnLinea($_POST['como_paga'] ?? '')
+                                    ? 0.0 : (float)($_POST['anticipo'] ?? 0),
                 // El nombre se guarda además del id: si esa persona se va y su
                 // usuario se desactiva, el reporte de hace seis meses tiene que
                 // seguir diciendo quién atendió.
@@ -194,7 +203,12 @@ final class CajaControlador
 
         $saldo = round((float)$venta['saldo'], 2);
         if ($saldo <= 0.01) {
-            $this->volver('Venta registrada y liquidada. No hizo falta la liga.', 'ok');
+            // Con el anticipo ya forzado a cero esto no deberia pasar.
+            // Si pasa es que la venta traia pagos de antes, y entonces
+            // no hay nada que cobrar: decirlo claro es mejor que generar
+            // un cobro por cero que el proveedor va a rechazar.
+            $this->volver('Esta venta ya está pagada por completo, no hay nada que cobrar. '
+                . 'Si querías cobrar algo más, regístralo como una venta nueva.', 'error');
         }
 
         $api = new \LibertyFin\Servicio\LigaPago(\LibertyFin\Servicio\Integraciones::de('spei'));

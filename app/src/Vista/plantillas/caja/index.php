@@ -118,7 +118,7 @@ $token = $_SESSION['lf_token'];
       <div class="tt"><span>Total</span><span id="sTot">$0.00</span></div>
     </div>
 
-    <div class="lf-anticipo">
+    <div class="lf-anticipo" id="cajaAnticipo">
       <label for="anticipo">Anticipo que se cobra hoy</label>
       <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01">
       <p id="msgSaldo">Deja el total para liquidar de una vez.</p>
@@ -255,7 +255,7 @@ $token = $_SESSION['lf_token'];
     var act = document.querySelector('.lf-metodos .m.on');
     var enLinea = act && act.dataset.linea;
     $('btnTexto').textContent = enLinea
-      ? 'Generar el cobro'
+      ? 'Cobrar ' + pesos(cap)
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
     $('btnCobrar').disabled = lineas.length === 0;
   }
@@ -295,6 +295,16 @@ $token = $_SESSION['lf_token'];
           x.classList.remove('on'); });
         b.classList.add('on');
         $('comoPaga').value = b.dataset.metodo;
+        /* Con un pago en línea el anticipo no aplica: el cliente todavía
+           no ha pagado nada. Dejarlo a la vista invita a escribir ahí el
+           total y entonces la venta queda liquidada sin que haya entrado
+           un peso. */
+        var caja = $('cajaAnticipo');
+        if (caja) {
+          var linea = !!b.dataset.linea;
+          caja.hidden = linea;
+          if (linea) $('anticipo').value = '0';
+        }
         calcular();
       });
     });

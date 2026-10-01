@@ -198,7 +198,7 @@ final class ReporteRepo extends Repo
                    ), NULLIF(v.area_nombre,''), 'Sin area')
                        ORDER BY 1 SEPARATOR ', ') AS area,
                    ROUND(SUM(pc.monto),2) AS devengado,
-                   COUNT(DISTINCT pc.venta_id) AS ventas
+                   COUNT(*) AS ventas
             FROM pago_comisiones pc INNER JOIN ventas v ON v.id = pc.venta_id
             WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             GROUP BY pc.colaborador_nombre

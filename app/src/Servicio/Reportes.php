@@ -91,7 +91,7 @@ final class Reportes
                 $f = $r->porColaborador($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Colaborador', Libro::TEXTO, 28], ['Área', Libro::TEXTO, 24],
-                     ['Ventas', Libro::NUMERO, 10], ['Comisión', Libro::MONEDA, 15]],
+                     ['Pagos', Libro::NUMERO, 10], ['Comisión', Libro::MONEDA, 15]],
                     array_map(function ($x) {
                         return [$x['nombre'] ?: 'POR ASIGNAR', $x['area'],
                                 (int)$x['ventas'], $x['devengado']];
