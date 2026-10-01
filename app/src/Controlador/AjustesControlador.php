@@ -51,6 +51,9 @@ final class AjustesControlador
             $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
         }
         if ($p === 'empresa') {
+            $datos['aprobacion'] = $repo->modoAprobacion();
+            $datos['modosAprobacion'] = \LibertyFin\Datos\ConfigRepo::APROBACION;
+            $datos['hayLigas'] = \LibertyFin\Servicio\Integraciones::activa('spei');
             $principal = Conexion::de($GLOBALS['lf_bd_principal']);
             $datos['empresa'] = (new \LibertyFin\Datos\EmpresaRepo($principal))
                                 ->uno($_SESSION['empresa_id'] ?? 0);
@@ -222,5 +225,31 @@ final class AjustesControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /ajustes?t=' . $pestana); exit;
+    }
+
+    /**
+     * Cambia si los pagos en linea se aplican solos o esperan aprobacion.
+     */
+    public function aprobacion()
+    {
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        $db = Conexion::de($_SESSION['empresa_db']);
+        try {
+            $antes = (new ConfigRepo($db))->modoAprobacion();
+            (new ConfigRepo($db))->fijarAprobacion($_POST['modo'] ?? 'auto');
+            \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar',
+                'aprobación de pagos', $antes, $_POST['modo'] ?? 'auto');
+            $this->volver(($_POST['modo'] ?? '') === 'revisar'
+                ? 'Los pagos en línea van a esperar tu aprobación.'
+                : 'Los pagos en línea se van a aplicar solos al confirmarse.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] aprobación: ' . $e->getMessage());
+            $this->volver('No se pudo cambiar.', 'error');
+        }
     }
 }

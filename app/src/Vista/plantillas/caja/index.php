@@ -159,11 +159,11 @@ $token = $_SESSION['lf_token'];
     <div class="lf-cobro-modo">
       <label class="m on">
         <input type="radio" name="con_liga" value="" checked>
-        <span><b>Cobrar ahora</b><small>efectivo, transferencia o tarjeta en el mostrador</small></span>
+        <span><b>Ya me pagó</b><small>efectivo o transferencia, aquí en el mostrador</small></span>
       </label>
       <label class="m">
         <input type="radio" name="con_liga" value="1">
-        <span><b>Mandarle una liga</b><small>paga en línea, por SPEI o en tiendas</small></span>
+        <span><b>Va a pagar en línea</b><small>tarjeta, SPEI o efectivo en tiendas</small></span>
       </label>
       <div id="formaLiga" hidden style="padding:0 2px 4px">
         <select class="form-select form-select-sm" name="forma_liga">
@@ -172,8 +172,9 @@ $token = $_SESSION['lf_token'];
           <?php endforeach; ?>
         </select>
         <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:7px;line-height:1.5">
-          La venta queda <b>con saldo</b> hasta que el cliente pague. El abono entra
-          cuando el proveedor confirme, no ahora.
+          Al cobrar aparecen aquí mismo los datos: el código para tarjeta, la CLABE
+          para SPEI o el comprobante con código de barras para la tienda. La venta
+          queda <b>con saldo</b> hasta que el proveedor confirme el pago.
         </p>
       </div>
     </div>

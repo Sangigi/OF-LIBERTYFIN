@@ -279,4 +279,49 @@ final class ConfigRepo extends Repo
             ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC LIMIT 12");
         return $r;
     }
+
+    /**
+     * Como se aplican los pagos en linea.
+     *
+     * DOS FORMAS DE TRABAJAR, Y LAS DOS SON LEGITIMAS
+     *
+     *   'auto'    el abono entra solo cuando el proveedor confirma.
+     *             Para quien usa el sistema como bitacora: el dinero ya
+     *             llego, anotarlo a mano es trabajo doble.
+     *
+     *   'revisar' el pago confirmado queda PENDIENTE DE APROBAR y
+     *             alguien lo libera. Para quien necesita que una
+     *             persona vea cada entrada antes de darla por buena:
+     *             negocios con varias sucursales, o donde quien cobra
+     *             no es quien responde por la caja.
+     *
+     * Por omision va en 'auto'. Pedir una aprobacion que nadie va a dar
+     * deja las ventas colgadas y a la gente convencida de que el
+     * sistema no sirve.
+     */
+    const APROBACION = [
+        'auto'    => ['Se aplican solos',
+                      'En cuanto el proveedor confirma el pago, el abono entra'],
+        'revisar' => ['Requieren aprobación',
+                      'El pago confirmado espera a que alguien lo apruebe'],
+    ];
+
+    public function modoAprobacion()
+    {
+        $v = $this->valorDe('pagos.aprobacion', 'auto');
+        return isset(self::APROBACION[$v]) ? $v : 'auto';
+    }
+
+    public function exigeAprobacion()
+    {
+        return $this->modoAprobacion() === 'revisar';
+    }
+
+    public function fijarAprobacion($modo)
+    {
+        if (!isset(self::APROBACION[$modo])) {
+            throw new \InvalidArgumentException('Ese modo no existe');
+        }
+        return $this->guardar('pagos.aprobacion', $modo);
+    }
 }

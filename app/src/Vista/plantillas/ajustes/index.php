@@ -182,6 +182,39 @@ $em = $empresa; ?>
 <?php endif; ?>
 
 
+
+<?php /* ═══ CÓMO SE APLICAN LOS PAGOS EN LÍNEA ═══ */ ?>
+<?php if (!empty($hayLigas)): ?>
+<section class="card">
+  <header class="card-header">
+    <div><span>Pagos en línea</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Qué pasa cuando el proveedor confirma que el cliente pagó</p></div>
+  </header>
+  <div class="card-body">
+    <form method="post" action="/ajustes/aprobacion" class="lf-modos">
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <?php foreach ($modosAprobacion as $k => $m): ?>
+        <label class="m<?= $aprobacion===$k ? ' on' : '' ?>">
+          <input type="radio" name="modo" value="<?= $k ?>"
+                 <?= $aprobacion===$k ? 'checked' : '' ?>>
+          <span><b><?= P::e($m[0]) ?></b><small><?= P::e($m[1]) ?></small></span>
+        </label>
+      <?php endforeach; ?>
+      <button class="btn btn-primary btn-sm" type="submit">Guardar</button>
+    </form>
+    <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:14px;line-height:1.6;
+              padding-top:13px;border-top:1px solid var(--lf-linea)">
+      Si solo usas el sistema para llevar el historial, déjalo en
+      <b>se aplican solos</b>: el dinero ya entró y anotarlo a mano es trabajo doble.
+      <b>Requieren aprobación</b> sirve cuando alguien tiene que ver cada entrada antes
+      de darla por buena —varias sucursales, o quien cobra no responde por la caja—.
+      Mientras no se apruebe, la venta sigue con saldo y no entra al corte.
+    </p>
+  </div>
+</section>
+<?php endif; ?>
+
 <?php /* ═══════════════ SUCURSALES ═══════════════ */ elseif ($pestana === 'sucursales'):
 $e = $buscar_ed($sucursales); ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>

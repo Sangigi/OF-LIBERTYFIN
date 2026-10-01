@@ -100,6 +100,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
     $r->get('/ligas',          ['LibertyFin\Controlador\LigasControlador', 'index']);
     $r->post('/ligas/generar', ['LibertyFin\Controlador\LigasControlador', 'generar']);
     $r->post('/ligas/revisar', ['LibertyFin\Controlador\LigasControlador', 'revisar']);
+    $r->get('/ligas/{id}/documento', ['LibertyFin\Controlador\LigasControlador', 'documento']);
+    $r->post('/ligas/aprobar', ['LibertyFin\Controlador\LigasControlador', 'aprobar']);
 }
 
 // Facturación: igual que recargas, solo existe con credenciales.
@@ -153,6 +155,7 @@ $r->post('/mantenimiento/empresa/rechazar', ['LibertyFin\Controlador\Mantenimien
 $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'index']);
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
 $r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
+$r->post('/ajustes/aprobacion',['LibertyFin\Controlador\AjustesControlador', 'aprobacion']);
 $r->get('/usuarios',             ['LibertyFin\Controlador\UsuariosControlador', 'index']);
 $r->post('/usuarios/guardar',    ['LibertyFin\Controlador\UsuariosControlador', 'guardar']);
 $r->post('/usuarios/restablecer',['LibertyFin\Controlador\UsuariosControlador', 'restablecer']);
@@ -206,6 +209,7 @@ $permisos = [
   '/ajustes'                => 'ver.ajustes',
   '/ajustes/guardar'        => 'editar.ajustes',
   '/ajustes/alternar'       => 'editar.ajustes',
+  '/ajustes/aprobacion'     => 'editar.ajustes',
   '/usuarios'               => 'ver.usuarios',
   '/usuarios/guardar'       => 'editar.usuarios',
   '/usuarios/restablecer'   => 'editar.usuarios',
@@ -213,6 +217,8 @@ $permisos = [
   '/ligas'                  => 'ver.ligas',
   '/ligas/generar'          => 'cobrar',
   '/ligas/revisar'          => 'ver.ligas',
+  '/ligas/{id}/documento'   => 'ver.ligas',
+  '/ligas/aprobar'          => 'cobrar',
   '/facturacion'            => 'ver.facturacion',
   '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',

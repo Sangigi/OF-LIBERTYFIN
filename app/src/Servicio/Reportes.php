@@ -76,7 +76,7 @@ final class Reportes
                     [['Área', Libro::TEXTO, 30], ['Ventas', Libro::NUMERO, 10],
                      ['Vendido', Libro::MONEDA, 15], ['Cobrado', Libro::MONEDA, 15],
                      ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
-                     ['Queda', Libro::MONEDA, 15]],
+                     ['Utilidad', Libro::MONEDA, 15]],
                     array_map(function ($x) {
                         return [$x['area'], (int)$x['ventas'], $x['vendido'], $x['cobrado'],
                                 $x['gastos'], $x['comisiones'],
@@ -186,7 +186,7 @@ final class Reportes
                      ['Base', Libro::MONEDA, 13], ['IVA', Libro::MONEDA, 12],
                      ['Total', Libro::MONEDA, 14], ['Cobrado', Libro::MONEDA, 14],
                      ['Debe', Libro::MONEDA, 13], ['Gastos', Libro::MONEDA, 13],
-                     ['Comisión', Libro::MONEDA, 13], ['Queda', Libro::MONEDA, 14]],
+                     ['Comisión', Libro::MONEDA, 13], ['Utilidad', Libro::MONEDA, 14]],
                     array_map(function ($x) {
                         return [$x['folio'], $x['cliente'], $x['area'], $x['fecha'],
                                 $x['subtotal'], $x['iva'], $x['total'], $x['cobrado'],
@@ -314,7 +314,7 @@ final class Reportes
             ['Debe',         Libro::MONEDA, 13],
             ['Gastos',       Libro::MONEDA, 12],
             ['Comisión',     Libro::MONEDA, 13],
-            ['Queda',        Libro::MONEDA, 14],
+            ['Utilidad',     Libro::MONEDA, 14],
             ['Forma',        Libro::TEXTO,  14],
         ];
 

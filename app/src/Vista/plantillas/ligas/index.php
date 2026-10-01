@@ -152,9 +152,54 @@ $qs = function ($x = []) use ($estado, $q) {
 </script>
 <?php endif; ?>
 
+<?php if ($exige && $aprobar): ?>
+<section class="card" style="border-color:color-mix(in srgb,var(--lf-amb) 48%,transparent);
+         margin-bottom:18px">
+  <header class="card-header">
+    <div><span>Pagos por aprobar</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        El proveedor ya confirmó que entró el dinero. Falta tu visto bueno</p></div>
+    <span class="badge bg-warning"><?= count($aprobar) ?></span>
+  </header>
+  <div style="padding:0 10px 8px">
+    <?php foreach ($aprobar as $a): ?>
+      <div class="lf-row">
+        <span style="flex:1;min-width:0">
+          <b style="display:block;font-size:13.5px">
+            <?= P::e($a['cliente_nombre'] ?: $a['descripcion']) ?></b>
+          <small style="color:var(--lf-tinta-4);font-size:11.5px">
+            <?= P::e($metodos[$a['metodo']][0] ?? $a['metodo']) ?> ·
+            <?= P::e($a['referencia']) ?>
+            <?php if ($a['venta_id']): ?>
+              · <a href="/ventas/<?= (int)$a['venta_id'] ?>">ver la venta</a>
+            <?php endif; ?></small>
+        </span>
+        <b class="lf-mono" style="flex-shrink:0;color:var(--lf-brand-2)">
+          <?= D::pesos($a['monto']) ?></b>
+        <form method="post" action="/ligas/aprobar" style="flex-shrink:0">
+          <input type="hidden" name="token" value="<?= P::e($token) ?>">
+          <input type="hidden" name="id" value="<?= (int)$a['id'] ?>">
+          <button class="btn btn-primary btn-sm" type="submit">Aprobar</button>
+        </form>
+      </div>
+    <?php endforeach; ?>
+  </div>
+  <div class="card-footer">
+    Mientras no se apruebe, la venta sigue con saldo y no entra al corte. Es a
+    propósito: así alguien ve cada entrada antes de darla por buena.
+    <?php if (\LibertyFin\Dominio\Permisos::puede('editar.ajustes')): ?>
+      Se cambia en <a href="/ajustes">Ajustes</a>.
+    <?php endif; ?>
+  </div>
+</section>
+<?php endif; ?>
+
 <div class="lf-pills" style="margin-bottom:14px">
-  <?php foreach (['pendientes'=>'Esperando', 'pagada'=>'Pagadas',
-                  'vencidas'=>'Vencidas', ''=>'Todas'] as $k=>$t): ?>
+  <?php
+  $filtros = ['pendientes'=>'Esperando'];
+  if ($exige) $filtros['por_aprobar'] = 'Por aprobar';
+  $filtros += ['pagada'=>'Pagadas', 'vencidas'=>'Vencidas', ''=>'Todas'];
+  foreach ($filtros as $k=>$t): ?>
     <a class="lf-pill <?= $estado===$k?'active':'' ?>"
        href="<?= P::e($qs(['estado'=>$k ?: null, 'p'=>null])) ?>"><?= $t ?></a>
   <?php endforeach; ?>
@@ -204,6 +249,10 @@ $qs = function ($x = []) use ($estado, $q) {
               <span class="badge bg-success">Pagada</span>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
                 <?= date('d/m/y H:i', strtotime($l['pagado_en'])) ?></span>
+            <?php elseif ($l['estado'] === 'por_aprobar'): ?>
+              <span class="badge bg-warning">Por aprobar</span>
+              <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
+                el dinero ya entró</span>
             <?php elseif ($vencida): ?>
               <span class="badge bg-danger">Venció</span>
             <?php else: ?>

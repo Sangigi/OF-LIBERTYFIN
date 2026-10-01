@@ -27,7 +27,8 @@ final class LigasControlador
         $repo = new LigaRepo($db);
         $cfg  = Integraciones::de('spei');
 
-        $estado = Peticion::opcion('estado', ['', 'pendientes', 'pagada', 'vencidas'], 'pendientes');
+        $estado = Peticion::opcion('estado',
+                    ['', 'pendientes', 'por_aprobar', 'pagada', 'vencidas'], 'pendientes');
         $buscar = trim(Peticion::texto('q', ''));
         $pagina = max(1, Peticion::entero('p', 1));
         $porPag = 20;
@@ -47,6 +48,8 @@ final class LigasControlador
             'total' => $total, 'pagina' => $pagina,
             'paginas' => max(1, (int)ceil($total / $porPag)),
             'reciente'  => $_SESSION['lf_liga'] ?? null,
+            'exige'     => (new \LibertyFin\Datos\ConfigRepo($db))->exigeAprobacion(),
+            'aprobar'   => $repo->listado('por_aprobar', '', 50),
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso'], $_SESSION['lf_liga']);
@@ -137,7 +140,8 @@ final class LigasControlador
         $lista = $una ? array_filter([$repo->porId($una)]) : $repo->porRevisar(25);
         if (!$lista) $this->a('No hay ligas pendientes que revisar.', 'ok');
 
-        $cobradas = 0; $revisadas = 0; $fallos = 0;
+        $exige = (new \LibertyFin\Datos\ConfigRepo($db))->exigeAprobacion();
+        $cobradas = 0; $revisadas = 0; $fallos = 0; $porAprobar = 0;
         foreach ($lista as $l) {
             if ($l['estado'] === 'pagada') continue;
             $r = $api->estado($l['referencia']);
@@ -146,7 +150,16 @@ final class LigasControlador
 
             if (!$r['pagado']) { $repo->marcarRevisada($l['id']); continue; }
 
-            // Pagaron. Ahora sí entra el dinero.
+            // Pagaron. Si el negocio exige aprobacion, aqui se detiene:
+            // queda marcada como confirmada por el proveedor pero el
+            // abono no entra hasta que alguien la apruebe.
+            if ($exige) {
+                $repo->marcarRevisada($l['id'], 'por_aprobar');
+                $porAprobar++;
+                continue;
+            }
+
+            // Ahora si entra el dinero.
             try {
                 $pagoId = null;
                 if ($l['venta_id']) {
@@ -169,6 +182,11 @@ final class LigasControlador
             }
         }
 
+        if ($porAprobar) {
+            $this->a($porAprobar . ' pago' . ($porAprobar==1?'':'s') . ' confirmado'
+                . ($porAprobar==1?'':'s') . ' por el proveedor, esperando tu aprobación. '
+                . 'El abono entra cuando lo apruebes.', 'ok');
+        }
         $this->a($cobradas
             ? $cobradas . ' liga' . ($cobradas==1?'':'s') . ' cobrada'
               . ($cobradas==1?'':'s') . '. El abono ya está aplicado.'
@@ -187,5 +205,93 @@ final class LigasControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /ligas'); exit;
+    }
+
+    /**
+     * El comprobante que el cliente se lleva para pagar en tienda.
+     *
+     * Se imprime o se manda por mensaje. Lleva el codigo de barras, la
+     * referencia escrita por si el escaner falla, los pasos y las
+     * tiendas donde se puede pagar.
+     */
+    public function documento($id)
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $l = (new LigaRepo($db))->porId($id);
+        if (!$l) {
+            http_response_code(404);
+            Plantilla::pagina('errores/404', ['titulo' => 'No existe'], 'layout-limpio');
+            return;
+        }
+        $cfg = Integraciones::de('spei') ?: [];
+
+        Plantilla::pagina('ligas/documento', [
+            'titulo'   => 'Ficha de pago',
+            'l'        => $l,
+            'empresa'  => $_SESSION['empresa_nombre'] ?? 'LibertyFin',
+            // El nombre con el que el convenio aparece en la caja de la
+            // tienda. Casi nunca es el nombre comercial, y si el cliente
+            // dice el equivocado el cajero no lo encuentra.
+            'convenio' => trim((string)($cfg['nombre_convenio'] ?? ''))
+                          ?: ($_SESSION['empresa_nombre'] ?? 'LibertyFin'),
+            'tiendas'  => self::tiendas($cfg),
+        ], 'layout-limpio');
+    }
+
+    /**
+     * Donde se puede pagar.
+     *
+     * Sale de la configuracion porque depende del convenio de cada
+     * proveedor: no todos aceptan las mismas cadenas, y poner una lista
+     * fija manda gente a una tienda donde la van a rechazar.
+     */
+    private static function tiendas(array $cfg)
+    {
+        $propias = array_filter(array_map('trim',
+            explode(',', (string)($cfg['tiendas'] ?? ''))));
+        return $propias ?: [
+            'OXXO', '7-Eleven', 'Farmacias Guadalajara', 'Farmacias Benavides',
+            'Circle K', 'Waldos', 'Del Sol', 'Woolworth',
+        ];
+    }
+
+    /**
+     * Aprueba un pago que el proveedor ya confirmo.
+     *
+     * Solo existe cuando el negocio pidio revisar los pagos. Es el
+     * momento en que el dinero entra de verdad: antes de esto la venta
+     * sigue con saldo aunque el cliente ya haya pagado.
+     */
+    public function aprobar()
+    {
+        if (!$this->token()) $this->a('No se pudo verificar el formulario.', 'error');
+        $db   = Conexion::de($_SESSION['empresa_db']);
+        $repo = new LigaRepo($db);
+        $l    = $repo->porId((int)($_POST['id'] ?? 0));
+        if (!$l) $this->a('Esa liga no existe.', 'error');
+        if ($l['estado'] === 'pagada') $this->a('Ese pago ya estaba aplicado.', 'ok');
+        if ($l['estado'] !== 'por_aprobar') {
+            $this->a('Ese pago todavía no lo confirma el proveedor.', 'error');
+        }
+        try {
+            $pagoId = null;
+            if ($l['venta_id']) {
+                $res = (new RegistrarPago($db))->abonar((int)$l['venta_id'], [
+                    'monto'      => $l['monto'],
+                    'metodo'     => $l['metodo'] === 'tarjeta' ? 'tarjeta' : 'transferencia',
+                    'referencia' => 'Liga ' . $l['referencia'],
+                    'fecha'      => date('Y-m-d'),
+                    'usuario_id' => $_SESSION['usuario_id'] ?? null,
+                ]);
+                $pagoId = $res['pago_id'] ?? null;
+            }
+            $repo->marcarPagada($l['id'], $pagoId);
+            Auditoria::anota('pago.registrar', 'pago aprobado · ' . $l['referencia'],
+                'por aprobar', Dinero::pesos($l['monto']));
+            $this->a('Pago aprobado. El abono ya está aplicado.', 'ok');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] aprobar pago: ' . $e->getMessage());
+            $this->a('No se pudo aplicar: ' . $e->getMessage(), 'error');
+        }
     }
 }

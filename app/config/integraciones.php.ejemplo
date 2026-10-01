@@ -101,6 +101,16 @@ return [
 
     // ── Ligas de pago por transferencia ─────────────────────────
     'spei' => [
+        // CÓMO APARECE TU NEGOCIO EN LA CAJA DE LA TIENDA.
+        // Casi nunca es el nombre comercial: es el que registró el
+        // proveedor al abrir el convenio. Si el cliente dice el
+        // equivocado, el cajero no lo encuentra y lo manda de regreso.
+        'nombre_convenio' => '',
+        // Dónde se puede pagar, separadas por coma. Depende del
+        // convenio: no todos aceptan las mismas cadenas, y una lista
+        // fija manda gente a una tienda donde la van a rechazar.
+        'tiendas' => 'OXXO, 7-Eleven, Farmacias Guadalajara, Circle K',
+
         'activo'         => false,
         'usuario'        => '',
         'clave'          => '',

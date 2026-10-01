@@ -1968,3 +1968,13 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
 .lf-elegir .ir{text-decoration:none;display:inline-flex;align-items:center}
 .lf-elegir .ir.apagado{opacity:.45;pointer-events:none;cursor:not-allowed}
 .lf-elegir .nota{font-size:11px;color:var(--lf-tinta-4);line-height:1.5;margin:10px 0 0}
+
+/* Elegir entre dos formas de trabajar */
+.lf-modos{display:flex;flex-direction:column;gap:9px;align-items:flex-start}
+.lf-modos .m{display:flex;align-items:flex-start;gap:11px;padding:13px 15px;cursor:pointer;
+  width:100%;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  background:var(--lf-sup);transition:border-color .12s,background .12s}
+.lf-modos .m.on{border-color:var(--lf-brand);background:var(--lf-brand-glow)}
+.lf-modos .m input{margin-top:2px;accent-color:var(--lf-brand);flex-shrink:0}
+.lf-modos b{display:block;font-size:13px;font-weight:600}
+.lf-modos small{display:block;font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5;margin-top:2px}
