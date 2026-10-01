@@ -25,7 +25,13 @@ $alineado = function ($tipo) {
   </div>
 
   <?php foreach ($reportes as $i => $rep): ?>
-  <section class="rep">
+  <?php
+  // Con muchas columnas se baja el tamaño al imprimir. Con pocas no
+  // hace falta y achicarlas sería perder legibilidad sin motivo.
+  $n = count($rep['columnas']);
+  $clase = $n >= 12 ? ' ancha' : ($n >= 8 ? ' media' : '');
+  ?>
+  <section class="rep<?= $clase ?>">
     <header>
       <div>
         <h1><?= P::e($rep['titulo']) ?></h1>
@@ -98,7 +104,10 @@ body{background:#eef1ef;margin:0;
 .marca span{width:26px;height:26px;border-radius:8px;background:#27ae60;color:#fff;
   display:flex;align-items:center;justify-content:center;font-size:14px}
 
-table{width:100%;border-collapse:collapse;font-size:12px}
+/* En pantalla sí se puede desplazar; al imprimir se encoge. */
+.rep{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px;min-width:max-content}
+@media print{ table{min-width:0} .rep{overflow:visible} }
 th{background:#27ae60;color:#fff;text-align:left;padding:9px 10px;font-weight:600;
   font-size:11.5px;white-space:nowrap}
 td{padding:7px 10px;border-bottom:1px solid #e6ebe8}
@@ -115,7 +124,7 @@ tfoot td{background:#eff5f1;font-weight:700;border-top:2px solid #27ae60;border-
    página, y sin la barra de botones. Una tabla larga sin encabezado
    repetido es ilegible a partir de la segunda hoja. */
 @media print{
-  @page{size:A4 landscape;margin:11mm 10mm 14mm}
+  @page{size:A4 landscape;margin:9mm 7mm 12mm}
   body{background:#fff}
   .lf-hoja{max-width:none;padding:0}
   .barra{display:none}
@@ -125,6 +134,18 @@ tfoot td{background:#eff5f1;font-weight:700;border-top:2px solid #27ae60;border-
   thead{display:table-header-group}
   tfoot{display:table-row-group}
   tr{break-inside:avoid;page-break-inside:avoid}
+
+  /* TABLAS ANCHAS: SE ENCOGEN, NO SE CORTAN.
+     El desglose tiene quince columnas. En A4 apaisado, con el tamaño
+     normal, las últimas cinco quedaban fuera de la hoja y no había
+     forma de verlas: el papel no se desplaza.
+     Se reparte el ancho y se deja que el texto baje de renglón. */
+  table{table-layout:fixed;width:100%}
+  .rep.ancha th, .rep.ancha td{font-size:7.5px;padding:3px 4px;
+    word-break:break-word;overflow-wrap:anywhere}
+  .rep.ancha th{font-size:7px;letter-spacing:-.1px}
+  .rep.media th, .rep.media td{font-size:9px;padding:4px 5px;
+    word-break:break-word;overflow-wrap:anywhere}
   th{background:#27ae60 !important;color:#fff !important;
      -webkit-print-color-adjust:exact;print-color-adjust:exact}
   tbody tr:nth-child(even){background:#f8faf9 !important;

@@ -273,7 +273,15 @@ final class Reportes
      */
     public function desglose($desde, $hasta, $por = 'servicio')
     {
-        $filas = (new ReporteRepo($this->db))->detallePorLinea($desde, $hasta);
+        // Se recuerda por periodo: la pantalla pide el desglose y ademas
+        // `todos()` lo arma para la pestana, asi que sin esto la consulta
+        // mas pesada del reporte corria dos veces en cada carga.
+        static $cache = [];
+        $k = $desde . '|' . $hasta;
+        if (!isset($cache[$k])) {
+            $cache[$k] = (new ReporteRepo($this->db))->detallePorLinea($desde, $hasta);
+        }
+        $filas = $cache[$k];
         $campo = ($por === 'origen') ? 'area_origen' : 'area_servicio';
 
         $grupos = [];
