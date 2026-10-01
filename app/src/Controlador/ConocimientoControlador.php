@@ -23,12 +23,18 @@ final class ConocimientoControlador
         $q    = trim(Peticion::texto('q', ''));
         $tipo = Peticion::opcion('tipo', array_keys(BaseConocimientoRepo::TIPOS), '');
         $area = Peticion::opcion('area', array_keys(BaseConocimientoRepo::AREAS), '');
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = 12;
+        $todas  = $repo->buscar($q, $tipo, $area, 500);
 
         Plantilla::pagina('conocimiento/index', [
             'titulo'    => 'Base de conocimientos',
             'icono'     => 'serv',
             'subtitulo' => 'Soporte',
-            'filas'     => $repo->buscar($q, $tipo, $area),
+            'filas'     => array_slice($todas, ($pagina-1)*$porPag, $porPag),
+            'pagina'    => $pagina,
+            'paginas'   => max(1, (int)ceil(count($todas) / $porPag)),
+            'totalC'    => count($todas),
             'cifras'    => $repo->cifras(),
             'editando'  => Peticion::entero('editar') ? $repo->uno(Peticion::entero('editar')) : null,
             'abrir'     => Peticion::entero('ver') ? $repo->ver(Peticion::entero('ver')) : null,

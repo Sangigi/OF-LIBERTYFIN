@@ -145,7 +145,12 @@ $comoVa = [
       </a>
     <?php endforeach; ?>
   </div>
-  <div class="card-footer">
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($tickets) ?> reporte<?= count($tickets)==1?'':'s' ?></span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n){ return '?p=' . $n; }]); ?>
+  </div>
+  <div class="card-footer" style="border-top:none;padding-top:0">
     Te avisamos por correo en cuanto te contestemos. No hace falta que estés
     revisando aquí.
   </div>

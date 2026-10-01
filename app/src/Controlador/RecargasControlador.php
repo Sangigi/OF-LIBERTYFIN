@@ -62,9 +62,11 @@ final class RecargasControlador
             'prueba'      => $_SESSION['lf_prueba_emida'] ?? null,
             'elegido'     => Peticion::texto('producto', '')
                              ? $repo->porId(Peticion::texto('producto', '')) : null,
+            'pegar'       => !empty($_SESSION['lf_pegar']),
             'aviso'       => $_SESSION['lf_aviso'] ?? null,
         ]);
-        unset($_SESSION['lf_aviso'], $_SESSION['lf_saldo_emida'], $_SESSION['lf_prueba_emida']);
+        unset($_SESSION['lf_aviso'], $_SESSION['lf_saldo_emida'],
+              $_SESSION['lf_prueba_emida'], $_SESSION['lf_pegar']);
     }
 
     /**
@@ -83,7 +85,12 @@ final class RecargasControlador
         $r = (new Emida(Integraciones::de('emida')))->catalogo();
         ob_end_clean();
 
-        if (!$r['ok']) $this->volver('No se pudo bajar el catálogo: ' . $r['error'], 'error');
+        if (!$r['ok']) {
+            // Si el intermediario no tiene el script, se dice qué hacer
+            // mientras tanto en vez de dejarlo en "no se pudo".
+            $_SESSION['lf_pegar'] = !empty($r['sin_script']);
+            $this->volver('No se pudo bajar el catálogo: ' . $r['error'], 'error');
+        }
         if (!$r['productos']) {
             $this->volver('El proveedor respondió, pero sin productos. '
                 . 'Puede que la cuenta no tenga ninguno asignado todavía.', 'error');
@@ -214,5 +221,34 @@ final class RecargasControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /recargas'); exit;
+    }
+
+    /**
+     * Carga el catálogo pegado desde el portal del proveedor.
+     *
+     * No reemplaza a bajarlo por API: es lo que permite trabajar mientras
+     * el intermediario no tenga el script. Un sistema que no se puede
+     * usar hasta que un tercero suba un archivo no sirve de nada.
+     */
+    public function pegarCatalogo()
+    {
+        if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
+        $db = Conexion::de($_SESSION['empresa_db']);
+
+        $productos = EmidaRepo::leerPegado($_POST['pegado'] ?? '');
+        if (!$productos) {
+            $_SESSION['lf_pegar'] = true;
+            $this->volver('No se entendió ningún producto. Copia la tabla completa '
+                . 'desde el portal de Emida, con todo y encabezados.', 'error');
+        }
+        try {
+            $n = (new EmidaRepo($db))->guardarCatalogo($productos);
+            Auditoria::anota('ajustes.cambiar', 'catálogo de Emida (pegado)',
+                null, $n . ' productos');
+            $this->volver($n . ' productos cargados desde el pegado.', 'ok');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] pegar catálogo: ' . $e->getMessage());
+            $this->volver('No se pudo guardar: ' . $e->getMessage(), 'error');
+        }
     }
 }

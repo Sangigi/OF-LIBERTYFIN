@@ -109,7 +109,13 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
       </tbody>
     </table>
   </div>
-  <div class="card-footer">
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($ventas) ?> de <?= number_format($totalV) ?></span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+      'enlace'=>function($n) use ($desde,$hasta){
+        return '?' . http_build_query(['desde'=>$desde,'hasta'=>$hasta,'p'=>$n]); }]); ?>
+  </div>
+  <div class="card-footer" style="border-top:none;padding-top:0">
     Una venta sin cliente no se puede facturar: el CFDI necesita el RFC de quien
     recibe. Y una sin liquidar tampoco, porque el SAT timbra el pago, no la promesa.
   </div>

@@ -49,6 +49,9 @@ final class FacturacionControlador
         $cuenta = new CuentaRepo($db);
         $docs   = $cuenta->estadoDocumentacion();
 
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = Peticion::POR_PAGINA;
+        $totalV = $repo->cuantas($desde, $hasta, []);
         $cfgFac = Integraciones::de('facturapi');
 
         Plantilla::pagina('facturacion/index', [
@@ -58,7 +61,10 @@ final class FacturacionControlador
             'sandbox'    => !empty($cfgFac['sandbox']),
             'faltan'     => $faltan,
             'docs'       => $docs,
-            'ventas'     => $repo->listado($desde, $hasta, [], 25, 0),
+            'ventas'     => $repo->listado($desde, $hasta, [], $porPag, ($pagina-1)*$porPag),
+            'pagina'     => $pagina,
+            'paginas'    => max(1, (int)ceil($totalV / $porPag)),
+            'totalV'     => $totalV,
             'desde'      => $desde, 'hasta' => $hasta,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);

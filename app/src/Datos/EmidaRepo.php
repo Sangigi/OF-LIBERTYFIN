@@ -201,4 +201,84 @@ final class EmidaRepo extends Repo
                    COALESCE(SUM(CASE WHEN estado = 'exitosa' THEN comision END),0) AS comision
             FROM lf_emida_transacciones WHERE DATE(creado_en) = ?", [$f]) ?: [];
     }
+
+    /**
+     * Lee un catálogo pegado desde la pantalla del proveedor.
+     *
+     * POR QUÉ EXISTE
+     *
+     * El intermediario no tiene script de catálogo, y pedírselo a Emida
+     * puede tardar. Mientras tanto, su portal sí muestra la tabla y se
+     * puede copiar completa. Esto la entiende.
+     *
+     * Acepta columnas separadas por tabulador —que es lo que sale al
+     * copiar de una tabla web— o por coma. Y se salta los renglones que
+     * no empiezan con un identificador numérico, que son los títulos y
+     * los botones que se copian de más.
+     */
+    public static function leerPegado($texto)
+    {
+        // PRIMERO SE JUNTAN LAS LÍNEAS PARTIDAS.
+        //
+        // En la tabla del proveedor hay nombres de dos renglones:
+        //
+        //     5094900  Pago INFONAVIT
+        //     Creditos y financieras   PAGO SERVICIOS   INFONAVIT  ...
+        //
+        // Al copiar, eso llega como dos líneas. Un renglón que NO empieza
+        // con un identificador es la continuación del anterior, así que se
+        // pega en vez de descartarse. Sin esto se perdía uno de cada tres
+        // productos, y justo los de pago de servicios.
+        $lineas = [];
+        foreach (preg_split('/\r\n|\r|\n/', (string)$texto) as $cruda) {
+            if (trim($cruda) === '') continue;
+            if (preg_match('/^\s*\d{4,}\s*[\t,]/', $cruda) || !$lineas) {
+                $lineas[] = rtrim($cruda);
+            } else {
+                $lineas[count($lineas) - 1] .= ' ' . trim($cruda);
+            }
+        }
+
+        $productos = [];
+        foreach ($lineas as $linea) {
+            $linea = trim($linea);
+            if ($linea === '') continue;
+
+            $c = strpos($linea, "\t") !== false
+               ? preg_split('/\t+/', $linea)
+               : str_getcsv($linea);
+            $c = array_map('trim', $c);
+            if (count($c) < 4) continue;
+
+            $id = preg_replace('/\D/', '', $c[0]);
+            if ($id === '' || strlen($id) < 4) continue;   // encabezado o basura
+
+            $num = function ($v) {
+                $v = preg_replace('/[^0-9.]/', '', (string)$v);
+                return $v === '' ? 0.0 : (float)$v;
+            };
+            // El nombre puede traer un salto adentro, de los que la tabla
+            // parte en dos líneas: se aplana.
+            $nombre = preg_replace('/\s+/', ' ', (string)($c[1] ?? ''));
+
+            $monto = $num($c[5] ?? '');
+            $min   = $num($c[6] ?? '');
+            $max   = $num($c[7] ?? '');
+            $tipo  = stripos((string)($c[8] ?? ''), 'consulta') !== false ? 'consulta'
+                   : (($min > 0 || $max > 0 || $monto <= 0) ? 'consulta' : 'directa');
+
+            $productos[] = [
+                'producto_id' => $id,
+                'nombre'      => mb_substr($nombre, 0, 220),
+                'categoria'   => mb_substr((string)($c[2] ?? ''), 0, 80),
+                'carrier'     => mb_substr((string)($c[3] ?? ''), 0, 80),
+                'comision'    => $num($c[4] ?? ''),
+                'monto'       => $monto,
+                'monto_min'   => $min,
+                'monto_max'   => $max,
+                'tipo'        => $tipo,
+            ];
+        }
+        return $productos;
+    }
 }

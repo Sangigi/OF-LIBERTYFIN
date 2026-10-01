@@ -170,6 +170,11 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
         </tbody>
       </table>
     </div>
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span><?= count($tickets) ?> de <?= number_format($totalT) ?></span>
+      <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+        'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
+    </div>
   </section>
 
   <section class="card">

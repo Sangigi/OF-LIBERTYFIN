@@ -71,13 +71,37 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
       Cada compañía y cada monto tienen su propio identificador, y sin el catálogo
       no se puede vender ninguno.
     </p>
-    <form method="post" action="/recargas/catalogo">
+    <form method="post" action="/recargas/catalogo" style="margin-bottom:20px">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <button class="btn btn-primary" type="submit">Bajar el catálogo ahora</button>
     </form>
   </div>
 </section>
 <?php endif; ?>
+
+<details class="lf-alta" <?= $pegar ? 'open' : '' ?>>
+  <summary><?= W::icono('mas','16px') ?>Cargar el catálogo pegándolo</summary>
+  <div style="padding:0 20px 18px">
+    <p style="font-size:12.5px;color:var(--lf-tinta-3);line-height:1.6;margin-bottom:14px">
+      Entra al portal de Emida, abre su <b>Catálogo de Servicios</b>, selecciona la
+      tabla completa y pégala aquí. Entiende las columnas tal como salen, y junta
+      los nombres que la tabla parte en dos renglones.
+    </p>
+    <form method="post" action="/recargas/pegar">
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <textarea class="form-control lf-mono" name="pegado" rows="7"
+                style="font-size:11.5px;line-height:1.5"
+                placeholder="5077200&#9;Recarga Telcel $200&#9;RECARGAS&#9;Telcel&#9;-&#9;$200.00&#9;-&#9;-&#9;Venta Directa"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" type="submit">Cargar</button>
+        <span style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5">
+          Reemplaza el catálogo completo. Los productos que ya no aparezcan dejan de
+          venderse, pero no se borran: las operaciones viejas siguen sabiendo qué fue.
+        </span>
+      </div>
+    </form>
+  </div>
+</details>
 
 <div class="lf-split">
   <section class="card">

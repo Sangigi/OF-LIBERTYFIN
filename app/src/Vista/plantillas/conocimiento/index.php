@@ -155,6 +155,10 @@ $color = ['articulo'=>'bg-secondary','plantilla'=>'bg-success','error'=>'bg-warn
   <button class="btn btn-secondary btn-sm" type="submit">Buscar</button>
 </form>
 
+<?php $qsC = function ($x = []) use ($q, $tipo, $area) {
+  return '?' . http_build_query(array_merge(array_filter(['q'=>$q,'tipo'=>$tipo,'area'=>$area]),
+    array_filter($x, function($z){ return $z !== null; }))); }; ?>
+
 <div class="lf-docs">
   <?php if (!$filas): ?>
     <p style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:34px">
@@ -187,3 +191,12 @@ $color = ['articulo'=>'bg-secondary','plantilla'=>'bg-success','error'=>'bg-warn
     </section>
   <?php endforeach; ?>
 </div>
+
+<?php if ($paginas > 1): ?>
+<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;
+     flex-wrap:wrap;margin-top:18px;font-size:12.5px;color:var(--lf-tinta-4)">
+  <span><?= count($filas) ?> de <?= number_format($totalC) ?></span>
+  <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+    'enlace'=>function($n) use ($qsC){ return $qsC(['p'=>$n]); }]); ?>
+</div>
+<?php endif; ?>

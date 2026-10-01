@@ -134,4 +134,27 @@ final class CajaRepo extends Repo
                    COALESCE(SUM(CASE WHEN diferencia < 0 THEN -diferencia END),0) AS faltantes
             FROM caja WHERE sucursal_id = ? AND estado = 'cerrada'", [(int)$sucursalId]) ?: [];
     }
+
+    /** Los cobros del turno, paginados. */
+    public function cobrosDelTurno($cajaId, $limite = 10, $desfase = 0)
+    {
+        return $this->todos("
+            SELECT p.id, p.monto, p.metodo_pago, p.referencia, p.fecha_pago, p.tipo,
+                   v.codigo_venta, COALESCE(c.nombre,'Público general') AS cliente
+            FROM venta_pagos p
+            INNER JOIN ventas v   ON v.id = p.venta_id
+            LEFT  JOIN clientes c ON c.id = v.cliente_id
+            WHERE v.caja_id = ? AND p.cancelado = 0 AND v.estado <> 'cancelada'
+            ORDER BY p.fecha_pago DESC, p.id DESC
+            LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, [(int)$cajaId]);
+    }
+
+    public function cuantosCobros($cajaId)
+    {
+        return (int)$this->valor("
+            SELECT COUNT(*) FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            WHERE v.caja_id = ? AND p.cancelado = 0 AND v.estado <> 'cancelada'",
+            [(int)$cajaId]);
+    }
 }

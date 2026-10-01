@@ -26,7 +26,9 @@ final class AyudaControlador
         $repo = new TicketRepo($this->principal());
         $emp  = (int)($_SESSION['empresa_id'] ?? 0);
 
-        $ver = Peticion::entero('ver');
+        $ver    = Peticion::entero('ver');
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = Peticion::POR_PAGINA;
 
         // Las dos se calculan UNA vez. Antes esto terminaba con
         //     ['mensajes' => []] + $this->conversacion(...)
@@ -40,7 +42,11 @@ final class AyudaControlador
             'titulo'     => 'Ayuda',
             'icono'      => 'alerta',
             'subtitulo'  => $_SESSION['empresa_nombre'] ?? '',
-            'tickets'    => $emp ? $repo->bandeja(['empresa' => $emp], 30) : [],
+            'tickets'    => $emp ? $repo->bandeja(['empresa' => $emp], $porPag,
+                                                  ($pagina-1)*$porPag) : [],
+            'pagina'     => $pagina,
+            'paginas'    => $emp ? max(1, (int)ceil(
+                                count($repo->bandeja(['empresa'=>$emp], 500)) / $porPag)) : 1,
             'abierto'    => $abierto,
             'mensajes'   => $mensajes,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,

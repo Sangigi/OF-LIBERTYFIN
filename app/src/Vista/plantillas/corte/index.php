@@ -73,7 +73,12 @@ $esperado = $fondo + $efe;
 
 <div class="lf-split">
   <section class="card">
-    <header class="card-header">Cobros del turno</header>
+    <header class="card-header">
+      <div><span>Cobros del turno</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Del más reciente al primero</p></div>
+      <span class="badge bg-secondary"><?= number_format($totalC) ?></span>
+    </header>
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table table-hover">
         <thead><tr><th>Hora</th><th>Cliente</th><th>Método</th><th class="text-end">Monto</th></tr></thead>
@@ -87,8 +92,7 @@ $esperado = $fondo + $efe;
             <td data-label="Hora" class="lf-mono" style="font-size:12px">
               <?= date('H:i', strtotime($c['fecha_pago'])) ?></td>
             <td data-label="Cliente">
-              <a href="/ventas/<?= (int)$c['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
-                <?= P::e($c['cliente'] ?: 'Público general') ?></a>
+              <b style="font-weight:600"><?= P::e($c['cliente'] ?: 'Público general') ?></b>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
                 <?= P::e($c['codigo_venta']) ?> · <?= P::e($c['tipo']) ?></span>
             </td>
@@ -101,6 +105,11 @@ $esperado = $fondo + $efe;
         <?php endforeach; ?>
         </tbody>
       </table>
+    </div>
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <span><?= count($cobros) ?> de <?= number_format($totalC) ?></span>
+      <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
+        'enlace'=>function($n){ return '?p=' . $n; }]); ?>
     </div>
   </section>
 

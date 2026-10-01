@@ -13,6 +13,14 @@ $iniciales = function ($n) {
     $p = preg_split('/\s+/', trim($n));
     return mb_strtoupper(mb_substr($p[0],0,1) . (isset($p[1]) ? mb_substr($p[1],0,1) : ''));
 };
+
+// Conserva el periodo al cambiar de página: sin esto, pasar a la página
+// dos devolvería al mes actual y las cifras cambiarían sin aviso.
+$qs = function ($x = []) use ($desde, $hasta) {
+    return '?' . http_build_query(array_merge(
+        array_filter(['desde' => $desde, 'hasta' => $hasta]),
+        array_filter($x, function ($v) { return $v !== null; })));
+};
 ?>
 
 <?php if ($aviso): ?>
@@ -120,6 +128,14 @@ $iniciales = function ($n) {
         Devengado en el periodo</p></div>
     <span class="badge bg-secondary"><?= count($equipo) ?> con comisión</span>
   </header>
+  <?php
+  // La rejilla cabe sin scroll hasta doce. Con treinta colaboradores la
+  // tarjeta crece tanto que las métricas de arriba se pierden.
+  $total_eq = count($equipo);
+  $paginas_eq = max(1, (int)ceil($total_eq / $porPag));
+  $pag_eq = min($pagina, $paginas_eq);
+  $equipo = array_slice($equipo, ($pag_eq - 1) * $porPag, $porPag);
+  ?>
   <div class="lf-equipo">
     <?php if (!$equipo): ?>
       <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
@@ -143,9 +159,11 @@ $iniciales = function ($n) {
       </div>
     <?php endforeach; ?>
   </div>
-  <div class="card-footer" style="display:flex;justify-content:space-between">
-    <span>Total generado en el periodo</span>
-    <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b>
+  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    <span><?= count($equipo) ?> de <?= $total_eq ?> ·
+      total generado <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($total) ?></b></span>
+    <?php P::parcial('parciales/paginacion', ['pagina'=>$pag_eq,'paginas'=>$paginas_eq,
+      'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
   </div>
 </section>
 
@@ -157,6 +175,9 @@ $iniciales = function ($n) {
         <?php W::dona(array_map(function($a){
           return ['rotulo'=>$a['area'] ?: 'Sin área','monto'=>$a['monto']]; }, $areas),
           D::corto($total), 'generado'); ?>
+      </div>
+      <div class="card-footer">
+        El total reparte lo generado en el periodo, pagado o no.
       </div>
     </section>
     <?php endif; ?>
@@ -180,11 +201,10 @@ $iniciales = function ($n) {
             <?php W::avance($pct, $pct < 99.5); ?>
           </div>
         <?php endforeach; ?>
-        <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:4px;padding-top:12px;
-                  border-top:1px solid var(--lf-linea);line-height:1.5">
-          Lo que falta se libera conforme los clientes paguen. Un área muy abajo
-          no está vendiendo mal: está esperando cobranza.
-        </p>
+      </div>
+      <div class="card-footer">
+        Lo que falta se libera conforme los clientes paguen. Un área muy abajo
+        no está vendiendo mal: está esperando cobranza.
       </div>
     </section>
     <?php endif; ?>

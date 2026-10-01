@@ -40,10 +40,16 @@ final class CorteControlador
 
         $caja = $repo->abierta($usr, $suc);
         $mov = $cobros = [];
+        $pagina = max(1, Peticion::entero('p', 1));
+        $porPag = Peticion::POR_PAGINA;
+        $totalC = 0;
         if ($caja) {
             $desde  = $caja['fecha_apertura'] ?? $caja['created_at'] ?? date('Y-m-d 00:00:00');
             $mov    = $repo->movimiento($caja['id'], $desde);
-            $cobros = $repo->cobros($caja['id'], $desde, 40);
+            // Paginados: un turno con cien cobros desplegaba cien
+            // renglones y dejaba la columna de al lado minúscula.
+            $totalC = $repo->cuantosCobros($caja['id']);
+            $cobros = $repo->cobrosDelTurno($caja['id'], $porPag, ($pagina - 1) * $porPag);
             $_SESSION['caja_id'] = (int)$caja['id'];
         } else {
             unset($_SESSION['caja_id']);
@@ -56,6 +62,9 @@ final class CorteControlador
                                  : 'Sin caja abierta',
             'pestana'   => 'turno',
             'caja'      => $caja,
+            'pagina'    => $pagina,
+            'paginas'   => max(1, (int)ceil($totalC / $porPag)),
+            'totalC'    => $totalC,
             'mov'       => $mov,
             'cobros'    => $cobros,
             'historial' => $repo->historial($suc, 8),

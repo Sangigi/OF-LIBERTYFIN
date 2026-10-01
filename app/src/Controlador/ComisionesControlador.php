@@ -33,7 +33,13 @@ final class ComisionesControlador
             'resumen'    => $repo->resumen($desde, $hasta),
             'equipo'     => $repo->porColaborador($desde, $hasta),
             'areas'      => $repo->porArea($desde, $hasta),
+            'desde'      => $desde,
+            'hasta'      => $hasta,
+            'pagina'     => max(1, Peticion::entero('p', 1)),
+            'porPag'     => 12,
             'liberacion' => $repo->liberacion($desde, $hasta),
+            // Cinco y cinco: las tres tarjetas de abajo se ven juntas, y
+            // con cantidades distintas una queda enana al lado de otra.
             'atadas'     => $repo->atadas($desde, $hasta, 5),
             'sin_dueno'  => $sinDueno,
             'candidatos' => $candidatos,

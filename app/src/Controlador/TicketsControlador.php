@@ -33,6 +33,7 @@ final class TicketsControlador
 
         $pagina = max(1, Peticion::entero('p', 1));
         $porPag = 20;
+        $totalT = count($repo->bandeja($filtros, 500));
 
         Plantilla::pagina('tickets/index', [
             'titulo'     => 'Tickets',
@@ -44,6 +45,8 @@ final class TicketsControlador
             'filtros'    => $filtros,
             'mios'       => !empty($_GET['mios']),
             'pagina'     => $pagina,
+            'paginas'    => max(1, (int)ceil($totalT / $porPag)),
+            'totalT'     => $totalT,
             'empresas'   => (new PlataformaRepo($this->principal()))->empresas(),
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);

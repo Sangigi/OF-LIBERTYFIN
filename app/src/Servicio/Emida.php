@@ -476,13 +476,26 @@ final class Emida
     public function catalogo()
     {
         if ($this->porProxy()) {
-            $r = $this->proxy($this->cfg['proxy_catalogo'] ?? 'get_products.php', [
+            $script = $this->cfg['proxy_catalogo'] ?? 'get_products.php';
+            $r = $this->proxy($script, [
                 'username' => $this->cfg['usuario'] ?? '',
                 'password' => $this->cfg['clave'] ?? '',
             ]);
-            if (!$r['ok']) return $r;
-            return ['ok' => true, 'via' => 'intermediario',
-                    'productos' => self::normalizar($r['datos'])];
+            if ($r['ok']) {
+                return ['ok' => true, 'via' => 'intermediario',
+                        'productos' => self::normalizar($r['datos'])];
+            }
+            // Un 404 aquí no es un fallo de red: es que ese script NO
+            // existe en el intermediario. El sistema anterior solo subió
+            // los de saldo, venta y consulta; el del catálogo nunca hizo
+            // falta porque los productos se capturaban a mano.
+            if (strpos($r['error'], '404') !== false) {
+                return ['ok' => false, 'sin_script' => true, 'error' =>
+                    'El intermediario no tiene el script del catálogo (' . $script . '). '
+                  . 'Ahí solo están get_balance.php, pinDistSale.php y lookup_transaction.php. '
+                  . 'Mientras lo suben, puedes pegar el catálogo a mano.'];
+            }
+            return $r;
         }
         try {
             $op = $this->operacionPara('productos');
