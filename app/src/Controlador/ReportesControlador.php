@@ -33,7 +33,13 @@ final class ReportesControlador
             // imprimible, para que no puedan decir cosas distintas.
             'tipos'        => \LibertyFin\Servicio\Reportes::TIPOS,
             'tipo'         => $tipo,
-            'reporte'      => (new \LibertyFin\Servicio\Reportes($db))->armar($tipo, $desde, $hasta),
+            // LOS OCHO DE UNA VEZ, para cambiar de pestaña sin recargar.
+            //
+            // Son ocho consultas de agregado contra el mismo periodo que
+            // ya se está consultando para las cifras de arriba. A cambio,
+            // comparar "por área" con "por colaborador" deja de costar
+            // dos viajes al servidor y la pérdida del lugar en la página.
+            'reportes'     => (new \LibertyFin\Servicio\Reportes($db))->todos($desde, $hasta),
             'desde'        => $desde, 'hasta' => $hasta,
         ]);
     }

@@ -86,24 +86,24 @@ final class Reportes
                 $f = $r->porColaborador($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Colaborador', Libro::TEXTO, 28], ['Área', Libro::TEXTO, 24],
-                     ['Pagos', Libro::NUMERO, 10], ['Comisión', Libro::MONEDA, 15]],
+                     ['Ventas', Libro::NUMERO, 10], ['Comisión', Libro::MONEDA, 15]],
                     array_map(function ($x) {
                         return [$x['nombre'] ?: 'POR ASIGNAR', $x['area'],
-                                (int)$x['pagos'], $x['monto']];
+                                (int)$x['ventas'], $x['devengado']];
                     }, $f),
-                    $this->sumar($f, ['pagos','monto'],
-                        function ($t) { return ['TOTAL', '', (int)$t['pagos'], $t['monto']]; }));
+                    $this->sumar($f, ['ventas','devengado'],
+                        function ($t) { return ['TOTAL', '', (int)$t['ventas'], $t['devengado']]; }));
 
             case 'servicio':
                 $f = $r->porServicio($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
-                    [['Servicio', Libro::TEXTO, 38], ['Área', Libro::TEXTO, 24],
-                     ['Veces', Libro::NUMERO, 9], ['Vendido', Libro::MONEDA, 15]],
+                    [['Servicio', Libro::TEXTO, 44], ['Veces', Libro::NUMERO, 10],
+                     ['Vendido', Libro::MONEDA, 16]],
                     array_map(function ($x) {
-                        return [$x['nombre'], $x['categoria'] ?? '', (int)$x['veces'], $x['vendido']];
+                        return [$x['nombre'], (int)$x['veces'], $x['facturado']];
                     }, $f),
-                    $this->sumar($f, ['veces','vendido'],
-                        function ($t) { return ['TOTAL', '', (int)$t['veces'], $t['vendido']]; }));
+                    $this->sumar($f, ['veces','facturado'],
+                        function ($t) { return ['TOTAL', (int)$t['veces'], $t['facturado']]; }));
 
             case 'cliente':
                 $f = $r->porCliente($desde, $hasta);
@@ -138,14 +138,14 @@ final class Reportes
                 $f = $r->porMetodo($desde, $hasta);
                 $gran = array_sum(array_column($f, 'monto'));
                 return $this->envolver($tipo, $desde, $hasta,
-                    [['Forma de pago', Libro::TEXTO, 24], ['Pagos', Libro::NUMERO, 10],
+                    [['Forma de pago', Libro::TEXTO, 24], ['Cobros', Libro::NUMERO, 10],
                      ['Monto', Libro::MONEDA, 16], ['Parte', Libro::PORCENT, 10]],
                     array_map(function ($x) use ($gran) {
-                        return [ucfirst($x['metodo']), (int)$x['pagos'], $x['monto'],
+                        return [ucfirst($x['metodo']), (int)$x['cobros'], $x['monto'],
                                 $gran > 0 ? $x['monto'] / $gran : 0];
                     }, $f),
-                    $this->sumar($f, ['pagos','monto'],
-                        function ($t) { return ['TOTAL', (int)$t['pagos'], $t['monto'], 1]; }));
+                    $this->sumar($f, ['cobros','monto'],
+                        function ($t) { return ['TOTAL', (int)$t['cobros'], $t['monto'], 1]; }));
 
             case 'dia':
                 $f = $r->porDia($desde, $hasta);
@@ -162,21 +162,22 @@ final class Reportes
                 $f = $r->detalle($desde, $hasta);
                 return $this->envolver('detalle', $desde, $hasta,
                     [['Folio', Libro::TEXTO, 18], ['Cliente', Libro::TEXTO, 30],
-                     ['Área', Libro::TEXTO, 24], ['Fecha venta', Libro::FECHA, 13],
-                     ['Fecha pago', Libro::FECHA, 13], ['Tipo', Libro::TEXTO, 12],
-                     ['Forma', Libro::TEXTO, 15], ['Total venta', Libro::MONEDA, 14],
-                     ['Cobrado', Libro::MONEDA, 14], ['Gastos', Libro::MONEDA, 13],
+                     ['Área', Libro::TEXTO, 24], ['Fecha', Libro::FECHA, 13],
+                     ['Base', Libro::MONEDA, 13], ['IVA', Libro::MONEDA, 12],
+                     ['Total', Libro::MONEDA, 14], ['Cobrado', Libro::MONEDA, 14],
+                     ['Debe', Libro::MONEDA, 13], ['Gastos', Libro::MONEDA, 13],
                      ['Comisión', Libro::MONEDA, 13], ['Queda', Libro::MONEDA, 14]],
                     array_map(function ($x) {
-                        return [$x['codigo_venta'], $x['cliente'], $x['area'],
-                                $x['fecha'], $x['fecha_pago'], $x['tipo'], $x['metodo'],
-                                $x['total'], $x['monto'], $x['gastos'], $x['comision'],
-                                $x['monto'] - $x['gastos'] - $x['comision']];
+                        return [$x['folio'], $x['cliente'], $x['area'], $x['fecha'],
+                                $x['subtotal'], $x['iva'], $x['total'], $x['cobrado'],
+                                $x['saldo'], $x['gastos'], $x['comision'],
+                                $x['cobrado'] - $x['gastos'] - $x['comision']];
                     }, $f),
-                    $this->sumar($f, ['monto','gastos','comision'],
-                        function ($t) { return ['TOTAL', '', '', '', '', '', '', '',
-                            $t['monto'], $t['gastos'], $t['comision'],
-                            $t['monto'] - $t['gastos'] - $t['comision']]; }));
+                    $this->sumar($f, ['subtotal','iva','total','cobrado','saldo','gastos','comision'],
+                        function ($t) { return ['TOTAL', '', '', '',
+                            $t['subtotal'], $t['iva'], $t['total'], $t['cobrado'],
+                            $t['saldo'], $t['gastos'], $t['comision'],
+                            $t['cobrado'] - $t['gastos'] - $t['comision']]; }));
         }
     }
 
@@ -202,12 +203,19 @@ final class Reportes
         return $armar($t);
     }
 
+    /** Los ocho reportes del periodo, para pintarlos todos de una vez. */
+    public function todos($desde, $hasta)
+    {
+        $r = [];
+        foreach (array_keys(self::TIPOS) as $t) $r[$t] = $this->armar($t, $desde, $hasta);
+        return $r;
+    }
+
     /** Un .xlsx con todos los reportes del periodo, uno por hoja. */
     public function libroCompleto($desde, $hasta)
     {
         $l = new Libro();
-        foreach (array_keys(self::TIPOS) as $t) {
-            $rep = $this->armar($t, $desde, $hasta);
+        foreach ($this->todos($desde, $hasta) as $rep) {
             $l->hoja($rep['titulo'], $rep['columnas'], $rep['filas'], [
                 'titulo'    => $rep['titulo'],
                 'subtitulo' => $rep['periodo'] . ' · ' . $rep['nota'],

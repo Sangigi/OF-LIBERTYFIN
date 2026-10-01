@@ -1898,3 +1898,18 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
 .lf-pagar.compacto{grid-template-columns:1fr;gap:10px}
 .lf-pagar.compacto .via{padding:13px}
 .lf-pagar.compacto .dato{font-size:14px;padding:9px}
+
+/* Contador dentro de la pestaña: dice cuánto hay sin tener que entrar */
+.lf-pill .n{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:99px;
+  background:var(--lf-vidrio);font-size:10.5px;font-weight:700;font-family:var(--lf-mono);
+  color:var(--lf-tinta-4);vertical-align:1px}
+.lf-pill.active .n{background:rgba(255,255,255,.22);color:#fff}
+/* Sin transición al cambiar de panel: un desvanecido en una tabla de
+   cincuenta renglones se ve como un parpadeo, no como suavidad. */
+[data-panel][hidden]{display:none !important}
+
+/* Mientras llega el contenido nuevo: se atenúa en vez de parpadear en
+   blanco. Un bloque vacío durante 200 ms se lee como un error. */
+.lf-cont.cargando{opacity:.45;pointer-events:none;transition:opacity .12s}
+.lf-cont{transition:opacity .12s}
+@media (prefers-reduced-motion:reduce){ .lf-cont{transition:none} }

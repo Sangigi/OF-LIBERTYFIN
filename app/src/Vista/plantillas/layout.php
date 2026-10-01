@@ -21,6 +21,160 @@ use LibertyFin\Vista\Widget as W;
   // el usuario lo pida.
   document.documentElement.setAttribute('data-theme', 'light');
 })();
+
+/* ══════════════════════════════════════════════════════
+   PESTAÑAS SIN RECARGAR
+   Sirve para cualquier sección: un contenedor con
+   data-tabs, enlaces con data-tab y bloques con
+   data-panel. Los enlaces siguen siendo enlaces, así que
+   funcionan igual sin JavaScript y se pueden abrir en
+   otra pestaña del navegador.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  function activar(caja, clave, empujar) {
+    var hubo = false;
+    caja.querySelectorAll('[data-panel]').forEach(function (p) {
+      var es = p.dataset.panel === clave;
+      p.hidden = !es;
+      if (es) hubo = true;
+    });
+    if (!hubo) return false;
+
+    caja.querySelectorAll('[data-tab]').forEach(function (t) {
+      var es = t.dataset.tab === clave;
+      t.classList.toggle('active', es);
+      if (t.hasAttribute('aria-selected')) t.setAttribute('aria-selected', es ? 'true' : 'false');
+    });
+
+    /* La dirección se actualiza sin recargar: así recargar a mano,
+       compartir el enlace o usar el botón de atrás siguen llevando a la
+       misma pestaña. Sin esto, cambiar de pestaña y recargar devolvía a
+       la primera sin explicación. */
+    if (empujar) {
+      var activo = caja.querySelector('[data-tab="' + CSS.escape(clave) + '"]');
+      if (activo && activo.getAttribute('href')) {
+        history.pushState({ lfTabs: caja.dataset.tabs, lfClave: clave },
+                          '', activo.getAttribute('href'));
+      }
+    }
+    return true;
+  }
+
+  document.addEventListener('click', function (ev) {
+    var t = ev.target.closest('[data-tab]');
+    if (!t) return;
+    /* Ctrl, Cmd o botón de en medio: se deja pasar, porque el usuario
+       está pidiendo abrirlo en otra pestaña del navegador. */
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+
+    var caja = t.closest('[data-tabs]');
+    if (!caja) return;
+    if (activar(caja, t.dataset.tab, true)) ev.preventDefault();
+  });
+
+  window.addEventListener('popstate', function (ev) {
+    var e = ev.state;
+    if (e && e.lfTabs) {
+      var caja = document.querySelector('[data-tabs="' + CSS.escape(e.lfTabs) + '"]');
+      if (caja) { activar(caja, e.lfClave, false); return; }
+    }
+    /* Sin estado propio —por ejemplo al volver desde otra página— se
+       lee de la dirección. */
+    document.querySelectorAll('[data-tabs]').forEach(function (caja) {
+      var par = new URLSearchParams(location.search);
+      var v = par.get('tipo') || par.get('t') || par.get('pestana');
+      if (v) activar(caja, v, false);
+    });
+  });
+})();
+
+/* ══════════════════════════════════════════════════════
+   CAMBIAR DE PESTAÑA SIN RECARGAR LA PÁGINA
+   Vale para cualquier sección: pestañas, filtros y
+   paginación. Trae solo el contenido y lo cambia en su
+   sitio, en vez de volver a pedir la página entera con su
+   menú, su barra y sus estilos.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  var cont = document.querySelector('.lf-cont');
+  if (!cont || !window.history || !window.fetch) return;
+
+  var enCurso = null;
+
+  function esNuestro(a) {
+    if (!a || !a.getAttribute('href')) return false;
+    if (a.target || a.hasAttribute('download')) return false;
+    /* Solo pestañas, filtros y paginación. Un enlace cualquiera puede
+       llevar a una descarga, a otra sección o a una acción, y cambiarlo
+       a medias dejaría la pantalla mintiendo. */
+    if (!a.matches('.lf-pill, .lf-pag a, [data-tab]')) return false;
+    var u;
+    try { u = new URL(a.href, location.href); } catch (e) { return false; }
+    return u.origin === location.origin;
+  }
+
+  function ejecutarScripts(donde) {
+    /* Un <script> insertado con innerHTML no corre. Se vuelve a crear
+       para que sí: sin esto, los botones de copiar, los selectores y los
+       confirmar del contenido nuevo quedan muertos. */
+    donde.querySelectorAll('script').forEach(function (viejo) {
+      var nuevo = document.createElement('script');
+      for (var i = 0; i < viejo.attributes.length; i++) {
+        nuevo.setAttribute(viejo.attributes[i].name, viejo.attributes[i].value);
+      }
+      nuevo.textContent = viejo.textContent;
+      viejo.parentNode.replaceChild(nuevo, viejo);
+    });
+  }
+
+  function ir(url, empujar) {
+    if (enCurso) enCurso.abort();
+    enCurso = new AbortController();
+    cont.classList.add('cargando');
+
+    fetch(url, { signal: enCurso.signal, headers: { 'X-LF-Parcial': '1' },
+                 credentials: 'same-origin' })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var nuevo = doc.querySelector('.lf-cont');
+        if (!nuevo) { location.href = url; return; }
+
+        cont.innerHTML = nuevo.innerHTML;
+        ejecutarScripts(cont);
+        if (doc.title) document.title = doc.title;
+        if (empujar) history.pushState({ lfNav: 1 }, '', url);
+        cont.classList.remove('cargando');
+        /* Se sube al principio del bloque, no de la página: con el
+           filtro arriba, quedarse donde estaba hace creer que no pasó
+           nada. */
+        var caja = cont.querySelector('.card');
+        if (caja && caja.getBoundingClientRect().top < 0) {
+          caja.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      })
+      .catch(function (e) {
+        if (e.name === 'AbortError') return;
+        cont.classList.remove('cargando');
+        location.href = url;   /* si algo falla, se recarga como siempre */
+      });
+  }
+
+  document.addEventListener('click', function (ev) {
+    if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+    var a = ev.target.closest('a');
+    if (!esNuestro(a)) return;
+    ev.preventDefault();
+    ir(a.href, true);
+  });
+
+  window.addEventListener('popstate', function (ev) {
+    if (ev.state && ev.state.lfNav) ir(location.href, false);
+  });
+})();
 </script>
 
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">

@@ -214,7 +214,28 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
 <?php endif; ?>
 
 <?php /* ═══ LOS OCHO REPORTES ═══ */ ?>
-<section class="card">
+<?php
+/**
+ * Los ocho van en la página, y la pestaña solo muestra uno.
+ *
+ * Antes cada pestaña era un enlace y recargaba: se perdía el lugar en la
+ * página y había que esperar. Comparar "por área" con "por colaborador"
+ * costaba dos viajes al servidor.
+ *
+ * Los datos ya estaban consultados de todos modos para el Excel, así que
+ * cambiar de pestaña es instantáneo.
+ */
+$celda = function ($v, $t) {
+    if ($v === null || $v === '') return '';
+    if ($t === '$') return D::pesos($v);
+    if ($t === 'n') return number_format((float)$v);
+    if ($t === '%') return number_format((float)$v * (abs($v) <= 1.5 ? 100 : 1), 1) . '%';
+    if ($t === 'f') return date('d/m/Y', is_numeric($v) ? (int)$v : strtotime((string)$v));
+    return $v;
+};
+$derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
+?>
+<section class="card lf-tabs" data-tabs="reportes">
   <header class="card-header">
     <div><span>Reportes del periodo</span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
@@ -229,67 +250,61 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
     </div>
   </header>
 
-  <div class="lf-pills" style="padding:4px 20px 14px">
+  <div class="lf-pills" style="padding:4px 20px 14px" role="tablist">
     <?php foreach ($tipos as $k => $t): ?>
-      <a class="lf-pill <?= $tipo===$k?'active':'' ?>"
+      <a class="lf-pill <?= $tipo===$k?'active':'' ?>" role="tab" data-tab="<?= $k ?>"
+         aria-selected="<?= $tipo===$k?'true':'false' ?>"
          href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$k]) ?>">
-        <?= P::e($t['rotulo']) ?></a>
+        <?= P::e($t['rotulo']) ?>
+        <span class="n"><?= count($reportes[$k]['filas']) ?></span></a>
     <?php endforeach; ?>
   </div>
 
-  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
-    <table class="table">
-      <thead><tr>
-        <?php foreach ($reporte['columnas'] as $c): ?>
-          <th<?= in_array($c[1], ['$','n','%'], true) ? ' class="text-end"' : '' ?>>
-            <?= P::e($c[0]) ?></th>
-        <?php endforeach; ?>
-      </tr></thead>
-      <tbody>
-      <?php if (!$reporte['filas']): ?>
-        <tr><td colspan="<?= count($reporte['columnas']) ?>"
-            style="text-align:center;color:var(--lf-tinta-4);padding:32px">
-          No hay datos en este periodo.</td></tr>
-      <?php endif; ?>
-      <?php foreach (array_slice($reporte['filas'], 0, 50) as $f): ?>
-        <tr>
-          <?php foreach ($reporte['columnas'] as $k => $c):
-            $v = $f[$k] ?? null;
-            $txt = ($v === null || $v === '') ? '–'
-                 : ($c[1] === '$' ? D::pesos($v)
-                 : ($c[1] === 'n' ? number_format((float)$v)
-                 : ($c[1] === '%' ? number_format((float)$v * (abs($v) <= 1.5 ? 100 : 1), 1) . '%'
-                 : ($c[1] === 'f' ? date('d/m/Y', strtotime((string)$v)) : $v)))); ?>
-            <td data-label="<?= P::e($c[0]) ?>"
-                <?= in_array($c[1], ['$','n','%'], true) ? 'class="text-end lf-mono"' : '' ?>>
-              <?= P::e($txt) ?></td>
+  <?php foreach ($reportes as $k => $rep): ?>
+  <div data-panel="<?= $k ?>" <?= $tipo===$k ? '' : 'hidden' ?>>
+    <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+      <table class="table">
+        <thead><tr>
+          <?php foreach ($rep['columnas'] as $c): ?>
+            <th<?= $derecha($c[1]) ? ' class="text-end"' : '' ?>><?= P::e($c[0]) ?></th>
           <?php endforeach; ?>
-        </tr>
-      <?php endforeach; ?>
-      </tbody>
-      <?php if ($reporte['filas']): ?>
-      <tfoot><tr style="border-top:2px solid var(--lf-brand)">
-        <?php foreach ($reporte['columnas'] as $k => $c):
-          $v = $reporte['totales'][$k] ?? '';
-          $txt = ($v === null || $v === '') ? ''
-               : ($c[1] === '$' ? D::pesos($v)
-               : ($c[1] === 'n' ? number_format((float)$v)
-               : ($c[1] === '%' ? number_format((float)$v * 100, 1) . '%' : $v))); ?>
-          <td <?= in_array($c[1], ['$','n','%'], true) ? 'class="text-end lf-mono"' : '' ?>
-              style="font-weight:700"><?= P::e($txt) ?></td>
+        </tr></thead>
+        <tbody>
+        <?php if (!$rep['filas']): ?>
+          <tr><td colspan="<?= count($rep['columnas']) ?>"
+              style="text-align:center;color:var(--lf-tinta-4);padding:32px">
+            No hay datos en este periodo. Cambia las fechas de arriba.</td></tr>
+        <?php endif; ?>
+        <?php foreach (array_slice($rep['filas'], 0, 50) as $f): ?>
+          <tr>
+            <?php foreach ($rep['columnas'] as $j => $c): ?>
+              <td data-label="<?= P::e($c[0]) ?>"
+                  <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
+                <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+            <?php endforeach; ?>
+          </tr>
         <?php endforeach; ?>
-      </tr></tfoot>
-      <?php endif; ?>
-    </table>
-  </div>
+        </tbody>
+        <?php if ($rep['filas']): ?>
+        <tfoot><tr style="border-top:2px solid var(--lf-brand)">
+          <?php foreach ($rep['columnas'] as $j => $c): ?>
+            <td <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>
+                style="font-weight:700"><?= P::e($celda($rep['totales'][$j] ?? '', $c[1])) ?></td>
+          <?php endforeach; ?>
+        </tr></tfoot>
+        <?php endif; ?>
+      </table>
+    </div>
 
-  <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
-    <span style="flex:1;min-width:220px"><?= P::e($reporte['nota']) ?>
-      <?php if (count($reporte['filas']) > 50): ?>
-        <b>Se muestran 50 de <?= count($reporte['filas']) ?>; el Excel los trae todos.</b>
-      <?php endif; ?></span>
-    <a class="btn btn-secondary btn-sm" target="_blank"
-       href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$tipo]) ?>">
-      Imprimir este</a>
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="flex:1;min-width:220px"><?= P::e($rep['nota']) ?>
+        <?php if (count($rep['filas']) > 50): ?>
+          <b>Se muestran 50 de <?= count($rep['filas']) ?>; el Excel los trae todos.</b>
+        <?php endif; ?></span>
+      <a class="btn btn-secondary btn-sm" target="_blank"
+         href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$k]) ?>">
+        Imprimir este</a>
+    </div>
   </div>
+  <?php endforeach; ?>
 </section>
