@@ -819,9 +819,18 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 @media(max-width:940px){.lf-nav a.on::after{display:none}}
 .lf-pie{border-top:1px solid var(--lf-linea);padding:12px;margin:0 12px 10px}
 @media(max-width:940px){.lf-pie{display:none}}
-.lf-ucard{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--lf-r)}
-.lf-ucard b{font-size:13px;font-weight:600;display:block}
-.lf-ucard small{font-size:11px;color:var(--lf-tinta-4)}
+.lf-ucard{display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:var(--lf-r);
+  color:var(--lf-tinta)}
+.lf-ucard b{font-size:13px;font-weight:600;display:block;color:var(--lf-tinta);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ucard small{font-size:11px;color:var(--lf-tinta-4);display:block;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ucard:hover{background:var(--lf-vidrio)}
+/* El botón de salir: visible siempre, no solo al pasar el ratón. En una
+   pantalla táctil no hay "pasar el ratón", y salir es justo lo que
+   alguien busca cuando presta su computadora. */
+.lf-ucard .lf-btn-ghost{color:var(--lf-tinta-3);width:30px;height:30px}
+.lf-ucard .lf-btn-ghost:hover{color:var(--lf-rojo);background:var(--lf-rojo-soft)}
 
 .lf-top{min-height:var(--lf-head-h,64px);display:flex;align-items:center;padding:14px 30px;gap:14px;flex-wrap:wrap}
 @media(max-width:600px){.lf-top{padding:12px 16px}}
@@ -1676,9 +1685,14 @@ body.lf-centro{
 .lf-msg.err{background:rgba(207,68,54,.22);color:#ffd9d4}
 .lf-msg.amb{background:rgba(197,138,20,.22);color:#ffe9bd}
 
-.lf-pie{margin-top:22px;font-size:11px;text-align:center;
+/* `lf-pie-entrada` y no `lf-pie`: esa ya era el pie de la barra lateral,
+   donde van la foto, el nombre y el botón de salir. Al definirla aquí
+   —después, y con color blanco— los pintaba invisibles sobre el fondo
+   claro del menú. Un nombre repetido en una hoja de estilos no da error:
+   simplemente gana el último, y el síntoma aparece en otra pantalla. */
+.lf-pie-entrada{margin-top:22px;font-size:11px;text-align:center;
   color:color-mix(in srgb,#fff 52%,transparent)}
-.lf-pie a{color:inherit;text-decoration:underline}
+.lf-pie-entrada a{color:inherit;text-decoration:underline}
 
 @media(max-width:400px){
   .lf-tarjeta{padding:22px 20px 24px}
@@ -1737,3 +1751,73 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
 .lf-cobro-modo .m input{margin-top:2px;accent-color:var(--lf-brand);flex-shrink:0}
 .lf-cobro-modo b{display:block;font-size:12.5px;font-weight:600}
 .lf-cobro-modo small{display:block;font-size:10.5px;color:var(--lf-tinta-4);line-height:1.4}
+
+
+/* ══════════════════════════════════════════════════════
+   36 · IMÁGENES Y COLOR DE LA MARCA
+   Estas reglas se perdieron al rehacer la pantalla de
+   entrar: estaban dentro del bloque que se reemplazó.
+   Por eso dejaron de verse la foto del perfil, el logo de
+   la empresa y el selector de color, sin que nada fallara.
+   ══════════════════════════════════════════════════════ */
+
+/* Logo de la empresa, arriba del menú */
+.lf-marca img.g{object-fit:cover;border-radius:50%;box-shadow:0 4px 12px rgba(0,0,0,.14)}
+.lf-marca b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px}
+
+/* Foto de perfil en el avatar */
+.lf-av.con-foto{background-size:cover;background-position:center;color:transparent;
+  border:2px solid var(--lf-sup);box-shadow:0 0 0 1px var(--lf-linea)}
+
+/* Elegir una imagen, con vista previa */
+.lf-foto{display:flex;align-items:center;gap:14px}
+.lf-foto .prev{width:64px;height:64px;border-radius:50%;flex-shrink:0;
+  background:var(--lf-vidrio);background-size:cover;background-position:center;
+  border:1px solid var(--lf-linea);display:flex;align-items:center;justify-content:center;
+  color:var(--lf-tinta-4);font-size:22px;font-weight:700;font-family:var(--lf-mono)}
+.lf-foto .prev.cuadro{border-radius:var(--lf-r)}
+.lf-foto input[type=file]{font-size:12px;color:var(--lf-tinta-3)}
+.lf-foto input[type=file]::file-selector-button{
+  padding:8px 15px;margin-right:11px;border-radius:var(--lf-r-pill);
+  border:1px solid var(--lf-linea);background:var(--lf-sup);color:var(--lf-tinta-2);
+  font-family:var(--lf-font);font-size:12.5px;font-weight:600;cursor:pointer}
+.lf-foto input[type=file]::file-selector-button:hover{
+  border-color:var(--lf-brand);color:var(--lf-brand-2)}
+
+/* Color de la marca */
+.lf-colores{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.lf-color{width:34px;height:34px;border-radius:50%;cursor:pointer;
+  border:2px solid var(--lf-sup);box-shadow:0 0 0 1px var(--lf-linea);transition:transform .12s}
+.lf-color:hover{transform:scale(1.12)}
+.lf-color.on{box-shadow:0 0 0 2px var(--lf-tinta)}
+.lf-color-libre{width:34px;height:34px;padding:0;border:none;background:none;
+  cursor:pointer;border-radius:50%;overflow:hidden}
+.lf-color-libre::-webkit-color-swatch-wrapper{padding:0}
+.lf-color-libre::-webkit-color-swatch{border:2px solid var(--lf-sup);border-radius:50%}
+
+/* Miniatura del servicio en las tablas */
+.lf-mini-img{width:32px;height:32px;border-radius:9px;flex-shrink:0;
+  background:var(--lf-vidrio);background-size:cover;background-position:center;
+  display:flex;align-items:center;justify-content:center;color:var(--lf-tinta-4)}
+
+/* El registro usa estas dos, que vivían en el bloque de acceso viejo.
+   Sin ellas su botón de enviar salía como texto suelto. */
+.lf-aviso{display:flex;align-items:flex-start;gap:10px;padding:12px 14px;
+  border-radius:var(--lf-r);font-size:12.5px;line-height:1.5;margin-bottom:18px}
+.lf-aviso svg{flex-shrink:0;margin-top:1px}
+.lf-aviso.err{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-aviso.amb{background:var(--lf-amb-soft);color:var(--lf-amb)}
+
+.lf-entrar{width:100%;padding:13px;border:none;border-radius:var(--lf-r-pill);
+  background:var(--lf-brand);color:#fff;font-family:var(--lf-font);font-size:14.5px;
+  font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:background .15s,transform .08s,box-shadow .15s}
+.lf-entrar:hover:not(:disabled){background:var(--lf-brand-2);
+  box-shadow:0 6px 18px rgba(39,174,96,.28)}
+.lf-entrar:active:not(:disabled){transform:translateY(1px)}
+.lf-entrar:disabled{opacity:.45;cursor:not-allowed}
+.lf-entrar .giro{display:none;width:16px;height:16px;flex-shrink:0;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;
+  animation:lf-giro .7s linear infinite}
+.lf-entrar.cargando .giro{display:block}
+.lf-entrar.cargando{cursor:progress}

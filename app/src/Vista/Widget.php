@@ -275,6 +275,9 @@ final class Widget
             'buscar' => '<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
             'mas'    => '<path d="M12 5v14M5 12h14"/>',
             'baja'   => '<path d="M12 3v12M7.5 10.5 12 15l4.5-4.5M4 20h16"/>',
+            // Puerta con flecha saliendo. Una flecha sola se confunde con
+            // "siguiente", y ahí lo que se hace es cerrar la sesión.
+            'salir'  => '<path d="M15 4h3.5A1.5 1.5 0 0 1 20 5.5v13a1.5 1.5 0 0 1-1.5 1.5H15"/><path d="M10 16.5 14.5 12 10 7.5M14.5 12H3.5"/>',
             'luna'   => '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
             'sol'    => '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
         ];

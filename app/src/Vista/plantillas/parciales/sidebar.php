@@ -154,14 +154,16 @@ foreach ($menu as $m) {
   </nav>
 
   <div class="lf-pie">
+    <?php $foto = $_SESSION['lf_foto'] ?? ''; ?>
     <div class="lf-ucard">
-      <?php $foto = $_SESSION['lf_foto'] ?? ''; ?>
       <a href="/cuenta" class="lf-av<?= $foto ? ' con-foto' : '' ?>" title="Mi cuenta"
-         style="text-decoration:none<?= $foto ? ";background-image:url('" . P::e($foto) . "')" : '' ?>">
+         <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>>
         <?= $foto ? '' : P::e($ini) ?></a>
-      <span style="flex:1;min-width:0"><b><?= P::e($u) ?></b><small><?= P::e($rol) ?></small></span>
-      <a href="/salir" class="lf-btn-ghost" title="Cerrar sesión" style="flex-shrink:0">
-        <?= W::icono('baja','15px') ?></a>
+      <a href="/cuenta" style="flex:1;min-width:0;text-decoration:none;color:inherit"
+         title="Mi cuenta">
+        <b><?= P::e($u) ?></b><small><?= P::e($rol) ?></small></a>
+      <a href="/salir" class="lf-btn-ghost" title="Cerrar sesión" aria-label="Cerrar sesión">
+        <?= W::icono('salir','15px') ?></a>
     </div>
   </div>
 </aside>

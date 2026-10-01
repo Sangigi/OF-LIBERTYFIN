@@ -91,7 +91,7 @@ $token = $_SESSION['lf_token'];
     </form>
   </div>
 
-  <p class="lf-pie">
+  <p class="lf-pie-entrada">
     © <?= date('Y') ?> Libertyfin · Todos los derechos reservados
   </p>
 </main>

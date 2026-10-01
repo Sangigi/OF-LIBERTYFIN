@@ -39,5 +39,5 @@ use LibertyFin\Vista\Plantilla as P;
     </a>
   </div>
 
-  <p class="lf-pie">© <?= date('Y') ?> Libertyfin · Todos los derechos reservados</p>
+  <p class="lf-pie-entrada">© <?= date('Y') ?> Libertyfin · Todos los derechos reservados</p>
 </main>
