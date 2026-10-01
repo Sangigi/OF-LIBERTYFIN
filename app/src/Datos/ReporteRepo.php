@@ -344,6 +344,19 @@ final class ReporteRepo extends Repo
     public function detallePorLinea($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+
+        // El especialista llega con la migracion 10, que se aplica al
+        // ENTRAR. Quien ya tenia sesion abierta al actualizar todavia
+        // no la tiene, y el reporte reventaba con 'Unknown column'.
+        //
+        // Un reporte no puede depender de que alguien haya vuelto a
+        // entrar: si la columna no esta, se devuelve 'Sin asignar' y
+        // todo lo demas sigue funcionando.
+        $hayEsp = $this->hayColumna('ventas', 'especialista_nombre');
+        $esp = $hayEsp
+             ? "COALESCE(NULLIF(TRIM(v.especialista_nombre),''), 'Sin asignar')"
+             : "'Sin asignar'";
+
         return $this->todos("
             SELECT v.codigo_venta                          AS folio,
                    v.fecha,
@@ -369,8 +382,7 @@ final class ReporteRepo extends Repo
                    END                                     AS tipo_persona,
                    COALESCE(p.nombre, 'Sin producto')      AS producto,
                    COALESCE(NULLIF(TRIM(p.descripcion),''), '')  AS producto_desc,
-                   COALESCE(NULLIF(TRIM(v.especialista_nombre),''), 'Sin asignar')
-                                                           AS especialista,
+                   {$esp}                                  AS especialista,
                    COALESCE(NULLIF(TRIM(v.descripcion),''), '')  AS nota_venta,
                    d.cantidad,
                    d.precio_unitario,
@@ -401,5 +413,25 @@ final class ReporteRepo extends Repo
             WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             ORDER BY area_servicio, tipo_persona, v.fecha DESC, v.codigo_venta",
             [$a, $b]);
+    }
+
+    /**
+     * Existe esa columna?
+     *
+     * Se consulta una vez por peticion y se recuerda: preguntarlo en
+     * cada reporte seria una consulta mas por cada tabla.
+     */
+    protected function hayColumna($tabla, $columna)
+    {
+        static $visto = [];
+        $k = $tabla . '.' . $columna;
+        if (isset($visto[$k])) return $visto[$k];
+        try {
+            $visto[$k] = (bool)$this->valor("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?",
+                [$tabla, $columna]);
+        } catch (\Throwable $e) { $visto[$k] = false; }
+        return $visto[$k];
     }
 }

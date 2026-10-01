@@ -147,6 +147,11 @@ final class Autenticar
             //
             // En una base al día cuesta una consulta.
             if (!Migraciones::alDia($db)) Migraciones::aplicar($db);
+            // Se recuerda con qué versión de CÓDIGO se entró. Si después
+            // se sube una actualización, quien ya tenía sesión abierta
+            // seguiría usando columnas que su base no tiene. Guardarlo
+            // permite notarlo sin una consulta por petición.
+            $_SESSION['lf_esquema'] = Migraciones::VERSION;
 
             $cfg = new \LibertyFin\Datos\ConfigRepo($db);
             $color = (string)$cfg->valorDe('marca.color', '');

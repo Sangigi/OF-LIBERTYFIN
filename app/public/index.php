@@ -273,6 +273,27 @@ $hallazgo = $r->despachar($_SERVER['REQUEST_METHOD'], $_SERVER['REQUEST_URI']);
 
 // La bitácora escribe en la base de la empresa de la sesión. Se fija una
 // vez aquí para que ningún controlador tenga que acordarse.
+// SI EL CÓDIGO AVANZÓ MIENTRAS HABÍA SESIONES ABIERTAS.
+//
+// Las migraciones se aplican al entrar. Quien ya estaba dentro cuando
+// se subió una actualización sigue con la base vieja, y una pantalla
+// que usa una columna nueva revienta con "Unknown column" sin decir
+// qué hacer.
+//
+// Esto lo nota comparando con lo que se guardó al entrar: cero
+// consultas de más en el caso normal, y se arregla solo en cuanto el
+// código cambia.
+if (!empty($_SESSION['empresa_db'])
+    && ($_SESSION['lf_esquema'] ?? 0) < \LibertyFin\Servicio\Migraciones::VERSION) {
+    try {
+        \LibertyFin\Servicio\Migraciones::aplicar(
+            \LibertyFin\Datos\Conexion::de($_SESSION['empresa_db']));
+        $_SESSION['lf_esquema'] = \LibertyFin\Servicio\Migraciones::VERSION;
+    } catch (\Throwable $e) {
+        error_log('[LibertyFin] migración en caliente: ' . $e->getMessage());
+    }
+}
+
 // Un usuario de plataforma no tiene base de empresa: su bitácora se
 // escribe en la base de la empresa sobre la que actúa, no aquí.
 if (!empty($_SESSION['empresa_db'])) {

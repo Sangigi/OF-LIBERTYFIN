@@ -128,85 +128,114 @@ final class Libro
 
     // ══════════════════════════════════════════════════════════
 
+    /**
+     * El XML de una hoja.
+     *
+     * EL ORDEN DE LOS ELEMENTOS NO ES NEGOCIABLE
+     *
+     * El esquema de Excel exige: sheetViews, sheetFormatPr, cols,
+     * sheetData, autoFilter. En ese orden exacto.
+     *
+     * Antes se escribia `cols` y despues se insertaba `sheetViews`
+     * delante de `sheetData` con un reemplazo, lo que dejaba cols antes
+     * de sheetViews. Un lector permisivo lo abre igual; Excel dice que
+     * el archivo esta danado y no lo abre.
+     *
+     * Y `cols` vacio tampoco vale: si no hay columnas, se omite.
+     */
     private function hojaXml(array $h)
     {
         $cols = $h['columnas'];
         $n = count($cols);
-        $x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-           . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
 
-        // Anchos
-        $x .= '<cols>';
-        foreach ($cols as $i => $c) {
-            $x .= '<col min="' . ($i+1) . '" max="' . ($i+1) . '" width="'
-                . (float)($c[2] ?? 16) . '" customWidth="1"/>';
-        }
-        $x .= '</cols><sheetData>';
-
+        $filas = '';
         $fila = 1;
         $titulo = $h['extras']['titulo'] ?? '';
         $sub    = $h['extras']['subtitulo'] ?? '';
 
         if ($titulo !== '') {
-            $x .= '<row r="' . $fila . '" ht="24" customHeight="1">'
-                . $this->celda('A' . $fila, $titulo, self::TEXTO, 5) . '</row>';
+            $filas .= '<row r="' . $fila . '" ht="24" customHeight="1">'
+                   . $this->celda('A' . $fila, $titulo, self::TEXTO, 5) . '</row>';
             $fila++;
         }
         if ($sub !== '') {
-            $x .= '<row r="' . $fila . '" ht="16" customHeight="1">'
-                . $this->celda('A' . $fila, $sub, self::TEXTO, 6) . '</row>';
+            $filas .= '<row r="' . $fila . '" ht="16" customHeight="1">'
+                   . $this->celda('A' . $fila, $sub, self::TEXTO, 6) . '</row>';
             $fila++;
         }
-        if ($titulo !== '' || $sub !== '') { $fila++; }   // un renglón en blanco
+        if ($titulo !== '' || $sub !== '') $fila++;   // un renglon en blanco
 
-        // Encabezados
         $filaEnc = $fila;
-        $x .= '<row r="' . $fila . '" ht="22" customHeight="1">';
-        foreach ($cols as $i => $c) {
-            $x .= $this->celda($this->col($i) . $fila, $c[0], self::TEXTO, 1);
+        if ($n) {
+            $filas .= '<row r="' . $fila . '" ht="22" customHeight="1">';
+            foreach ($cols as $i => $c) {
+                $filas .= $this->celda($this->col($i) . $fila, $c[0], self::TEXTO, 1);
+            }
+            $filas .= '</row>';
+            $fila++;
         }
-        $x .= '</row>';
-        $fila++;
 
-        // Datos
         foreach ($h['filas'] as $f) {
-            $x .= '<row r="' . $fila . '">';
+            $filas .= '<row r="' . $fila . '">';
             foreach ($cols as $i => $c) {
                 $v = $f[$i] ?? null;
                 if ($v === null || $v === '') continue;
-                $x .= $this->celda($this->col($i) . $fila, $v, $c[1] ?? self::TEXTO,
-                                   $this->estiloDe($c[1] ?? self::TEXTO));
+                $filas .= $this->celda($this->col($i) . $fila, $v, $c[1] ?? self::TEXTO,
+                                       $this->estiloDe($c[1] ?? self::TEXTO));
             }
-            $x .= '</row>';
+            $filas .= '</row>';
             $fila++;
         }
 
-        // Totales
         if (!empty($h['extras']['totales'])) {
-            $x .= '<row r="' . $fila . '" ht="20" customHeight="1">';
+            $hay = false;
+            $r = '<row r="' . $fila . '" ht="20" customHeight="1">';
             foreach ($cols as $i => $c) {
                 $v = $h['extras']['totales'][$i] ?? null;
                 if ($v === null || $v === '') continue;
                 $tipo = $c[1] ?? self::TEXTO;
-                $x .= $this->celda($this->col($i) . $fila, $v, $tipo,
+                $r .= $this->celda($this->col($i) . $fila, $v, $tipo,
                                    $tipo === self::MONEDA ? 7 : ($tipo === self::NUMERO ? 8 : 4));
+                $hay = true;
             }
-            $x .= '</row>';
-            $fila++;
+            if ($hay) { $filas .= $r . '</row>'; $fila++; }
         }
 
-        $x .= '</sheetData>';
+        $ultima = max($fila - 1, 1);
 
-        // Congelar bajo los encabezados y dejar filtros
-        $x .= '<autoFilter ref="A' . $filaEnc . ':' . $this->col($n - 1) . ($fila - 1) . '"/>';
-        $x .= '</worksheet>';
+        $x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+           . '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">';
 
-        // El panel congelado va ANTES de sheetData en el esquema
-        return str_replace('<sheetData>',
-            '<sheetViews><sheetView workbookViewId="0" showGridLines="0">'
-          . '<pane ySplit="' . $filaEnc . '" topLeftCell="A' . ($filaEnc + 1)
-          . '" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>'
-          . '<sheetFormatPr defaultRowHeight="15"/><sheetData>', $x);
+        // 1 · sheetViews
+        $x .= '<sheetViews><sheetView workbookViewId="0" showGridLines="0">';
+        if ($n) {
+            $x .= '<pane ySplit="' . $filaEnc . '" topLeftCell="A' . ($filaEnc + 1)
+                . '" activePane="bottomLeft" state="frozen"/>';
+        }
+        $x .= '</sheetView></sheetViews>';
+
+        // 2 · sheetFormatPr
+        $x .= '<sheetFormatPr defaultRowHeight="15"/>';
+
+        // 3 · cols, solo si hay
+        if ($n) {
+            $x .= '<cols>';
+            foreach ($cols as $i => $c) {
+                $x .= '<col min="' . ($i + 1) . '" max="' . ($i + 1) . '" width="'
+                    . (float)($c[2] ?? 16) . '" customWidth="1"/>';
+            }
+            $x .= '</cols>';
+        }
+
+        // 4 · sheetData
+        $x .= '<sheetData>' . $filas . '</sheetData>';
+
+        // 5 · autoFilter, solo si hay encabezados y al menos un renglon
+        if ($n && $ultima > $filaEnc) {
+            $x .= '<autoFilter ref="A' . $filaEnc . ':' . $this->col($n - 1) . $ultima . '"/>';
+        }
+
+        return $x . '</worksheet>';
     }
 
     private function estiloDe($tipo)
