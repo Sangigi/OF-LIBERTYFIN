@@ -156,34 +156,35 @@ $token = $_SESSION['lf_token'];
     </div>
 
     <?php
-    /* UN SOLO SELECTOR, NO DOS PREGUNTAS.
-       Antes había que elegir el método de pago y además marcar si iba a
-       pagar en línea. Son la misma decisión partida en dos: quien elige
-       "tarjeta" ya dijo todo lo que hacía falta. */
+    /* UN MÉTODO, UN BOTÓN, UN MODAL.
+       Se elige cómo paga, se cobra, y sale lo que hace falta: el código
+       para la tarjeta, la CLABE para SPEI, el comprobante para la
+       tienda. Sin recargar y sin preguntar dos veces lo mismo. */
     $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
     $opciones = [];
     foreach ($metodos as $k) {
-        $opciones[$k] = ['rotulo' => ($rot[$k] ?? $k) . ' · en el mostrador',
-                         'nota'   => 'Ya te pagó', 'liga' => ''];
+        $opciones[] = ['id'=>$k, 'rotulo'=>$rot[$k] ?? ucfirst($k),
+                       'icono'=>$k==='efectivo'?'caja':'venta', 'linea'=>''];
     }
     if ($ligas) {
-        $opciones['_tarjeta'] = ['rotulo' => 'Tarjeta en línea',
-            'nota' => 'Sale un código para que pase su tarjeta', 'liga' => 'tarjeta'];
-        $opciones['_spei']    = ['rotulo' => 'Transferencia SPEI',
-            'nota' => 'Sale una CLABE y el pago se detecta solo', 'liga' => 'spei'];
-        $opciones['_tienda']  = ['rotulo' => 'Efectivo en tienda',
-            'nota' => 'Sale un comprobante con código de barras', 'liga' => 'efectivo'];
+        $opciones[] = ['id'=>'_tarjeta','rotulo'=>'Tarjeta','icono'=>'cobro','linea'=>'tarjeta'];
+        $opciones[] = ['id'=>'_spei','rotulo'=>'SPEI','icono'=>'venta','linea'=>'spei'];
+        $opciones[] = ['id'=>'_tienda','rotulo'=>'Efectivo (tienda)','icono'=>'bolsa','linea'=>'efectivo'];
     }
     ?>
-    <div class="lf-cobro-como">
-      <label class="form-label" for="comoPaga">¿Cómo paga?</label>
-      <select class="form-select" name="como_paga" id="comoPaga">
-        <?php foreach ($opciones as $k => $o): ?>
-          <option value="<?= P::e($k) ?>" data-liga="<?= P::e($o['liga']) ?>">
-            <?= P::e($o['rotulo']) ?></option>
+    <div class="lf-metodos">
+      <label class="form-label">¿Cómo paga?</label>
+      <div class="ops">
+        <?php foreach ($opciones as $n => $o): ?>
+          <button type="button" class="m<?= $n === 0 ? ' on' : '' ?>"
+                  data-metodo="<?= P::e($o['id']) ?>" data-linea="<?= P::e($o['linea']) ?>">
+            <?= W::icono($o['icono'],'17px') ?>
+            <span><?= P::e($o['rotulo']) ?></span>
+          </button>
         <?php endforeach; ?>
-      </select>
-      <p class="nota" id="notaPago"></p>
+      </div>
+      <input type="hidden" name="como_paga" id="comoPaga"
+             value="<?= P::e($opciones[0]['id'] ?? 'efectivo') ?>">
     </div>
 
 
@@ -246,8 +247,8 @@ $token = $_SESSION['lf_token'];
       ? 'Se liquida completa. La comisión se libera toda.'
       : 'Queda un saldo de <b class="lf-mono" style="color:var(--lf-amb)">' + pesos(saldo)
         + '</b>. La comisión se libera conforme el cliente pague.';
-    var sel = $('comoPaga');
-    var enLinea = sel && sel.options[sel.selectedIndex].dataset.liga;
+    var act = document.querySelector('.lf-metodos .m.on');
+    var enLinea = act && act.dataset.linea;
     $('btnTexto').textContent = enLinea
       ? 'Generar el cobro'
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
@@ -279,24 +280,19 @@ $token = $_SESSION['lf_token'];
     pinta();
   })();
 
-  /* El selector cambia lo que dice el botón: con el mismo texto, el
-     cajero cree que ya cobró cuando en realidad el cliente se va a
-     pagar a otro lado. */
+  /* Los botones de método. El texto del botón de cobrar cambia según
+     el elegido: con el mismo texto, el cajero cree que ya cobró cuando
+     el cliente se va a pagar a otro lado. */
   (function(){
-    var sel = $('comoPaga'), nota = $('notaPago');
-    if (!sel) return;
-    var notas = {};
-    <?php foreach ($opciones as $k => $o): ?>
-    notas[<?= json_encode($k) ?>] = <?= json_encode($o['nota']) ?>;
-    <?php endforeach; ?>
-    function ver(){
-      var o = sel.options[sel.selectedIndex];
-      nota.textContent = notas[sel.value] || '';
-      nota.classList.toggle('linea', !!o.dataset.liga);
-      calcular();
-    }
-    sel.addEventListener('change', ver);
-    ver();
+    document.querySelectorAll('.lf-metodos .m').forEach(function(b){
+      b.addEventListener('click', function(){
+        document.querySelectorAll('.lf-metodos .m').forEach(function(x){
+          x.classList.remove('on'); });
+        b.classList.add('on');
+        $('comoPaga').value = b.dataset.metodo;
+        calcular();
+      });
+    });
   })();
 
   document.querySelectorAll('.lf-serv').forEach(function(b){
@@ -366,5 +362,186 @@ $token = $_SESSION['lf_token'];
   });
 
   pintar();
+})();
+</script>
+
+<?php /* ═══════════ EL MODAL DE COBRO ═══════════ */ ?>
+<div class="lf-modal" id="modalCobro" hidden>
+  <div class="caja" role="dialog" aria-modal="true" aria-labelledby="mTitulo">
+    <header>
+      <div>
+        <h2 id="mTitulo">Cobro</h2>
+        <p id="mSub"></p>
+      </div>
+      <button type="button" class="cerrar" id="mCerrar" aria-label="Cerrar">&times;</button>
+    </header>
+    <div class="cuerpo" id="mCuerpo"></div>
+    <footer id="mPie"></footer>
+  </div>
+</div>
+
+<script>
+(function () {
+  var modal = document.getElementById('modalCobro');
+  if (!modal) return;
+  var cuerpo = document.getElementById('mCuerpo'),
+      titulo = document.getElementById('mTitulo'),
+      sub    = document.getElementById('mSub'),
+      pie    = document.getElementById('mPie'),
+      form   = document.getElementById('formCobro') || document.querySelector('form.lf-pos, form'),
+      reloj  = null;
+
+  function abrir(){ modal.hidden = false; document.body.classList.add('lf-modal-abierto'); }
+  function cerrar(){
+    modal.hidden = true;
+    document.body.classList.remove('lf-modal-abierto');
+    if (reloj) { clearInterval(reloj); reloj = null; }
+  }
+  document.getElementById('mCerrar').addEventListener('click', cerrar);
+  modal.addEventListener('click', function(e){ if (e.target === modal) cerrar(); });
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape' && !modal.hidden) cerrar();
+  });
+
+  function esc(t){ var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+  function money(n){ return '$' + (+n).toLocaleString('es-MX', {minimumFractionDigits:2, maximumFractionDigits:2}); }
+
+  function copiable(valor, id, grande){
+    return '<div class="dato' + (grande ? ' grande' : '') + '">' + esc(valor) + '</div>'
+      + '<div class="copiar"><input readonly id="' + id + '" value="' + esc(valor) + '">'
+      + '<button type="button" class="btn btn-secondary btn-sm" data-copia="' + id + '">Copiar</button></div>';
+  }
+
+  /* Pregunta cada 4 segundos si ya pagó. Así el cajero ve el aviso en el
+     momento en que entra el dinero, sin recargar ni ir a otra pantalla. */
+  function vigilar(id){
+    var espera = document.getElementById('mEspera');
+    if (reloj) clearInterval(reloj);
+    reloj = setInterval(function(){
+      fetch('/caja/estado/' + id, { headers: {'Accept':'application/json'}, credentials:'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d || !d.pagado) return;
+          clearInterval(reloj); reloj = null;
+          if (espera) {
+            espera.className = 'espera ok';
+            espera.innerHTML = d.estado === 'por_aprobar'
+              ? '<b>El cliente ya pagó.</b> Falta aprobarlo para que entre al corte.'
+              : '<b>¡Pagado!</b> El abono ya quedó aplicado.';
+          }
+        })
+        .catch(function(){ /* si falla la red se vuelve a intentar solo */ });
+    }, 4000);
+  }
+
+  function pintar(d){
+    var l = d.liga || {}, modo = d.modo;
+
+    if (modo === 'cobrado') {
+      titulo.textContent = 'Cobrado';
+      sub.textContent = 'Venta ' + (d.venta ? d.venta.codigo : '');
+      cuerpo.innerHTML = '<p class="ok-grande">' + money(d.venta.cobrado) + '</p>'
+        + '<p class="msg">Listo. La venta quedó registrada.</p>';
+      pie.innerHTML = '<a class="btn btn-secondary" href="/ventas/' + d.venta.id
+        + '/ticket?auto=1" target="_blank">Imprimir ticket</a>'
+        + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
+      return;
+    }
+
+    sub.textContent = 'Venta ' + (d.venta ? d.venta.codigo : '') + ' · ' + money(l.monto);
+
+    if (modo === 'tarjeta') {
+      titulo.textContent = 'Pago con tarjeta';
+      cuerpo.innerHTML =
+        '<p class="msg">Que escanee el código con su teléfono, o ábrele la página '
+        + 'para que capture los datos de su tarjeta.</p>'
+        + '<div class="qr" id="mQr"></div>'
+        + copiable(l.liga, 'mLiga')
+        + '<div class="espera" id="mEspera"><span class="giro"></span>'
+        + 'Esperando a que pague. Esto se actualiza solo.</div>';
+      cargarQr(l.liga);
+      pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.liga)
+        + '" target="_blank" rel="noopener">Abrir la página</a>'
+        + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
+      vigilar(l.id);
+
+    } else if (modo === 'spei') {
+      titulo.textContent = 'Transferencia SPEI';
+      cuerpo.innerHTML =
+        '<p class="msg">Que transfiera desde su banco a esta CLABE, por '
+        + '<b>' + money(l.monto) + '</b> exactos.</p>'
+        + copiable(l.clabe, 'mClabe', true)
+        + '<p class="aviso">Una cantidad distinta no se asocia sola y hay que buscarla a mano.</p>'
+        + '<div class="espera" id="mEspera"><span class="giro"></span>'
+        + 'Esperando el depósito. En cuanto llegue, aparece aquí.</div>';
+      pie.innerHTML = '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
+      vigilar(l.id);
+
+    } else if (modo === 'efectivo') {
+      titulo.textContent = 'Pago en tienda';
+      cuerpo.innerHTML =
+        '<p class="msg">Dale el comprobante. Puede pagar en OXXO y tiendas participantes '
+        + 'con este código.</p>'
+        + copiable(l.ref, 'mRef', true)
+        + '<p class="aviso">El comprobante trae el código de barras, los pasos y la lista '
+        + 'de tiendas. Imprímelo o mándaselo.</p>'
+        + '<div class="espera" id="mEspera"><span class="giro"></span>'
+        + 'El pago en tienda puede tardar unas horas en reflejarse.</div>';
+      pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.doc)
+        + '" target="_blank">Ver el comprobante</a>'
+        + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
+      vigilar(l.id);
+    }
+  }
+
+  /* El QR se pide al servidor, que ya sabe dibujarlo. Meter un generador
+     en el navegador sería repetir trescientas líneas que ya existen. */
+  function cargarQr(url){
+    var c = document.getElementById('mQr');
+    if (!c) return;
+    c.innerHTML = '<span class="giro"></span>';
+    fetch('/qr?t=' + encodeURIComponent(url), { credentials:'same-origin' })
+      .then(function(r){ return r.text(); })
+      .then(function(svg){ c.innerHTML = svg; })
+      .catch(function(){ c.innerHTML = ''; });
+  }
+
+  document.addEventListener('click', function(e){
+    var c = e.target.closest('[data-copia]');
+    if (c) {
+      var i = document.getElementById(c.dataset.copia);
+      navigator.clipboard.writeText(i.value).then(function(){
+        var t = c.textContent; c.textContent = 'Copiado';
+        setTimeout(function(){ c.textContent = t; }, 1600);
+      }).catch(function(){ i.select(); });
+      return;
+    }
+    if (e.target.closest('[data-seguir]')) { location.href = '/caja'; }
+  });
+
+  /* El envío ya no recarga: se manda, se recibe y se abre el modal. */
+  if (form) form.addEventListener('submit', function(ev){
+    ev.preventDefault();
+    var btn = document.getElementById('btnCobrar');
+    if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
+
+    var datos = new FormData(form);
+    datos.append('json', '1');
+    fetch(form.action, { method:'POST', body:datos,
+                         headers:{'Accept':'application/json'}, credentials:'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
+        if (!d.ok) { alert(d.error || 'No se pudo cobrar.'); return; }
+        pintar(d);
+        abrir();
+      })
+      .catch(function(){
+        if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
+        /* Si algo falla se manda como siempre, para no dejar al cajero
+           sin poder cobrar porque el JavaScript tuvo un mal día. */
+        form.submit();
+      });
+  });
 })();
 </script>

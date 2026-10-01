@@ -2,6 +2,7 @@
 namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\AjustesRepo;
+use LibertyFin\Datos\ConfigRepo;
 use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\UsuarioRepo;
 use LibertyFin\Http\Peticion;
@@ -51,7 +52,9 @@ final class AjustesControlador
             $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
         }
         if ($p === 'empresa') {
-            $datos['aprobacion'] = $repo->modoAprobacion();
+            // Va en ConfigRepo, no en AjustesRepo: son repositorios
+            // distintos y `$repo` aqui es el de ajustes.
+            $datos['aprobacion'] = (new ConfigRepo($db))->modoAprobacion();
             $datos['modosAprobacion'] = \LibertyFin\Datos\ConfigRepo::APROBACION;
             $datos['hayLigas'] = \LibertyFin\Servicio\Integraciones::activa('spei');
             $principal = Conexion::de($GLOBALS['lf_bd_principal']);

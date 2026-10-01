@@ -80,6 +80,8 @@ $r->post('/ventas/{id}/comision',        ['LibertyFin\Controlador\VentasControla
 $r->post('/ventas/{id}/quitar-comision', ['LibertyFin\Controlador\VentasControlador', 'quitarComision']);
 $r->get('/caja',          ['LibertyFin\Controlador\CajaControlador', 'index']);
 $r->get('/caja/clientes', ['LibertyFin\Controlador\CajaControlador', 'clientes']);
+$r->get('/qr',              ['LibertyFin\Controlador\CajaControlador', 'qr']);
+$r->get('/caja/estado/{id}', ['LibertyFin\Controlador\CajaControlador', 'estado']);
 $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
 $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador', 'index']);
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
@@ -187,6 +189,8 @@ $permisos = [
   '/caja'                   => 'cobrar',
   '/caja/clientes'          => 'cobrar',
   '/caja/cobrar'            => 'cobrar',
+  '/caja/estado/{id}'       => 'cobrar',
+  '/qr'                     => 'cobrar',
   '/cobranza'               => 'ver.cobranza',
   '/corte'                  => 'ver.corte',
   '/corte/abrir'            => 'abrir.caja',

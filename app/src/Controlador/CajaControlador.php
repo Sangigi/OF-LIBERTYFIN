@@ -181,6 +181,11 @@ final class CajaControlador
             'referencia' => $semilla, 'id' => $semilla,
         ]);
         if (!$g) {
+            if ($this->pideJson()) {
+                $this->json(['ok' => false, 'venta_ok' => true,
+                    'error' => 'La venta ' . $venta['codigo_venta'] . ' quedó registrada con '
+                             . 'saldo, pero el cobro no se generó: ' . $api->error()], 200);
+            }
             // La venta SÍ quedó. Se dice qué pasó y dónde seguir, en vez
             // de dejar creer que no se registró nada.
             $this->volver('Venta ' . $venta['codigo_venta'] . ' registrada con saldo, pero '
@@ -201,7 +206,22 @@ final class CajaControlador
             // Se vuelve a CAJA, no a Ligas. El cajero tiene al cliente
             // enfrente: mandarlo a otra pantalla lo obliga a volver a
             // empezar para la siguiente venta.
-            $_SESSION['lf_liga'] = (new \LibertyFin\Datos\LigaRepo($db))->porId($id);
+            $liga = (new \LibertyFin\Datos\LigaRepo($db))->porId($id);
+
+            if ($this->pideJson()) {
+                $this->json(['ok' => true, 'modo' => $forma, 'liga' => [
+                    'id'    => (int)$liga['id'],
+                    'monto' => (float)$liga['monto'],
+                    'liga'  => $liga['liga'],
+                    'clabe' => $liga['clabe'],
+                    'barras'=> $liga['barras'],
+                    'ref'   => $liga['referencia'],
+                    'vence' => $liga['vence'],
+                    'doc'   => '/ligas/' . (int)$liga['id'] . '/documento',
+                ], 'venta' => ['codigo' => $venta['codigo_venta']]]);
+            }
+
+            $_SESSION['lf_liga'] = $liga;
             $_SESSION['lf_aviso'] = ['texto' =>
                 'Venta ' . $venta['codigo_venta'] . ' registrada. Muéstrale el código o '
                 . 'mándale la liga; el abono entra cuando pague.', 'tipo' => 'ok'];
@@ -248,5 +268,109 @@ final class CajaControlador
 
         $validos = (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles();
         return in_array($como, $validos, true) ? $como : 'efectivo';
+    }
+
+    /** ¿La petición espera JSON en vez de una página? */
+    private function pideJson()
+    {
+        return !empty($_POST['json'])
+            || (isset($_SERVER['HTTP_ACCEPT'])
+                && strpos($_SERVER['HTTP_ACCEPT'], 'application/json') !== false);
+    }
+
+    private function json(array $d, $codigo = 200)
+    {
+        http_response_code($codigo);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($d, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    /**
+     * ¿Ya pago? La caja lo pregunta cada pocos segundos.
+     *
+     * Asi el cajero ve el aviso en el momento en que entra el dinero,
+     * sin recargar ni ir a otra pantalla. Es lo que hace que SPEI se
+     * sienta como un cobro y no como una promesa.
+     */
+    public function estado($id)
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $l  = (new \LibertyFin\Datos\LigaRepo($db))->porId($id);
+        if (!$l) $this->json(['ok' => false, 'error' => 'No existe'], 404);
+
+        if ($l['estado'] === 'pagada') {
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'pagada']);
+        }
+        if ($l['estado'] === 'por_aprobar') {
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'por_aprobar']);
+        }
+
+        // Se le pregunta al proveedor, pero no en cada vuelta: cada diez
+        // segundos basta y evita castigar su servicio.
+        $hace = $l['revisado_en'] ? (time() - strtotime($l['revisado_en'])) : 999;
+        if ($hace >= 10) {
+            $cfg = \LibertyFin\Servicio\Integraciones::de('spei');
+            if ($cfg) {
+                ob_start();
+                $api = new \LibertyFin\Servicio\LigaPago($cfg);
+                $r = $api->estado($l['referencia']);
+                ob_end_clean();
+
+                $repo = new \LibertyFin\Datos\LigaRepo($db);
+                if ($r && !empty($r['pagado'])) {
+                    $exige = (new \LibertyFin\Datos\ConfigRepo($db))->exigeAprobacion();
+                    if ($exige) {
+                        $repo->marcarRevisada($l['id'], 'por_aprobar');
+                        $this->json(['ok' => true, 'pagado' => true, 'estado' => 'por_aprobar']);
+                    }
+                    $pagoId = null;
+                    if ($l['venta_id']) {
+                        $res = (new \LibertyFin\Servicio\RegistrarPago($db))->abonar((int)$l['venta_id'], [
+                            'monto' => $l['monto'],
+                            'metodo' => $l['metodo'] === 'tarjeta' ? 'tarjeta' : 'transferencia',
+                            'referencia' => 'Liga ' . $l['referencia'],
+                            'fecha' => date('Y-m-d'),
+                            'usuario_id' => $_SESSION['usuario_id'] ?? null,
+                        ]);
+                        $pagoId = $res['pago_id'] ?? null;
+                    }
+                    $repo->marcarPagada($l['id'], $pagoId);
+                    \LibertyFin\Servicio\Auditoria::anota('pago.registrar',
+                        'cobro en linea ' . $l['referencia'], null,
+                        \LibertyFin\Dominio\Dinero::pesos($l['monto']));
+                    $this->json(['ok' => true, 'pagado' => true, 'estado' => 'pagada']);
+                }
+                $repo->marcarRevisada($l['id']);
+            }
+        }
+        $this->json(['ok' => true, 'pagado' => false, 'estado' => 'pendiente']);
+    }
+
+    /**
+     * Dibuja un QR. Lo pide el modal de cobro.
+     *
+     * Se hace aqui y no en el navegador porque el generador ya existe en
+     * el servidor: meter otro en JavaScript seria repetir trescientas
+     * lineas que ya estan escritas y probadas.
+     */
+    public function qr()
+    {
+        $t = (string)(\LibertyFin\Http\Peticion::texto('t', ''));
+        // Solo direcciones nuestras o del proveedor de pago. Dibujar
+        // cualquier texto convertiria esto en un generador abierto que
+        // alguien podria usar para que la pagina sirva un QR a donde el
+        // quiera.
+        if ($t === '' || !preg_match('~^https?://~', $t) || mb_strlen($t) > 213) {
+            http_response_code(400);
+            exit;
+        }
+        $svg = \LibertyFin\Vista\Qr::svg($t, 190);
+        if ($svg === null) { http_response_code(400); exit; }
+
+        header('Content-Type: image/svg+xml; charset=utf-8');
+        header('Cache-Control: private, max-age=300');
+        echo $svg;
+        exit;
     }
 }

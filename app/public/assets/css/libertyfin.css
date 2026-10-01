@@ -1996,3 +1996,75 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
    de ir protegiendo clase por clase cada que ocurre.
    ══════════════════════════════════════════════════════ */
 [hidden]{display:none !important}
+
+
+/* ══════════════════════════════════════════════════════
+   41 · BOTONES DE MÉTODO Y MODAL DE COBRO
+   Un método, un botón, un modal. El cajero tiene al
+   cliente enfrente: recargar la pantalla le borra el
+   contexto y lo obliga a empezar de nuevo.
+   ══════════════════════════════════════════════════════ */
+.lf-metodos{padding:0 20px 14px}
+.lf-metodos .ops{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:7px}
+.lf-metodos .m{display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:12px 8px;cursor:pointer;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r);background:var(--lf-sup);color:var(--lf-tinta-3);
+  font-family:var(--lf-font);font-size:11.5px;font-weight:600;
+  transition:border-color .12s,background .12s,color .12s;text-align:center;line-height:1.25}
+.lf-metodos .m:hover{border-color:var(--lf-brand);color:var(--lf-tinta)}
+.lf-metodos .m.on{border-color:var(--lf-brand);background:var(--lf-brand-soft);
+  color:var(--lf-brand-2);box-shadow:0 0 0 2px var(--lf-brand-ring)}
+.lf-metodos .m svg{flex-shrink:0}
+
+.lf-modal{position:fixed;inset:0;z-index:300;display:flex;align-items:center;
+  justify-content:center;padding:20px;background:rgba(16,22,19,.5);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);animation:lf-velo .18s ease}
+body.lf-modal-abierto{overflow:hidden}
+.lf-modal .caja{width:100%;max-width:430px;max-height:90vh;overflow-y:auto;
+  background:var(--lf-sup);border-radius:var(--lf-r-panel);box-shadow:var(--lf-s3);
+  animation:lf-sube .22s ease}
+@keyframes lf-sube{from{opacity:0;transform:translateY(14px)}}
+
+.lf-modal header{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;
+  padding:20px 22px 14px;border-bottom:1px solid var(--lf-linea)}
+.lf-modal h2{font-size:17px;font-weight:700;letter-spacing:-.3px;margin:0}
+.lf-modal header p{font-size:12px;color:var(--lf-tinta-4);margin:3px 0 0}
+.lf-modal .cerrar{width:30px;height:30px;border:none;background:none;cursor:pointer;
+  border-radius:50%;font-size:22px;line-height:1;color:var(--lf-tinta-4);flex-shrink:0}
+.lf-modal .cerrar:hover{background:var(--lf-vidrio);color:var(--lf-tinta)}
+
+.lf-modal .cuerpo{padding:20px 22px}
+.lf-modal .msg{font-size:13px;color:var(--lf-tinta-2);line-height:1.6;margin:0 0 16px}
+.lf-modal .aviso{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.55;margin:10px 0 0}
+.lf-modal .ok-grande{font-size:34px;font-weight:800;color:var(--lf-brand-2);
+  text-align:center;letter-spacing:-1px;margin:6px 0 10px;font-family:var(--lf-mono)}
+.lf-modal .qr{display:flex;justify-content:center;min-height:190px;align-items:center;
+  margin-bottom:14px}
+.lf-modal .qr svg{border-radius:10px;max-width:100%;height:auto}
+.lf-modal .dato{font-family:var(--lf-mono);font-size:15px;font-weight:700;letter-spacing:1px;
+  text-align:center;padding:13px;background:var(--lf-sup-2);border-radius:var(--lf-r);
+  overflow-wrap:anywhere;margin-bottom:9px}
+.lf-modal .dato.grande{font-size:20px;letter-spacing:2.5px}
+.lf-modal .copiar{display:flex;gap:7px}
+.lf-modal .copiar input{flex:1;min-width:0;padding:8px 11px;font-size:11.5px;
+  background:var(--lf-sup-2);border:1px solid var(--lf-linea);border-radius:var(--lf-r-sm);
+  color:var(--lf-tinta);outline:none;text-overflow:ellipsis;font-family:var(--lf-mono)}
+
+.lf-modal .espera{display:flex;align-items:center;gap:10px;margin-top:16px;padding:12px 14px;
+  border-radius:var(--lf-r);background:var(--lf-amb-soft);color:var(--lf-amb);
+  font-size:12px;line-height:1.5}
+.lf-modal .espera.ok{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-modal .espera .giro{width:14px;height:14px;flex-shrink:0;border-radius:50%;
+  border:2px solid currentColor;border-top-color:transparent;animation:lf-giro .8s linear infinite}
+.lf-modal .espera.ok .giro{display:none}
+.lf-modal .qr .giro{width:26px;height:26px;border:3px solid var(--lf-linea);
+  border-top-color:var(--lf-brand);border-radius:50%;animation:lf-giro .8s linear infinite}
+
+.lf-modal footer{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;
+  padding:14px 22px 20px;border-top:1px solid var(--lf-linea)}
+.lf-modal footer .btn{text-decoration:none;display:inline-flex;align-items:center}
+@media(max-width:440px){
+  .lf-modal{padding:0;align-items:flex-end}
+  .lf-modal .caja{max-width:none;max-height:92vh;border-radius:var(--lf-r-panel) var(--lf-r-panel) 0 0}
+  .lf-modal footer .btn{flex:1;justify-content:center}
+}
