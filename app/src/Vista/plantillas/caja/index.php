@@ -155,30 +155,37 @@ $token = $_SESSION['lf_token'];
                 placeholder="Qué se vendió, condiciones, referencias… (opcional)"></textarea>
     </div>
 
-    <?php if ($ligas): ?>
-    <div class="lf-cobro-modo">
-      <label class="m on">
-        <input type="radio" name="con_liga" value="" checked>
-        <span><b>Ya me pagó</b><small>efectivo o transferencia, aquí en el mostrador</small></span>
-      </label>
-      <label class="m">
-        <input type="radio" name="con_liga" value="1">
-        <span><b>Va a pagar en línea</b><small>tarjeta, SPEI o efectivo en tiendas</small></span>
-      </label>
-      <div id="formaLiga" hidden style="padding:0 2px 4px">
-        <select class="form-select form-select-sm" name="forma_liga">
-          <?php foreach ($formasLiga as $k => $f): ?>
-            <option value="<?= $k ?>"><?= P::e($f[0]) ?> · <?= P::e($f[2]) ?></option>
-          <?php endforeach; ?>
-        </select>
-        <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:7px;line-height:1.5">
-          Al cobrar aparecen aquí mismo los datos: el código para tarjeta, la CLABE
-          para SPEI o el comprobante con código de barras para la tienda. La venta
-          queda <b>con saldo</b> hasta que el proveedor confirme el pago.
-        </p>
-      </div>
+    <?php
+    /* UN SOLO SELECTOR, NO DOS PREGUNTAS.
+       Antes había que elegir el método de pago y además marcar si iba a
+       pagar en línea. Son la misma decisión partida en dos: quien elige
+       "tarjeta" ya dijo todo lo que hacía falta. */
+    $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
+    $opciones = [];
+    foreach ($metodos as $k) {
+        $opciones[$k] = ['rotulo' => ($rot[$k] ?? $k) . ' · en el mostrador',
+                         'nota'   => 'Ya te pagó', 'liga' => ''];
+    }
+    if ($ligas) {
+        $opciones['_tarjeta'] = ['rotulo' => 'Tarjeta en línea',
+            'nota' => 'Sale un código para que pase su tarjeta', 'liga' => 'tarjeta'];
+        $opciones['_spei']    = ['rotulo' => 'Transferencia SPEI',
+            'nota' => 'Sale una CLABE y el pago se detecta solo', 'liga' => 'spei'];
+        $opciones['_tienda']  = ['rotulo' => 'Efectivo en tienda',
+            'nota' => 'Sale un comprobante con código de barras', 'liga' => 'efectivo'];
+    }
+    ?>
+    <div class="lf-cobro-como">
+      <label class="form-label" for="comoPaga">¿Cómo paga?</label>
+      <select class="form-select" name="como_paga" id="comoPaga">
+        <?php foreach ($opciones as $k => $o): ?>
+          <option value="<?= P::e($k) ?>" data-liga="<?= P::e($o['liga']) ?>">
+            <?= P::e($o['rotulo']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <p class="nota" id="notaPago"></p>
     </div>
-    <?php endif; ?>
+
 
     <button class="btn btn-primary" type="submit" id="btnCobrar" disabled
             style="width:calc(100% - 40px);margin:0 20px 20px;padding:14px">
@@ -210,12 +217,19 @@ $token = $_SESSION['lf_token'];
     });
     $('vacio').hidden = lineas.length > 0;
     $('conteo').textContent = lineas.length + ' concepto' + (lineas.length===1?'':'s');
-    $('lineas').value = JSON.stringify(lineas.map(function(l){
-      return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
-    calcular();
+    calcular();   // calcular() ya serializa las líneas
   }
 
   function calcular(){
+    /* SE VUELVE A SERIALIZAR AQUÍ, NO SOLO EN pintar().
+       Editar un precio no repinta la lista —perdería el foco a media
+       escritura— y por eso el campo oculto conservaba los precios
+       originales. Con los servicios de precio libre, que van en cero,
+       el servidor recibía un ticket de cero aunque en pantalla se viera
+       bien: "El ticket suma cero" con el precio puesto. */
+    $('lineas').value = JSON.stringify(lineas.map(function(l){
+      return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
+
     var cap = lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0);
     var pct = parseFloat($('ivaPct').value) || 0;
     // IVA incluido: el total es lo capturado y el impuesto se extrae.
@@ -232,7 +246,11 @@ $token = $_SESSION['lf_token'];
       ? 'Se liquida completa. La comisión se libera toda.'
       : 'Queda un saldo de <b class="lf-mono" style="color:var(--lf-amb)">' + pesos(saldo)
         + '</b>. La comisión se libera conforme el cliente pague.';
-    $('btnTexto').textContent = ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro';
+    var sel = $('comoPaga');
+    var enLinea = sel && sel.options[sel.selectedIndex].dataset.liga;
+    $('btnTexto').textContent = enLinea
+      ? 'Generar el cobro'
+      : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
     $('btnCobrar').disabled = lineas.length === 0;
   }
 
@@ -261,23 +279,24 @@ $token = $_SESSION['lf_token'];
     pinta();
   })();
 
-  // Elegir "mandarle una liga" cambia lo que dice el botón: con el
-  // mismo texto, el cajero cree que ya cobró.
+  /* El selector cambia lo que dice el botón: con el mismo texto, el
+     cajero cree que ya cobró cuando en realidad el cliente se va a
+     pagar a otro lado. */
   (function(){
-    var radios = document.querySelectorAll('input[name="con_liga"]');
-    if (!radios.length) return;
-    var caja = $('formaLiga'), btn = $('btnTexto');
-    radios.forEach(function(r){
-      r.addEventListener('change', function(){
-        var conLiga = r.value === '1' && r.checked;
-        caja.hidden = !conLiga;
-        document.querySelectorAll('.lf-cobro-modo .m').forEach(function(m){
-          m.classList.toggle('on', m.contains(r) ? r.checked : !r.checked);
-        });
-        if (btn) btn.dataset.liga = conLiga ? '1' : '';
-        calcular();
-      });
-    });
+    var sel = $('comoPaga'), nota = $('notaPago');
+    if (!sel) return;
+    var notas = {};
+    <?php foreach ($opciones as $k => $o): ?>
+    notas[<?= json_encode($k) ?>] = <?= json_encode($o['nota']) ?>;
+    <?php endforeach; ?>
+    function ver(){
+      var o = sel.options[sel.selectedIndex];
+      nota.textContent = notas[sel.value] || '';
+      nota.classList.toggle('linea', !!o.dataset.liga);
+      calcular();
+    }
+    sel.addEventListener('change', ver);
+    ver();
   })();
 
   document.querySelectorAll('.lf-serv').forEach(function(b){

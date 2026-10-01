@@ -219,4 +219,34 @@ final class CajaControlador
         $u = (new \LibertyFin\Datos\UsuarioRepo($db))->porId($id);
         return $u ? $u['nombre'] : null;
     }
+
+    /**
+     * Que forma de pago en linea pidio, si es que pidio alguna.
+     *
+     * Las opciones del mostrador son el metodo tal cual; las de linea
+     * llevan guion bajo delante para no confundirse con ellas. Devuelve
+     * cadena vacia cuando el cliente ya pago.
+     */
+    private static function formaEnLinea($como)
+    {
+        $mapa = ['_tarjeta' => 'tarjeta', '_spei' => 'spei', '_tienda' => 'efectivo'];
+        return $mapa[$como] ?? '';
+    }
+
+    /**
+     * Con que metodo se registra la venta.
+     *
+     * En las de linea el dinero todavia no entra, pero el metodo queda
+     * anotado para que el corte y los reportes sepan por donde va a
+     * llegar. SPEI y tienda acaban en la cuenta, asi que cuentan como
+     * transferencia.
+     */
+    private static function metodoDe($como, $db)
+    {
+        $linea = self::formaEnLinea($como);
+        if ($linea) return $linea === 'tarjeta' ? 'tarjeta' : 'transferencia';
+
+        $validos = (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles();
+        return in_array($como, $validos, true) ? $como : 'efectivo';
+    }
 }

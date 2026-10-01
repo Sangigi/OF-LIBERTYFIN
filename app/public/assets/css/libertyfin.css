@@ -1389,7 +1389,13 @@ section.card + section.card{margin-top:0}
     color:var(--lf-tinta-3);font-size:19px;line-height:1;cursor:pointer;z-index:2}
 
   /* El velo: desenfoque en vez de un negro plano, para que se siga
-     viendo dónde estabas. */
+     viendo dónde estabas.
+
+     `display:block` aquí le ganaba al atributo `hidden`, así que el
+     velo se quedaba puesto SIEMPRE en móvil: la pantalla salía
+     desenfocada y no dejaba tocar nada. Un atributo `hidden` no vence a
+     una regla de display, hay que decirlo explícito. */
+  .lf-velo[hidden]{display:none !important}
   .lf-velo{display:block;position:fixed;inset:0;z-index:50;
     background:rgba(16,22,19,.34);
     -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
@@ -1978,3 +1984,15 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
 .lf-modos .m input{margin-top:2px;accent-color:var(--lf-brand);flex-shrink:0}
 .lf-modos b{display:block;font-size:13px;font-weight:600}
 .lf-modos small{display:block;font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5;margin-top:2px}
+
+
+/* ══════════════════════════════════════════════════════
+   40 · EL ATRIBUTO `hidden` SIEMPRE GANA
+   Una regla con `display` le gana a `hidden`, y entonces
+   un elemento marcado como oculto se queda a la vista.
+   Pasó con el velo del menú en móvil: la pantalla salía
+   desenfocada y no dejaba tocar nada.
+   Esto lo cierra de una vez para todo el sistema, en vez
+   de ir protegiendo clase por clase cada que ocurre.
+   ══════════════════════════════════════════════════════ */
+[hidden]{display:none !important}
