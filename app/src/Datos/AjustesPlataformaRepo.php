@@ -42,6 +42,7 @@ final class AjustesPlataformaRepo
         'reportes'    => 'Reportes',
         'recargas'    => 'Recargas',
         'facturacion' => 'Facturación',
+        'ligas'       => 'Ligas de pago',
     ];
 
     /**

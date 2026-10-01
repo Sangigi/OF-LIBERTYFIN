@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 7;
+    const VERSION = 9;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -282,6 +282,94 @@ final class Migraciones
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    /**
+     * 8 · El catálogo de Emida y sus transacciones.
+     *
+     * Se crean aquí y no al vuelo porque son parte del esquema: una
+     * empresa que vende recargas las necesita desde el primer día, y
+     * crearlas en el primer uso significa que el primer uso es el más
+     * lento y el más propenso a fallar.
+     */
+    private static function v8(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_emida_productos (
+                producto_id VARCHAR(30) NOT NULL PRIMARY KEY,
+                nombre VARCHAR(220) NOT NULL,
+                categoria VARCHAR(80) NULL,
+                carrier VARCHAR(80) NULL,
+                comision DECIMAL(10,2) NOT NULL DEFAULT 0,
+                monto DECIMAL(12,2) NOT NULL DEFAULT 0,
+                monto_min DECIMAL(12,2) NOT NULL DEFAULT 0,
+                monto_max DECIMAL(12,2) NOT NULL DEFAULT 0,
+                tipo VARCHAR(12) NOT NULL DEFAULT 'directa',
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                actualizado DATETIME NULL,
+                KEY ix_ep_cat (categoria),
+                KEY ix_ep_carrier (carrier),
+                KEY ix_ep_activo (activo, categoria)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_emida_transacciones (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                sales_id VARCHAR(30) NOT NULL,
+                producto_id VARCHAR(30) NOT NULL,
+                producto_nombre VARCHAR(220) NULL,
+                cuenta VARCHAR(40) NOT NULL,
+                monto DECIMAL(12,2) NOT NULL,
+                comision DECIMAL(10,2) NOT NULL DEFAULT 0,
+                estado VARCHAR(20) NOT NULL DEFAULT 'pendiente',
+                folio_proveedor VARCHAR(80) NULL,
+                codigo VARCHAR(10) NULL,
+                h2h VARCHAR(10) NULL,
+                mensaje VARCHAR(300) NULL,
+                venta_id INT NULL,
+                usuario_id INT NULL,
+                usuario_nombre VARCHAR(160) NULL,
+                creado_en DATETIME NOT NULL,
+                UNIQUE KEY ix_et_sales (sales_id),
+                KEY ix_et_fecha (creado_en),
+                KEY ix_et_estado (estado)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    /**
+     * 9 · Ligas de pago.
+     *
+     * Aparte de `venta_pagos` a propósito: un renglón ahí significa
+     * "entró dinero" y lo suman el corte, los reportes y las comisiones.
+     * Una liga significa "le pedimos al cliente que pague", que a veces
+     * no termina en nada.
+     */
+    private static function v9(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_ligas_pago (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                referencia VARCHAR(20) NOT NULL,
+                venta_id INT NULL,
+                cliente_nombre VARCHAR(200) NULL,
+                monto DECIMAL(12,2) NOT NULL,
+                metodo VARCHAR(16) NOT NULL DEFAULT 'todos',
+                descripcion VARCHAR(80) NULL,
+                liga VARCHAR(500) NULL,
+                clabe VARCHAR(30) NULL,
+                barras VARCHAR(80) NULL,
+                estado VARCHAR(16) NOT NULL DEFAULT 'pendiente',
+                vence DATE NULL,
+                pagado_en DATETIME NULL,
+                pago_id INT NULL,
+                pruebas TINYINT(1) NOT NULL DEFAULT 0,
+                usuario_id INT NULL,
+                usuario_nombre VARCHAR(160) NULL,
+                revisado_en DATETIME NULL,
+                creado_en DATETIME NOT NULL,
+                UNIQUE KEY ix_lp_ref (referencia),
+                KEY ix_lp_estado (estado, vence),
+                KEY ix_lp_venta (venta_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -291,5 +379,7 @@ final class Migraciones
         5 => 'Marca de guía de primer uso',
         6 => 'Roles nuevos en la columna usuarios.rol',
         7 => 'Bitácora de cambios (lf_auditoria)',
+        8 => 'Catálogo y transacciones de Emida',
+        9 => 'Ligas de pago (tarjeta, SPEI, tiendas)',
     ];
 }

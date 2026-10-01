@@ -124,6 +124,10 @@ final class UsuariosControlador
 
     public function miCuenta()
     {
+        // Sin empresa no hay plan, ni datos fiscales, ni documentos: esas
+        // pestañas son de una empresa y esta cuenta no pertenece a
+        // ninguna. Le queda su perfil, que es lo que venía a ver.
+        if (empty($_SESSION['empresa_db'])) { $this->miCuentaPlataforma(); return; }
         $db   = Conexion::de($_SESSION['empresa_db']);
         // Un cajero solo ve su perfil: lo fiscal y el alta de comercio
         // comprometen a la empresa entera.
@@ -174,6 +178,9 @@ final class UsuariosControlador
     /** Datos fiscales. Viven en la base de la empresa. */
     public function guardarFiscales()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta?t=fiscales');
 
@@ -207,6 +214,9 @@ final class UsuariosControlador
     /** El alta de comercio para procesar pagos. */
     public function guardarComercio()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta?t=comercio');
         try {
@@ -223,6 +233,9 @@ final class UsuariosControlador
     /** Sube un documento para revisión. */
     public function subirDocumento()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta?t=documentos');
         $tipo = $_POST['tipo'] ?? '';
@@ -246,6 +259,9 @@ final class UsuariosControlador
 
     public function cambiarClave()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta');
         try {
@@ -294,6 +310,9 @@ final class UsuariosControlador
     /** Foto de perfil. Cada quien la suya, sin pedir permiso a nadie. */
     public function guardarFoto()
     {
+        if (empty($_SESSION['empresa_db'])) {
+            $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
+        }
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta');
         $repo = new UsuarioRepo($db);

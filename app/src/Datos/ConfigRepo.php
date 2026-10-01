@@ -141,6 +141,7 @@ final class ConfigRepo extends Repo
         'reportes'    => 'Reportes',
         'recargas'    => 'Recargas',
         'facturacion' => 'Facturación',
+        'ligas'       => 'Ligas de pago',
     ];
 
     /**

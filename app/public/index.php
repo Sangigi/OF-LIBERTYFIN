@@ -53,6 +53,7 @@ $r = new Router();
 $r->get('/login',  ['LibertyFin\Controlador\LoginControlador', 'mostrar']);
 $r->post('/login', ['LibertyFin\Controlador\LoginControlador', 'entrar']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
+$r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);
 // El registro solo existe si hay credenciales de cPanel: sin ellas no se
 // puede crear la base de una empresa nueva, y un formulario que no lleva
 // a ningún lado es peor que no tenerlo.
@@ -94,6 +95,13 @@ $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
+// Ligas de pago: solo con credenciales de SPEI.
+if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
+    $r->get('/ligas',          ['LibertyFin\Controlador\LigasControlador', 'index']);
+    $r->post('/ligas/generar', ['LibertyFin\Controlador\LigasControlador', 'generar']);
+    $r->post('/ligas/revisar', ['LibertyFin\Controlador\LigasControlador', 'revisar']);
+}
+
 // Facturación: igual que recargas, solo existe con credenciales.
 if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
     $r->get('/facturacion',              ['LibertyFin\Controlador\FacturacionControlador', 'index']);
@@ -105,6 +113,7 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
     $r->post('/recargas/consultar',['LibertyFin\Controlador\RecargasControlador', 'consultar']);
     $r->post('/recargas/probar',  ['LibertyFin\Controlador\RecargasControlador', 'probar']);
+    $r->post('/recargas/catalogo',['LibertyFin\Controlador\RecargasControlador', 'sincronizar']);
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/csv', ['LibertyFin\Controlador\ReportesControlador', 'csv']);
@@ -198,11 +207,15 @@ $permisos = [
   '/usuarios/guardar'       => 'editar.usuarios',
   '/usuarios/restablecer'   => 'editar.usuarios',
   '/usuarios/alternar'      => 'editar.usuarios',
+  '/ligas'                  => 'ver.ligas',
+  '/ligas/generar'          => 'cobrar',
+  '/ligas/revisar'          => 'ver.ligas',
   '/facturacion'            => 'ver.facturacion',
   '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',
   '/recargas/consultar'     => 'ver.recargas',
   '/recargas/probar'        => 'ver.recargas',
+  '/recargas/catalogo'      => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
   '/ayuda'                  => 'abrir.ticket',
   '/ayuda/crear'            => 'abrir.ticket',
@@ -243,7 +256,7 @@ $permisos = [
   '/cuenta/documento' => 'editar.empresa',
 ];
 
-$publicas = ['/login', '/salir', '/registro'];
+$publicas = ['/login', '/salir', '/registro', '/ayuda-acceso'];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 
 // El portero: una sola línea decide quién pasa, en vez de repetir la
@@ -267,6 +280,18 @@ if (!empty($_SESSION['empresa_db'])) {
 if ($hallazgo !== null && !in_array($ruta, $publicas, true)) {
     $patron = $hallazgo['patron'] ?? $ruta;
     $necesita = $permisos[$patron] ?? null;
+    // Una sesión de plataforma en una ruta de empresa: se detiene aquí
+    // con una explicación, en vez de dejar que reviente adentro con
+    // "1046 No database selected".
+    if ($necesita !== null && empty($_SESSION['empresa_db'])
+        && \LibertyFin\Dominio\Permisos::necesitaEmpresa($necesita)) {
+        http_response_code(403);
+        Plantilla::pagina('errores/sin-empresa', [
+            'titulo' => 'Esta pantalla es de una empresa', 'icono' => 'alerta', 'subtitulo' => '',
+        ]);
+        exit;
+    }
+
     if ($necesita !== null && !\LibertyFin\Dominio\Permisos::puede($necesita)) {
         http_response_code(403);
         Plantilla::pagina('errores/403', [

@@ -222,4 +222,29 @@ final class VentaRepo extends Repo
             SELECT COUNT(DISTINCT v.id) FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id {$where}", $p);
     }
+
+    /**
+     * Ventas que todavía deben algo.
+     *
+     * Se usa para elegir a cuál generarle una liga de pago: no tiene
+     * caso ofrecer las liquidadas, y escribir el id a mano invita a
+     * equivocarse de venta.
+     */
+    public function conSaldo($tope = 30)
+    {
+        return $this->todos("
+            SELECT v.id, v.codigo_venta, v.fecha, v.total,
+                   COALESCE(c.nombre,'Público general') AS cliente,
+                   ROUND(v.total - COALESCE(pg.cobrado,0), 2) AS saldo,
+                   DATEDIFF(CURDATE(), COALESCE(pg.ultimo, v.fecha)) AS dias
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo
+                        FROM venta_pagos WHERE cancelado = 0 GROUP BY venta_id ) pg
+                   ON pg.venta_id = v.id
+            WHERE v.estado <> 'cancelada'
+              AND v.total - COALESCE(pg.cobrado,0) > 0.01
+            ORDER BY dias DESC, saldo DESC
+            LIMIT " . (int)$tope);
+    }
 }

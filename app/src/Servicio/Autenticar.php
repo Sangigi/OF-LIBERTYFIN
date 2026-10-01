@@ -217,6 +217,7 @@ final class Autenticar
         $_SESSION['empresa_nombre'] = 'LibertyFin';
         $_SESSION['sucursal_nombre']= 'Plataforma';
         $_SESSION['login_time']     = time();
+        self::recordar();
         $_SESSION['user_agent']     = $_SERVER['HTTP_USER_AGENT'] ?? '';
         // Sin empresa: es la marca de que estas claves NO deben existir.
         unset($_SESSION['empresa_db'], $_SESSION['empresa_id'], $_SESSION['sucursal_id']);
@@ -233,5 +234,45 @@ final class Autenticar
 
         $this->repo->marcarAccesoPlataforma((int)$u['id']);
         return true;
+    }
+
+    /**
+     * "Recordar sesión en este dispositivo".
+     *
+     * Alarga la cookie de sesión a 30 días en vez de que muera al cerrar
+     * el navegador. NO guarda la contraseña ni crea un token aparte: lo
+     * que dura más es la sesión, y sigue cayéndose sola si cambia el
+     * navegador o pasa el tiempo de inactividad.
+     *
+     * Es menos potente que un "recordarme" con token persistente, y a
+     * propósito: ese token es una segunda llave que hay que guardar,
+     * rotar y poder revocar, y en un sistema donde se cobra dinero no
+     * vale la pena a cambio de no volver a escribir la contraseña.
+     */
+    private static function recordar()
+    {
+        $quiere = !empty($_POST['recordar']);
+        $dias = 30;
+
+        if ($quiere) {
+            $p = session_get_cookie_params();
+            setcookie(session_name(), session_id(), [
+                'expires'  => time() + $dias * 86400,
+                'path'     => $p['path'] ?: '/',
+                'domain'   => $p['domain'] ?? '',
+                'secure'   => !empty($_SERVER['HTTPS']),
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            // Solo para dejar la casilla marcada la próxima vez. No
+            // contiene nada que sirva para entrar.
+            setcookie('lf_recordar', '1', [
+                'expires' => time() + $dias * 86400, 'path' => '/',
+                'secure' => !empty($_SERVER['HTTPS']), 'httponly' => false, 'samesite' => 'Lax',
+            ]);
+            $_SESSION['lf_recordado'] = true;
+        } else {
+            setcookie('lf_recordar', '', ['expires' => time() - 3600, 'path' => '/']);
+        }
     }
 }

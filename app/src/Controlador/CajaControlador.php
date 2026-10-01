@@ -26,6 +26,11 @@ final class CajaControlador
             'subtitulo' => 'Venta nueva · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
             'servicios' => $cat->servicios($suc, $area, $buscar),
             'areas'     => $cat->areas(),
+            'metodos'   => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
+            // Cobrar con liga solo aparece si hay con qué generarla.
+            'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
+                         && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
+            'formasLiga'=> \LibertyFin\Servicio\LigaPago::METODOS,
             'area'      => $area,
             'buscar'    => $buscar,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
@@ -138,5 +143,59 @@ final class CajaControlador
     {
         $_SESSION['lf_aviso'] = ['texto' => $mensaje, 'tipo' => $tipo];
         header('Location: /caja'); exit;
+    }
+
+    /**
+     * Genera la liga para una venta recién creada.
+     *
+     * Se llama después de registrar la venta, no antes: si la liga
+     * fallara y la venta no existiera, el cliente se iría sin nada y sin
+     * rastro de lo que se intentó cobrarle.
+     */
+    private function conLiga($db, array $r, $forma)
+    {
+        $venta = (new \LibertyFin\Datos\VentaRepo($db))->detalle($r['id']);
+        if (!$venta) $this->volver('La venta se registró pero no se pudo leer.', 'error');
+
+        $saldo = round((float)$venta['saldo'], 2);
+        if ($saldo <= 0.01) {
+            $this->volver('Venta registrada y liquidada. No hizo falta la liga.', 'ok');
+        }
+
+        $api = new \LibertyFin\Servicio\LigaPago(\LibertyFin\Servicio\Integraciones::de('spei'));
+        $semilla = '9' . str_pad((string)$r['id'], 7, '0', STR_PAD_LEFT) . date('ymdHi');
+
+        $g = $api->generar([
+            'monto' => $saldo, 'metodo' => $forma,
+            'descripcion' => 'Venta ' . $venta['codigo_venta'],
+            'referencia' => $semilla, 'id' => $semilla,
+        ]);
+        if (!$g) {
+            // La venta SÍ quedó. Se dice qué pasó y dónde seguir, en vez
+            // de dejar creer que no se registró nada.
+            $this->volver('Venta ' . $venta['codigo_venta'] . ' registrada con saldo, pero '
+                . 'la liga no se generó: ' . $api->error()
+                . ' Puedes intentarlo de nuevo desde Ligas de pago.', 'error');
+        }
+
+        try {
+            $id = (new \LibertyFin\Datos\LigaRepo($db))->crear([
+                'referencia' => $g['referencia'], 'venta_id' => (int)$r['id'],
+                'cliente' => $venta['cliente'] ?: 'Público general', 'monto' => $saldo,
+                'metodo' => $forma, 'descripcion' => 'Venta ' . $venta['codigo_venta'],
+                'liga' => $g['liga'], 'clabe' => $g['clabe'], 'barras' => $g['barras'],
+                'vence' => $g['vence'], 'pruebas' => $g['pruebas'],
+                'usuario_id' => $_SESSION['usuario_id'] ?? null,
+                'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
+            ]);
+            $_SESSION['lf_liga'] = (new \LibertyFin\Datos\LigaRepo($db))->porId($id);
+            $_SESSION['lf_aviso'] = ['texto' =>
+                'Venta ' . $venta['codigo_venta'] . ' registrada. Comparte la liga con el cliente; '
+                . 'el abono entra cuando pague.', 'tipo' => 'ok'];
+            header('Location: /ligas'); exit;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] liga en caja: ' . $e->getMessage());
+            $this->volver('Venta registrada, pero la liga no se guardó: ' . $e->getMessage(), 'error');
+        }
     }
 }

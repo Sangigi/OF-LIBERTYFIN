@@ -128,7 +128,7 @@ $d = function ($k) use ($datos) { return P::e($datos[$k] ?? ''); };
       </section>
     </form>
 
-    <p class="lf-acceso-pie">¿Ya tienes cuenta? <a href="/login">Entra aquí</a>.</p>
+    <p class="lf-pie-reg">¿Ya tienes cuenta? <a href="/login">Entra aquí</a>.</p>
   <?php endif; ?>
 </main>
 

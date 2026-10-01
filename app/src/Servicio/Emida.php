@@ -458,6 +458,104 @@ final class Emida
         return $o['ok'] ? implode(', ', $o['operaciones']) : ('no se pudieron leer: ' . $o['error']);
     }
 
+    /**
+     * El catálogo de productos del proveedor.
+     *
+     * POR QUÉ ESTO ERA LO QUE FALTABA
+     *
+     * Yo tenía un desplegable con "Telcel, Movistar, AT&T" y un monto
+     * libre. Emida no funciona así: cada combinación de compañía y monto
+     * es un PRODUCTO con su propio identificador. "Recarga Telcel $200"
+     * es el 5077200, y mandar otra cosa da el código 51.
+     *
+     * Y hay mucho más que recargas: pago de agua, gas, gobierno,
+     * tarjetas de regalo, internet. Unos son de monto fijo (Venta
+     * Directa) y otros de monto variable que primero se consulta
+     * (Consulta/Pago). Sin el catálogo no se puede vender ninguno.
+     */
+    public function catalogo()
+    {
+        if ($this->porProxy()) {
+            $r = $this->proxy($this->cfg['proxy_catalogo'] ?? 'get_products.php', [
+                'username' => $this->cfg['usuario'] ?? '',
+                'password' => $this->cfg['clave'] ?? '',
+            ]);
+            if (!$r['ok']) return $r;
+            return ['ok' => true, 'via' => 'intermediario',
+                    'productos' => self::normalizar($r['datos'])];
+        }
+        try {
+            $op = $this->operacionPara('productos');
+            if (!$op) {
+                return ['ok' => false, 'error' =>
+                    'Este WSDL no tiene una operación de catálogo. Ofrece: '
+                    . $this->nombresDisponibles()];
+            }
+            $r = $this->cliente()->__soapCall($op, [$this->base()]);
+            return ['ok' => true, 'operacion' => $op, 'productos' => self::normalizar($r)];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'error' => $e->getMessage()];
+        }
+    }
+
+    /**
+     * Pone el catálogo en una forma estable.
+     *
+     * El proveedor devuelve nombres de campo distintos según la
+     * operación y la versión. Se aceptan todos los que se han visto y se
+     * traducen a uno solo, para que el resto del sistema no tenga que
+     * saber cuál vino.
+     */
+    private static function normalizar($datos)
+    {
+        $lista = [];
+        if (is_object($datos)) $datos = (array)$datos;
+        if (is_array($datos)) {
+            // A veces viene envuelto: {Products: {Product: [...]}}
+            foreach (['Products','Product','productos','items','data'] as $k) {
+                if (isset($datos[$k])) { $datos = $datos[$k]; break; }
+            }
+            if (is_object($datos)) $datos = (array)$datos;
+            foreach ((array)$datos as $p) {
+                $p = is_object($p) ? (array)$p : (array)$p;
+                $id = self::campo($p, ['ProductId','productId','id','ProductID']);
+                if ($id === null || $id === '') continue;
+                $min = self::campo($p, ['MinAmount','minAmount','monto_min','MinimumAmount']);
+                $max = self::campo($p, ['MaxAmount','maxAmount','monto_max','MaximumAmount']);
+                $monto = self::campo($p, ['Amount','amount','monto','Price','FaceValue']);
+                $lista[] = [
+                    'producto_id' => (string)$id,
+                    'nombre'      => (string)self::campo($p, ['ProductName','productName','nombre','Description','Name']),
+                    'categoria'   => (string)self::campo($p, ['CategoryName','category','categoria','Category']),
+                    'carrier'     => (string)self::campo($p, ['CarrierName','carrier','proveedor','Carrier']),
+                    'comision'    => self::num(self::campo($p, ['Fee','fee','comision','UserFee'])),
+                    'monto'       => self::num($monto),
+                    'monto_min'   => self::num($min),
+                    'monto_max'   => self::num($max),
+                    // Monto fijo = se vende directo. Variable = primero
+                    // se consulta cuánto debe el cliente.
+                    'tipo'        => (self::num($min) > 0 || self::num($max) > 0 || self::num($monto) <= 0)
+                                     ? 'consulta' : 'directa',
+                ];
+            }
+        }
+        return $lista;
+    }
+
+    private static function campo(array $p, array $nombres)
+    {
+        foreach ($nombres as $n) {
+            if (array_key_exists($n, $p) && $p[$n] !== null && $p[$n] !== '') return $p[$n];
+        }
+        return null;
+    }
+
+    private static function num($v)
+    {
+        if ($v === null || $v === '') return 0.0;
+        return (float)preg_replace('/[^0-9.\-]/', '', (string)$v);
+    }
+
     /** El saldo disponible con el proveedor. */
     public function saldo()
     {

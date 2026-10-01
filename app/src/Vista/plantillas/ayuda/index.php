@@ -37,6 +37,10 @@ $comoVa = [
       <?= P::e($comoVa[$t['estado']][0] ?? $t['estado']) ?></span>
   </header>
   <div class="card-body">
+    <?php if (!$mensajes): ?>
+      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:22px">
+        Todavía no hay mensajes en este reporte.</p>
+    <?php endif; ?>
     <?php foreach ($mensajes as $m):
       $mio = (int)$m['autor_id'] === (int)($_SESSION['usuario_id'] ?? 0); ?>
       <div class="lf-msj">
@@ -55,6 +59,25 @@ $comoVa = [
       </div>
     <?php endforeach; ?>
   </div>
+
+  <?php
+  // Qué esperar ahora. Un ticket sin esto deja a la persona sin saber
+  // si le toca a ella hacer algo o si está esperando a alguien.
+  $queSigue = [
+    'abierto'   => 'Lo recibimos. Alguien lo va a leer y te contestamos aquí mismo.',
+    'en_curso'  => 'Estamos trabajando en ello. Te escribimos en cuanto haya algo.',
+    'esperando' => 'Necesitamos que nos contestes para poder seguir.',
+    'resuelto'  => 'Lo dimos por resuelto. Si sigue pasando, escríbenos aquí y lo reabrimos.',
+    'cerrado'   => 'Este reporte está cerrado. Si vuelve a pasar, abre uno nuevo.',
+  ][$t['estado']] ?? ''; ?>
+  <?php if ($queSigue): ?>
+    <div class="card-body" style="border-top:1px solid var(--lf-linea);
+         background:<?= $t['estado']==='esperando' ? 'var(--lf-amb-soft)' : 'var(--lf-vidrio)' ?>">
+      <p style="font-size:12.5px;line-height:1.6;margin:0;
+         color:<?= $t['estado']==='esperando' ? 'var(--lf-amb)' : 'var(--lf-tinta-3)' ?>">
+        <b>¿Qué sigue?</b> <?= P::e($queSigue) ?></p>
+    </div>
+  <?php endif; ?>
 
   <?php if ($t['estado'] !== 'cerrado'): ?>
   <div class="card-body" style="border-top:1px solid var(--lf-linea)">

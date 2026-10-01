@@ -57,9 +57,15 @@ final class RegistrarPago
             $fecha,
             $datos['usuario_id'] ?? null,
         ]);
+        $pagoId = (int)$this->db->lastInsertId();
 
         (new SincronizarComisiones($this->db))->paraVenta($ventaId);
-        return ['monto' => $monto, 'tipo' => $tipo, 'saldo' => Dinero::centavos($saldo - $monto)];
+        // El id del abono se devuelve para que quien lo haya disparado
+        // —una liga de pago, por ejemplo— pueda dejar constancia de cuál
+        // fue, y no vuelva a abonar si se consulta dos veces.
+        return ['monto' => $monto, 'tipo' => $tipo,
+                'saldo' => Dinero::centavos($saldo - $monto),
+                'pago_id' => $pagoId];
     }
 
     /** Cancelación lógica: deja rastro y devuelve las comisiones a su sitio. */

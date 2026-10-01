@@ -101,6 +101,7 @@ final class Permisos
         'ver.corte'        => ['admin','cajero'],
         'ver.recargas'     => ['admin','cajero'],
         'ver.facturacion'  => ['admin'],
+        'ver.ligas'        => ['admin','cajero'],
         'ver.ajustes'      => ['admin'],
         'ver.usuarios'     => ['admin'],
         'ver.auditoria'    => ['admin'],
@@ -250,6 +251,32 @@ final class Permisos
         'cajero'     => [],
         'inventario' => [],
     ];
+
+    /**
+     * Los permisos que NO necesitan una empresa.
+     *
+     * Sirve para un guardia central: si una sesión sin empresa llega a
+     * una ruta que pide cualquier otro permiso, se detiene ahí con un
+     * mensaje. Sin eso, la petición avanza hasta que un repositorio
+     * intenta consultar una base vacía y revienta con "1046 No database
+     * selected" y una traza que no explica nada.
+     *
+     * Es una red, no el arreglo: cada pantalla sigue siendo responsable
+     * de lo suyo. Pero convierte un error feo en uno que se entiende, y
+     * lo hace en UN lugar en vez de cuarenta y siete.
+     */
+    const SIN_EMPRESA = [
+        'ver.soporte', 'ver.tickets', 'ver.empresas', 'ver.conocimiento',
+        'editar.conocimiento', 'ver.mantenimiento', 'ver.informes',
+        'revisar.docs', 'clave.ajena', 'bloquear.cuenta', 'diagnostico',
+        'alta.empresas', 'usuarios.plataforma', 'suspender.empresa',
+        'ajustes.globales', 'ajustes.empresa',
+    ];
+
+    public static function necesitaEmpresa($permiso)
+    {
+        return !in_array($permiso, self::SIN_EMPRESA, true);
+    }
 
     public static function rolesQuePuedeAsignar($rol = null)
     {

@@ -26,16 +26,25 @@ final class AyudaControlador
         $repo = new TicketRepo($this->principal());
         $emp  = (int)($_SESSION['empresa_id'] ?? 0);
 
+        $ver = Peticion::entero('ver');
+
+        // Las dos se calculan UNA vez. Antes esto terminaba con
+        //     ['mensajes' => []] + $this->conversacion(...)
+        // y el `+` de arreglos conserva la clave de la IZQUIERDA, así que
+        // los mensajes llegaban siempre vacíos: el cliente abría su
+        // ticket y no veía ninguna respuesta de soporte.
+        $abierto  = $this->miTicket($repo, $ver, $emp);
+        $mensajes = $abierto ? $this->mensajesVisibles($repo, $ver) : [];
+
         Plantilla::pagina('ayuda/index', [
             'titulo'     => 'Ayuda',
             'icono'      => 'alerta',
             'subtitulo'  => $_SESSION['empresa_nombre'] ?? '',
             'tickets'    => $emp ? $repo->bandeja(['empresa' => $emp], 30) : [],
-            'abierto'    => Peticion::entero('ver')
-                            ? $this->miTicket($repo, Peticion::entero('ver'), $emp) : null,
-            'mensajes'   => [],
+            'abierto'    => $abierto,
+            'mensajes'   => $mensajes,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
-        ] + ($this->conversacion($repo, Peticion::entero('ver'), $emp)));
+        ]);
         unset($_SESSION['lf_aviso']);
     }
 
@@ -51,16 +60,17 @@ final class AyudaControlador
         return ($t && (int)$t['empresa_id'] === $empresaId) ? $t : null;
     }
 
-    private function conversacion(TicketRepo $repo, $id, $empresaId)
+    /**
+     * Los mensajes que el cliente SÍ puede ver.
+     *
+     * Las notas internas quedan fuera: están escritas para el equipo de
+     * soporte, con lenguaje y detalles que no son para el cliente.
+     */
+    private function mensajesVisibles(TicketRepo $repo, $id)
     {
-        $t = $this->miTicket($repo, $id, $empresaId);
-        if (!$t) return ['mensajes' => []];
-        // Las notas internas NO se muestran: están escritas para el
-        // equipo de soporte, no para el cliente.
-        $m = array_values(array_filter($repo->mensajes($id), function ($x) {
+        return array_values(array_filter($repo->mensajes($id), function ($x) {
             return empty($x['interno']);
         }));
-        return ['mensajes' => $m];
     }
 
     public function crear()

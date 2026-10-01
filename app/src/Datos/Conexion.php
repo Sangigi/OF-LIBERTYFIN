@@ -17,6 +17,14 @@ final class Conexion
 
     public static function de($base)
     {
+        // Sin nombre de base, PDO conecta al servidor pero sin catálogo,
+        // y la primera consulta revienta con "1046 No database selected"
+        // y una traza que no dice de dónde vino. Mejor fallar aquí.
+        if (trim((string)$base) === '') {
+            throw new \RuntimeException(
+                'No hay base de datos seleccionada. Si entraste con una cuenta de '
+                . 'plataforma, esta pantalla es de empresa y no te corresponde.');
+        }
         if (isset(self::$vivas[$base])) return self::$vivas[$base];
         if (self::$cfg === null) throw new \RuntimeException('Conexion::configurar() no se ha llamado');
         $c = self::$cfg;

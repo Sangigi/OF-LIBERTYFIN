@@ -56,4 +56,10 @@ final class LoginControlador
         $_SESSION['lf_usuario'] = $usuario;
         header('Location: /login'); exit;
     }
+
+    /** Qué hacer si no recuerdas la contraseña. Pública. */
+    public function ayudaAcceso()
+    {
+        Plantilla::pagina('ayuda-acceso', ['titulo' => 'Recuperar el acceso'], 'layout-limpio');
+    }
 }

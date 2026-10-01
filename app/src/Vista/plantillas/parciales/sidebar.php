@@ -30,6 +30,8 @@ $deEmpresa = [
    'sec' => 'cobranza'],
   ['ruta' => '/corte',      'icono' => 'caja',    'texto' => 'Corte de caja', 'p' => 'ver.corte',
    'sec' => 'corte'],
+  ['ruta' => '/ligas',      'icono' => 'cobro',   'texto' => 'Ligas de pago', 'p' => 'ver.ligas',
+   'si' => 'spei', 'sec' => 'ligas'],
   ['ruta' => '/recargas',   'icono' => 'bolsa',   'texto' => 'Recargas',      'p' => 'ver.recargas',
    'si' => 'emida', 'sec' => 'recargas'],
   ['grupo' => 'Administración'],

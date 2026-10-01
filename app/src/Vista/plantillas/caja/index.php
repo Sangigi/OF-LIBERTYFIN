@@ -124,6 +124,30 @@ $token = $_SESSION['lf_token'];
                 placeholder="Qué se vendió, condiciones, referencias… (opcional)"></textarea>
     </div>
 
+    <?php if ($ligas): ?>
+    <div class="lf-cobro-modo">
+      <label class="m on">
+        <input type="radio" name="con_liga" value="" checked>
+        <span><b>Cobrar ahora</b><small>efectivo, transferencia o tarjeta en el mostrador</small></span>
+      </label>
+      <label class="m">
+        <input type="radio" name="con_liga" value="1">
+        <span><b>Mandarle una liga</b><small>paga en línea, por SPEI o en tiendas</small></span>
+      </label>
+      <div id="formaLiga" hidden style="padding:0 2px 4px">
+        <select class="form-select form-select-sm" name="forma_liga">
+          <?php foreach ($formasLiga as $k => $f): ?>
+            <option value="<?= $k ?>"><?= P::e($f[0]) ?> · <?= P::e($f[2]) ?></option>
+          <?php endforeach; ?>
+        </select>
+        <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:7px;line-height:1.5">
+          La venta queda <b>con saldo</b> hasta que el cliente pague. El abono entra
+          cuando el proveedor confirme, no ahora.
+        </p>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <button class="btn btn-primary" type="submit" id="btnCobrar" disabled
             style="width:calc(100% - 40px);margin:0 20px 20px;padding:14px">
       <?= W::icono('cobro','16px') ?><span id="btnTexto">Cobrar</span>
@@ -203,6 +227,25 @@ $token = $_SESSION['lf_token'];
     $('servAnt').addEventListener('click', function(){ if (actual>1){ actual--; pinta(); } });
     $('servSig').addEventListener('click', function(){ if (actual<totalPag){ actual++; pinta(); } });
     pinta();
+  })();
+
+  // Elegir "mandarle una liga" cambia lo que dice el botón: con el
+  // mismo texto, el cajero cree que ya cobró.
+  (function(){
+    var radios = document.querySelectorAll('input[name="con_liga"]');
+    if (!radios.length) return;
+    var caja = $('formaLiga'), btn = $('btnTexto');
+    radios.forEach(function(r){
+      r.addEventListener('change', function(){
+        var conLiga = r.value === '1' && r.checked;
+        caja.hidden = !conLiga;
+        document.querySelectorAll('.lf-cobro-modo .m').forEach(function(m){
+          m.classList.toggle('on', m.contains(r) ? r.checked : !r.checked);
+        });
+        if (btn) btn.dataset.liga = conLiga ? '1' : '';
+        calcular();
+      });
+    });
   })();
 
   document.querySelectorAll('.lf-serv').forEach(function(b){

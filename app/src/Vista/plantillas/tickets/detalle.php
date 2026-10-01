@@ -58,7 +58,12 @@ document.addEventListener('click', function(ev){
 <div class="lf-split">
   <div>
     <section class="card">
-      <header class="card-header">Conversación</header>
+      <header class="card-header">
+        <div><span>Conversación</span>
+          <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+            <?php $pub = 0; foreach ($mensajes as $x) if (empty($x['interno'])) $pub++; ?>
+            <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente</p></div>
+      </header>
       <div class="card-body">
         <?php foreach ($mensajes as $m): ?>
           <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?>">
