@@ -434,4 +434,54 @@ final class ReporteRepo extends Repo
         } catch (\Throwable $e) { $visto[$k] = false; }
         return $visto[$k];
     }
+
+    /**
+     * Cada comision, con el porque al lado.
+     *
+     * UN RENGLON POR COMISION, NO POR COLABORADOR
+     *
+     * El resumen dice que Gisselle gano $7,336.91. Esto dice de donde:
+     * de que venta, de que pago, con que porcentaje y sobre cuanto.
+     *
+     * Las tres columnas que explican el numero son el porcentaje, lo
+     * cobrado en ese pago y la proporcion: una comision del 30% sobre un
+     * anticipo del 25% no da el 30% de la venta, da el 30% de ese
+     * cuarto. Sin esas tres juntas, el monto parece sacado de la nada y
+     * el colaborador llega a preguntar.
+     */
+    public function comisionesDetalle($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT pc.colaborador_nombre              AS colaborador,
+                   v.codigo_venta                     AS folio,
+                   COALESCE(cl.nombre,'Publico general') AS cliente,
+                   v.fecha                            AS fecha_venta,
+                   p.fecha_pago,
+                   p.tipo                             AS tipo_pago,
+                   p.metodo_pago                      AS metodo,
+                   -- El area del SERVICIO, igual que en el resto
+                   COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin area') AS area,
+                   pc.area_nombre                     AS equipo,
+                   v.total                            AS total_venta,
+                   p.monto                            AS cobrado,
+                   pc.porcentaje,
+                   pc.proporcion_cobrada              AS proporcion,
+                   pc.monto                           AS comision
+            FROM pago_comisiones pc
+            INNER JOIN venta_pagos p ON p.id = pc.pago_id
+            INNER JOIN ventas v      ON v.id = pc.venta_id
+            LEFT  JOIN clientes cl   ON cl.id = v.cliente_id
+            WHERE v.estado <> 'cancelada' AND p.cancelado = 0
+              AND p.fecha_pago >= ? AND p.fecha_pago < ?
+            ORDER BY pc.colaborador_nombre, p.fecha_pago, v.codigo_venta",
+            [$a, $b]);
+    }
 }

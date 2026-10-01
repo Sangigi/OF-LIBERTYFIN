@@ -43,6 +43,9 @@ final class ReportesControlador
             'desglose'     => (new \LibertyFin\Servicio\Reportes($db))->desglose(
                                 $desde, $hasta, Peticion::opcion('por', ['servicio','origen'], 'servicio')),
             'por'          => Peticion::opcion('por', ['servicio','origen'], 'servicio'),
+            // El porque de cada comision, una tabla por colaborador.
+            'comisiones'   => (new \LibertyFin\Servicio\Reportes($db))
+                                ->desgloseComisiones($desde, $hasta),
             'desde'        => $desde, 'hasta' => $hasta,
         ]);
     }
@@ -169,6 +172,19 @@ final class ReportesControlador
                     'columnas' => $t['columnas'],
                     'filas'    => $t['filas'],
                     'totales'  => $t['totales'],
+                ];
+            }
+        } elseif ($tipo === 'colaborador' && Peticion::texto('detalle', '') === '1') {
+            // El resumen y, debajo, una tabla por colaborador con el
+            // porque de cada comision.
+            $reps[] = $srv->armar('colaborador', $desde, $hasta);
+            foreach ($srv->desgloseComisiones($desde, $hasta)['tablas'] as $t) {
+                $reps[] = [
+                    'tipo' => 'comisiones', 'titulo' => 'Comisiones de ' . $t['titulo'],
+                    'nota' => 'Cada renglón es un pago. La comisión sale del porcentaje '
+                            . 'aplicado sobre lo cobrado en ese pago, no sobre la venta completa.',
+                    'periodo' => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+                    'columnas' => $t['columnas'], 'filas' => $t['filas'], 'totales' => $t['totales'],
                 ];
             }
         } elseif (Peticion::texto('todos', '') === '1' || Peticion::texto('tipos', '') !== '') {

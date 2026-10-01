@@ -357,4 +357,65 @@ final class Reportes
             'total'   => array_sum(array_column($filas, 'cobrado')),
         ];
     }
+
+    /**
+     * Una tabla por colaborador, con el detalle de cada comision.
+     *
+     * Contesta la pregunta que llega cada quincena: "por que me toco
+     * esto". El resumen da el total; esto da los renglones.
+     */
+    public function desgloseComisiones($desde, $hasta)
+    {
+        static $cache = [];
+        $k = $desde . '|' . $hasta;
+        if (!isset($cache[$k])) {
+            $cache[$k] = (new ReporteRepo($this->db))->comisionesDetalle($desde, $hasta);
+        }
+        $filas = $cache[$k];
+
+        $grupos = [];
+        foreach ($filas as $f) $grupos[$f['colaborador'] ?: 'POR ASIGNAR'][] = $f;
+        uasort($grupos, function ($a, $b) {
+            return array_sum(array_column($b, 'comision'))
+               <=> array_sum(array_column($a, 'comision'));
+        });
+
+        $cols = [
+            ['Folio',        Libro::TEXTO,  17],
+            ['Cliente',      Libro::TEXTO,  30],
+            ['Área',         Libro::TEXTO,  24],
+            ['Fecha de pago',Libro::FECHA,  13],
+            ['Tipo',         Libro::TEXTO,  12],
+            ['Forma',        Libro::TEXTO,  14],
+            ['Total venta',  Libro::MONEDA, 14],
+            ['Cobrado',      Libro::MONEDA, 14],
+            ['% comisión',   Libro::PORCENT,11],
+            ['Sobre',        Libro::PORCENT,10],
+            ['Comisión',     Libro::MONEDA, 14],
+        ];
+
+        $tablas = [];
+        foreach ($grupos as $quien => $gf) {
+            $tablas[] = [
+                'titulo'   => $quien,
+                'columnas' => $cols,
+                'filas'    => array_map(function ($f) {
+                    return [$f['folio'], $f['cliente'], $f['area'], $f['fecha_pago'],
+                            ucfirst((string)$f['tipo_pago']), ucfirst((string)$f['metodo']),
+                            $f['total_venta'], $f['cobrado'],
+                            (float)$f['porcentaje'] / 100,
+                            (float)$f['proporcion'],
+                            $f['comision']];
+                }, $gf),
+                'totales'  => ['TOTAL ' . mb_strtoupper($quien), '', '', '', '', '',
+                    '', array_sum(array_column($gf, 'cobrado')), '', '',
+                    array_sum(array_column($gf, 'comision'))],
+                'pagos'    => count($gf),
+                'monto'    => array_sum(array_column($gf, 'comision')),
+            ];
+        }
+        return ['tablas' => $tablas, 'cuantas' => count($tablas),
+                'total' => array_sum(array_column($filas, 'comision')),
+                'pagos' => count($filas)];
+    }
 }

@@ -402,7 +402,100 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
     </div>
   </div>
 
-  <?php foreach ($reportes as $k => $rep): if ($k === 'desglose') continue; ?>
+  <?php /* Debajo del resumen por colaborador: el porque de cada comision. */ ?>
+  <div data-panel="colaborador" <?= $tipo==='colaborador' ? '' : 'hidden' ?>>
+    <?php $rep = $reportes['colaborador']; ?>
+    <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+      <table class="table">
+        <thead><tr>
+          <?php foreach ($rep['columnas'] as $c): ?>
+            <th<?= $derecha($c[1]) ? ' class="text-end"' : '' ?>><?= P::e($c[0]) ?></th>
+          <?php endforeach; ?>
+        </tr></thead>
+        <tbody>
+        <?php if (!$rep['filas']): ?>
+          <tr><td colspan="<?= count($rep['columnas']) ?>"
+              style="text-align:center;color:var(--lf-tinta-4);padding:32px">
+            No hay comisiones en este periodo.</td></tr>
+        <?php endif; ?>
+        <?php foreach ($rep['filas'] as $f): ?>
+          <tr>
+            <?php foreach ($rep['columnas'] as $j => $c): ?>
+              <td data-label="<?= P::e($c[0]) ?>"
+                  <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
+                <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+            <?php endforeach; ?>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+        <?php if ($rep['filas']): ?>
+        <tfoot><tr style="border-top:2px solid var(--lf-brand)">
+          <?php foreach ($rep['columnas'] as $j => $c): ?>
+            <td <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>
+                style="font-weight:700"><?= P::e($celda($rep['totales'][$j] ?? '', $c[1])) ?></td>
+          <?php endforeach; ?>
+        </tr></tfoot>
+        <?php endif; ?>
+      </table>
+    </div>
+
+    <?php if ($comisiones['tablas']): ?>
+      <div style="padding:18px 20px 6px">
+        <h3 style="font-size:14px;font-weight:700;margin:0 0 4px">De dónde sale cada comisión</h3>
+        <p style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.6;margin:0 0 4px">
+          Cada renglón es un pago. <b>La comisión no es un porcentaje de la venta:
+          es el porcentaje aplicado sobre lo que se cobró en ese pago.</b> Por eso un
+          anticipo del 25% con comisión del 30% no da el 30% de la venta.
+          Las columnas <b>% comisión</b> y <b>Sobre</b> explican el número.
+        </p>
+      </div>
+
+      <?php foreach ($comisiones['tablas'] as $tb): ?>
+        <details class="lf-colab">
+          <summary>
+            <span class="n"><?= P::e($tb['titulo']) ?></span>
+            <span class="p"><?= (int)$tb['pagos'] ?> pago<?= $tb['pagos']==1?'':'s' ?></span>
+            <b class="lf-mono"><?= D::pesos($tb['monto']) ?></b>
+          </summary>
+          <div class="table-responsive lf-cards">
+            <table class="table">
+              <thead><tr>
+                <?php foreach ($tb['columnas'] as $c): ?>
+                  <th<?= $derecha($c[1]) ? ' class="text-end"' : '' ?>><?= P::e($c[0]) ?></th>
+                <?php endforeach; ?>
+              </tr></thead>
+              <tbody>
+              <?php foreach ($tb['filas'] as $f): ?>
+                <tr>
+                  <?php foreach ($tb['columnas'] as $j => $c): ?>
+                    <td data-label="<?= P::e($c[0]) ?>"
+                        <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
+                      <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+                  <?php endforeach; ?>
+                </tr>
+              <?php endforeach; ?>
+              </tbody>
+              <tfoot><tr style="border-top:2px solid var(--lf-brand)">
+                <?php foreach ($tb['columnas'] as $j => $c): ?>
+                  <td <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>
+                      style="font-weight:700"><?= P::e($celda($tb['totales'][$j] ?? '', $c[1])) ?></td>
+                <?php endforeach; ?>
+              </tr></tfoot>
+            </table>
+          </div>
+        </details>
+      <?php endforeach; ?>
+    <?php endif; ?>
+
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <span><?= P::e($rep['nota']) ?></span>
+      <a class="btn btn-secondary btn-sm" target="_blank"
+         href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,
+               'tipo'=>'colaborador','detalle'=>1]) ?>">Imprimir con el detalle</a>
+    </div>
+  </div>
+
+  <?php foreach ($reportes as $k => $rep): if ($k === 'desglose' || $k === 'colaborador') continue; ?>
   <div data-panel="<?= $k ?>" <?= $tipo===$k ? '' : 'hidden' ?>>
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table">
