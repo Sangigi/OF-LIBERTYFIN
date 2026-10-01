@@ -15,6 +15,8 @@ final class ReportesControlador
 
         $desde = Peticion::fecha('desde', date('Y-m-01'));
         $hasta = Peticion::fecha('hasta', date('Y-m-t'));
+        $tipo  = Peticion::opcion('tipo',
+                    array_keys(\LibertyFin\Servicio\Reportes::TIPOS), 'area');
 
         Plantilla::pagina('reportes/index', [
             'titulo'       => 'Reportes',
@@ -26,17 +28,15 @@ final class ReportesControlador
             'servicios'    => $repo->porServicio($desde, $hasta, 10),
             'metodos'      => $repo->porMetodo($desde, $hasta),
             'colaboradores'=> $repo->porColaborador($desde, $hasta),
+            // Los ocho reportes: la lista para las pestañas y el que se
+            // está viendo. Salen del mismo sitio que el Excel y la hoja
+            // imprimible, para que no puedan decir cosas distintas.
+            'tipos'        => \LibertyFin\Servicio\Reportes::TIPOS,
+            'tipo'         => $tipo,
+            'reporte'      => (new \LibertyFin\Servicio\Reportes($db))->armar($tipo, $desde, $hasta),
             'desde'        => $desde, 'hasta' => $hasta,
         ]);
     }
-
-    /**
-     * Descarga el detalle en CSV.
-     *
-     * Con BOM y punto y coma: sin eso, Excel en español abre el archivo
-     * con todo en una columna y rompe los acentos. Es un detalle tonto
-     * que hace la diferencia entre un reporte que se usa y uno que no.
-     */
 
     /**
      * Descarga el periodo en Excel, un reporte por hoja.
