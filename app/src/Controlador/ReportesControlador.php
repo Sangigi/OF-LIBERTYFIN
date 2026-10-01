@@ -125,8 +125,30 @@ final class ReportesControlador
         $reps = [];
         $filtradas = null;
 
+        $por = Peticion::opcion('por', ['servicio', 'origen'], 'servicio');
+
+        // El desglose se imprime como VARIOS reportes, uno por area, no
+        // como una tabla gigante con renglones de titulo en medio. Asi
+        // cada area empieza en su hoja, con su encabezado repetido, y se
+        // puede arrancar la de Legal y mandarla sola.
+        $armarDesglose = function () use ($srv, $desde, $hasta, $por) {
+            $d = $srv->desglose($desde, $hasta, $por);
+            $r = [];
+            foreach ($d['tablas'] as $t) {
+                $r[] = [
+                    'tipo'     => 'desglose',
+                    'titulo'   => $t['titulo'],
+                    'nota'     => 'Agrupado por el area ' . $d['rotulo'] . '.',
+                    'periodo'  => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+                    'columnas' => $t['columnas'],
+                    'filas'    => $t['filas'],
+                    'totales'  => $t['totales'],
+                ];
+            }
+            return $r;
+        };
+
         if ($tipo === 'desglose') {
-            $por = Peticion::opcion('por', ['servicio', 'origen'], 'servicio');
             $d = $srv->desglose($desde, $hasta, $por);
 
             // `areas` llega como lista separada por |. Se comparan contra
@@ -156,7 +178,13 @@ final class ReportesControlador
                          $todosLosTipos))
                      : $todosLosTipos;
             foreach ($pedidos as $t) {
-                if ($t === 'desglose') continue;   // ese se pide aparte
+                // Al imprimir todo se incluye el desglose, en tablas
+                // separadas. Saltarselo dejaba fuera justo el reporte
+                // que mas se usa.
+                if ($t === 'desglose') {
+                    foreach ($armarDesglose() as $x) $reps[] = $x;
+                    continue;
+                }
                 $reps[] = $srv->armar($t, $desde, $hasta);
             }
         } else {

@@ -5,7 +5,11 @@ use LibertyFin\Dominio\Dinero as D;
 
 /** Da formato a una celda según el tipo de su columna. */
 $fmt = function ($v, $tipo) {
-    if ($v === null || $v === '') return '–';
+    // Una celda vacia se deja VACIA. La raya era para distinguir "no
+    // hay dato" de "se me olvido", pero cuando una columna entera esta
+    // vacia —la descripcion de los servicios, por ejemplo— la hoja se
+    // llena de rayas y se vuelve ilegible.
+    if ($v === null || $v === '') return '';
     switch ($tipo) {
         case L::MONEDA:  return D::pesos($v);
         case L::NUMERO:  return number_format((float)$v);
@@ -87,7 +91,7 @@ $alineado = function ($tipo) {
     <?php endif; ?>
     <p class="pie">
       Generado el <?= date('d/m/Y \a \l\a\s H:i') ?> ·
-      <?= count($rep['filas']) ?> renglón<?= count($rep['filas'])==1?'':'es' ?>
+      <?= count($rep['filas']) ?> <?= count($rep['filas'])==1 ? 'renglón' : 'renglones' ?>
     </p>
   </section>
   <?php endforeach; ?>

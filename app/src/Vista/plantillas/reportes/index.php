@@ -260,17 +260,19 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
       </span>
     </div>
     <div class="ops">
-      <?php foreach ($tipos as $k => $t): if ($k === 'desglose') continue; ?>
+      <?php foreach ($tipos as $k => $t): ?>
         <label>
           <input type="checkbox" value="<?= $k ?>" <?= $tipo===$k?'checked':'' ?>>
           <span><?= P::e($t['rotulo']) ?>
-            <small><?= count($reportes[$k]['filas']) ?></small></span>
+            <small><?= $k === 'desglose'
+                       ? $desglose['cuantas'] . ' tablas'
+                       : count($reportes[$k]['filas']) ?></small></span>
         </label>
       <?php endforeach; ?>
     </div>
     <a class="btn btn-primary btn-sm ir" href="#" target="_blank">Imprimir</a>
-    <p class="nota">El desglose por área se imprime desde su propia pestaña,
-      porque ahí se eligen las tablas una por una.</p>
+    <p class="nota">El desglose sale con una tabla por área. Para elegir
+      <b>cuáles</b> áreas, hazlo desde su propia pestaña.</p>
   </div>
 
   <div class="lf-pills" style="padding:4px 20px 14px" role="tablist">
