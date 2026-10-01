@@ -11,7 +11,9 @@ use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Dominio\Dinero as D;
 ?>
 <?php if (!$d['filas']): ?>
-  <p class="lf-det-vacio">No hay ventas con comisión en este periodo.</p>
+  <p class="lf-det-vacio"><?= $d['q'] !== ''
+      ? 'Sin resultados para «' . P::e($d['q']) . '».'
+      : 'No hay ventas con comisión en este periodo.' ?></p>
 <?php else: ?>
   <div class="table-responsive lf-cards">
     <table class="table table-hover">
@@ -43,7 +45,8 @@ use LibertyFin\Dominio\Dinero as D;
   </div>
 <?php endif; ?>
 <div class="lf-det-pie">
-  <span><?= (int)$d['total'] ?> venta<?= $d['total'] == 1 ? '' : 's' ?> ·
+  <span><?= $d['q'] !== '' ? (int)$d['total'] . ' de ' . (int)$d['total_todos'] : (int)$d['total'] ?>
+    venta<?= $d['total_todos'] == 1 && $d['q'] === '' ? '' : 's' ?> ·
     devengado <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($d['devengado']) ?></b></span>
   <?php P::parcial('parciales/paginacion', [
       'pagina' => $d['pagina'], 'paginas' => $d['paginas'], 'enlace' => $enlace]); ?>

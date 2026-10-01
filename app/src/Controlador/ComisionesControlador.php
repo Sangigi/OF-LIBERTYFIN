@@ -63,14 +63,17 @@ final class ComisionesControlador
         $hasta  = Peticion::fecha('hasta', date('Y-m-t'));
         $nombre = Peticion::texto('nombre');
         $equipo = Peticion::texto('equipo');
+        $q      = mb_substr(Peticion::texto('q'), 0, 100);
 
         $d = $repo->detalleColaborador((int)$id, $nombre, $equipo, $desde, $hasta,
-                                       Peticion::entero('p', 1), Peticion::POR_PAGINA);
+                                       Peticion::entero('p', 1), Peticion::POR_PAGINA, $q);
 
         $base = '/comisiones/colaborador/' . (int)$id;
-        $qs   = function ($p) use ($desde, $hasta, $nombre, $equipo) {
-            return http_build_query(['desde' => $desde, 'hasta' => $hasta,
-                'nombre' => $nombre, 'equipo' => $equipo, 'p' => $p]);
+        $qs   = function ($p) use ($desde, $hasta, $nombre, $equipo, $q) {
+            $x = ['desde' => $desde, 'hasta' => $hasta,
+                  'nombre' => $nombre, 'equipo' => $equipo, 'p' => $p];
+            if ($q !== '') $x['q'] = $q;        // la paginación conserva la búsqueda
+            return http_build_query($x);
         };
 
         header('Content-Type: text/html; charset=utf-8');

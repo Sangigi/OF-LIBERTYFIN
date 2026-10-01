@@ -283,6 +283,9 @@ $qs = function ($x = []) use ($desde, $hasta) {
 .lf-win-btns button:focus-visible{outline:2px solid var(--lf-brand);outline-offset:1px}
 .lf-win-btns svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;
   stroke-width:2;stroke-linecap:round}
+.lf-win-busca{padding:8px 12px;border-bottom:1px solid var(--lf-linea);flex-shrink:0}
+.lf-win-busca .lf-search input{padding-top:7px;padding-bottom:7px;font-size:12.5px}
+.lf-win.mini .lf-win-busca{display:none}
 .lf-win-cuerpo{flex:1;min-height:0;overflow:auto;position:relative}
 .lf-win-cuerpo .table-responsive{padding:2px 8px 0}
 .lf-win.cargando .lf-win-cuerpo{opacity:.55;pointer-events:none}
@@ -320,6 +323,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
   var MIN_W = 320, MIN_H = 180;
   var ICO_MIN = '<svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg>';
   var ICO_MAX = '<svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>';
+  var ICO_BUSCAR = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
   var ICO_X   = '<svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 
   function esc(t) {
@@ -376,9 +380,21 @@ $qs = function ($x = []) use ($desde, $hasta) {
     w.style.top  = limitar(r.top, 4, innerHeight - 44) + 'px';
   }
 
+  function urlDe(w, p) {
+    var b = w._base;
+    var q = new URLSearchParams({ desde: b.desde, hasta: b.hasta,
+      nombre: b.nombre, equipo: b.equipo, p: p || 1 });
+    if (w._q) q.set('q', w._q);
+    return '/comisiones/colaborador/' + b.id + '?' + q;
+  }
+
   function cargar(w, url) {
+    /* Si se sigue escribiendo, la petición anterior ya no sirve. */
+    if (w._ac) w._ac.abort();
+    w._ac = window.AbortController ? new AbortController() : null;
     w.classList.add('cargando');
-    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
+                 signal: w._ac ? w._ac.signal : undefined })
       .then(function (r) {
         if (r.redirected) { location.reload(); throw 0; }     /* sesión vencida */
         if (!r.ok) throw new Error(r.status);
@@ -391,7 +407,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
         w.classList.remove('cargando');
       })
       .catch(function (e) {
-        if (e === 0) return;
+        if (e === 0 || (e && e.name === 'AbortError')) return;
         w.classList.remove('cargando');
         w.dataset.url = url;
         w.querySelector('.lf-win-cuerpo').innerHTML =
@@ -430,6 +446,10 @@ $qs = function ($x = []) use ($desde, $hasta) {
           '<button type="button" class="cerrar" title="Cerrar" aria-label="Cerrar">' + ICO_X + '</button>' +
         '</div>' +
       '</div>' +
+      '<div class="lf-win-busca"><div class="lf-search">' + ICO_BUSCAR +
+        '<input class="form-control form-control-sm" type="search" autocomplete="off" ' +
+        'placeholder="Buscar cliente, folio, área, fecha o monto…" aria-label="Buscar en las ventas">' +
+      '</div></div>' +
       '<div class="lf-win-cuerpo"><p class="lf-win-msj">Cargando…</p></div>' +
       '<span class="lf-win-grip sw" data-grip="sw"></span>' +
       '<span class="lf-win-grip se" data-grip="se"></span>';
@@ -445,11 +465,10 @@ $qs = function ($x = []) use ($desde, $hasta) {
     alFrente(w);
     card.classList.add('abierta');
 
-    var q = new URLSearchParams({
-      desde: cont.dataset.desde, hasta: cont.dataset.hasta,
-      nombre: card.dataset.nombre, equipo: card.dataset.equipo, p: 1
-    });
-    cargar(w, '/comisiones/colaborador/' + card.dataset.id + '?' + q);
+    w._base = { id: card.dataset.id, desde: cont.dataset.desde, hasta: cont.dataset.hasta,
+                nombre: card.dataset.nombre, equipo: card.dataset.equipo };
+    w._q = '';
+    cargar(w, urlDe(w, 1));
   }
 
   /* ── Arrastrar desde la barra ── */
@@ -535,9 +554,38 @@ $qs = function ($x = []) use ($desde, $hasta) {
     if (card) abrir(card);
   });
 
+  /* Búsqueda: espera a que se deje de escribir y consulta en el servidor,
+     para que cubra TODAS las ventas y no solo las de la página visible. */
+  document.addEventListener('input', function (ev) {
+    var inp = ev.target.closest && ev.target.closest('.lf-win-busca input');
+    if (!inp) return;
+    var w = inp.closest('.lf-win');
+    clearTimeout(w._t);
+    w._t = setTimeout(function () {
+      var q = inp.value.replace(/\s+/g, ' ').trim();
+      if (q === w._q) return;
+      w._q = q;
+      cargar(w, urlDe(w, 1));
+    }, 300);
+  });
+
   document.addEventListener('keydown', function (ev) {
     var w = ev.target.closest && ev.target.closest('.lf-win');
-    if (w && ev.key === 'Escape') { cerrar(w); return; }
+    if (w && ev.key === 'Enter' && ev.target.closest('.lf-win-busca input')) {
+      ev.preventDefault();
+      clearTimeout(w._t);
+      w._q = ev.target.value.replace(/\s+/g, ' ').trim();
+      cargar(w, urlDe(w, 1));
+      return;
+    }
+    /* Esc en el buscador: primero limpia; con el campo vacío, cierra. */
+    if (w && ev.key === 'Escape') {
+      var campo = ev.target.closest('.lf-win-busca input');
+      if (campo && campo.value !== '') {
+        campo.value = ''; clearTimeout(w._t); w._q = ''; cargar(w, urlDe(w, 1));
+      } else { cerrar(w); }
+      return;
+    }
     if (ev.key !== 'Enter' && ev.key !== ' ') return;
     var card = ev.target.closest && ev.target.closest('.lf-pers[data-id]');
     if (card && ev.target === card) { ev.preventDefault(); abrir(card); }

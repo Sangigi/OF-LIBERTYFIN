@@ -305,18 +305,71 @@ final class ComisionRepo extends Repo
     }
 
     /**
+     * Condición de búsqueda sobre las columnas de `detalleColaborador`.
+     *
+     * Cada palabra tiene que aparecer en ALGUNA columna (cliente, folio,
+     * área, fecha, porcentaje, devengado, por liberar) y todas las
+     * palabras tienen que cumplirse: "legales 12000" encuentra las ventas
+     * de legales cuyo monto contiene 12000.
+     *
+     * Los montos se comparan sin "$" ni comas, así que "$1,200.50",
+     * "1,200" y "1200" encuentran lo mismo. Es coincidencia parcial:
+     * "50" también encuentra 150.00. Se escapan % _ \ para que lo escrito
+     * se busque literal y no como comodín.
+     *
+     * @return array [$sql, $params]  $sql empieza con " AND " o es ''.
+     */
+    private function condicionBusqueda($q)
+    {
+        $q = trim(preg_replace('/\s+/u', ' ', (string)$q));
+        if ($q === '') return ['', []];
+
+        $esc = function ($t) { return '%' . addcslashes($t, '%_\\') . '%'; };
+        $col = function ($e) { return "CONVERT(" . $e . " USING utf8mb4) COLLATE utf8mb4_unicode_ci"; };
+        $sql = ''; $par = [];
+        foreach (array_slice(explode(' ', $q), 0, 6) as $t) {
+            $t = mb_substr($t, 0, 60);
+            if ($t === '') continue;
+            $num = str_replace(['$', ','], '', $t);          // "$1,200.50" -> "1200.50"
+            $num = preg_match('/^\d*\.?\d+$|^\d+\.$/', $num) ? $num : null;
+
+            // CONVERT + COLLATE: `area_servicio` mezcla columnas de tablas con
+            // distinta collation (categorias suele ser _bin) y MySQL responde
+            // "Illegal mix of collations". Así todo se compara igual, sin
+            // distinguir mayúsculas ni acentos ("publico" encuentra "Público").
+            $c = $col("t.codigo_venta") . " LIKE ?"
+               . " OR " . $col("COALESCE(t.cliente,'Público general')") . " LIKE ?"
+               . " OR " . $col("t.area_servicio") . " LIKE ?"
+               . " OR DATE_FORMAT(t.fecha,'%d %b %Y') LIKE ?"      // "10 Sep 2026", como se ve
+               . " OR DATE_FORMAT(t.fecha,'%d/%m/%Y') LIKE ?"
+               . " OR DATE_FORMAT(t.fecha,'%Y-%m-%d') LIKE ?";
+            array_push($par, $esc($t), $esc($t), $esc($t), $esc($t), $esc($t), $esc($t));
+            if ($num !== null) {
+                $c .= " OR CAST(t.devengado AS CHAR) LIKE ? OR CAST(t.pendiente AS CHAR) LIKE ?"
+                    . " OR CAST(t.porcentaje AS CHAR) LIKE ?";
+                array_push($par, $esc($num), $esc($num), $esc($num));
+            }
+            $sql .= " AND (" . $c . ")";
+        }
+        return [$sql, $par];
+    }
+
+    /**
      * Detalle de UN colaborador: sus ventas del periodo, de la más
-     * reciente a la más vieja.
+     * reciente a la más vieja, con búsqueda opcional ($q).
      *
      * Filtra por los mismos tres campos con los que `porColaborador`
      * agrupa (id, nombre y equipo), para que la suma del panel sea
-     * exactamente la cifra de la tarjeta que se expandió. `<=>` porque
+     * exactamente la cifra de la tarjeta que se abrió. `<=>` porque
      * el id y el equipo pueden ser NULL y `= NULL` nunca coincide.
      *
      * Una fila por VENTA, no por pago: es lo que cuenta la tarjeta
      * ("N ventas") y lo que la oficina reconoce.
+     *
+     * La búsqueda se hace en el servidor y sobre TODAS las ventas del
+     * colaborador, no solo las de la página visible.
      */
-    public function detalleColaborador($colabId, $nombre, $equipo, $desde, $hasta, $pagina, $porPag)
+    public function detalleColaborador($colabId, $nombre, $equipo, $desde, $hasta, $pagina, $porPag, $q = '')
     {
         list($a, $b) = $this->rango($desde, $hasta);
         $id     = $colabId > 0 ? (int)$colabId : null;
@@ -324,6 +377,7 @@ final class ComisionRepo extends Repo
         $pagina = max(1, (int)$pagina);
         $porPag = max(1, (int)$porPag);
 
+        // Todo el periodo, sin búsqueda: es el "de N" y el total real.
         $tot = $this->uno("
             SELECT COUNT(DISTINCT pc.venta_id) AS ventas,
                    COALESCE(SUM(pc.monto),0)   AS devengado
@@ -333,12 +387,8 @@ final class ComisionRepo extends Repo
               AND v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
         ", [$id, $nombre, $equipo, $a, $b]) ?: ['ventas' => 0, 'devengado' => 0];
 
-        $total   = (int)$tot['ventas'];
-        $paginas = max(1, (int)ceil($total / $porPag));
-        $pagina  = min($pagina, $paginas);
-        $off     = ($pagina - 1) * $porPag;
-
-        $filas = $this->todos("
+        // Una fila por venta; sobre esto se busca, se cuenta y se pagina.
+        $base = "
             SELECT v.id AS venta_id, v.codigo_venta, v.fecha,
                    c.nombre AS cliente,
                    -- Área del SERVICIO, igual que en el resto del módulo.
@@ -368,17 +418,40 @@ final class ComisionRepo extends Repo
                 GROUP BY venta_id
             ) asg ON asg.venta_id = v.id
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
-            ORDER BY v.fecha DESC, v.id DESC
-            LIMIT " . (int)$porPag . " OFFSET " . (int)$off,
-            [$id, $nombre, $equipo, $id, $nombre, $equipo, $a, $b]);
+            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'";
+        $pBase = [$id, $nombre, $equipo, $id, $nombre, $equipo, $a, $b];
+
+        list($cond, $pCond) = $this->condicionBusqueda($q);
+
+        if ($cond === '') {
+            $total = (int)$tot['ventas'];
+            $suma  = (float)$tot['devengado'];
+        } else {
+            $f = $this->uno("SELECT COUNT(*) AS n, COALESCE(SUM(t.devengado),0) AS s
+                             FROM (" . $base . ") t WHERE 1=1" . $cond,
+                            array_merge($pBase, $pCond)) ?: ['n' => 0, 's' => 0];
+            $total = (int)$f['n'];
+            $suma  = (float)$f['s'];
+        }
+
+        $paginas = max(1, (int)ceil($total / $porPag));
+        $pagina  = min($pagina, $paginas);
+        $off     = ($pagina - 1) * $porPag;
+
+        $filas = $this->todos("SELECT t.* FROM (" . $base . ") t WHERE 1=1" . $cond
+            . " ORDER BY t.fecha DESC, t.venta_id DESC"
+            . " LIMIT " . (int)$porPag . " OFFSET " . (int)$off,
+            array_merge($pBase, $pCond));
 
         return [
-            'filas'     => $filas,
-            'total'     => $total,
-            'devengado' => (float)$tot['devengado'],
-            'pagina'    => $pagina,
-            'paginas'   => $paginas,
+            'filas'           => $filas,
+            'total'           => $total,
+            'devengado'       => $suma,
+            'total_todos'     => (int)$tot['ventas'],
+            'devengado_todos' => (float)$tot['devengado'],
+            'q'               => trim((string)$q),
+            'pagina'          => $pagina,
+            'paginas'         => $paginas,
         ];
     }
 }
