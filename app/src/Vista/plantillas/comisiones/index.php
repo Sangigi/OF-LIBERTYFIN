@@ -157,7 +157,8 @@ $qs = function ($x = []) use ($desde, $hasta) {
           <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
         <div style="flex:1;min-width:0">
           <b><?= P::e($c['colaborador_nombre']) ?></b>
-          <small><?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
+          <small><?= P::e($c['area_nombre']) ?> ·
+            <?= (int)$c['ventas'] ?> <?= $c['ventas']==1 ? 'pago' : 'pagos' ?></small>
           <?php W::avance($mayor > 0 ? $c['devengado'] / $mayor * 100 : 0, $huerfano); ?>
         </div>
         <span class="mn"><?= D::pesos($c['devengado']) ?>

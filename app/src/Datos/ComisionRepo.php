@@ -64,7 +64,8 @@ final class ComisionRepo extends Repo
                    -- el área del trabajo. Se conserva con su nombre
                    -- propio porque sigue siendo útil saber de qué equipo
                    -- es alguien, pero ya no se llama area a secas.
-                   pc.area_nombre AS equipo,
+                   GROUP_CONCAT(DISTINCT pc.area_nombre
+                       ORDER BY pc.area_nombre SEPARATOR ', ') AS equipo,
                    -- El ÁREA es la del servicio que se vendió. Un
                    -- colaborador puede comisionar en varias.
                    GROUP_CONCAT(DISTINCT COALESCE((
@@ -90,7 +91,13 @@ final class ComisionRepo extends Repo
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
             WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
-            GROUP BY pc.colaborador_id, pc.colaborador_nombre, pc.area_nombre
+            -- SE AGRUPA POR PERSONA, NO POR PERSONA Y EQUIPO.
+            --
+            -- `pc.area_nombre` es el equipo al que pertenecia esa
+            -- comision. Incluirlo en el GROUP BY partia en dos a quien
+            -- comisiona en varios: Gisselle salia dos veces, una con
+            -- $2,633.18 y otra con $150.00, y nadie sabia cual mirar.
+            GROUP BY pc.colaborador_id, pc.colaborador_nombre
             ORDER BY sin_dueno ASC, devengado DESC
         ", [self::SIN_DUENO, $a, $b]);
     }
