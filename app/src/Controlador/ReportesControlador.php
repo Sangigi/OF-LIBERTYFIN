@@ -89,29 +89,87 @@ final class ReportesControlador
      * ve bien, respeta los acentos, repite el encabezado en cada página y
      * numera. Y se imprime directo, que es lo que casi siempre quieren.
      */
+    /**
+     * La hoja imprimible, que el navegador convierte en PDF.
+     *
+     * POR QUE NO SE ESCRIBE UN PDF
+     *
+     * Generar PDF en PHP sin librerias significa dibujar texto a mano,
+     * sin acentos decentes ni control de saltos de pagina. Con una hoja
+     * HTML y `@media print`, el navegador lo convierte en un PDF que se
+     * ve bien, respeta los acentos, repite el encabezado en cada pagina
+     * y numera. Y se imprime directo, que es lo que casi siempre
+     * quieren.
+     *
+     * QUE SE IMPRIME
+     *
+     *   tipo=X            un reporte
+     *   todos=1           los ocho
+     *   tipos=a,b,c       solo esos
+     *   tipo=desglose     todas las tablas del desglose
+     *     + areas=a|b     solo esas areas
+     *
+     * El filtro existe porque imprimir todo para leer una tabla gasta
+     * papel y esconde lo que se buscaba. Quien imprime casi siempre
+     * quiere una cosa concreta.
+     */
     public function imprimir()
     {
         $db = Conexion::de($_SESSION['empresa_db']);
         $desde = Peticion::fecha('desde', date('Y-m-01'));
         $hasta = Peticion::fecha('hasta', date('Y-m-t'));
-        $tipo = Peticion::opcion('tipo',
-            array_keys(\LibertyFin\Servicio\Reportes::TIPOS), 'area');
+        $srv   = new \LibertyFin\Servicio\Reportes($db);
+        $todosLosTipos = array_keys(\LibertyFin\Servicio\Reportes::TIPOS);
 
-        $srv = new \LibertyFin\Servicio\Reportes($db);
-        // "todos" imprime los ocho, uno tras otro: es el paquete que se
-        // manda al contador a fin de mes.
-        $reps = Peticion::texto('todos', '') === '1'
-              ? array_map(function ($t) use ($srv, $desde, $hasta) {
-                    return $srv->armar($t, $desde, $hasta); },
-                  array_keys(\LibertyFin\Servicio\Reportes::TIPOS))
-              : [$srv->armar($tipo, $desde, $hasta)];
+        $tipo = Peticion::opcion('tipo', $todosLosTipos, 'area');
+        $reps = [];
+        $filtradas = null;
+
+        if ($tipo === 'desglose') {
+            $por = Peticion::opcion('por', ['servicio', 'origen'], 'servicio');
+            $d = $srv->desglose($desde, $hasta, $por);
+
+            // `areas` llega como lista separada por |. Se comparan contra
+            // los titulos reales: un titulo que ya no existe —porque
+            // cambio el periodo— simplemente no aparece, en vez de dejar
+            // la hoja en blanco sin explicar por que.
+            $pedidas = array_filter(array_map('trim',
+                explode('|', Peticion::texto('areas', ''))));
+            $filtradas = $pedidas ? count($pedidas) : null;
+
+            foreach ($d['tablas'] as $t) {
+                if ($pedidas && !in_array($t['titulo'], $pedidas, true)) continue;
+                $reps[] = [
+                    'tipo'     => 'desglose',
+                    'titulo'   => $t['titulo'],
+                    'nota'     => 'Agrupado por el área ' . $d['rotulo'] . '.',
+                    'periodo'  => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+                    'columnas' => $t['columnas'],
+                    'filas'    => $t['filas'],
+                    'totales'  => $t['totales'],
+                ];
+            }
+        } elseif (Peticion::texto('todos', '') === '1' || Peticion::texto('tipos', '') !== '') {
+            $pedidos = Peticion::texto('tipos', '') !== ''
+                     ? array_values(array_intersect(
+                         array_map('trim', explode(',', Peticion::texto('tipos', ''))),
+                         $todosLosTipos))
+                     : $todosLosTipos;
+            foreach ($pedidos as $t) {
+                if ($t === 'desglose') continue;   // ese se pide aparte
+                $reps[] = $srv->armar($t, $desde, $hasta);
+            }
+        } else {
+            $reps[] = $srv->armar($tipo, $desde, $hasta);
+        }
 
         Plantilla::pagina('reportes/imprimir', [
-            'titulo'   => 'Reportes',
-            'reportes' => $reps,
-            'periodo'  => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
-            'empresa'  => $_SESSION['empresa_nombre'] ?? 'LibertyFin',
-            'auto'     => Peticion::texto('auto', '') === '1',
+            'titulo'    => 'Reportes',
+            'reportes'  => $reps,
+            'periodo'   => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+            'empresa'   => $_SESSION['empresa_nombre'] ?? 'LibertyFin',
+            'auto'      => Peticion::texto('auto', '') === '1',
+            'filtradas' => $filtradas,
         ], 'layout-limpio');
     }
 }

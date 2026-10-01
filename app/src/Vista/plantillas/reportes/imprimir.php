@@ -22,8 +22,18 @@ $alineado = function ($tipo) {
   <div class="barra">
     <button type="button" onclick="window.print()">Imprimir o guardar en PDF</button>
     <a href="/reportes">Volver</a>
+    <?php if ($filtradas !== null): ?>
+      <span class="filtro"><?= count($reportes) ?> de las seleccionadas</span>
+    <?php endif; ?>
   </div>
 
+  <?php if (!$reportes): ?>
+    <section class="rep">
+      <header><div><h1>No hay nada que imprimir</h1>
+        <p class="per">Ninguna de las tablas que elegiste tiene datos en este
+          periodo, o cambiaron al cambiar las fechas.</p></div></header>
+    </section>
+  <?php endif; ?>
   <?php foreach ($reportes as $i => $rep): ?>
   <?php
   // Con muchas columnas se baja el tamaño al imprimir. Con pocas no
@@ -93,6 +103,8 @@ body{background:#eef1ef;margin:0;
   font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
 .barra button:hover{background:#1f8b4d}
 .barra a{font-size:13px;color:#43504a}
+.barra .filtro{font-size:12px;color:#1f8b4d;background:#e8f6ee;
+  padding:5px 12px;border-radius:99px;font-weight:600}
 
 .rep{background:#fff;border-radius:12px;padding:30px 32px;margin-bottom:22px;
   box-shadow:0 2px 10px rgba(0,0,0,.07)}

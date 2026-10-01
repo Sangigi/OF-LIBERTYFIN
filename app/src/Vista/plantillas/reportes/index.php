@@ -244,11 +244,34 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
       <a class="btn btn-primary btn-sm"
          href="/reportes/excel?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta]) ?>">
         <?= W::icono('baja','14px') ?>Excel completo</a>
-      <a class="btn btn-secondary btn-sm" target="_blank"
-         href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'todos'=>1]) ?>">
-        Imprimir todos</a>
+      <button type="button" class="btn btn-secondary btn-sm" id="abrirElegirTipos">
+        Imprimir…</button>
     </div>
   </header>
+
+  <?php /* Qué reportes imprimir, cuando son varios */ ?>
+  <div class="lf-elegir" id="elegirTipos" hidden
+       data-base="/reportes/imprimir?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta])) ?>">
+    <div class="cab">
+      <b><?= W::icono('baja','15px') ?>Qué imprimir</b>
+      <span class="todas">
+        <button type="button" data-todas="1">Todos</button>
+        <button type="button" data-todas="0">Ninguno</button>
+      </span>
+    </div>
+    <div class="ops">
+      <?php foreach ($tipos as $k => $t): if ($k === 'desglose') continue; ?>
+        <label>
+          <input type="checkbox" value="<?= $k ?>" <?= $tipo===$k?'checked':'' ?>>
+          <span><?= P::e($t['rotulo']) ?>
+            <small><?= count($reportes[$k]['filas']) ?></small></span>
+        </label>
+      <?php endforeach; ?>
+    </div>
+    <a class="btn btn-primary btn-sm ir" href="#" target="_blank">Imprimir</a>
+    <p class="nota">El desglose por área se imprime desde su propia pestaña,
+      porque ahí se eligen las tablas una por una.</p>
+  </div>
 
   <div class="lf-pills" style="padding:4px 20px 14px" role="tablist">
     <?php foreach ($tipos as $k => $t): ?>
@@ -295,6 +318,31 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
     <?php if (!$desglose['tablas']): ?>
       <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:32px">
         No hay ventas en este periodo.</p>
+    <?php else: ?>
+      <?php /* Elegir qué tablas imprimir. Imprimir las nueve para leer
+               una gasta papel y esconde lo que se buscaba. */ ?>
+      <div class="lf-elegir" id="elegirAreas"
+           data-base="/reportes/imprimir?<?= P::e(http_build_query(
+             ['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose','por'=>$por])) ?>">
+        <div class="cab">
+          <b><?= W::icono('baja','15px') ?>Imprimir</b>
+          <span class="todas">
+            <button type="button" data-todas="1">Todas</button>
+            <button type="button" data-todas="0">Ninguna</button>
+          </span>
+        </div>
+        <div class="ops">
+          <?php foreach ($desglose['tablas'] as $tb): ?>
+            <label>
+              <input type="checkbox" value="<?= P::e($tb['titulo']) ?>" checked>
+              <span><?= P::e($tb['titulo']) ?>
+                <small><?= count($tb['filas']) ?></small></span>
+            </label>
+          <?php endforeach; ?>
+        </div>
+        <a class="btn btn-primary btn-sm ir" href="#" target="_blank">
+          Imprimir las <?= count($desglose['tablas']) ?></a>
+      </div>
     <?php endif; ?>
 
     <?php foreach ($desglose['tablas'] as $tb): ?>
@@ -400,3 +448,67 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
   </div>
   <?php endforeach; ?>
 </section>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   ELEGIR QUÉ IMPRIMIR
+   Las casillas arman la dirección. El botón siempre dice
+   cuántas van, porque "Imprimir" a secas no deja claro si
+   respeta lo marcado.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  document.querySelectorAll('.lf-elegir').forEach(function (caja) {
+    var ir    = caja.querySelector('.ir');
+    var base  = caja.dataset.base;
+    var esAreas = caja.id === 'elegirAreas';
+
+    function refrescar() {
+      var marcadas = Array.prototype.filter
+        .call(caja.querySelectorAll('input[type=checkbox]'), function (c) { return c.checked; })
+        .map(function (c) { return c.value; });
+      var total = caja.querySelectorAll('input[type=checkbox]').length;
+
+      if (!marcadas.length) {
+        ir.classList.add('apagado');
+        ir.removeAttribute('href');
+        ir.textContent = 'Elige al menos una';
+        return;
+      }
+      ir.classList.remove('apagado');
+
+      /* Si están todas, no se manda el filtro: la dirección queda
+         corta y se puede compartir sin arrastrar una lista enorme. */
+      var url = base;
+      if (marcadas.length < total) {
+        url += '&' + (esAreas ? 'areas=' : 'tipos=')
+             + marcadas.map(encodeURIComponent).join(esAreas ? '|' : ',');
+      } else if (!esAreas) {
+        url += '&todos=1';
+      }
+      ir.href = url;
+      ir.textContent = marcadas.length === total
+        ? ('Imprimir ' + (esAreas ? 'las ' : 'los ') + total)
+        : ('Imprimir ' + marcadas.length + ' de ' + total);
+    }
+
+    caja.addEventListener('change', refrescar);
+    caja.querySelectorAll('[data-todas]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = b.dataset.todas === '1';
+        caja.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = v; });
+        refrescar();
+      });
+    });
+    refrescar();
+  });
+
+  var abrir = document.getElementById('abrirElegirTipos');
+  var caja  = document.getElementById('elegirTipos');
+  if (abrir && caja) {
+    abrir.addEventListener('click', function () {
+      caja.hidden = !caja.hidden;
+      if (!caja.hidden) caja.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }
+})();
+</script>
