@@ -142,12 +142,17 @@ $token = $_SESSION['lf_token'];
       <label class="form-label">Especialista asignado</label>
       <select class="form-select form-select-sm" name="especialista">
         <option value="">Sin asignar</option>
-        <?php foreach ($equipo as $u): if (empty($u['activo'])) continue; ?>
-          <option value="<?= (int)$u['id'] ?>"><?= P::e($u['nombre']) ?></option>
+        <?php foreach ($equipo as $area => $gente): ?>
+          <optgroup label="<?= P::e($area) ?>">
+            <?php foreach ($gente as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= P::e($c['nombre']) ?></option>
+            <?php endforeach; ?>
+          </optgroup>
         <?php endforeach; ?>
       </select>
       <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 0 14px;line-height:1.45">
-        Quién va a hacer el trabajo, no quién está cobrando.
+        Quién va a hacer el trabajo, no quién está cobrando. Son los
+        colaboradores de <a href="/ajustes?t=comisiones">Áreas y colaboradores</a>.
       </p>
 
       <label class="form-label">Descripción de la venta</label>

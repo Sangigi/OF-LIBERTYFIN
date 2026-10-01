@@ -27,10 +27,14 @@ final class CajaControlador
             'servicios' => $cat->servicios($suc, $area, $buscar),
             'areas'     => $cat->areas(),
             'metodos'   => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
-            // Quién va a HACER el trabajo. No es quien cobra.
-            'equipo'    => (new \LibertyFin\Datos\UsuarioRepo($db))->todos_(),
-            // Quién va a HACER el trabajo. No es quien cobra.
-            'equipo'    => (new \LibertyFin\Datos\UsuarioRepo($db))->todos_(),
+            // Quien va a HACER el trabajo: los COLABORADORES, agrupados
+            // por area, no los usuarios del sistema. Un contador puede
+            // atender sin tener cuenta para entrar.
+            'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
+            // Quien va a HACER el trabajo: los COLABORADORES, agrupados
+            // por area, no los usuarios del sistema. Un contador puede
+            // atender sin tener cuenta para entrar.
+            'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
             // Cobrar con liga solo aparece si hay con qué generarla.
             'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
                          && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
@@ -124,9 +128,9 @@ final class CajaControlador
                 // seguir diciendo quién atendió.
                 'especialista_id'     => (int)($_POST['especialista'] ?? 0) ?: null,
                 'especialista_nombre' => $this->nombreDe($db, (int)($_POST['especialista'] ?? 0)),
-                'metodo_pago'     => in_array($_POST['metodo'] ?? '',
-                                    (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(), true)
-                                    ? $_POST['metodo'] : 'efectivo',
+                // `como_paga` trae UNA sola respuesta: el metodo del
+                // mostrador, o uno de los de linea con guion bajo delante.
+                'metodo_pago'    => self::metodoDe($_POST['como_paga'] ?? '', $db),
                 'referencia'     => trim($_POST['referencia'] ?? ''),
                 'descripcion'    => trim($_POST['descripcion'] ?? ''),
                 'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
@@ -136,6 +140,22 @@ final class CajaControlador
         } catch (\Throwable $e) {
             error_log('[LibertyFin] cobrar: ' . $e->getMessage());
             $this->volver('No se pudo registrar la venta. Quedó anotado el error.', 'error');
+        }
+
+        // Pago en linea: se genera el cobro y se devuelven los datos
+        // para el modal, sin salir de la caja.
+        $enLinea = self::formaEnLinea($_POST['como_paga'] ?? '');
+        if ($enLinea && \LibertyFin\Servicio\Integraciones::activa('spei')) {
+            return $this->conLiga($db, $r, $enLinea);
+        }
+
+        // Cobro en el mostrador. Si lo pidio el modal se contesta en
+        // JSON; si no, se sigue como siempre y se va al ticket.
+        if ($this->pideJson()) {
+            $this->json(['ok' => true, 'modo' => 'cobrado',
+                'venta' => ['id' => (int)$r['id'], 'codigo' => $r['codigo'],
+                            'total' => (float)$r['total'],
+                            'cobrado' => (float)$r['cobrado']]]);
         }
 
         header('Location: /ventas/' . $r['id'] . '?nueva=1');
@@ -151,6 +171,11 @@ final class CajaControlador
 
     private function volver($mensaje, $tipo = 'error')
     {
+        // Si lo pidio el modal, el error vuelve como JSON. Redirigir
+        // dejaria al cajero mirando la caja en blanco sin saber que paso.
+        if ($this->pideJson()) {
+            $this->json(['ok' => $tipo !== 'error', 'error' => $mensaje]);
+        }
         $_SESSION['lf_aviso'] = ['texto' => $mensaje, 'tipo' => $tipo];
         header('Location: /caja'); exit;
     }
@@ -232,12 +257,20 @@ final class CajaControlador
         }
     }
 
-    /** El nombre del especialista, para dejarlo escrito en la venta. */
+    /**
+     * El nombre del colaborador, para dejarlo escrito en la venta.
+     *
+     * Se guarda el nombre ademas del id porque si esa persona deja la
+     * empresa y se desactiva, el reporte de hace seis meses tiene que
+     * seguir diciendo quien atendio.
+     */
     private function nombreDe($db, $id)
     {
         if (!$id) return null;
-        $u = (new \LibertyFin\Datos\UsuarioRepo($db))->porId($id);
-        return $u ? $u['nombre'] : null;
+        foreach ((new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea() as $area => $gente) {
+            foreach ($gente as $c) if ((int)$c['id'] === (int)$id) return $c['nombre'];
+        }
+        return null;
     }
 
     /**

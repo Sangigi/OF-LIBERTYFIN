@@ -276,4 +276,31 @@ final class ComisionRepo extends Repo
             ORDER BY pendiente DESC
             LIMIT " . (int)$tope, [$a, $b]);
     }
+
+    /**
+     * Los colaboradores activos, agrupados por area.
+     *
+     * Es lo que se ofrece al asignar el especialista de una venta. NO
+     * son los usuarios del sistema: un contador puede atender clientes
+     * sin tener cuenta para entrar, y un cajero tiene cuenta pero no
+     * hace el trabajo. Son listas distintas y confundirlas obliga a
+     * crear usuarios falsos para poder asignar.
+     *
+     * Se llama `equipoPorArea` y no `porArea` porque ese nombre ya era
+     * el de las comisiones agrupadas por area. Dos cosas distintas con
+     * el mismo nombre acaban en que alguien llama a la equivocada.
+     */
+    public function equipoPorArea()
+    {
+        $filas = $this->todos("
+            SELECT c.id, c.nombre, a.nombre AS area
+            FROM comision_colaboradores c
+            INNER JOIN comision_areas a ON a.id = c.area_id
+            WHERE c.activo = 1 AND a.activo = 1
+            ORDER BY a.nombre, c.nombre");
+
+        $r = [];
+        foreach ($filas as $f) $r[$f['area'] ?: 'Sin area'][] = $f;
+        return $r;
+    }
 }
