@@ -1316,6 +1316,30 @@ section.card + section.card{margin-top:0}
   font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
   color:var(--lf-amb);margin-top:2px}
 
+/* Panel expandible de cada colaborador.
+   `dense` rellena el hueco que deja el panel (ocupa toda la fila) con las
+   tarjetas siguientes: el panel queda justo debajo de la fila de la
+   tarjeta pulsada y, sin panel abierto, la rejilla es idéntica. */
+.lf-equipo{grid-auto-flow:row dense}
+.lf-pers[data-id]{cursor:pointer;transition:border-color .15s,background .15s}
+.lf-pers[data-id]:hover{border-color:var(--lf-brand)}
+.lf-pers[data-id]:focus-visible{outline:2px solid var(--lf-brand);outline-offset:2px}
+.lf-pers.abierta{border-color:var(--lf-brand);background:var(--lf-brand-glow)}
+.lf-chev{flex-shrink:0;width:7px;height:7px;margin:-2px 2px 0 -4px;
+  border-right:2px solid var(--lf-tinta-4);border-bottom:2px solid var(--lf-tinta-4);
+  transform:rotate(45deg);transition:transform .2s}
+.lf-pers.abierta .lf-chev{transform:rotate(-135deg);margin-top:3px}
+.lf-det{grid-column:1/-1;background:var(--lf-sup);border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r);overflow:hidden;animation:lf-det-in .18s ease-out}
+@keyframes lf-det-in{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.lf-det.espera{opacity:.6;pointer-events:none}
+.lf-det .table-responsive{padding:2px 8px 0}
+.lf-det-vacio,.lf-det-msj{padding:22px;text-align:center;color:var(--lf-tinta-4);font-size:13px;margin:0}
+.lf-det-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--lf-linea);
+  font-size:12px;color:var(--lf-tinta-4)}
+@media (prefers-reduced-motion:reduce){.lf-det{animation:none}.lf-chev{transition:none}}
+
 
 /* ══════════════════════════════════════════════════════
    26 · BARRA LATERAL FIJA DE VERDAD

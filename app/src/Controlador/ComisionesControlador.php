@@ -50,6 +50,37 @@ final class ComisionesControlador
         unset($_SESSION['lf_aviso']);
     }
 
+    /**
+     * Fragmento HTML con las ventas de un colaborador. Lo pide el panel
+     * expandible de la tarjeta "Por colaborador"; no es una página.
+     */
+    public function colaborador($id)
+    {
+        $db   = Conexion::de($_SESSION['empresa_db']);
+        $repo = new ComisionRepo($db);
+
+        $desde  = Peticion::fecha('desde', date('Y-m-01'));
+        $hasta  = Peticion::fecha('hasta', date('Y-m-t'));
+        $nombre = Peticion::texto('nombre');
+        $equipo = Peticion::texto('equipo');
+
+        $d = $repo->detalleColaborador((int)$id, $nombre, $equipo, $desde, $hasta,
+                                       Peticion::entero('p', 1), Peticion::POR_PAGINA);
+
+        $base = '/comisiones/colaborador/' . (int)$id;
+        $qs   = function ($p) use ($desde, $hasta, $nombre, $equipo) {
+            return http_build_query(['desde' => $desde, 'hasta' => $hasta,
+                'nombre' => $nombre, 'equipo' => $equipo, 'p' => $p]);
+        };
+
+        header('Content-Type: text/html; charset=utf-8');
+        header('Cache-Control: no-store');
+        Plantilla::parcial('comisiones/detalle', [
+            'd'      => $d,
+            'enlace' => function ($n) use ($base, $qs) { return $base . '?' . $qs($n); },
+        ]);
+    }
+
     /** Asigna dueño a un renglón que estaba en POR ASIGNAR. */
     public function reasignar()
     {

@@ -303,4 +303,82 @@ final class ComisionRepo extends Repo
         foreach ($filas as $f) $r[$f['area'] ?: 'Sin area'][] = $f;
         return $r;
     }
+
+    /**
+     * Detalle de UN colaborador: sus ventas del periodo, de la más
+     * reciente a la más vieja.
+     *
+     * Filtra por los mismos tres campos con los que `porColaborador`
+     * agrupa (id, nombre y equipo), para que la suma del panel sea
+     * exactamente la cifra de la tarjeta que se expandió. `<=>` porque
+     * el id y el equipo pueden ser NULL y `= NULL` nunca coincide.
+     *
+     * Una fila por VENTA, no por pago: es lo que cuenta la tarjeta
+     * ("N ventas") y lo que la oficina reconoce.
+     */
+    public function detalleColaborador($colabId, $nombre, $equipo, $desde, $hasta, $pagina, $porPag)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $id     = $colabId > 0 ? (int)$colabId : null;
+        $equipo = ($equipo === '' || $equipo === null) ? null : $equipo;
+        $pagina = max(1, (int)$pagina);
+        $porPag = max(1, (int)$porPag);
+
+        $tot = $this->uno("
+            SELECT COUNT(DISTINCT pc.venta_id) AS ventas,
+                   COALESCE(SUM(pc.monto),0)   AS devengado
+            FROM pago_comisiones pc
+            INNER JOIN ventas v ON v.id = pc.venta_id
+            WHERE pc.colaborador_id <=> ? AND pc.colaborador_nombre = ? AND pc.area_nombre <=> ?
+              AND v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+        ", [$id, $nombre, $equipo, $a, $b]) ?: ['ventas' => 0, 'devengado' => 0];
+
+        $total   = (int)$tot['ventas'];
+        $paginas = max(1, (int)ceil($total / $porPag));
+        $pagina  = min($pagina, $paginas);
+        $off     = ($pagina - 1) * $porPag;
+
+        $filas = $this->todos("
+            SELECT v.id AS venta_id, v.codigo_venta, v.fecha,
+                   c.nombre AS cliente,
+                   -- Área del SERVICIO, igual que en el resto del módulo.
+                   COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin área') AS area_servicio,
+                   x.pct AS porcentaje,
+                   ROUND(x.dev,2) AS devengado,
+                   ROUND(GREATEST(COALESCE(asg.asignada,0) - x.dev, 0),2) AS pendiente
+            FROM ventas v
+            INNER JOIN (
+                SELECT venta_id, SUM(monto) AS dev, MAX(porcentaje) AS pct
+                FROM pago_comisiones
+                WHERE colaborador_id <=> ? AND colaborador_nombre = ? AND area_nombre <=> ?
+                GROUP BY venta_id
+            ) x ON x.venta_id = v.id
+            LEFT JOIN (
+                SELECT venta_id, SUM(monto_comision) AS asignada
+                FROM venta_comisiones
+                WHERE cancelada = 0
+                  AND colaborador_id <=> ? AND colaborador_nombre = ? AND area_nombre <=> ?
+                GROUP BY venta_id
+            ) asg ON asg.venta_id = v.id
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+            ORDER BY v.fecha DESC, v.id DESC
+            LIMIT " . (int)$porPag . " OFFSET " . (int)$off,
+            [$id, $nombre, $equipo, $id, $nombre, $equipo, $a, $b]);
+
+        return [
+            'filas'     => $filas,
+            'total'     => $total,
+            'devengado' => (float)$tot['devengado'],
+            'pagina'    => $pagina,
+            'paginas'   => $paginas,
+        ];
+    }
 }

@@ -142,7 +142,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
   $pag_eq = min($pagina, $paginas_eq);
   $equipo = array_slice($equipo, ($pag_eq - 1) * $porPag, $porPag);
   ?>
-  <div class="lf-equipo">
+  <div class="lf-equipo" data-desde="<?= P::e($desde) ?>" data-hasta="<?= P::e($hasta) ?>">
     <?php if (!$equipo): ?>
       <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
         No hay comisiones devengadas en este periodo.</p>
@@ -152,7 +152,10 @@ $qs = function ($x = []) use ($desde, $hasta) {
     // vertical deja media pantalla en blanco.
     $mayor = 0; foreach ($equipo as $c) $mayor = max($mayor, (float)$c['devengado']);
     foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
-      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>">
+      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>" role="button" tabindex="0" aria-expanded="false"
+           data-id="<?= (int)$c['colaborador_id'] ?>"
+           data-nombre="<?= P::e($c['colaborador_nombre']) ?>"
+           data-equipo="<?= P::e($c['equipo']) ?>">
         <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
           <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
         <div style="flex:1;min-width:0">
@@ -162,6 +165,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
         </div>
         <span class="mn"><?= D::pesos($c['devengado']) ?>
           <?php if ($huerfano): ?><i>no se paga</i><?php endif; ?></span>
+        <span class="lf-chev" aria-hidden="true"></span>
       </div>
     <?php endforeach; ?>
   </div>
@@ -242,3 +246,94 @@ $qs = function ($x = []) use ($desde, $hasta) {
     </section>
     <?php endif; ?>
 </div>
+
+<script>
+/* Panel expandible por colaborador. Delegado en document y con guarda: el
+   contenido se reemplaza al navegar sin recargar, y el script se vuelve a
+   ejecutar; sin la guarda quedarían oyentes duplicados. */
+(function () {
+  if (window.__lfComDet) return;
+  window.__lfComDet = true;
+
+  function panelDe(card) {
+    var n = card.nextElementSibling;
+    return (n && n.classList.contains('lf-det')) ? n : null;
+  }
+
+  function cerrar(card) {
+    var p = panelDe(card);
+    if (p) p.remove();
+    card.classList.remove('abierta');
+    card.setAttribute('aria-expanded', 'false');
+  }
+
+  function cargar(panel, url) {
+    panel.classList.add('espera');
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (r) {
+        if (r.redirected) { location.reload(); throw 0; }  /* sesión vencida */
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        panel.innerHTML = html;
+        panel.classList.remove('espera');
+      })
+      .catch(function (e) {
+        if (e === 0) return;
+        panel.classList.remove('espera');
+        panel.innerHTML = '<p class="lf-det-msj">No se pudo cargar el detalle. ' +
+          '<a href="#" data-reintentar>Reintentar</a></p>';
+        panel.dataset.url = url;
+      });
+  }
+
+  function abrir(card) {
+    var cont = card.closest('.lf-equipo');
+    /* Uno a la vez: con varios abiertos la tarjeta crece y se pierden
+       las métricas de arriba. */
+    cont.querySelectorAll('.lf-pers.abierta').forEach(cerrar);
+
+    var q = new URLSearchParams({
+      desde: cont.dataset.desde, hasta: cont.dataset.hasta,
+      nombre: card.dataset.nombre, equipo: card.dataset.equipo, p: 1
+    });
+    var panel = document.createElement('div');
+    panel.className = 'lf-det espera';
+    panel.setAttribute('role', 'region');
+    panel.setAttribute('aria-label', 'Ventas de ' + card.dataset.nombre);
+    panel.innerHTML = '<p class="lf-det-msj">Cargando…</p>';
+    card.after(panel);
+    card.classList.add('abierta');
+    card.setAttribute('aria-expanded', 'true');
+    cargar(panel, '/comisiones/colaborador/' + card.dataset.id + '?' + q);
+  }
+
+  function alternar(card) { panelDe(card) ? cerrar(card) : abrir(card); }
+
+  document.addEventListener('click', function (ev) {
+    var re = ev.target.closest('.lf-det [data-reintentar]');
+    if (re) {
+      ev.preventDefault();
+      var pn = re.closest('.lf-det');
+      cargar(pn, pn.dataset.url);
+      return;
+    }
+    var pag = ev.target.closest('.lf-det .page-item a');
+    if (pag) {
+      ev.preventDefault();
+      if (!pag.closest('.page-item.disabled')) cargar(pag.closest('.lf-det'), pag.getAttribute('href'));
+      return;
+    }
+    if (ev.target.closest('.lf-det')) return;          /* enlaces de venta, etc. */
+    var card = ev.target.closest('.lf-pers[data-id]');
+    if (card) alternar(card);
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var card = ev.target.closest && ev.target.closest('.lf-pers[data-id]');
+    if (card && ev.target === card) { ev.preventDefault(); alternar(card); }
+  });
+})();
+</script>
