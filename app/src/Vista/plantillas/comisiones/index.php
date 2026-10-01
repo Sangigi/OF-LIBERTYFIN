@@ -90,7 +90,13 @@ $qs = function ($x = []) use ($desde, $hasta) {
             <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
               <?= P::e($s['codigo_venta']) ?> · <?= date('d M', strtotime($s['fecha'])) ?></span>
           </td>
-          <td data-label="Área"><span class="badge bg-secondary"><?= P::e($s['area_nombre']) ?></span></td>
+          <td data-label="Área">
+            <span class="badge bg-secondary"><?= P::e($s['area_servicio']) ?></span>
+            <?php if ($s['area_nombre'] && $s['area_nombre'] !== $s['area_servicio']): ?>
+              <span style="display:block;color:var(--lf-tinta-4);font-size:10.5px;margin-top:3px">
+                comisión del equipo <?= P::e($s['area_nombre']) ?></span>
+            <?php endif; ?>
+          </td>
           <td data-label="%" class="text-end lf-mono"><?= number_format($s['porcentaje'],2) ?>%</td>
           <td data-label="Monto" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($s['monto']) ?></td>
           <td data-label="Asignar a">

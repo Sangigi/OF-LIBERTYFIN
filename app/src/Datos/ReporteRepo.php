@@ -184,12 +184,24 @@ final class ReporteRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT pc.colaborador_nombre AS nombre, pc.area_nombre AS area,
+            -- El area es la del SERVICIO vendido, no el equipo de quien
+            -- comisiono: una venta de contabilidad cerrada por alguien
+            -- de Administracion es de contabilidad.
+            SELECT pc.colaborador_nombre AS nombre,
+                   GROUP_CONCAT(DISTINCT COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin area')
+                       ORDER BY 1 SEPARATOR ', ') AS area,
                    ROUND(SUM(pc.monto),2) AS devengado,
                    COUNT(DISTINCT pc.venta_id) AS ventas
             FROM pago_comisiones pc INNER JOIN ventas v ON v.id = pc.venta_id
             WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
-            GROUP BY pc.colaborador_nombre, pc.area_nombre
+            GROUP BY pc.colaborador_nombre
             ORDER BY (pc.colaborador_nombre = 'POR ASIGNAR'), devengado DESC", [$a, $b]);
     }
 

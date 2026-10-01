@@ -59,7 +59,23 @@ final class ComisionRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT pc.colaborador_id, pc.colaborador_nombre, pc.area_nombre,
+            SELECT pc.colaborador_id, pc.colaborador_nombre,
+                   -- `area_nombre` aquí es el EQUIPO del colaborador, no
+                   -- el área del trabajo. Se conserva con su nombre
+                   -- propio porque sigue siendo útil saber de qué equipo
+                   -- es alguien, pero ya no se llama area a secas.
+                   pc.area_nombre AS equipo,
+                   -- El ÁREA es la del servicio que se vendió. Un
+                   -- colaborador puede comisionar en varias.
+                   GROUP_CONCAT(DISTINCT COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr    ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat  ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin área')
+                       ORDER BY 1 SEPARATOR ', ') AS area_nombre,
                    ROUND(SUM(pc.monto),2) AS devengado,
                    COUNT(DISTINCT pc.venta_id) AS ventas,
                    (pc.colaborador_nombre = ?) AS sin_dueno
@@ -75,11 +91,26 @@ final class ComisionRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT pc.area_nombre AS area, ROUND(SUM(pc.monto),2) AS monto
+            -- EL ÁREA ES LA DEL SERVICIO, NO LA DEL COLABORADOR.
+            --
+            -- `pago_comisiones.area_nombre` guarda el equipo de quien
+            -- comisionó. Agrupar por ahí hacía que una venta de
+            -- contabilidad apareciera bajo Administración solo porque
+            -- la cerró alguien de ese equipo, y no coincidía con el
+            -- control que lleva la oficina.
+            SELECT COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr    ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat  ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                   ROUND(SUM(pc.monto),2) AS monto
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
             WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
-            GROUP BY pc.area_nombre
+            GROUP BY area
             ORDER BY monto DESC
         ", [$a, $b]);
     }
@@ -91,7 +122,22 @@ final class ComisionRepo extends Repo
             SELECT pc.venta_comision_id AS renglon,
                    v.id AS venta_id, v.codigo_venta, v.fecha,
                    c.nombre AS cliente,
+                   -- `area_nombre` aqui es el EQUIPO al que pertenecia
+                   -- ese renglon de comision. Se conserva porque es con
+                   -- lo que se sugiere quien puede tomarla: si la
+                   -- comision era del equipo legal, el candidato tiene
+                   -- que ser de legal.
                    pc.area_nombre, pc.porcentaje,
+                   -- Y el area del SERVICIO, que es lo que la persona
+                   -- busca al leer el renglon: de que fue la venta.
+                   COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin area') AS area_servicio,
                    ROUND(pc.monto,2) AS monto
             FROM pago_comisiones pc
             INNER JOIN ventas v   ON v.id = pc.venta_id
@@ -184,7 +230,15 @@ final class ComisionRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT vc.area_nombre AS area,
+            -- Mismo criterio que el resto: el area del SERVICIO.
+            SELECT COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin area') AS area,
                    ROUND(SUM(vc.monto_comision),2) AS asignada,
                    ROUND(COALESCE(SUM(pc.dev),0),2) AS devengada
             FROM venta_comisiones vc
@@ -194,7 +248,7 @@ final class ComisionRepo extends Repo
                    ON pc.venta_comision_id = vc.id
             WHERE vc.cancelada = 0 AND v.estado <> 'cancelada'
               AND v.fecha >= ? AND v.fecha < ?
-            GROUP BY vc.area_nombre
+            GROUP BY area
             ORDER BY asignada DESC", [$a, $b]);
     }
 
