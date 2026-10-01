@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 9;
+    const VERSION = 10;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -370,6 +370,29 @@ final class Migraciones
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    /**
+     * 10 · El especialista asignado a la venta.
+     *
+     * NO es quien la cobró. `usuario_id` ya guarda al cajero que tecleó;
+     * esto es quién va a HACER el trabajo. Son distintos casi siempre:
+     * recepción cobra, el contador trabaja.
+     *
+     * Se guarda el id y también el nombre. El id para poder filtrar y
+     * enlazar; el nombre porque si esa persona se va de la empresa y su
+     * usuario se desactiva, el reporte de hace seis meses tiene que
+     * seguir diciendo quién atendió.
+     */
+    private static function v10(PDO $db)
+    {
+        foreach ([
+            "ALTER TABLE ventas ADD COLUMN especialista_id INT NULL AFTER usuario_id",
+            "ALTER TABLE ventas ADD COLUMN especialista_nombre VARCHAR(160) NULL AFTER especialista_id",
+            "ALTER TABLE ventas ADD INDEX ix_v_especialista (especialista_id)",
+        ] as $sql) {
+            try { $db->exec($sql); } catch (\Throwable $e) { /* ya existe */ }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -381,5 +404,6 @@ final class Migraciones
         7 => 'Bitácora de cambios (lf_auditoria)',
         8 => 'Catálogo y transacciones de Emida',
         9 => 'Ligas de pago (tarjeta, SPEI, tiendas)',
+        10 => 'Especialista asignado a la venta',
     ];
 }

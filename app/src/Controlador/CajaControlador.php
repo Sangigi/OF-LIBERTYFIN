@@ -27,6 +27,10 @@ final class CajaControlador
             'servicios' => $cat->servicios($suc, $area, $buscar),
             'areas'     => $cat->areas(),
             'metodos'   => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
+            // Quién va a HACER el trabajo. No es quien cobra.
+            'equipo'    => (new \LibertyFin\Datos\UsuarioRepo($db))->todos_(),
+            // Quién va a HACER el trabajo. No es quien cobra.
+            'equipo'    => (new \LibertyFin\Datos\UsuarioRepo($db))->todos_(),
             // Cobrar con liga solo aparece si hay con qué generarla.
             'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
                          && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
@@ -115,6 +119,11 @@ final class CajaControlador
                 'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
                 'caja_id'        => $_SESSION['caja_id'] ?? null,
                 'anticipo'       => (float)($_POST['anticipo'] ?? 0),
+                // El nombre se guarda además del id: si esa persona se va y su
+                // usuario se desactiva, el reporte de hace seis meses tiene que
+                // seguir diciendo quién atendió.
+                'especialista_id'     => (int)($_POST['especialista'] ?? 0) ?: null,
+                'especialista_nombre' => $this->nombreDe($db, (int)($_POST['especialista'] ?? 0)),
                 'metodo_pago'     => in_array($_POST['metodo'] ?? '',
                                     (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(), true)
                                     ? $_POST['metodo'] : 'efectivo',
@@ -201,5 +210,13 @@ final class CajaControlador
             error_log('[LibertyFin] liga en caja: ' . $e->getMessage());
             $this->volver('Venta registrada, pero la liga no se guardó: ' . $e->getMessage(), 'error');
         }
+    }
+
+    /** El nombre del especialista, para dejarlo escrito en la venta. */
+    private function nombreDe($db, $id)
+    {
+        if (!$id) return null;
+        $u = (new \LibertyFin\Datos\UsuarioRepo($db))->porId($id);
+        return $u ? $u['nombre'] : null;
     }
 }

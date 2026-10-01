@@ -37,15 +37,19 @@ final class RegistrarVenta
             // ── La venta. `total` es lo VENDIDO, nunca lo cobrado. ──
             $st = $this->db->prepare("
                 INSERT INTO ventas
-                    (codigo_venta, cliente_id, usuario_id, sucursal_id, caja_id,
+                    (codigo_venta, cliente_id, usuario_id, especialista_id, especialista_nombre,
+                     sucursal_id, caja_id,
                      subtotal, descuento, iva, total, iva_modo,
                      metodo_pago, estado, descripcion, fecha)
-                VALUES (?,?,?,?,?, ?,?,?,?,?, ?,'completada',?,NOW())
+                VALUES (?,?,?,?,?, ?,?, ?,?,?,?,?, ?,'completada',?,NOW())
             ");
             $st->execute([
                 $codigo,
                 $ctx['cliente_id'] ?: null,
                 $ctx['usuario_id'] ?: null,
+                // Quién va a hacer el trabajo, no quién cobró.
+                $ctx['especialista_id'] ?: null,
+                $ctx['especialista_nombre'] ?: null,
                 $ctx['sucursal_id'] ?: null,
                 $ctx['caja_id'] ?: null,
                 $t['subtotal'], 0, $t['iva'], $t['total'],

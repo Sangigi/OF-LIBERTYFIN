@@ -139,6 +139,17 @@ $token = $_SESSION['lf_token'];
     </div>
 
     <div style="padding:0 20px 14px">
+      <label class="form-label">Especialista asignado</label>
+      <select class="form-select form-select-sm" name="especialista">
+        <option value="">Sin asignar</option>
+        <?php foreach ($equipo as $u): if (empty($u['activo'])) continue; ?>
+          <option value="<?= (int)$u['id'] ?>"><?= P::e($u['nombre']) ?></option>
+        <?php endforeach; ?>
+      </select>
+      <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 0 14px;line-height:1.45">
+        Quién va a hacer el trabajo, no quién está cobrando.
+      </p>
+
       <label class="form-label">Descripción de la venta</label>
       <textarea class="form-control lf-desc" name="descripcion" rows="3"
                 placeholder="Qué se vendió, condiciones, referencias… (opcional)"></textarea>

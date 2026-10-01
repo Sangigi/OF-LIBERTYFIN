@@ -260,7 +260,99 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
     <?php endforeach; ?>
   </div>
 
-  <?php foreach ($reportes as $k => $rep): ?>
+  <?php /* El desglose no es una tabla: son varias, una por área. */ ?>
+  <div data-panel="desglose" <?= $tipo==='desglose' ? '' : 'hidden' ?>>
+    <div style="padding:0 20px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <span style="font-size:12.5px;color:var(--lf-tinta-3)">Agrupar por el área</span>
+      <div class="lf-pills" style="margin:0">
+        <a class="lf-pill <?= $por==='servicio'?'active':'' ?>"
+           href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose','por'=>'servicio']) ?>">
+          del servicio contratado</a>
+        <a class="lf-pill <?= $por==='origen'?'active':'' ?>"
+           href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose','por'=>'origen']) ?>">
+          de donde salió la venta</a>
+      </div>
+    </div>
+
+    <div style="padding:0 20px 14px">
+      <p style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.6;margin:0;
+                padding:12px 14px;background:var(--lf-vidrio);border-radius:var(--lf-r)">
+        <b>Una venta puede pertenecer a dos áreas a la vez.</b> Si recepción cobró un
+        servicio contable, la venta salió de Administración y el trabajo es de
+        Contabilidad: las dos cosas son ciertas. Por eso se elige con cuál agrupar en
+        vez de que el sistema decida.
+        <b>El total no cambia</b> al cambiar la agrupación — es el mismo dinero contado
+        de dos maneras.
+        <?php if ($por === 'servicio'): ?>
+          Agrupando por servicio, contabilidad se parte en personas físicas y morales.
+        <?php else: ?>
+          Agrupando por origen no se parte contabilidad: ahí la pregunta es de qué
+          equipo salió la venta.
+        <?php endif; ?>
+      </p>
+    </div>
+
+    <?php if (!$desglose['tablas']): ?>
+      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:32px">
+        No hay ventas en este periodo.</p>
+    <?php endif; ?>
+
+    <?php foreach ($desglose['tablas'] as $tb): ?>
+      <div style="padding:0 12px 20px">
+        <h3 style="font-size:14px;font-weight:700;padding:0 8px 9px;margin:0;
+                   border-bottom:2px solid var(--lf-brand);display:flex;
+                   justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap">
+          <span><?= P::e($tb['titulo']) ?></span>
+          <span style="font-size:12px;font-weight:600;color:var(--lf-brand-2);
+                       font-family:var(--lf-mono)">
+            <?= D::pesos(array_sum(array_column($tb['filas'], 9))) ?>
+            <span style="color:var(--lf-tinta-4);font-weight:400">
+              · <?= count($tb['filas']) ?> renglones</span></span>
+        </h3>
+        <div class="table-responsive lf-cards">
+          <table class="table">
+            <thead><tr>
+              <?php foreach ($tb['columnas'] as $c): ?>
+                <th<?= $derecha($c[1]) ? ' class="text-end"' : '' ?>><?= P::e($c[0]) ?></th>
+              <?php endforeach; ?>
+            </tr></thead>
+            <tbody>
+            <?php foreach (array_slice($tb['filas'], 0, 40) as $f): ?>
+              <tr>
+                <?php foreach ($tb['columnas'] as $j => $c): ?>
+                  <td data-label="<?= P::e($c[0]) ?>"
+                      <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
+                    <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+                <?php endforeach; ?>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+            <tfoot><tr style="border-top:2px solid var(--lf-brand)">
+              <?php foreach ($tb['columnas'] as $j => $c): ?>
+                <td <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>
+                    style="font-weight:700"><?= P::e($celda($tb['totales'][$j] ?? '', $c[1])) ?></td>
+              <?php endforeach; ?>
+            </tr></tfoot>
+          </table>
+        </div>
+        <?php if (count($tb['filas']) > 40): ?>
+          <p style="font-size:11.5px;color:var(--lf-tinta-4);padding:8px">
+            Se muestran 40 de <?= count($tb['filas']) ?>; el Excel los trae todos.</p>
+        <?php endif; ?>
+      </div>
+    <?php endforeach; ?>
+
+    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <span><?= $desglose['cuantas'] ?> tabla<?= $desglose['cuantas']==1?'':'s' ?> ·
+        total cobrado <b class="lf-mono" style="color:var(--lf-tinta)">
+          <?= D::pesos($desglose['total']) ?></b></span>
+      <a class="btn btn-secondary btn-sm" target="_blank"
+         href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose']) ?>">
+        Imprimir</a>
+    </div>
+  </div>
+
+  <?php foreach ($reportes as $k => $rep): if ($k === 'desglose') continue; ?>
   <div data-panel="<?= $k ?>" <?= $tipo===$k ? '' : 'hidden' ?>>
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table">

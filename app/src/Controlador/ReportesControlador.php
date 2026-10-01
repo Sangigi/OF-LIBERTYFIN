@@ -40,6 +40,9 @@ final class ReportesControlador
             // comparar "por área" con "por colaborador" deja de costar
             // dos viajes al servidor y la pérdida del lugar en la página.
             'reportes'     => (new \LibertyFin\Servicio\Reportes($db))->todos($desde, $hasta),
+            'desglose'     => (new \LibertyFin\Servicio\Reportes($db))->desglose(
+                                $desde, $hasta, Peticion::opcion('por', ['servicio','origen'], 'servicio')),
+            'por'          => Peticion::opcion('por', ['servicio','origen'], 'servicio'),
             'desde'        => $desde, 'hasta' => $hasta,
         ]);
     }

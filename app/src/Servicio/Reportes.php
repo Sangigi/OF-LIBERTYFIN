@@ -50,6 +50,11 @@ final class Reportes
             'rotulo' => 'Detalle de pagos',
             'nota'   => 'Cada abono, uno por renglón. Es el que se audita.',
         ],
+        'desglose' => [
+            'rotulo' => 'Desglose por área',
+            'nota'   => 'Una tabla por área, con el producto y el especialista de cada '
+                      . 'renglón. Contabilidad se parte en personas físicas y morales.',
+        ],
     ];
 
     private $db;
@@ -158,6 +163,21 @@ final class Reportes
                     $this->sumar($f, ['pagos','cobrado'],
                         function ($t) { return ['TOTAL', (int)$t['pagos'], $t['cobrado']]; }));
 
+            case 'desglose':
+                // Para el Excel y la impresion se aplanan las tablas en
+                // una sola, con un renglon de titulo entre cada area:
+                // asi cabe en una hoja y sigue siendo el mismo dato.
+                $d = $this->desglose($desde, $hasta, 'servicio');
+                $filas = []; $cols = $d['tablas'] ? $d['tablas'][0]['columnas'] : [];
+                foreach ($d['tablas'] as $t) {
+                    $filas[] = [mb_strtoupper($t['titulo'])];
+                    foreach ($t['filas'] as $x) $filas[] = $x;
+                    $filas[] = $t['totales'];
+                    $filas[] = [''];
+                }
+                return $this->envolver('desglose', $desde, $hasta, $cols, $filas,
+                    array_fill(0, count($cols), ''));
+
             default: // detalle
                 $f = $r->detalle($desde, $hasta);
                 return $this->envolver('detalle', $desde, $hasta,
@@ -223,5 +243,110 @@ final class Reportes
             ]);
         }
         return $l;
+    }
+
+    /**
+     * El desglose: una tabla por área, con el detalle de cada renglón.
+     *
+     * LAS DOS FORMAS DE AGRUPAR, Y POR QUE ESTAN LAS DOS
+     *
+     * Una venta hecha en Administracion que incluye un servicio
+     * contable pertenece a las dos areas: a Administracion porque de
+     * ahi salio, a Contabilidad porque de eso fue el trabajo.
+     *
+     * No hay una respuesta correcta: son dos preguntas distintas.
+     *
+     *   "¿Cuanto vendio cada equipo?"      -> agrupar por ORIGEN
+     *   "¿Cuanto trabajo hay de cada tipo?" -> agrupar por SERVICIO
+     *
+     * Por eso se eligen, en vez de que el sistema decida por ti. Y es
+     * el mismo dinero contado de dos maneras: el total general no
+     * cambia al cambiar la agrupacion. Si cambiara, una de las dos
+     * estaria mal.
+     *
+     * Agrupando por SERVICIO, contabilidad se parte en dos tablas:
+     * personas fisicas y personas morales. Agrupando por ORIGEN no se
+     * parte, porque ahi la pregunta es de que equipo salio la venta y
+     * el tipo de persona no viene al caso.
+     *
+     * @param string $por  'servicio' u 'origen'
+     */
+    public function desglose($desde, $hasta, $por = 'servicio')
+    {
+        $filas = (new ReporteRepo($this->db))->detallePorLinea($desde, $hasta);
+        $campo = ($por === 'origen') ? 'area_origen' : 'area_servicio';
+
+        $grupos = [];
+        foreach ($filas as $f) {
+            $g = $f[$campo] ?: 'Sin area';
+            // La division de contabilidad solo aplica agrupando por
+            // servicio: por origen no significa nada.
+            if ($por !== 'origen' && !empty($f['tipo_persona'])) {
+                $g .= ' · ' . $f['tipo_persona'];
+            }
+            $grupos[$g][] = $f;
+        }
+        // De mayor a menor dinero: lo que mas pesa, arriba.
+        uasort($grupos, function ($a, $b) {
+            return array_sum(array_column($b, 'cobrado'))
+               <=> array_sum(array_column($a, 'cobrado'));
+        });
+
+        $cols = [
+            ['Folio',        Libro::TEXTO,  17],
+            ['Cliente',      Libro::TEXTO,  28],
+            ['Área',         Libro::TEXTO,  24],
+            ['Producto',     Libro::TEXTO,  38],
+            ['Descripción',  Libro::TEXTO,  34],
+            ['Especialista', Libro::TEXTO,  22],
+            ['Fecha',        Libro::FECHA,  12],
+            ['Cant.',        Libro::NUMERO,  8],
+            ['Total',        Libro::MONEDA, 14],
+            ['Cobrado',      Libro::MONEDA, 14],
+            ['Debe',         Libro::MONEDA, 13],
+            ['Gastos',       Libro::MONEDA, 12],
+            ['Comisión',     Libro::MONEDA, 13],
+            ['Queda',        Libro::MONEDA, 14],
+            ['Forma',        Libro::TEXTO,  14],
+        ];
+
+        $tablas = [];
+        foreach ($grupos as $nombre => $gf) {
+            $tablas[] = [
+                'titulo'   => $nombre,
+                'columnas' => $cols,
+                'filas'    => array_map(function ($f) use ($por) {
+                    return [
+                        $f['folio'], $f['cliente'],
+                        // Se muestra la OTRA area: agrupando por servicio
+                        // interesa de donde salio, y al reves.
+                        $por === 'origen' ? $f['area_servicio'] : $f['area_origen'],
+                        $f['producto'], $f['producto_desc'], $f['especialista'],
+                        $f['fecha'], $f['cantidad'],
+                        $f['total_linea'], $f['cobrado'], $f['saldo'],
+                        $f['gastos'], $f['comision'],
+                        $f['cobrado'] - $f['gastos'] - $f['comision'],
+                        ucfirst((string)$f['metodo']),
+                    ];
+                }, $gf),
+                'totales'  => ['TOTAL ' . mb_strtoupper($nombre), '', '', '', '', '', '', '',
+                    array_sum(array_column($gf, 'total_linea')),
+                    array_sum(array_column($gf, 'cobrado')),
+                    array_sum(array_column($gf, 'saldo')),
+                    array_sum(array_column($gf, 'gastos')),
+                    array_sum(array_column($gf, 'comision')),
+                    array_sum(array_column($gf, 'cobrado'))
+                        - array_sum(array_column($gf, 'gastos'))
+                        - array_sum(array_column($gf, 'comision')),
+                    ''],
+            ];
+        }
+        return [
+            'por'     => $por,
+            'rotulo'  => $por === 'origen' ? 'de donde salió la venta' : 'del servicio contratado',
+            'tablas'  => $tablas,
+            'cuantas' => count($tablas),
+            'total'   => array_sum(array_column($filas, 'cobrado')),
+        ];
     }
 }

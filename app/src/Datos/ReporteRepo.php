@@ -313,4 +313,93 @@ final class ReporteRepo extends Repo
               AND p.fecha_pago >= ? AND p.fecha_pago < ?
             GROUP BY dia ORDER BY dia", [$a, $b]);
     }
+
+    /**
+     * El detalle, UN RENGLON POR LINEA DE VENTA.
+     *
+     * POR QUE POR LINEA Y NO POR VENTA
+     *
+     * Para poner la columna "Producto" hace falta saber de cual se
+     * habla, y una venta puede tener varios. Por venta habria que
+     * amontonarlos en una celda, y entonces no se puede filtrar ni
+     * sumar por producto.
+     *
+     * El dinero de la venta se reparte entre sus lineas segun lo que
+     * pesa cada una, igual que en el reporte por area. Asi la suma de
+     * los renglones sigue dando el total de las ventas.
+     *
+     * LAS DOS AREAS, Y POR QUE VAN LAS DOS
+     *
+     *   area_servicio  de que fue el trabajo (la categoria del producto)
+     *   area_origen    de donde salio la venta (el area escrita en ella)
+     *
+     * Una venta hecha en Administracion que incluye un servicio
+     * contable pertenece a las dos: a Administracion por origen, a
+     * Contabilidad por trabajo. No hay que elegir una; hay que poder
+     * agrupar por cualquiera de las dos.
+     *
+     * Y dentro de contabilidad se separa persona fisica de moral, que
+     * es la division que lleva la oficina.
+     */
+    public function detallePorLinea($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT v.codigo_venta                          AS folio,
+                   v.fecha,
+                   COALESCE(cl.nombre, 'Publico general')  AS cliente,
+                   COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin area')
+                                                           AS area_servicio,
+                   COALESCE(NULLIF(v.area_nombre,''), NULLIF(cat.nombre,''), 'Sin area')
+                                                           AS area_origen,
+                   -- Dentro de contabilidad: fisica o moral.
+                   -- Se mira el nombre del servicio, que es lo unico que
+                   -- lo dice hoy. 'PF' y 'PM' cuentan: asi se escriben
+                   -- varios, y buscar solo 'FISICA' los dejaba fuera.
+                   CASE
+                     WHEN UPPER(COALESCE(cat.nombre,'')) NOT LIKE '%CONTAB%' THEN NULL
+                     WHEN UPPER(p.nombre) LIKE '%MORAL%'
+                       OR UPPER(p.nombre) REGEXP '(^| )PM( |$)'      THEN 'Personas morales'
+                     WHEN UPPER(p.nombre) LIKE '%FISICA%'
+                       OR UPPER(p.nombre) LIKE '%FÍSICA%'
+                       OR UPPER(p.nombre) REGEXP '(^| )PF( |$)'      THEN 'Personas fisicas'
+                     WHEN CHAR_LENGTH(TRIM(COALESCE(cl.rfc,''))) = 12 THEN 'Personas morales'
+                     WHEN CHAR_LENGTH(TRIM(COALESCE(cl.rfc,''))) = 13 THEN 'Personas fisicas'
+                     ELSE 'Sin clasificar'
+                   END                                     AS tipo_persona,
+                   COALESCE(p.nombre, 'Sin producto')      AS producto,
+                   COALESCE(NULLIF(TRIM(p.descripcion),''), '')  AS producto_desc,
+                   COALESCE(NULLIF(TRIM(v.especialista_nombre),''), 'Sin asignar')
+                                                           AS especialista,
+                   COALESCE(NULLIF(TRIM(v.descripcion),''), '')  AS nota_venta,
+                   d.cantidad,
+                   d.precio_unitario,
+                   -- El peso de la linea dentro de su venta
+                   ROUND(v.total     * (d.subtotal / NULLIF(tot.suma,0)), 2) AS total_linea,
+                   ROUND(COALESCE(pg.cobrado,0) * (d.subtotal / NULLIF(tot.suma,0)), 2) AS cobrado,
+                   ROUND((v.total - COALESCE(pg.cobrado,0))
+                         * (d.subtotal / NULLIF(tot.suma,0)), 2) AS saldo,
+                   ROUND(COALESCE(g.gastos,0)   * (d.subtotal / NULLIF(tot.suma,0)), 2) AS gastos,
+                   ROUND(COALESCE(cm.comision,0)* (d.subtotal / NULLIF(tot.suma,0)), 2) AS comision,
+                   v.metodo_pago                           AS metodo,
+                   suc.nombre                              AS sucursal
+            FROM venta_detalles d
+            INNER JOIN ventas v     ON v.id = d.venta_id
+            LEFT  JOIN productos p  ON p.id = d.producto_id
+            LEFT  JOIN categorias cat ON cat.id = p.categoria_id
+            LEFT  JOIN clientes cl  ON cl.id = v.cliente_id
+            LEFT  JOIN sucursales suc ON suc.id = v.sucursal_id
+            INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
+                         FROM venta_detalles GROUP BY venta_id ) tot ON tot.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
+                        WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
+                        GROUP BY venta_id ) g ON g.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
+                        GROUP BY venta_id ) cm ON cm.venta_id = v.id
+            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            ORDER BY area_servicio, tipo_persona, v.fecha DESC, v.codigo_venta",
+            [$a, $b]);
+    }
 }
