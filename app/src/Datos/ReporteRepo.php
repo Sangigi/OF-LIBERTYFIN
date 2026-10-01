@@ -119,7 +119,18 @@ final class ReporteRepo extends Repo
                        COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
                        -- El peso del renglón dentro de su venta
                        (d.subtotal * 1.0 / NULLIF(tot.suma,0))                   AS peso,
-                       d.subtotal                                               AS vendido,
+                       -- SE REPARTE `v.total`, NO SE SUMA `d.subtotal`.
+                       --
+                       -- No siempre son lo mismo: el IVA, los descuentos
+                       -- y los ajustes se aplican a la venta, no a sus
+                       -- renglones. Sumar los renglones perdía esa
+                       -- diferencia —en este histórico, $655.85 que
+                       -- salían de un área y no entraban a ninguna—.
+                       --
+                       -- El renglón solo decide la PROPORCIÓN. Lo que se
+                       -- reparte es el total de la venta, así el reporte
+                       -- siempre suma lo mismo que las ventas.
+                       v.total * (d.subtotal / NULLIF(tot.suma,0))              AS vendido,
                        COALESCE(pg.cobrado,0) * (d.subtotal / NULLIF(tot.suma,0)) AS cobrado,
                        COALESCE(g.gastos,0)   * (d.subtotal / NULLIF(tot.suma,0)) AS gastos,
                        COALESCE(cm.comision,0)* (d.subtotal / NULLIF(tot.suma,0)) AS comisiones
