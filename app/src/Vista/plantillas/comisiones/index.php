@@ -142,7 +142,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
   $pag_eq = min($pagina, $paginas_eq);
   $equipo = array_slice($equipo, ($pag_eq - 1) * $porPag, $porPag);
   ?>
-  <div class="lf-equipo" id="equipoCards">
+  <div class="lf-equipo" data-desde="<?= P::e($desde) ?>" data-hasta="<?= P::e($hasta) ?>">
     <?php if (!$equipo): ?>
       <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
         No hay comisiones devengadas en este periodo.</p>
@@ -152,23 +152,20 @@ $qs = function ($x = []) use ($desde, $hasta) {
     // vertical deja media pantalla en blanco.
     $mayor = 0; foreach ($equipo as $c) $mayor = max($mayor, (float)$c['devengado']);
     foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
-      <?php /* Clicable: abre la ventana con el detalle de sus comisiones.
-               Es un <button> y no un <div> para que funcione con el
-               teclado y lo lea un lector de pantalla. */ ?>
-      <button type="button" class="lf-pers lf-abre<?= $huerfano ? ' sin' : '' ?>"
-              data-quien="<?= P::e($c['nombre'] ?: 'POR ASIGNAR') ?>"
-              title="Ver de dónde sale esta comisión">
+      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>" role="button" tabindex="0" title="Ver sus ventas en una ventana"
+           data-id="<?= (int)$c['colaborador_id'] ?>"
+           data-nombre="<?= P::e($c['colaborador_nombre']) ?>"
+           data-equipo="<?= P::e($c['equipo']) ?>">
         <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
           <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
         <div style="flex:1;min-width:0">
           <b><?= P::e($c['colaborador_nombre']) ?></b>
-          <small><?= P::e($c['area_nombre']) ?> ·
-            <?= (int)$c['ventas'] ?> <?= $c['ventas']==1 ? 'pago' : 'pagos' ?></small>
+          <small><?= P::e($c['area_nombre']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
           <?php W::avance($mayor > 0 ? $c['devengado'] / $mayor * 100 : 0, $huerfano); ?>
         </div>
         <span class="mn"><?= D::pesos($c['devengado']) ?>
           <?php if ($huerfano): ?><i>no se paga</i><?php endif; ?></span>
-      </button>
+      </div>
     <?php endforeach; ?>
   </div>
   <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -249,128 +246,368 @@ $qs = function ($x = []) use ($desde, $hasta) {
     <?php endif; ?>
 </div>
 
-<?php /* ═══ VENTANAS FLOTANTES ═══ */ ?>
-<div id="lfVentanas"></div>
+<style>
+/* Estilos de las ventanas flotantes. Van aquí y no en libertyfin.css a
+   propósito: ese archivo lo guarda el navegador (?v=2) y una actualización
+   no se vería hasta vaciar la caché; así viajan siempre con la pantalla. */
+/* Ventana flotante por colaborador.
+   Vive en <body>, fuera de la rejilla: no mueve nada de lo que hay debajo.
+   z-index 200-290: encima de menú y velos móviles (<=60), debajo de los
+   modales (300) y de la guía (9000). */
+.lf-pers[data-id]{cursor:pointer;transition:border-color .15s,background .15s}
+.lf-pers[data-id]:hover{border-color:var(--lf-brand)}
+.lf-pers[data-id]:focus-visible{outline:2px solid var(--lf-brand);outline-offset:2px}
+.lf-pers.abierta{border-color:var(--lf-brand);background:var(--lf-brand-glow)}
+
+.lf-win{position:fixed;display:flex;flex-direction:column;box-sizing:border-box;
+  min-width:300px;min-height:0;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  box-shadow:var(--lf-shadow-lg);overflow:hidden;animation:lf-win-in .16s ease-out}
+.lf-win.activa{border-color:var(--lf-brand)}
+@keyframes lf-win-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.lf-win-bar{display:flex;align-items:center;gap:10px;padding:9px 8px 9px 14px;
+  background:var(--lf-vidrio);border-bottom:1px solid var(--lf-linea);
+  cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;flex-shrink:0}
+.lf-win.moviendo .lf-win-bar{cursor:grabbing}
+.lf-win.moviendo,.lf-win.redim{user-select:none;-webkit-user-select:none}
+.lf-win-tit{flex:1;min-width:0}
+.lf-win-tit b{display:block;font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-win-tit small{display:block;font-size:11px;color:var(--lf-tinta-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-win-btns{display:flex;gap:4px;flex-shrink:0}
+.lf-win-btns button{width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:var(--lf-r-sm);background:transparent;color:var(--lf-tinta-3);cursor:pointer;padding:0}
+.lf-win-btns button:hover{background:var(--lf-sup-2);color:var(--lf-tinta)}
+.lf-win-btns button.cerrar:hover{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-win-btns button:focus-visible{outline:2px solid var(--lf-brand);outline-offset:1px}
+.lf-win-btns svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round}
+.lf-win-busca{padding:8px 12px;border-bottom:1px solid var(--lf-linea);flex-shrink:0}
+.lf-win-busca .lf-search input{padding-top:7px;padding-bottom:7px;font-size:12.5px}
+.lf-win.mini .lf-win-busca{display:none}
+.lf-win-cuerpo{flex:1;min-height:0;overflow:auto;position:relative}
+.lf-win-cuerpo .table-responsive{padding:2px 8px 0}
+.lf-win.cargando .lf-win-cuerpo{opacity:.55;pointer-events:none}
+.lf-win.mini .lf-win-cuerpo,.lf-win.mini .lf-win-grip{display:none}
+.lf-win.mini{height:auto!important;min-width:0}
+.lf-win.mini .lf-win-bar{border-bottom:0}
+.lf-win-msj,.lf-det-vacio{padding:22px;text-align:center;color:var(--lf-tinta-4);font-size:13px;margin:0}
+.lf-det-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--lf-linea);
+  font-size:12px;color:var(--lf-tinta-4);position:sticky;bottom:0;background:var(--lf-sup)}
+/* Esquinas inferiores para cambiar el tamaño */
+.lf-win-grip{position:absolute;bottom:0;width:18px;height:18px;z-index:2;touch-action:none}
+.lf-win-grip.se{right:0;cursor:nwse-resize}
+.lf-win-grip.sw{left:0;cursor:nesw-resize}
+.lf-win-grip::after{content:"";position:absolute;bottom:4px;width:8px;height:8px;
+  border-bottom:2px solid var(--lf-tinta-4);opacity:.55}
+.lf-win-grip.se::after{right:4px;border-right:2px solid var(--lf-tinta-4)}
+.lf-win-grip.sw::after{left:4px;border-left:2px solid var(--lf-tinta-4)}
+.lf-win-grip:hover::after{opacity:1;border-color:var(--lf-brand)}
+@media (prefers-reduced-motion:reduce){.lf-win{animation:none}}
+</style>
 
 <script>
-/* ══════════════════════════════════════════════════════
-   VENTANAS DE COLABORADOR
-   Se mueven, se estiran, se minimizan y se pueden abrir
-   varias a la vez para comparar. No son un modal: un
-   modal tapa la pantalla y obliga a cerrarlo para mirar
-   otra cosa, y aqui lo util es justo tener dos abiertas.
-   ══════════════════════════════════════════════════════ */
+/* Ventanas flotantes por colaborador.
+   Se arrastran desde la barra, se minimizan, se cierran y se redimensionan
+   desde las esquinas de abajo. Pueden abrirse varias a la vez. Viven en
+   <body>, así que no alteran la rejilla.
+   El contenido se reemplaza al navegar sin recargar y este script se
+   vuelve a ejecutar: la guarda evita oyentes duplicados. */
 (function () {
-  var zona = document.getElementById('lfVentanas');
-  if (!zona) return;
-  var abiertas = {}, zTop = 400, nacidas = 0;
+  if (window.__lfComWin) return;
+  window.__lfComWin = true;
 
-  var periodo = '<?= P::e(http_build_query(['desde' => $desde, 'hasta' => $hasta])) ?>';
+  var ventanas = [];       /* orden de apilado: la última es la de arriba */
+  var MIN_W = 320, MIN_H = 180;
+  var ICO_MIN = '<svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg>';
+  var ICO_MAX = '<svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>';
+  var ICO_BUSCAR = '<svg viewBox="0 0 24 24" style="width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>';
+  var ICO_X   = '<svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
 
-  function traerAlFrente(v) { v.style.zIndex = ++zTop; }
+  function esc(t) {
+    return String(t).replace(/[&<>"']/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+  function fecha(iso) {
+    var m = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var p = iso.split('-');
+    return parseInt(p[2], 10) + ' ' + m[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  }
+  function limitar(v, a, b) { return Math.max(a, Math.min(b, v)); }
 
-  function abrir(quien) {
-    if (abiertas[quien]) { traerAlFrente(abiertas[quien]); return; }
+  function alFrente(w) {
+    var i = ventanas.indexOf(w);
+    if (i > -1) ventanas.splice(i, 1);
+    ventanas.push(w);
+    ventanas.forEach(function (x, n) {
+      x.style.zIndex = 200 + n;
+      x.classList.toggle('activa', x === w);
+    });
+  }
 
-    var v = document.createElement('div');
-    v.className = 'lf-vent';
-    /* Cada una un poco mas abajo que la anterior: apiladas en el mismo
-       punto, la segunda esconde a la primera. */
-    var d = (nacidas++ % 6) * 26;
-    v.style.left = (70 + d) + 'px';
-    v.style.top  = (70 + d) + 'px';
-    v.style.zIndex = ++zTop;
-    v.innerHTML =
-      '<header><span class="t">' + quien + '</span>'
-      + '<button type="button" class="b" data-min title="Minimizar">–</button>'
-      + '<button type="button" class="b" data-cerrar title="Cerrar">&times;</button></header>'
-      + '<div class="cont"><div class="cargando"><span class="giro"></span>Cargando…</div></div>'
-      + '<div class="asa" data-estirar></div>';
-    zona.appendChild(v);
-    abiertas[quien] = v;
-    v.addEventListener('mousedown', function () { traerAlFrente(v); });
+  function marcarTarjeta(w, abierta) {
+    var c = w._card;
+    if (!c || !document.contains(c)) return;
+    var otras = ventanas.some(function (x) { return x !== w && x._card === c; });
+    c.classList.toggle('abierta', abierta || otras);
+  }
 
-    fetch('/comisiones/colaborador?quien=' + encodeURIComponent(quien) + '&' + periodo,
-          { credentials: 'same-origin' })
-      .then(function (r) { return r.text(); })
-      .then(function (html) { v.querySelector('.cont').innerHTML = html; })
-      .catch(function () {
-        v.querySelector('.cont').innerHTML =
-          '<p class="vacio">No se pudo cargar. Vuelve a intentarlo.</p>';
+  function cerrar(w) {
+    var i = ventanas.indexOf(w);
+    if (i > -1) ventanas.splice(i, 1);
+    w.remove();
+    marcarTarjeta(w, false);
+    if (ventanas.length) alFrente(ventanas[ventanas.length - 1]);
+  }
+
+  function minimizar(w, forzar) {
+    var mini = (forzar === undefined) ? !w.classList.contains('mini') : forzar;
+    w.classList.toggle('mini', mini);
+    var b = w.querySelector('.minimizar');
+    b.innerHTML = mini ? ICO_MAX : ICO_MIN;
+    b.title = mini ? 'Restaurar' : 'Minimizar';
+    b.setAttribute('aria-label', b.title);
+    if (!mini) acomodar(w);
+  }
+
+  /* Que ninguna ventana quede con la barra fuera de la pantalla. */
+  function acomodar(w) {
+    var r = w.getBoundingClientRect();
+    w.style.left = limitar(r.left, 4 - r.width + 120, innerWidth - 120) + 'px';
+    w.style.top  = limitar(r.top, 4, innerHeight - 44) + 'px';
+  }
+
+  function urlDe(w, p) {
+    var b = w._base;
+    var q = new URLSearchParams({ desde: b.desde, hasta: b.hasta,
+      nombre: b.nombre, equipo: b.equipo, p: p || 1 });
+    if (w._q) q.set('q', w._q);
+    return '/comisiones/colaborador/' + b.id + '?' + q;
+  }
+
+  function cargar(w, url) {
+    /* Si se sigue escribiendo, la petición anterior ya no sirve. */
+    if (w._ac) w._ac.abort();
+    w._ac = window.AbortController ? new AbortController() : null;
+    w.classList.add('cargando');
+    fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
+                 signal: w._ac ? w._ac.signal : undefined })
+      .then(function (r) {
+        if (r.redirected) { location.reload(); throw 0; }     /* sesión vencida */
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        var cu = w.querySelector('.lf-win-cuerpo');
+        cu.innerHTML = html;
+        cu.scrollTop = 0;
+        w.classList.remove('cargando');
+      })
+      .catch(function (e) {
+        if (e === 0 || (e && e.name === 'AbortError')) return;
+        w.classList.remove('cargando');
+        w.dataset.url = url;
+        w.querySelector('.lf-win-cuerpo').innerHTML =
+          '<p class="lf-win-msj">No se pudo cargar el detalle. ' +
+          '<a href="#" data-reintentar>Reintentar</a></p>';
       });
   }
 
-  function cerrar(v) {
-    var q = Object.keys(abiertas).filter(function (k) { return abiertas[k] === v; })[0];
-    if (q) delete abiertas[q];
-    v.remove();
+  function abrir(card) {
+    var cont = card.closest('.lf-equipo');
+    var llave = [card.dataset.id, card.dataset.nombre, card.dataset.equipo,
+                 cont.dataset.desde, cont.dataset.hasta].join('|');
+
+    /* La misma persona y periodo: se trae al frente en vez de duplicarla. */
+    for (var i = 0; i < ventanas.length; i++) {
+      if (ventanas[i].dataset.llave === llave) {
+        minimizar(ventanas[i], false);
+        alFrente(ventanas[i]);
+        return;
+      }
+    }
+
+    var w = document.createElement('div');
+    w.className = 'lf-win';
+    w.dataset.llave = llave;
+    w.setAttribute('role', 'dialog');
+    w.setAttribute('aria-label', 'Ventas de ' + card.dataset.nombre);
+    w._card = card;
+    w.innerHTML =
+      '<div class="lf-win-bar">' +
+        '<div class="lf-win-tit"><b>' + esc(card.dataset.nombre) + '</b>' +
+        '<small>' + esc(card.dataset.equipo ? card.dataset.equipo + ' · ' : '') +
+          fecha(cont.dataset.desde) + ' – ' + fecha(cont.dataset.hasta) + '</small></div>' +
+        '<div class="lf-win-btns">' +
+          '<button type="button" class="minimizar" title="Minimizar" aria-label="Minimizar">' + ICO_MIN + '</button>' +
+          '<button type="button" class="cerrar" title="Cerrar" aria-label="Cerrar">' + ICO_X + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="lf-win-busca"><div class="lf-search">' + ICO_BUSCAR +
+        '<input class="form-control form-control-sm" type="search" autocomplete="off" ' +
+        'placeholder="Buscar cliente, folio, área, fecha o monto…" aria-label="Buscar en las ventas">' +
+      '</div></div>' +
+      '<div class="lf-win-cuerpo"><p class="lf-win-msj">Cargando…</p></div>' +
+      '<span class="lf-win-grip sw" data-grip="sw"></span>' +
+      '<span class="lf-win-grip se" data-grip="se"></span>';
+
+    /* Tamaño y posición inicial: en cascada para que varias no se tapen. */
+    var ancho = Math.min(720, innerWidth - 16);
+    var n = ventanas.length % 8;
+    w.style.width = ancho + 'px';
+    w.style.left = limitar((innerWidth - ancho) / 2 + n * 28, 4, Math.max(4, innerWidth - ancho - 4)) + 'px';
+    w.style.top  = limitar(90 + n * 28, 4, Math.max(4, innerHeight - 200)) + 'px';
+
+    document.body.appendChild(w);
+    alFrente(w);
+    card.classList.add('abierta');
+
+    w._base = { id: card.dataset.id, desde: cont.dataset.desde, hasta: cont.dataset.hasta,
+                nombre: card.dataset.nombre, equipo: card.dataset.equipo };
+    w._q = '';
+    cargar(w, urlDe(w, 1));
   }
 
-  document.addEventListener('click', function (ev) {
-    var b = ev.target.closest('.lf-abre');
-    if (b) { abrir(b.dataset.quien); return; }
-    var c = ev.target.closest('[data-cerrar]');
-    if (c) { cerrar(c.closest('.lf-vent')); return; }
-    var m = ev.target.closest('[data-min]');
-    if (m) {
-      var v = m.closest('.lf-vent');
-      v.classList.toggle('min');
-      m.textContent = v.classList.contains('min') ? '+' : '–';
+  /* ── Arrastrar desde la barra ── */
+  function empezarMover(ev, w) {
+    var r = w.getBoundingClientRect();
+    var dx = ev.clientX - r.left, dy = ev.clientY - r.top;
+    w.classList.add('moviendo');
+    function mover(e) {
+      w.style.left = limitar(e.clientX - dx, 120 - w.offsetWidth, innerWidth - 120) + 'px';
+      w.style.top  = limitar(e.clientY - dy, 4, innerHeight - 44) + 'px';
     }
+    function soltar() {
+      w.classList.remove('moviendo');
+      document.removeEventListener('pointermove', mover);
+      document.removeEventListener('pointerup', soltar);
+      document.removeEventListener('pointercancel', soltar);
+    }
+    document.addEventListener('pointermove', mover);
+    document.addEventListener('pointerup', soltar);
+    document.addEventListener('pointercancel', soltar);
+  }
+
+  /* ── Redimensionar desde las esquinas de abajo ── */
+  function empezarRedim(ev, w, lado) {
+    var r = w.getBoundingClientRect();
+    var x0 = ev.clientX, y0 = ev.clientY;
+    w.classList.add('redim');
+    w.style.height = r.height + 'px';
+    function mover(e) {
+      var h = limitar(r.height + (e.clientY - y0), MIN_H, innerHeight - r.top - 4);
+      var wd;
+      if (lado === 'se') {
+        wd = limitar(r.width + (e.clientX - x0), MIN_W, innerWidth - r.left - 4);
+      } else {                               /* sw: crece hacia la izquierda */
+        wd = limitar(r.width - (e.clientX - x0), MIN_W, r.right - 4);
+        w.style.left = (r.right - wd) + 'px';
+      }
+      w.style.width = wd + 'px';
+      w.style.height = h + 'px';
+    }
+    function soltar() {
+      w.classList.remove('redim');
+      document.removeEventListener('pointermove', mover);
+      document.removeEventListener('pointerup', soltar);
+      document.removeEventListener('pointercancel', soltar);
+    }
+    document.addEventListener('pointermove', mover);
+    document.addEventListener('pointerup', soltar);
+    document.addEventListener('pointercancel', soltar);
+  }
+
+  document.addEventListener('pointerdown', function (ev) {
+    var w = ev.target.closest('.lf-win');
+    if (!w) return;
+    alFrente(w);
+    if (ev.button !== 0) return;
+    var grip = ev.target.closest('.lf-win-grip');
+    if (grip) { ev.preventDefault(); empezarRedim(ev, w, grip.dataset.grip); return; }
+    if (ev.target.closest('.lf-win-btns')) return;
+    if (ev.target.closest('.lf-win-bar')) { ev.preventDefault(); empezarMover(ev, w); }
+  });
+
+  document.addEventListener('dblclick', function (ev) {
+    var bar = ev.target.closest('.lf-win-bar');
+    if (bar && !ev.target.closest('.lf-win-btns')) minimizar(bar.closest('.lf-win'));
+  });
+
+  document.addEventListener('click', function (ev) {
+    var w = ev.target.closest('.lf-win');
+    if (w) {
+      if (ev.target.closest('.cerrar')) { cerrar(w); return; }
+      if (ev.target.closest('.minimizar')) { minimizar(w); return; }
+      var re = ev.target.closest('[data-reintentar]');
+      if (re) { ev.preventDefault(); cargar(w, w.dataset.url); return; }
+      var pag = ev.target.closest('.page-item a');
+      if (pag) {
+        ev.preventDefault();
+        if (!pag.closest('.page-item.disabled')) cargar(w, pag.getAttribute('href'));
+      }
+      return;          /* los enlaces de venta funcionan normal */
+    }
+    var card = ev.target.closest('.lf-pers[data-id]');
+    if (card) abrir(card);
+  });
+
+  /* Búsqueda: espera a que se deje de escribir y consulta en el servidor,
+     para que cubra TODAS las ventas y no solo las de la página visible. */
+  document.addEventListener('input', function (ev) {
+    var inp = ev.target.closest && ev.target.closest('.lf-win-busca input');
+    if (!inp) return;
+    var w = inp.closest('.lf-win');
+    clearTimeout(w._t);
+    w._t = setTimeout(function () {
+      var q = inp.value.replace(/\s+/g, ' ').trim();
+      if (q === w._q) return;
+      w._q = q;
+      cargar(w, urlDe(w, 1));
+    }, 300);
   });
 
   document.addEventListener('keydown', function (ev) {
-    if (ev.key !== 'Escape') return;
-    /* Se cierra la de encima, no todas: cerrar las cinco de un golpe
-       obliga a volver a abrirlas. */
-    var todas = Array.prototype.slice.call(zona.querySelectorAll('.lf-vent'));
-    if (!todas.length) return;
-    todas.sort(function (a, b) { return (+b.style.zIndex) - (+a.style.zIndex); });
-    cerrar(todas[0]);
-  });
-
-  /* ── Mover y estirar ──
-     Con eventos de puntero, que funcionan igual con ratón y con dedo. */
-  var arrastra = null;
-  document.addEventListener('pointerdown', function (ev) {
-    var asa = ev.target.closest('[data-estirar]');
-    var cab = ev.target.closest('.lf-vent > header');
-    if (!asa && !cab) return;
-    if (cab && ev.target.closest('.b')) return;   // los botones no mueven
-
-    var v = (asa || cab).closest('.lf-vent');
-    traerAlFrente(v);
-    var r = v.getBoundingClientRect();
-    arrastra = {
-      v: v, modo: asa ? 'estirar' : 'mover',
-      x: ev.clientX, y: ev.clientY,
-      l: r.left, t: r.top, w: r.width, h: r.height
-    };
-    v.classList.add('moviendo');
-    ev.preventDefault();
-  });
-
-  document.addEventListener('pointermove', function (ev) {
-    if (!arrastra) return;
-    var dx = ev.clientX - arrastra.x, dy = ev.clientY - arrastra.y, v = arrastra.v;
-    if (arrastra.modo === 'mover') {
-      /* No se deja salir por arriba ni por los lados: una ventana
-         medio fuera de la pantalla no se puede volver a agarrar. */
-      var l = Math.max(8, Math.min(window.innerWidth - 120, arrastra.l + dx));
-      var t = Math.max(8, Math.min(window.innerHeight - 60, arrastra.t + dy));
-      v.style.left = l + 'px'; v.style.top = t + 'px';
-    } else {
-      v.style.width  = Math.max(320, arrastra.w + dx) + 'px';
-      v.style.height = Math.max(180, arrastra.h + dy) + 'px';
+    var w = ev.target.closest && ev.target.closest('.lf-win');
+    if (w && ev.key === 'Enter' && ev.target.closest('.lf-win-busca input')) {
+      ev.preventDefault();
+      clearTimeout(w._t);
+      w._q = ev.target.value.replace(/\s+/g, ' ').trim();
+      cargar(w, urlDe(w, 1));
+      return;
     }
+    /* Esc en el buscador: primero limpia; con el campo vacío, cierra. */
+    if (w && ev.key === 'Escape') {
+      var campo = ev.target.closest('.lf-win-busca input');
+      if (campo && campo.value !== '') {
+        campo.value = ''; clearTimeout(w._t); w._q = ''; cargar(w, urlDe(w, 1));
+      } else { cerrar(w); }
+      return;
+    }
+    if (ev.key !== 'Enter' && ev.key !== ' ') return;
+    var card = ev.target.closest && ev.target.closest('.lf-pers[data-id]');
+    if (card && ev.target === card) { ev.preventDefault(); abrir(card); }
   });
 
-  ['pointerup', 'pointercancel'].forEach(function (e) {
-    document.addEventListener(e, function () {
-      if (!arrastra) return;
-      arrastra.v.classList.remove('moviendo');
-      arrastra = null;
+  /* Si la pantalla cambia de tamaño, ninguna ventana se pierde fuera. */
+  window.addEventListener('resize', function () {
+    ventanas.forEach(function (w) {
+      w.style.width = Math.min(w.offsetWidth, innerWidth - 8) + 'px';
+      acomodar(w);
     });
   });
+
+  /* Las ventanas son de esta pantalla: si se navega a otra sin recargar,
+     se cierran en vez de quedarse flotando sobre ella. */
+  var cont = document.querySelector('.lf-cont');
+  if (cont && window.MutationObserver) {
+    new MutationObserver(function () {
+      if (!document.querySelector('.lf-equipo')) {
+        ventanas.slice().forEach(cerrar);
+      }
+    }).observe(cont, { childList: true });
+  }
 })();
 </script>
