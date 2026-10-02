@@ -1700,7 +1700,7 @@ body.lf-centro{
   color:color-mix(in srgb,#fff 78%,transparent)}
 .lf-recordar input{width:16px;height:16px;margin:0;accent-color:var(--lf-brand);
   cursor:pointer;flex-shrink:0;display:inline;}
-.lf-recordar span{line-height:12px;display:inline;}
+.lf-recordar span{align-items:center;line-height:16px;display:inline;}
 
 /* El botón, verde claro sobre el oscuro */
 .lf-boton{
