@@ -86,4 +86,31 @@ final class ComisionesControlador
         header('Location: /comisiones'); exit;
     }
 
+
+    /**
+     * El contenido de la ventana de un colaborador.
+     *
+     * Devuelve solo el trozo de HTML, no la pagina: la ventana se abre
+     * sin recargar y la caja tiene al cliente enfrente.
+     */
+    public function colaborador()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $quien = trim(Peticion::texto('quien', ''));
+        if ($quien === '') { http_response_code(400); exit; }
+
+        $desde = Peticion::fecha('desde', date('Y-m-01'));
+        $hasta = Peticion::fecha('hasta', date('Y-m-t'));
+
+        $filas = (new ComisionRepo($db))->detalleColaborador($quien, $desde, $hasta);
+
+        Plantilla::parcial('comisiones/detalle', [
+            'quien'  => $quien,
+            'filas'  => $filas,
+            'total'  => array_sum(array_column($filas, 'comision')),
+            'desde'  => $desde,
+            'hasta'  => $hasta,
+        ]);
+        exit;
+    }
 }

@@ -1,53 +1,58 @@
 <?php
 /**
- * Fragmento (no página): las ventas de un colaborador en el periodo.
- * Lo carga el panel expandible de la tarjeta "Por colaborador" y se
- * vuelve a pedir, con otro ?p=, cada vez que se cambia de página.
+ * El contenido de la ventana de un colaborador.
  *
- * Espera: $d (resultado de ComisionRepo::detalleColaborador) y $enlace
- * (función que recibe el número de página y devuelve la URL).
+ * Solo el trozo, sin diseno de pagina: lo inserta el JavaScript dentro
+ * de la ventana flotante.
  */
 use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Dominio\Dinero as D;
 ?>
-<?php if (!$d['filas']): ?>
-  <p class="lf-det-vacio"><?= $d['q'] !== ''
-      ? 'Sin resultados para «' . P::e($d['q']) . '».'
-      : 'No hay ventas con comisión en este periodo.' ?></p>
-<?php else: ?>
-  <div class="table-responsive lf-cards">
-    <table class="table table-hover">
+<div class="lf-vent-cuerpo">
+  <?php if (!$filas): ?>
+    <p class="vacio">No tiene comisiones en este periodo.</p>
+  <?php else: ?>
+    <table class="table">
       <thead><tr>
-        <th>Venta</th><th>Área</th>
-        <th class="text-end">%</th>
-        <th class="text-end">Devengado</th>
-        <th class="text-end">Por liberar</th>
+        <th>Folio</th><th>Cliente</th><th>Área</th>
+        <th>Pago</th><th>Tipo</th>
+        <th class="text-end">Venta</th><th class="text-end">Cobrado</th>
+        <th class="text-end">%</th><th class="text-end">Sobre</th>
+        <th class="text-end">Comisión</th>
       </tr></thead>
       <tbody>
-      <?php foreach ($d['filas'] as $f): ?>
+      <?php foreach ($filas as $f): ?>
         <tr>
-          <td data-label="Venta">
-            <a href="/ventas/<?= (int)$f['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
-              <?= P::e($f['cliente'] ?: 'Público general') ?></a>
-            <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
-              <?= P::e($f['codigo_venta']) ?> · <?= date('d M Y', strtotime($f['fecha'])) ?></span>
-          </td>
-          <td data-label="Área"><span class="badge bg-secondary"><?= P::e($f['area_servicio']) ?></span></td>
-          <td data-label="%" class="text-end lf-mono"><?= number_format((float)$f['porcentaje'], 2) ?>%</td>
-          <td data-label="Devengado" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($f['devengado']) ?></td>
-          <td data-label="Por liberar" class="text-end lf-mono"
-              <?= (float)$f['pendiente'] > 0.01 ? 'style="color:var(--lf-amb)"' : 'style="color:var(--lf-tinta-4)"' ?>>
-            <?= (float)$f['pendiente'] > 0.01 ? D::pesos($f['pendiente']) : '—' ?></td>
+          <td data-label="Folio">
+            <a href="/ventas/<?= (int)$f['venta_id'] ?>" class="lf-mono"
+               style="font-size:11.5px"><?= P::e($f['folio']) ?></a></td>
+          <td data-label="Cliente"><?= P::e($f['cliente']) ?></td>
+          <td data-label="Área" style="font-size:11.5px;color:var(--lf-tinta-3)">
+            <?= P::e($f['area']) ?></td>
+          <td data-label="Pago" class="lf-mono" style="font-size:11.5px">
+            <?= date('d/m/y', strtotime($f['fecha_pago'])) ?></td>
+          <td data-label="Tipo" style="font-size:11.5px">
+            <?= P::e(ucfirst((string)$f['tipo_pago'])) ?></td>
+          <td data-label="Venta" class="text-end lf-mono"><?= D::pesos($f['total_venta']) ?></td>
+          <td data-label="Cobrado" class="text-end lf-mono"><?= D::pesos($f['cobrado']) ?></td>
+          <td data-label="%" class="text-end lf-mono"><?= number_format((float)$f['porcentaje'],2) ?>%</td>
+          <td data-label="Sobre" class="text-end lf-mono"
+              style="color:var(--lf-tinta-4)"><?= number_format((float)$f['proporcion']*100,1) ?>%</td>
+          <td data-label="Comisión" class="text-end lf-mono"
+              style="font-weight:700;color:var(--lf-brand-2)"><?= D::pesos($f['comision']) ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
+      <tfoot><tr>
+        <td colspan="9" style="font-weight:600">
+          <?= count($filas) ?> pago<?= count($filas)==1?'':'s' ?></td>
+        <td class="text-end lf-mono" style="font-weight:700"><?= D::pesos($total) ?></td>
+      </tr></tfoot>
     </table>
-  </div>
-<?php endif; ?>
-<div class="lf-det-pie">
-  <span><?= $d['q'] !== '' ? (int)$d['total'] . ' de ' . (int)$d['total_todos'] : (int)$d['total'] ?>
-    venta<?= $d['total_todos'] == 1 && $d['q'] === '' ? '' : 's' ?> ·
-    devengado <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($d['devengado']) ?></b></span>
-  <?php P::parcial('parciales/paginacion', [
-      'pagina' => $d['pagina'], 'paginas' => $d['paginas'], 'enlace' => $enlace]); ?>
+    <p class="nota">
+      La comisión <b>no es un porcentaje de la venta</b>: es el porcentaje aplicado
+      sobre lo que se cobró en ese pago. La columna <b>Sobre</b> dice qué parte de la
+      venta entró con ese abono.
+    </p>
+  <?php endif; ?>
 </div>

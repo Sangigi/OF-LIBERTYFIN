@@ -142,7 +142,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
   $pag_eq = min($pagina, $paginas_eq);
   $equipo = array_slice($equipo, ($pag_eq - 1) * $porPag, $porPag);
   ?>
-  <div class="lf-equipo">
+  <div class="lf-equipo" id="equipoCards">
     <?php if (!$equipo): ?>
       <p style="grid-column:1/-1;padding:26px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
         No hay comisiones devengadas en este periodo.</p>
@@ -152,7 +152,12 @@ $qs = function ($x = []) use ($desde, $hasta) {
     // vertical deja media pantalla en blanco.
     $mayor = 0; foreach ($equipo as $c) $mayor = max($mayor, (float)$c['devengado']);
     foreach ($equipo as $c): $huerfano = (int)$c['sin_dueno'] === 1; ?>
-      <div class="lf-pers<?= $huerfano ? ' sin' : '' ?>">
+      <?php /* Clicable: abre la ventana con el detalle de sus comisiones.
+               Es un <button> y no un <div> para que funcione con el
+               teclado y lo lea un lector de pantalla. */ ?>
+      <button type="button" class="lf-pers lf-abre<?= $huerfano ? ' sin' : '' ?>"
+              data-quien="<?= P::e($c['nombre'] ?: 'POR ASIGNAR') ?>"
+              title="Ver de dónde sale esta comisión">
         <span class="lf-av <?= $huerfano ? 'gris' : '' ?>">
           <?= $huerfano ? '?' : P::e($iniciales($c['colaborador_nombre'])) ?></span>
         <div style="flex:1;min-width:0">
@@ -163,7 +168,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
         </div>
         <span class="mn"><?= D::pesos($c['devengado']) ?>
           <?php if ($huerfano): ?><i>no se paga</i><?php endif; ?></span>
-      </div>
+      </button>
     <?php endforeach; ?>
   </div>
   <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -243,3 +248,129 @@ $qs = function ($x = []) use ($desde, $hasta) {
     </section>
     <?php endif; ?>
 </div>
+
+<?php /* ═══ VENTANAS FLOTANTES ═══ */ ?>
+<div id="lfVentanas"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   VENTANAS DE COLABORADOR
+   Se mueven, se estiran, se minimizan y se pueden abrir
+   varias a la vez para comparar. No son un modal: un
+   modal tapa la pantalla y obliga a cerrarlo para mirar
+   otra cosa, y aqui lo util es justo tener dos abiertas.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  var zona = document.getElementById('lfVentanas');
+  if (!zona) return;
+  var abiertas = {}, zTop = 400, nacidas = 0;
+
+  var periodo = '<?= P::e(http_build_query(['desde' => $desde, 'hasta' => $hasta])) ?>';
+
+  function traerAlFrente(v) { v.style.zIndex = ++zTop; }
+
+  function abrir(quien) {
+    if (abiertas[quien]) { traerAlFrente(abiertas[quien]); return; }
+
+    var v = document.createElement('div');
+    v.className = 'lf-vent';
+    /* Cada una un poco mas abajo que la anterior: apiladas en el mismo
+       punto, la segunda esconde a la primera. */
+    var d = (nacidas++ % 6) * 26;
+    v.style.left = (70 + d) + 'px';
+    v.style.top  = (70 + d) + 'px';
+    v.style.zIndex = ++zTop;
+    v.innerHTML =
+      '<header><span class="t">' + quien + '</span>'
+      + '<button type="button" class="b" data-min title="Minimizar">–</button>'
+      + '<button type="button" class="b" data-cerrar title="Cerrar">&times;</button></header>'
+      + '<div class="cont"><div class="cargando"><span class="giro"></span>Cargando…</div></div>'
+      + '<div class="asa" data-estirar></div>';
+    zona.appendChild(v);
+    abiertas[quien] = v;
+    v.addEventListener('mousedown', function () { traerAlFrente(v); });
+
+    fetch('/comisiones/colaborador?quien=' + encodeURIComponent(quien) + '&' + periodo,
+          { credentials: 'same-origin' })
+      .then(function (r) { return r.text(); })
+      .then(function (html) { v.querySelector('.cont').innerHTML = html; })
+      .catch(function () {
+        v.querySelector('.cont').innerHTML =
+          '<p class="vacio">No se pudo cargar. Vuelve a intentarlo.</p>';
+      });
+  }
+
+  function cerrar(v) {
+    var q = Object.keys(abiertas).filter(function (k) { return abiertas[k] === v; })[0];
+    if (q) delete abiertas[q];
+    v.remove();
+  }
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('.lf-abre');
+    if (b) { abrir(b.dataset.quien); return; }
+    var c = ev.target.closest('[data-cerrar]');
+    if (c) { cerrar(c.closest('.lf-vent')); return; }
+    var m = ev.target.closest('[data-min]');
+    if (m) {
+      var v = m.closest('.lf-vent');
+      v.classList.toggle('min');
+      m.textContent = v.classList.contains('min') ? '+' : '–';
+    }
+  });
+
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    /* Se cierra la de encima, no todas: cerrar las cinco de un golpe
+       obliga a volver a abrirlas. */
+    var todas = Array.prototype.slice.call(zona.querySelectorAll('.lf-vent'));
+    if (!todas.length) return;
+    todas.sort(function (a, b) { return (+b.style.zIndex) - (+a.style.zIndex); });
+    cerrar(todas[0]);
+  });
+
+  /* ── Mover y estirar ──
+     Con eventos de puntero, que funcionan igual con ratón y con dedo. */
+  var arrastra = null;
+  document.addEventListener('pointerdown', function (ev) {
+    var asa = ev.target.closest('[data-estirar]');
+    var cab = ev.target.closest('.lf-vent > header');
+    if (!asa && !cab) return;
+    if (cab && ev.target.closest('.b')) return;   // los botones no mueven
+
+    var v = (asa || cab).closest('.lf-vent');
+    traerAlFrente(v);
+    var r = v.getBoundingClientRect();
+    arrastra = {
+      v: v, modo: asa ? 'estirar' : 'mover',
+      x: ev.clientX, y: ev.clientY,
+      l: r.left, t: r.top, w: r.width, h: r.height
+    };
+    v.classList.add('moviendo');
+    ev.preventDefault();
+  });
+
+  document.addEventListener('pointermove', function (ev) {
+    if (!arrastra) return;
+    var dx = ev.clientX - arrastra.x, dy = ev.clientY - arrastra.y, v = arrastra.v;
+    if (arrastra.modo === 'mover') {
+      /* No se deja salir por arriba ni por los lados: una ventana
+         medio fuera de la pantalla no se puede volver a agarrar. */
+      var l = Math.max(8, Math.min(window.innerWidth - 120, arrastra.l + dx));
+      var t = Math.max(8, Math.min(window.innerHeight - 60, arrastra.t + dy));
+      v.style.left = l + 'px'; v.style.top = t + 'px';
+    } else {
+      v.style.width  = Math.max(320, arrastra.w + dx) + 'px';
+      v.style.height = Math.max(180, arrastra.h + dy) + 'px';
+    }
+  });
+
+  ['pointerup', 'pointercancel'].forEach(function (e) {
+    document.addEventListener(e, function () {
+      if (!arrastra) return;
+      arrastra.v.classList.remove('moviendo');
+      arrastra = null;
+    });
+  });
+})();
+</script>

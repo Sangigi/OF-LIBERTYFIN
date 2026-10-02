@@ -318,4 +318,50 @@ final class ComisionRepo extends Repo
         foreach ($filas as $f) $r[$f['area'] ?: 'Sin area'][] = $f;
         return $r;
     }
+
+    /**
+     * Cada comision de un colaborador, con el porque al lado.
+     *
+     * Es lo que alimenta la ventana que se abre al tocar su tarjeta.
+     * Contesta "de donde salio mi pago" sin salir de la pantalla.
+     *
+     * Se busca por NOMBRE y no por id porque las tarjetas se agrupan
+     * por nombre: dos registros viejos del mismo colaborador con el
+     * texto escrito distinto cuentan como uno solo, igual que en el
+     * resumen de arriba.
+     */
+    public function detalleColaborador($quien, $desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT v.codigo_venta                        AS folio,
+                   v.id                                  AS venta_id,
+                   COALESCE(cl.nombre,'Publico general') AS cliente,
+                   p.fecha_pago,
+                   p.tipo                                AS tipo_pago,
+                   p.metodo_pago                         AS metodo,
+                   COALESCE((
+                       SELECT cat.nombre
+                       FROM venta_detalles d
+                       LEFT JOIN productos pr   ON pr.id = d.producto_id
+                       LEFT JOIN categorias cat ON cat.id = pr.categoria_id
+                       WHERE d.venta_id = v.id AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                       GROUP BY cat.nombre ORDER BY SUM(d.subtotal) DESC LIMIT 1
+                   ), NULLIF(v.area_nombre,''), 'Sin area')   AS area,
+                   pc.area_nombre                        AS equipo,
+                   v.total                               AS total_venta,
+                   p.monto                               AS cobrado,
+                   pc.porcentaje,
+                   pc.proporcion_cobrada                 AS proporcion,
+                   pc.monto                              AS comision
+            FROM pago_comisiones pc
+            INNER JOIN venta_pagos p ON p.id = pc.pago_id
+            INNER JOIN ventas v      ON v.id = pc.venta_id
+            LEFT  JOIN clientes cl   ON cl.id = v.cliente_id
+            WHERE v.estado <> 'cancelada' AND p.cancelado = 0
+              AND v.fecha >= ? AND v.fecha < ?
+              AND pc.colaborador_nombre = ?
+            ORDER BY p.fecha_pago DESC, v.codigo_venta",
+            [$a, $b, (string)$quien]);
+    }
 }
