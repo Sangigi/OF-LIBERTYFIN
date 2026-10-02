@@ -530,28 +530,9 @@ $token = $_SESSION['lf_token'];
 
     sub.textContent = 'Venta ' + (d.venta ? d.venta.codigo : '') + ' · ' + money(l.monto);
 
-    /* Si el proveedor no devolvio lo que se pidio, se dice. Mostrar
-       una CLABE cuando el cajero pulso "Tarjeta" lo deja explicandole
-       al cliente algo que no entiende. */
+    /* Cada servicio devuelve lo suyo, asi que no hace falta adivinar:
+       el modo que se pidio es el que llego. */
     var aviso = '';
-    if (l.falta) {
-      var otras = [];
-      if (l.liga)   otras.push('con tarjeta');
-      if (l.clabe)  otras.push('por transferencia');
-      if (l.barras) otras.push('en tienda');
-      aviso = '<div class="espera"><b>El proveedor no devolvió esa forma de pago.</b> '
-            + (otras.length
-                ? 'Sí puede pagar ' + otras.join(' o ') + ', abajo están los datos.'
-                : 'Tampoco devolvió ninguna otra. Revisa la configuración.')
-            + '</div>';
-    }
-
-    /* Cuando falta lo pedido, se muestra lo que si llego, en orden. */
-    if (l.falta) {
-      if (l.liga)        modo = 'tarjeta';
-      else if (l.clabe)  modo = 'spei';
-      else if (l.barras) modo = 'efectivo';
-    }
 
     if (modo === 'tarjeta') {
       titulo.textContent = 'Pago con tarjeta';

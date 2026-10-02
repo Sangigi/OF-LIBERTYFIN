@@ -37,30 +37,78 @@ final class LigaPago
      * config/integraciones.php sin tocar código.
      */
     /**
-     * Que metodos acepta cada liga.
+     * Cada forma de pago es un ENDPOINT distinto, no un codigo.
      *
-     * SOLO SE CONOCEN DOS CODIGOS, Y HAY QUE DECIRLO
+     * LO QUE ME TENIA EQUIVOCADO
      *
-     * En todo el sistema anterior aparecen unicamente `41` y `401`. Los
-     * de "solo tarjeta" y "solo SPEI" los invente, y el proveedor los
-     * ignora: devuelve siempre lo mismo y por eso todas las opciones
-     * acababan en SPEI.
+     * `PaymentTypes` no elige el metodo. `41` y `401` son LA MISMA cosa
+     * —"Contado"—: 401 es el de Sandbox y 41 el de produccion. El
+     * proveedor lo confirmo por correo. Por eso daba igual cual mandara
+     * y todo acababa en lo mismo.
      *
-     * Asi que `tarjeta` y `spei` mandan `41` —todos los metodos— y el
-     * modal muestra la parte que corresponde al boton elegido. El
-     * cliente puede pagar de la otra forma si quiere, que no es un
-     * problema: su dinero entra igual.
+     * El metodo lo decide a que servicio se le pega:
      *
-     * En cuanto Pagadetodo diga los codigos reales, se ponen en
-     * config/integraciones.php (`tipo_tarjeta`, `tipo_spei`) y esto
-     * empieza a restringir de verdad, sin tocar codigo.
+     *   GenerarLigaIndi        liga de tarjeta, pago simple
+     *   GenerarLigaDomiciliacionIndi   igual, pero deja la tarjeta
+     *                          tokenizada para cobros recurrentes
+     *   GenerarClabeIndi       la CLABE para SPEI
+     *   GenerarReferenciaIndi  la referencia para pagar en tienda
+     *
+     * Y cada uno pide campos distintos. Mandarle a uno el cuerpo de
+     * otro es lo que producia "El Account es obligatorio".
      */
     const METODOS = [
-        'todos'    => ['Todos los métodos', '41',  'Tarjeta, transferencia y tiendas'],
-        'tarjeta'  => ['Tarjeta',           '41',  'Débito o crédito, en línea'],
-        'spei'     => ['Transferencia SPEI','41',  'A una CLABE, se detecta solo'],
-        'efectivo' => ['Efectivo en tienda','401', 'OXXO y tiendas participantes'],
+        'tarjeta'  => ['Tarjeta',            'liga',       'Débito o crédito, en línea'],
+        'spei'     => ['Transferencia SPEI', 'clabe',      'A una CLABE, se detecta solo'],
+        'efectivo' => ['Efectivo en tienda', 'referencia', 'OXXO y tiendas participantes'],
+        'todos'    => ['Tarjeta',            'liga',       'Débito o crédito, en línea'],
     ];
+
+    /**
+     * Que servicio y que campos necesita cada forma.
+     *
+     * Las rutas salen de la configuracion para que un cambio del
+     * proveedor no obligue a tocar codigo; aqui van las que se han
+     * visto funcionando.
+     */
+    const SERVICIOS = [
+        'liga'       => ['/Service/GenerarLigaIndi',
+                         ['PaymentTypes','Id','Description','Amount','Reference','ExpirationDate']],
+        'clabe'      => ['/Service/GenerarClabeIndi',
+                         ['Description','Account','CustomerEmail','CustomerName','ExpirationDate']],
+        'referencia' => ['/Service/GenerarReferenciaIndi',
+                         ['Description','Amount','Reference','CustomerEmail','CustomerName','ExpirationDate']],
+    ];
+
+    /**
+     * El codigo de Contado.
+     *
+     *   401  Sandbox
+     *    41  produccion
+     *
+     * Solo lo usa la liga de tarjeta; los otros dos servicios ni
+     * siquiera lo reciben.
+     */
+    private function contado()
+    {
+        $propio = trim((string)($this->cfg['payment_types'] ?? ''));
+        if ($propio !== '') return $propio;
+        return $this->enPruebas() ? '401' : '41';
+    }
+
+    /**
+     * Cuantos digitos lleva la referencia.
+     *
+     * Trece en produccion y quince en el Sandbox de pagadetodo.mx. Con
+     * el largo equivocado el proveedor contesta el codigo 22, "El
+     * formato de la referencia es incorrecto".
+     */
+    private function largoReferencia()
+    {
+        $n = (int)($this->cfg['digitos_referencia'] ?? 0);
+        if ($n >= 10 && $n <= 20) return $n;
+        return $this->enPruebas() ? 15 : 13;
+    }
 
     private $cfg;
     private $ultimoError = '';
@@ -97,64 +145,63 @@ final class LigaPago
         $monto = round((float)($d['monto'] ?? 0), 2);
         if ($monto <= 0) { $this->ultimoError = 'El monto tiene que ser mayor a cero'; return null; }
 
-        $metodo = $d['metodo'] ?? 'todos';
-        if (!isset(self::METODOS[$metodo])) $metodo = 'todos';
-        $tipo = $this->cfg['tipo_' . $metodo] ?? self::METODOS[$metodo][1];
+        $metodo = $d['metodo'] ?? 'tarjeta';
+        if (!isset(self::METODOS[$metodo])) $metodo = 'tarjeta';
+        $servicio = self::METODOS[$metodo][1];
+        list($ruta, $campos) = self::SERVICIOS[$servicio];
 
-        $pruebas = $this->enPruebas();
-        // SPEI va a su propia direccion cuando esta configurada: es el
-        // endpoint que entrega la CLABE, y pide campos distintos al de
-        // la liga. Mandarle el cuerpo equivocado es lo que produce "El
-        // Account es obligatorio".
-        $propia = ($metodo === 'spei' && !empty($this->cfg['url_clabe']))
-                ? $this->cfg['url_clabe'] : null;
-        $url = $propia ?: ($pruebas
-             ? ($this->cfg['url_sandbox'] ?? $this->cfg['url'] ?? '')
-             : ($this->cfg['url'] ?? ''));
-        if (trim((string)$url) === '') {
-            $this->ultimoError = 'Falta la dirección del servicio en config/integraciones.php';
-            return null;
+        // La direccion: la del servicio si se configuro, si no la base
+        // mas su ruta. Asi un cambio del proveedor se arregla en el
+        // config y no en el codigo.
+        $url = trim((string)($this->cfg['url_' . $servicio] ?? ''));
+        if ($url === '') {
+            $base = rtrim(trim((string)($this->cfg['host'] ?? $this->cfg['url'] ?? '')), '/');
+            if ($base === '') {
+                $this->ultimoError = 'Falta `host` o `url_' . $servicio
+                                   . '` en config/integraciones.php';
+                return null;
+            }
+            $url = $base . $ruta;
         }
 
-        $dias = max(1, (int)($d['dias'] ?? $this->cfg['dias_vigencia'] ?? 3));
+        $pruebas    = $this->enPruebas();
+        $referencia = self::referencia($d['referencia'] ?? '', $this->largoReferencia());
+        $dias       = max(1, (int)($d['dias'] ?? $this->cfg['dias_vigencia'] ?? 3));
+        $cliente    = mb_substr(trim((string)($d['cliente'] ?? '')), 0, 60) ?: 'Publico general';
+        $correo     = filter_var($d['correo'] ?? '', FILTER_VALIDATE_EMAIL) ? $d['correo'] : '';
 
-        $referencia = self::referencia($d['referencia'] ?? '');
-
+        // Credenciales e identificadores: los pide siempre, los tres.
         $cuerpo = [
-            'User'           => $pruebas ? ($this->cfg['usuario_prueba'] ?: $this->cfg['usuario'])
-                                         : $this->cfg['usuario'],
-            'Password'       => $pruebas ? ($this->cfg['clave_prueba'] ?: $this->cfg['clave'])
-                                         : $this->cfg['clave'],
-            'IntegrationID'  => $this->cfg['integracion_id'],
-            'BusinessID'     => $this->cfg['negocio_id'] ?? '',
-            'PaymentTypes'   => (string)$tipo,
-            'Id'             => (string)($d['id'] ?? $d['referencia']),
-            // El proveedor corta a 40 y si se pasa, rechaza. Se corta aquí
-            // para que el error no venga de su lado sin explicación.
+            'User'          => $pruebas ? ($this->cfg['usuario_prueba'] ?: $this->cfg['usuario'])
+                                        : $this->cfg['usuario'],
+            'Password'      => $pruebas ? ($this->cfg['clave_prueba'] ?: $this->cfg['clave'])
+                                        : $this->cfg['clave'],
+            'IntegrationID' => $this->cfg['integracion_id'],
+            'BusinessID'    => $this->cfg['negocio_id'] ?? '',
+        ];
+        if (!empty($this->cfg['escuela_id'])) $cuerpo['SchoolID'] = $this->cfg['escuela_id'];
+
+        // Y despues, SOLO los campos que ese servicio espera. Mandarle
+        // de mas es lo que lo hace rechazar la peticion.
+        $posibles = [
+            'PaymentTypes'   => $this->contado(),
+            'Id'             => (string)($d['id'] ?? $referencia),
+            // El proveedor corta a 40 y si se pasa, rechaza.
             'Description'    => mb_substr((string)($d['descripcion'] ?? 'Pago'), 0, 40),
-            // En CENTAVOS y como cadena. Mandar "150.00" en vez de "15000"
-            // genera una liga por un peso y medio.
+            // En CENTAVOS y como cadena: mandar "150.00" en vez de
+            // "15000" genera un cobro por peso y medio.
             'Amount'         => (string)(int)round($monto * 100),
             'Reference'      => $referencia,
-            // `Account` es OBLIGATORIO y no estaba.
-            //
-            // Son 15 digitos que identifican el cobro del lado del
-            // proveedor. En el sistema anterior se generaba igual que la
-            // referencia, y se manda el MISMO valor: si fueran distintos
-            // habria dos identificadores para una sola operacion y
-            // conciliar seria adivinar cual mirar.
+            // `Account` identifica el cobro del lado del proveedor. Va
+            // el mismo valor que la referencia: dos identificadores para
+            // una sola operacion harian imposible conciliar.
             'Account'        => $referencia,
-            'CustomerName'   => mb_substr(trim((string)($d['cliente'] ?? '')), 0, 60) ?: 'Publico general',
-            'CustomerEmail'  => filter_var($d['correo'] ?? '', FILTER_VALIDATE_EMAIL)
-                                ? $d['correo'] : '',
+            'CustomerName'   => $cliente,
+            'CustomerEmail'  => $correo,
             'ExpirationDate' => date('Y-m-d', strtotime('+' . $dias . ' days')),
         ];
-
-        // Campos que algunos convenios piden y otros no. Se mandan solo
-        // si estan configurados: enviarlos vacios hace que el proveedor
-        // los rechace por invalidos en vez de ignorarlos.
-        foreach (['MontoTotal' => $monto] as $k => $v) {
-            if (!empty($this->cfg['manda_' . strtolower($k)])) $cuerpo[$k] = $v;
+        foreach ($campos as $c) {
+            if (isset($posibles[$c])) $cuerpo[$c] = $posibles[$c];
         }
 
         $ch = curl_init($url);
@@ -164,13 +211,13 @@ final class LigaPago
             CURLOPT_POSTFIELDS     => json_encode($cuerpo),
             CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
             CURLOPT_TIMEOUT        => max(10, (int)($this->cfg['timeout'] ?? 30)),
-            // El certificado SÍ se verifica. El sistema anterior lo
-            // desactivaba, y por aquí viajan montos y referencias de pago.
+            // El certificado SI se verifica. Por aqui viajan montos y
+            // referencias de pago.
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
-        $resp   = curl_exec($ch);
-        $codigo = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $resp    = curl_exec($ch);
+        $codigo  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         $errCurl = curl_error($ch);
         curl_close($ch);
 
@@ -178,9 +225,6 @@ final class LigaPago
             $this->ultimoError = 'No se pudo contactar al proveedor: ' . $errCurl;
             return null;
         }
-        // Lo que respondio, tal cual, para poder verlo si falla. Sin
-        // esto un rechazo del proveedor obliga a adivinar que campo
-        // esta mal.
         $this->ultimaRespuesta = mb_substr((string)$resp, 0, 800);
 
         $j = json_decode($resp, true);
@@ -190,44 +234,39 @@ final class LigaPago
             return null;
         }
 
-        $liga = self::campo($j, ['Url','url','liga','PaymentUrl','link']);
-        // El proveedor escribe 'Clabe' en un endpoint y 'CLABE' en otro.
-        $clabe = self::campo($j, ['Clabe','CLABE','clabe','Cuenta','account']);
-        $barras = self::campo($j, ['Barcode','barcode','codigo_barras','Reference']);
+        $liga   = self::campo($j, ['Url','url','liga','PaymentUrl','link']);
+        $clabe  = self::campo($j, ['Clabe','CLABE','clabe','Cuenta']);
+        $barras = self::campo($j, ['Reference','Barcode','barcode','referencia','codigo_barras']);
 
         if (!$liga && !$clabe && !$barras) {
-            $msg = self::campo($j, ['Message','message','error','Error','ErrorMessage']);
+            $msg = self::campo($j, ['Message','message','error','Error','ErrorMessage','Mensaje']);
             $this->ultimoError = $msg
-                ? 'El proveedor rechazó la liga: ' . $msg
+                ? 'El proveedor rechazó el cobro: ' . $msg
                 : 'El proveedor no devolvió ninguna forma de pagar.';
-            error_log('[LibertyFin] liga rechazada · enviado: ' . json_encode($cuerpo)
+            error_log('[LibertyFin] cobro rechazado · ' . $url
+                . ' · enviado: ' . json_encode($cuerpo)
                 . ' · recibido: ' . $this->ultimaRespuesta);
             return null;
         }
 
-        // SE AVISA SI NO LLEGO LO QUE SE PIDIO.
-        //
-        // Pedir tarjeta y recibir solo una CLABE no es un error del
-        // proveedor: es que el codigo de metodo no restringe. Pero el
-        // cajero tiene que saberlo antes de decirle al cliente que pase
-        // su tarjeta.
-        $falta = '';
-        if ($metodo === 'tarjeta'  && !$liga)   $falta = 'tarjeta';
-        if ($metodo === 'spei'     && !$clabe)  $falta = 'spei';
-        if ($metodo === 'efectivo' && !$barras) $falta = 'efectivo';
-
+        // Cada servicio devuelve lo suyo. Se guarda solo eso: si la
+        // liga de tarjeta trae una referencia, no es un codigo de
+        // barras y mostrarla como tal manda al cliente al OXXO con un
+        // numero que no sirve.
         return [
-            'liga'       => $liga,
-            'clabe'      => $clabe,
-            'barras'     => $barras,
-            'falta'      => $falta,
-            'referencia' => $cuerpo['Reference'],
+            'liga'       => $servicio === 'liga'       ? $liga   : null,
+            'clabe'      => $servicio === 'clabe'      ? $clabe  : null,
+            'barras'     => $servicio === 'referencia' ? $barras : null,
+            'falta'      => '',
+            'referencia' => $referencia,
             'vence'      => $cuerpo['ExpirationDate'],
             'metodo'     => $metodo,
+            'servicio'   => $servicio,
             'pruebas'    => $pruebas,
             'crudo'      => $j,
         ];
     }
+
 
     /**
      * Pregunta si ya pagaron.
@@ -293,11 +332,12 @@ final class LigaPago
      * que no se completó, y un desastre si dos ventas distintas la
      * comparten: la segunda cobraría el monto de la primera.
      */
-    public static function referencia($semilla = '')
+    public static function referencia($semilla = '', $largo = 13)
     {
+        $largo = max(10, min(20, (int)$largo));
         $s = preg_replace('/\D/', '', (string)$semilla);
-        if (strlen($s) >= 15) return substr($s, 0, 15);
-        return str_pad($s, 15, (string)random_int(0, 9), STR_PAD_LEFT);
+        if (strlen($s) >= $largo) return substr($s, -$largo);
+        return str_pad($s, $largo, (string)random_int(0, 9), STR_PAD_LEFT);
     }
 
     private static function campo(array $j, array $nombres)

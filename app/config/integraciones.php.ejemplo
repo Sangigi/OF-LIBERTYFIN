@@ -105,43 +105,41 @@ return [
         // Casi nunca es el nombre comercial: es el que registró el
         // proveedor al abrir el convenio. Si el cliente dice el
         // equivocado, el cajero no lo encuentra y lo manda de regreso.
-        // ── LAS DOS DIRECCIONES DEL PROVEEDOR ──────────────────
+        // ── LAS DIRECCIONES DEL PROVEEDOR ──────────────────────
         //
-        // No es una sola. El sistema anterior usaba dos endpoints
-        // distintos y cada uno pide campos distintos:
+        // CADA FORMA DE PAGO ES UN SERVICIO DISTINTO. No se elige con
+        // un codigo: se elige con la direccion a la que se pega.
         //
-        //   `url`        la liga de pago (tarjeta, tienda).
-        //                Campos: PaymentTypes, Amount, Reference...
+        //   GenerarLigaIndi        la liga de tarjeta
+        //   GenerarClabeIndi       la CLABE para SPEI
+        //   GenerarReferenciaIndi  la referencia para pagar en tienda
         //
-        //   `url_clabe`  la CLABE para SPEI.
-        //                Campos: Account, CustomerName, MontoTotal...
-        //
-        // Si se le manda a uno el cuerpo del otro, contesta cosas como
-        // "El Account es obligatorio". Si tu convenio usa una sola,
-        // deja `url_clabe` vacio y se usa `url` para todo.
-        'url'       => '',
-        'url_clabe' => '',
-        'url_estado'=> '',
+        // Con `host` basta: el sistema le agrega la ruta de cada uno.
+        // Las tres de abajo solo hacen falta si el proveedor te dio
+        // direcciones distintas a las normales.
+        'host'            => 'https://pagalaescuela.mx/Pagadetodo',
+        'url_liga'        => '',
+        'url_clabe'       => '',
+        'url_referencia'  => '',
+        'url_estado'      => '',
 
-        // Algunos convenios piden `MontoTotal` ademas de `Amount`.
-        // Mandarlo cuando no lo esperan hace que rechacen la peticion,
-        // asi que va apagado por omision.
-        'manda_montototal' => false,
+        // ── CONTADO ────────────────────────────────────────────
+        //
+        // `41` en produccion y `401` en el Sandbox de pagadetodo.mx.
+        // Son LA MISMA cosa: el proveedor lo confirmo por correo. No
+        // sirven para elegir metodo de pago.
+        //
+        // Vacio = se elige solo segun `sandbox`.
+        'payment_types' => '',
 
-        // ── LOS CODIGOS DE METODO ──────────────────────────────
+        // ── EL LARGO DE LA REFERENCIA ──────────────────────────
         //
-        // PIDELE A PAGADETODO LA LISTA. En todo el sistema anterior
-        // solo aparecen dos: `41` y `401`. Mientras no haya mas,
-        // tarjeta y SPEI usan `41` —todos los metodos— y por eso la
-        // liga sirve para las dos cosas aunque pulses una.
+        // 13 digitos en produccion, 15 en el Sandbox de pagadetodo.mx.
+        // Con el largo equivocado contesta el codigo 22, "El formato de
+        // la referencia es incorrecto".
         //
-        // No es un fallo: el dinero entra igual. Pero el dia que te
-        // den los codigos reales, ponlos aqui y empieza a restringir
-        // de verdad, sin tocar una linea de codigo.
-        'tipo_todos'    => '41',
-        'tipo_tarjeta'  => '',   // vacio = usa 41
-        'tipo_spei'     => '',   // vacio = usa 41
-        'tipo_efectivo' => '401',
+        // Vacio = se elige solo segun `sandbox`.
+        'digitos_referencia' => '',
 
         'nombre_convenio' => '',
         // Dónde se puede pagar, separadas por coma. Depende del
