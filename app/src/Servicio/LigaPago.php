@@ -36,11 +36,30 @@ final class LigaPago
      * funcionando; si tu asesor da otros, se cambian en
      * config/integraciones.php sin tocar código.
      */
+    /**
+     * Que metodos acepta cada liga.
+     *
+     * SOLO SE CONOCEN DOS CODIGOS, Y HAY QUE DECIRLO
+     *
+     * En todo el sistema anterior aparecen unicamente `41` y `401`. Los
+     * de "solo tarjeta" y "solo SPEI" los invente, y el proveedor los
+     * ignora: devuelve siempre lo mismo y por eso todas las opciones
+     * acababan en SPEI.
+     *
+     * Asi que `tarjeta` y `spei` mandan `41` —todos los metodos— y el
+     * modal muestra la parte que corresponde al boton elegido. El
+     * cliente puede pagar de la otra forma si quiere, que no es un
+     * problema: su dinero entra igual.
+     *
+     * En cuanto Pagadetodo diga los codigos reales, se ponen en
+     * config/integraciones.php (`tipo_tarjeta`, `tipo_spei`) y esto
+     * empieza a restringir de verdad, sin tocar codigo.
+     */
     const METODOS = [
         'todos'    => ['Todos los métodos', '41',  'Tarjeta, transferencia y tiendas'],
-        'tarjeta'  => ['Solo tarjeta',      '1',   'Débito o crédito, en línea'],
-        'spei'     => ['Solo transferencia','40',  'SPEI a una CLABE'],
-        'efectivo' => ['Solo tiendas',      '401', 'OXXO y tiendas participantes'],
+        'tarjeta'  => ['Tarjeta',           '41',  'Débito o crédito, en línea'],
+        'spei'     => ['Transferencia SPEI','41',  'A una CLABE, se detecta solo'],
+        'efectivo' => ['Efectivo en tienda','401', 'OXXO y tiendas participantes'],
     ];
 
     private $cfg;
@@ -186,10 +205,22 @@ final class LigaPago
             return null;
         }
 
+        // SE AVISA SI NO LLEGO LO QUE SE PIDIO.
+        //
+        // Pedir tarjeta y recibir solo una CLABE no es un error del
+        // proveedor: es que el codigo de metodo no restringe. Pero el
+        // cajero tiene que saberlo antes de decirle al cliente que pase
+        // su tarjeta.
+        $falta = '';
+        if ($metodo === 'tarjeta'  && !$liga)   $falta = 'tarjeta';
+        if ($metodo === 'spei'     && !$clabe)  $falta = 'spei';
+        if ($metodo === 'efectivo' && !$barras) $falta = 'efectivo';
+
         return [
             'liga'       => $liga,
             'clabe'      => $clabe,
             'barras'     => $barras,
+            'falta'      => $falta,
             'referencia' => $cuerpo['Reference'],
             'vence'      => $cuerpo['ExpirationDate'],
             'metodo'     => $metodo,

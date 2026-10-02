@@ -275,6 +275,10 @@ final class CajaControlador
                     'ref'   => $liga['referencia'],
                     'vence' => $liga['vence'],
                     'doc'   => '/ligas/' . (int)$liga['id'] . '/documento',
+                    // Que forma pidio el cajero y si el proveedor la
+                    // devolvio. Sin esto el modal muestra lo que haya y
+                    // parece que el boton no sirvio.
+                    'falta' => $g['falta'] ?? '',
                 ], 'venta' => ['codigo' => $venta['codigo_venta']]]);
             }
 

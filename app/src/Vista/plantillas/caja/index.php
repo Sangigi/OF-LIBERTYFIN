@@ -530,6 +530,29 @@ $token = $_SESSION['lf_token'];
 
     sub.textContent = 'Venta ' + (d.venta ? d.venta.codigo : '') + ' · ' + money(l.monto);
 
+    /* Si el proveedor no devolvio lo que se pidio, se dice. Mostrar
+       una CLABE cuando el cajero pulso "Tarjeta" lo deja explicandole
+       al cliente algo que no entiende. */
+    var aviso = '';
+    if (l.falta) {
+      var otras = [];
+      if (l.liga)   otras.push('con tarjeta');
+      if (l.clabe)  otras.push('por transferencia');
+      if (l.barras) otras.push('en tienda');
+      aviso = '<div class="espera"><b>El proveedor no devolvió esa forma de pago.</b> '
+            + (otras.length
+                ? 'Sí puede pagar ' + otras.join(' o ') + ', abajo están los datos.'
+                : 'Tampoco devolvió ninguna otra. Revisa la configuración.')
+            + '</div>';
+    }
+
+    /* Cuando falta lo pedido, se muestra lo que si llego, en orden. */
+    if (l.falta) {
+      if (l.liga)        modo = 'tarjeta';
+      else if (l.clabe)  modo = 'spei';
+      else if (l.barras) modo = 'efectivo';
+    }
+
     if (modo === 'tarjeta') {
       titulo.textContent = 'Pago con tarjeta';
       cuerpo.innerHTML =
@@ -538,7 +561,7 @@ $token = $_SESSION['lf_token'];
         + '<div class="qr" id="mQr"></div>'
         + copiable(l.liga, 'mLiga')
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
-        + 'Esperando a que pague. Esto se actualiza solo.</div>';
+        + 'Esperando a que pague. Esto se actualiza solo.</div>' + aviso;
       cargarQr(l.liga);
       pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.liga)
         + '" target="_blank" rel="noopener">Abrir la página</a>'
@@ -553,7 +576,7 @@ $token = $_SESSION['lf_token'];
         + copiable(l.clabe, 'mClabe', true)
         + '<p class="aviso">Una cantidad distinta no se asocia sola y hay que buscarla a mano.</p>'
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
-        + 'Esperando el depósito. En cuanto llegue, aparece aquí.</div>';
+        + 'Esperando el depósito. En cuanto llegue, aparece aquí.</div>' + aviso;
       pie.innerHTML = '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
       vigilar(l.id);
 
@@ -566,7 +589,7 @@ $token = $_SESSION['lf_token'];
         + '<p class="aviso">El comprobante trae el código de barras, los pasos y la lista '
         + 'de tiendas. Imprímelo o mándaselo.</p>'
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
-        + 'El pago en tienda puede tardar unas horas en reflejarse.</div>';
+        + 'El pago en tienda puede tardar unas horas en reflejarse.</div>' + aviso;
       pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.doc)
         + '" target="_blank">Ver el comprobante</a>'
         + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';

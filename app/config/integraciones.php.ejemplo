@@ -128,6 +128,21 @@ return [
         // asi que va apagado por omision.
         'manda_montototal' => false,
 
+        // ── LOS CODIGOS DE METODO ──────────────────────────────
+        //
+        // PIDELE A PAGADETODO LA LISTA. En todo el sistema anterior
+        // solo aparecen dos: `41` y `401`. Mientras no haya mas,
+        // tarjeta y SPEI usan `41` —todos los metodos— y por eso la
+        // liga sirve para las dos cosas aunque pulses una.
+        //
+        // No es un fallo: el dinero entra igual. Pero el dia que te
+        // den los codigos reales, ponlos aqui y empieza a restringir
+        // de verdad, sin tocar una linea de codigo.
+        'tipo_todos'    => '41',
+        'tipo_tarjeta'  => '',   // vacio = usa 41
+        'tipo_spei'     => '',   // vacio = usa 41
+        'tipo_efectivo' => '401',
+
         'nombre_convenio' => '',
         // Dónde se puede pagar, separadas por coma. Depende del
         // convenio: no todos aceptan las mismas cadenas, y una lista
