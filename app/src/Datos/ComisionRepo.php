@@ -385,7 +385,34 @@ final class ComisionRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         $id     = $colabId > 0 ? (int)$colabId : null;
+        // EL EQUIPO PUEDE VENIR COMO LISTA.
+        //
+        // La tarjeta agrupa por persona, y quien comisiona en varios
+        // equipos trae "Administración, Ventas". Comparar eso con
+        // `area_nombre <=> ?` no casa con ningun renglon: la ventana
+        // salia vacia para Gisselle en agosto, que es la unica que
+        // comisiona en dos.
+        //
+        // Se parte en una lista y se compara contra cualquiera de los
+        // valores. Con uno solo se comporta igual que antes.
         $equipo = ($equipo === '' || $equipo === null) ? null : $equipo;
+        $equipos = $equipo === null
+                 ? []
+                 : array_values(array_filter(array_map('trim', explode(',', $equipo)), 'strlen'));
+
+        // La condicion y sus parametros, para no repetirla cuatro veces.
+        if (!$equipos) {
+            // Sin equipo: se aceptan todos, incluido el nulo.
+            $condEq = '1=1';
+            $parEq  = [];
+        } elseif (count($equipos) === 1) {
+            $condEq = 'area_nombre <=> ?';
+            $parEq  = [$equipos[0]];
+        } else {
+            $condEq = 'area_nombre IN (' . implode(',', array_fill(0, count($equipos), '?')) . ')';
+            $parEq  = $equipos;
+        }
+        $condEqPc = str_replace('area_nombre', 'pc.area_nombre', $condEq);
         $pagina = max(1, (int)$pagina);
         $porPag = max(1, (int)$porPag);
 
@@ -395,9 +422,9 @@ final class ComisionRepo extends Repo
                    COALESCE(SUM(pc.monto),0)   AS devengado
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE pc.colaborador_id <=> ? AND pc.colaborador_nombre = ? AND pc.area_nombre <=> ?
+            WHERE pc.colaborador_id <=> ? AND pc.colaborador_nombre = ? AND {$condEqPc}
               AND v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
-        ", [$id, $nombre, $equipo, $a, $b]) ?: ['ventas' => 0, 'devengado' => 0];
+        ", array_merge([$id, $nombre], $parEq, [$a, $b])) ?: ['ventas' => 0, 'devengado' => 0];
 
         // Una fila por venta; sobre esto se busca, se cuenta y se pagina.
         $base = "
@@ -419,19 +446,19 @@ final class ComisionRepo extends Repo
             INNER JOIN (
                 SELECT venta_id, SUM(monto) AS dev, MAX(porcentaje) AS pct
                 FROM pago_comisiones
-                WHERE colaborador_id <=> ? AND colaborador_nombre = ? AND area_nombre <=> ?
+                WHERE colaborador_id <=> ? AND colaborador_nombre = ? AND {$condEq}
                 GROUP BY venta_id
             ) x ON x.venta_id = v.id
             LEFT JOIN (
                 SELECT venta_id, SUM(monto_comision) AS asignada
                 FROM venta_comisiones
                 WHERE cancelada = 0
-                  AND colaborador_id <=> ? AND colaborador_nombre = ? AND area_nombre <=> ?
+                  AND colaborador_id <=> ? AND colaborador_nombre = ? AND {$condEq}
                 GROUP BY venta_id
             ) asg ON asg.venta_id = v.id
             LEFT JOIN clientes c ON c.id = v.cliente_id
             WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'";
-        $pBase = [$id, $nombre, $equipo, $id, $nombre, $equipo, $a, $b];
+        $pBase = array_merge([$id, $nombre], $parEq, [$id, $nombre], $parEq, [$a, $b]);
 
         list($cond, $pCond) = $this->condicionBusqueda($q);
 
