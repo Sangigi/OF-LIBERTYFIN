@@ -33,6 +33,7 @@ final class Auditoria
         'servicio.precio'   => 'Cambió un precio',
         'servicio.alternar' => 'Activó o desactivó un servicio',
         'gasto.borrar'      => 'Borró un gasto',
+        'caja.abrir'        => 'Abrió la caja',
         'caja.cerrar'       => 'Cerró la caja',
         'usuario.crear'     => 'Creó un usuario',
         'usuario.editar'    => 'Editó un usuario',

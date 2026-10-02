@@ -20,6 +20,12 @@ final class CajaControlador
         $buscar = Peticion::texto('q');
         $suc    = $_SESSION['sucursal_id'] ?? null;
 
+        // El turno se pregunta a la BASE, no a la sesión. Antes se leía
+        // `$_SESSION['caja_id']`, que solo se escribía al pasar por
+        // /corte: quien entraba derecho a cobrar veía "no tienes caja
+        // abierta" teniéndola, y sus ventas se guardaban fuera del corte.
+        $turno = \LibertyFin\Servicio\Caja::abierta($db);
+
         Plantilla::pagina('caja/index', [
             'titulo'    => 'Caja',
             'icono'     => 'caja',
@@ -33,14 +39,8 @@ final class CajaControlador
             'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
             // Sin caja abierta la venta se registra igual, pero no entra
             // al corte del turno. Se avisa antes, no despues.
-            'cajaAbierta' => !empty($_SESSION['caja_id']),
-            // Quien va a HACER el trabajo: los COLABORADORES, agrupados
-            // por area, no los usuarios del sistema. Un contador puede
-            // atender sin tener cuenta para entrar.
-            'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
-            // Sin caja abierta la venta se registra igual, pero no entra
-            // al corte del turno. Se avisa antes, no despues.
-            'cajaAbierta' => !empty($_SESSION['caja_id']),
+            'cajaAbierta' => $turno !== null,
+            'turno'       => $turno,
             // Cobrar con liga solo aparece si hay con qué generarla.
             'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
                          && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
@@ -127,7 +127,10 @@ final class CajaControlador
                 'cliente_id'     => (int)($_POST['cliente_id'] ?? 0) ?: null,
                 'usuario_id'     => $_SESSION['usuario_id'] ?? null,
                 'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
-                'caja_id'        => $_SESSION['caja_id'] ?? null,
+                // El turno sale de la base. Leerlo de la sesión dejaba
+                // las ventas en `caja_id = NULL` cuando el cajero no
+                // había pasado por /corte, y al cerrar no aparecían.
+                'caja_id'        => \LibertyFin\Servicio\Caja::id($db),
                 // EN UN PAGO EN LINEA NO HAY ANTICIPO.
                 //
                 // El cliente todavia no ha pagado nada: va a pasar su
@@ -178,7 +181,7 @@ final class CajaControlador
                 'venta' => ['id' => (int)$r['id'], 'codigo' => $r['codigo'],
                             'total' => (float)$r['total'], 'cobrado' => $cobrado,
                             'paga_con' => $pagaCon, 'cambio' => $cambio,
-                            'en_corte' => !empty($_SESSION['caja_id'])]]);
+                            'en_corte' => \LibertyFin\Servicio\Caja::hay($db)]]);
         }
 
         header('Location: /ventas/' . $r['id'] . '?nueva=1');
@@ -256,10 +259,15 @@ final class CajaControlador
                 'cliente' => $venta['cliente'] ?: 'Público general', 'monto' => $saldo,
                 'metodo' => $forma, 'descripcion' => 'Venta ' . $venta['codigo_venta'],
                 'liga' => $g['liga'], 'clabe' => $g['clabe'], 'barras' => $g['barras'],
+                'imagen' => $g['imagen'] ?? null, 'formato' => $g['formato'] ?? null,
                 'vence' => $g['vence'], 'pruebas' => $g['pruebas'],
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
             ]);
+            // Se apunta en qué base vive esta referencia. El aviso del
+            // proveedor llega sin sesión y sin empresa: sin el directorio
+            // habría que abrir todas las bases para encontrarla.
+            \LibertyFin\Servicio\Cobros::apuntar($g['referencia'], $forma);
             // Se vuelve a CAJA, no a Ligas. El cajero tiene al cliente
             // enfrente: mandarlo a otra pantalla lo obliga a volver a
             // empezar para la siguiente venta.
@@ -375,15 +383,27 @@ final class CajaControlador
             $this->json(['ok' => true, 'pagado' => true, 'estado' => 'por_aprobar']);
         }
 
+        // SOLO LA TARJETA SE CONSULTA.
+        //
+        // SPEI y tienda no tienen servicio de estatus en Paga de Todo: el
+        // proveedor avisa llamando a /pagadetodo/pago-clabe y
+        // /pagadetodo/pago-referencia, que ya dejan la liga marcada. Aquí
+        // basta con releer la fila, que es lo que se hizo arriba.
+        //
+        // Antes se le preguntaba igual, a una dirección que además era la
+        // nuestra, y la respuesta no servía para nada: el modal giraba
+        // hasta que el cajero se cansaba.
+        $consultable = \LibertyFin\Servicio\LigaPago::consultable($l['metodo']);
+
         // Se le pregunta al proveedor, pero no en cada vuelta: cada diez
         // segundos basta y evita castigar su servicio.
         $hace = $l['revisado_en'] ? (time() - strtotime($l['revisado_en'])) : 999;
-        if ($hace >= 10) {
+        if ($consultable && $hace >= 10) {
             $cfg = \LibertyFin\Servicio\Integraciones::de('spei');
             if ($cfg) {
                 ob_start();
                 $api = new \LibertyFin\Servicio\LigaPago($cfg);
-                $r = $api->estado($l['referencia']);
+                $r = $api->estado($l['referencia'], $l['metodo']);
                 ob_end_clean();
 
                 $repo = new \LibertyFin\Datos\LigaRepo($db);
@@ -413,7 +433,11 @@ final class CajaControlador
                 $repo->marcarRevisada($l['id']);
             }
         }
-        $this->json(['ok' => true, 'pagado' => false, 'estado' => 'pendiente']);
+        // `consulta` le dice al modal de qué va la espera: si estamos
+        // preguntando, o si toca esperar a que el proveedor avise. Con
+        // eso el cajero sabe si vale la pena quedarse mirando.
+        $this->json(['ok' => true, 'pagado' => false, 'estado' => 'pendiente',
+                     'consulta' => $consultable]);
     }
 
     /**

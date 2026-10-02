@@ -98,8 +98,38 @@ final class Integraciones
                 'faltan'    => array_values(array_filter($d[2], function ($campo) use ($c) {
                     return trim((string)($c[$campo] ?? '')) === '';
                 })),
+                'aviso'     => self::aviso($k, $c),
             ];
         }
         return $r;
+    }
+
+    /**
+     * Lo que está configurado a medias.
+     *
+     * No es lo mismo que `faltan`: ahí van las credenciales sin las que
+     * la integración ni enciende. Esto es lo que enciende pero deja algo
+     * sin funcionar, y que de otro modo solo se descubre el día que un
+     * cliente paga y el pago nunca aparece.
+     */
+    private static function aviso($nombre, array $c)
+    {
+        if ($nombre !== 'spei' || empty($c['activo'])) return '';
+
+        if (trim((string)($c['secreto_webhook'] ?? '')) === '') {
+            return 'Falta `secreto_webhook`: sin él los avisos del proveedor se '
+                 . 'rechazan y los pagos por SPEI y en tienda nunca se van a aplicar solos.';
+        }
+        if (trim((string)($c['negocio_id'] ?? '')) === ''
+            && trim((string)($c['escuela_id'] ?? '')) !== '') {
+            return 'Estás usando `escuela_id` (Paga la Escuela) como BusinessID. '
+                 . 'Si tu convenio es de Paga de Todo, pásalo a `negocio_id`.';
+        }
+        $host = (string)($c['host'] ?? '');
+        if ($host !== '' && stripos($host, 'pagalaescuela') !== false) {
+            return 'El `host` apunta a Paga la Escuela. Para Paga de Todo va '
+                 . 'https://pagadetodo.mx/Pagadetodo';
+        }
+        return '';
     }
 }

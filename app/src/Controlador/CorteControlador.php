@@ -38,21 +38,19 @@ final class CorteControlador
             return;
         }
 
-        $caja = $repo->abierta($usr, $suc);
+        // El turno sale de la base, no de la sesión: ver Servicio\Caja.
+        $caja = \LibertyFin\Servicio\Caja::abierta($db);
         $mov = $cobros = [];
         $pagina = max(1, Peticion::entero('p', 1));
         $porPag = Peticion::POR_PAGINA;
         $totalC = 0;
         if ($caja) {
-            $desde  = $caja['fecha_apertura'] ?? $caja['created_at'] ?? date('Y-m-d 00:00:00');
+            $desde  = \LibertyFin\Servicio\Caja::desde($caja);
             $mov    = $repo->movimiento($caja['id'], $desde);
             // Paginados: un turno con cien cobros desplegaba cien
             // renglones y dejaba la columna de al lado minúscula.
             $totalC = $repo->cuantosCobros($caja['id']);
             $cobros = $repo->cobrosDelTurno($caja['id'], $porPag, ($pagina - 1) * $porPag);
-            $_SESSION['caja_id'] = (int)$caja['id'];
-        } else {
-            unset($_SESSION['caja_id']);
         }
 
         Plantilla::pagina('corte/index', [
@@ -79,17 +77,29 @@ final class CorteControlador
         if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error');
 
         $repo = new CajaRepo($db);
-        $suc  = (int)($_SESSION['sucursal_id'] ?? 0);
+        $suc  = \LibertyFin\Servicio\Caja::sucursal();
         $usr  = (int)($_SESSION['usuario_id'] ?? 0);
 
-        if ($repo->abierta($usr, $suc)) $this->volver('Ya tienes una caja abierta.', 'error');
+        if ($ya = $repo->abierta($usr, $suc)) {
+            $this->volver('Ya tienes la caja ' . (int)$ya['id'] . ' abierta desde el '
+                . date('d/m/Y H:i', strtotime(\LibertyFin\Servicio\Caja::desde($ya)))
+                . '. Ciérrala antes de abrir otra.', 'error');
+        }
 
         $monto = (float)($_POST['monto'] ?? 0);
         if ($monto < 0) $this->volver('El fondo no puede ser negativo.', 'error');
 
         try {
-            $repo->abrir($suc, $usr, $monto, $_POST['nota'] ?? '');
-            $this->volver('Caja abierta con un fondo de ' . Dinero::pesos($monto) . '.', 'ok');
+            $id = $repo->abrir($suc, $usr, $monto, $_POST['nota'] ?? '');
+            // Se recuerda YA. Antes el turno solo quedaba apuntado
+            // después de volver a /corte, y entre una cosa y otra las
+            // ventas se guardaban sin caja.
+            $nueva = $repo->porId($id);
+            if ($nueva) \LibertyFin\Servicio\Caja::recordar($nueva);
+            Auditoria::anota('caja.abrir', 'caja ' . $id, null,
+                'fondo ' . Dinero::pesos($monto));
+            $this->volver('Caja abierta con un fondo de ' . Dinero::pesos($monto)
+                . '. Ya puedes cobrar: las ventas entran a este turno.', 'ok');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] abrir caja: ' . $e->getMessage());
             $this->volver('No se pudo abrir la caja.', 'error');
@@ -102,10 +112,10 @@ final class CorteControlador
         if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error');
 
         $repo = new CajaRepo($db);
-        $caja = $repo->abierta((int)($_SESSION['usuario_id'] ?? 0), (int)($_SESSION['sucursal_id'] ?? 0));
+        $caja = \LibertyFin\Servicio\Caja::abierta($db);
         if (!$caja) $this->volver('No hay ninguna caja abierta.', 'error');
 
-        $desde = $caja['fecha_apertura'] ?? $caja['created_at'] ?? date('Y-m-d 00:00:00');
+        $desde = \LibertyFin\Servicio\Caja::desde($caja);
         $mov   = $repo->movimiento($caja['id'], $desde);
 
         // Lo esperado en el cajón: fondo inicial más lo cobrado EN EFECTIVO.
@@ -127,7 +137,7 @@ final class CorteControlador
                 'contado $' . number_format($contado, 2)
                 . (abs($contado - $esperado) > 0.009
                    ? ' · diferencia $' . number_format($contado - $esperado, 2) : ' · cuadró'));
-            unset($_SESSION['caja_id']);
+            \LibertyFin\Servicio\Caja::olvidar();
             $this->volver(abs($dif) <= 0.009
                 ? 'Caja cerrada. Cuadró exacto.'
                 : 'Caja cerrada con una diferencia de ' . Dinero::pesos($dif) . '.', 'ok');

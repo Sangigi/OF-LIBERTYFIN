@@ -31,9 +31,14 @@ final class LigaRepo extends Repo
                     liga VARCHAR(500) NULL,
                     clabe VARCHAR(30) NULL,
                     barras VARCHAR(80) NULL,
+                    imagen VARCHAR(500) NULL,
+                    formato VARCHAR(500) NULL,
                     estado VARCHAR(16) NOT NULL DEFAULT 'pendiente',
                     vence DATE NULL,
                     pagado_en DATETIME NULL,
+                    pagado_monto DECIMAL(12,2) NULL,
+                    transaccion VARCHAR(32) NULL,
+                    autorizacion VARCHAR(32) NULL,
                     pago_id INT NULL,
                     pruebas TINYINT(1) NOT NULL DEFAULT 0,
                     usuario_id INT NULL,
@@ -42,7 +47,8 @@ final class LigaRepo extends Repo
                     creado_en DATETIME NOT NULL,
                     UNIQUE KEY ix_lp_ref (referencia),
                     KEY ix_lp_estado (estado, vence),
-                    KEY ix_lp_venta (venta_id)
+                    KEY ix_lp_venta (venta_id),
+                    KEY ix_lp_trans (transaccion)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         } catch (\Throwable $e) {
             error_log('[LibertyFin] lf_ligas_pago: ' . $e->getMessage());
@@ -55,17 +61,99 @@ final class LigaRepo extends Repo
         $this->db->prepare("
             INSERT INTO lf_ligas_pago
                 (referencia, venta_id, cliente_nombre, monto, metodo, descripcion,
-                 liga, clabe, barras, estado, vence, pruebas,
+                 liga, clabe, barras, imagen, formato, estado, vence, pruebas,
                  usuario_id, usuario_nombre, creado_en)
-            VALUES (?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?, NOW())
+            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?, NOW())
         ")->execute([
             $d['referencia'], $d['venta_id'] ?? null, $d['cliente'] ?? null,
             $d['monto'], $d['metodo'], mb_substr((string)($d['descripcion'] ?? ''), 0, 80),
             $d['liga'] ?? null, $d['clabe'] ?? null, $d['barras'] ?? null,
+            $d['imagen'] ?? null, $d['formato'] ?? null,
             $d['vence'] ?? null, !empty($d['pruebas']) ? 1 : 0,
             $d['usuario_id'] ?? null, $d['usuario_nombre'] ?? null,
         ]);
         return (int)$this->db->lastInsertId();
+    }
+
+    /**
+     * El cobro al que apunta una CLABE.
+     *
+     * El aviso de SPEI llega con la CLABE, no con la referencia: es el
+     * único dato que el banco conoce.
+     */
+    public function porClabe($clabe)
+    {
+        $this->asegurar();
+        return $this->uno("SELECT * FROM lf_ligas_pago WHERE clabe = ?", [(string)$clabe]);
+    }
+
+    /**
+     * El cobro que corresponde a lo que mandó el proveedor.
+     *
+     * Busca por referencia y, si no, por CLABE o por código de barras: el
+     * mismo número viaja en campos distintos según el servicio, y exigir
+     * que coincida el nombre del campo dejaba pagos sin casar.
+     */
+    public function porCualquiera($valor)
+    {
+        $valor = trim((string)$valor);
+        if ($valor === '') return null;
+        $this->asegurar();
+        return $this->uno("
+            SELECT * FROM lf_ligas_pago
+            WHERE referencia = ? OR clabe = ? OR barras = ?
+            ORDER BY id DESC LIMIT 1", [$valor, $valor, $valor]);
+    }
+
+    /**
+     * El aviso de pago del proveedor, con su número de transacción.
+     *
+     * Se guarda ANTES de abonar. Si el proveedor reintenta —y lo hace
+     * cuando no le contestamos a tiempo— aquí se ve que esa transacción
+     * ya entró y no se abona dos veces.
+     */
+    public function yaEntro($referencia, $transaccion)
+    {
+        if (trim((string)$transaccion) === '') return null;
+        $this->asegurar();
+        return $this->uno("
+            SELECT * FROM lf_ligas_pago
+            WHERE referencia = ? AND transaccion = ? AND estado = 'pagada'",
+            [(string)$referencia, (string)$transaccion]);
+    }
+
+    /** Deja constancia de la transacción y la autorización del aviso. */
+    public function anotarAviso($id, $transaccion, $autorizacion, $monto = null)
+    {
+        $this->db->prepare("
+            UPDATE lf_ligas_pago
+            SET transaccion = ?, autorizacion = ?,
+                pagado_monto = COALESCE(?, pagado_monto), revisado_en = NOW()
+            WHERE id = ?
+        ")->execute([
+            $transaccion !== '' ? mb_substr((string)$transaccion, 0, 32) : null,
+            $autorizacion !== '' ? mb_substr((string)$autorizacion, 0, 32) : null,
+            $monto !== null ? \LibertyFin\Dominio\Dinero::centavos($monto) : null,
+            (int)$id,
+        ]);
+        return true;
+    }
+
+    /**
+     * Deshace un cobro que el proveedor canceló.
+     *
+     * El cliente puede volver a pagar la misma referencia, así que vuelve
+     * a 'pendiente' y NO a un estado terminal. Lo que se borra es la
+     * marca de pagado; el abono lo cancela quien llame a esto.
+     */
+    public function marcarCancelada($id)
+    {
+        $this->db->prepare("
+            UPDATE lf_ligas_pago
+            SET estado = 'pendiente', pagado_en = NULL, pago_id = NULL,
+                pagado_monto = NULL, revisado_en = NOW()
+            WHERE id = ?")->execute([(int)$id]);
+        return true;
     }
 
     public function porId($id)

@@ -99,84 +99,138 @@ return [
         'sandbox'        => true,
     ],
 
-    // ── Ligas de pago por transferencia ─────────────────────────
+    // ── Cobros en línea · PAGA DE TODO ──────────────────────────
+    //
+    // Un solo bloque para las tres formas en línea: tarjeta, SPEI y
+    // efectivo en tienda. Se llama `spei` por historia, no porque sea
+    // solo eso; renombrarlo obligaría a tocar media aplicación.
+    //
+    // OJO: PAGA DE TODO, NO PAGA LA ESCUELA.
+    //
+    // Son dos plataformas del mismo proveedor (Cobroscontarjeta.com) y
+    // la documentación viene mezclada, pero no son intercambiables:
+    //
+    //                   Paga la Escuela        Paga de Todo
+    //   host            pagalaescuela.mx       pagadetodo.mx
+    //   identificador   SchoolID               BusinessID
+    //
+    // Con el host de una y las credenciales de la otra, el proveedor
+    // contesta "El ID de la escuela es obligatorio" aunque todo lo demás
+    // esté bien, y uno se pasa la tarde buscando el error donde no está.
     'spei' => [
-        // CÓMO APARECE TU NEGOCIO EN LA CAJA DE LA TIENDA.
-        // Casi nunca es el nombre comercial: es el que registró el
-        // proveedor al abrir el convenio. Si el cliente dice el
-        // equivocado, el cajero no lo encuentra y lo manda de regreso.
-        // ── LAS DIRECCIONES DEL PROVEEDOR ──────────────────────
-        //
-        // CADA FORMA DE PAGO ES UN SERVICIO DISTINTO. No se elige con
-        // un codigo: se elige con la direccion a la que se pega.
-        //
-        //   GenerarLigaIndi        la liga de tarjeta
-        //   GenerarClabeIndi       la CLABE para SPEI
-        //   GenerarReferenciaIndi  la referencia para pagar en tienda
-        //
-        // Con `host` basta: el sistema le agrega la ruta de cada uno.
-        // Las tres de abajo solo hacen falta si el proveedor te dio
-        // direcciones distintas a las normales.
-        // ── LOS DOS IDENTIFICADORES ────────────────────────────
-        //
-        // La documentacion los separa y cada servicio pide el suyo:
-        //
-        //   SchoolID    la liga de tarjeta
-        //   BusinessID  la CLABE y la referencia de tienda
-        //
-        // En muchos convenios son el mismo numero. Si solo tienes uno,
-        // ponlo en los dos: el sistema usa el que falte del otro.
-        'escuela_id' => '',   // SchoolID
-        'negocio_id' => '',   // BusinessID
+        'activo'         => false,
+        'sandbox'        => true,
 
-        // La base. El sistema le agrega la ruta de cada servicio:
-        //   /Service/GenerarLigaIndi        tarjeta
-        //   /Service/GenerarClabeIndi       SPEI
-        //   /Service/GenerarReferenciaIndi  tienda
-        'host'            => 'https://pagalaescuela.mx/Pagalaescuela',
+        // ── CREDENCIALES ───────────────────────────────────────
+        'usuario'        => '',
+        'clave'          => '',
+        // Las de Sandbox, si te dieron un par distinto. Vacías = se usan
+        // las de arriba.
+        'usuario_prueba' => '',
+        'clave_prueba'   => '',
+        'integracion_id' => '',
+
+        // ── EL IDENTIFICADOR DEL COMERCIO ──────────────────────
+        //
+        // BusinessID. Lo piden los tres servicios de Paga de Todo.
+        'negocio_id'     => '',
+        // Solo si vienes de Paga la Escuela y todavía no mueves nada: se
+        // usa como respaldo cuando `negocio_id` está vacío.
+        'escuela_id'     => '',
+
+        // ── LAS DIRECCIONES ────────────────────────────────────
+        //
+        // CADA FORMA DE PAGO ES UN SERVICIO DISTINTO. No se elige con un
+        // código: se elige con la dirección a la que se pega.
+        //
+        //   /Service/GenerarLigaIndi            tarjeta
+        //   /Service/GenerarClabeIndi           SPEI
+        //   /Service/GenerarReferenciaIndi      efectivo en tienda
+        //   /Service/ConsultarEstatusLigaIndi   ¿ya pagó la tarjeta?
+        //
+        // Con `host` basta: el sistema le agrega la ruta de cada uno. Las
+        // de abajo solo hacen falta si el proveedor te dio direcciones
+        // distintas a las normales.
+        'host'            => 'https://pagadetodo.mx/Pagadetodo',
         'url_liga'        => '',
         'url_clabe'       => '',
         'url_referencia'  => '',
         'url_estado'      => '',
 
+        // ── EL SECRETO DE LOS AVISOS ───────────────────────────
+        //
+        // ESTO ES OBLIGATORIO PARA QUE SPEI Y TIENDA FUNCIONEN.
+        //
+        // Paga de Todo no te consulta si el cliente pagó en el OXXO: te
+        // AVISA, pegándole a unas direcciones tuyas. Esas direcciones no
+        // pueden pedir usuario y contraseña —quien llama es un servidor
+        // suyo, sin sesión— así que lo que las protege es este secreto
+        // metido en la URL.
+        //
+        // Sin él, cualquiera que adivine una referencia podría marcar
+        // ventas como pagadas escribiendo una dirección en el navegador.
+        //
+        // Genera uno largo y aleatorio, por ejemplo con:
+        //   php -r "echo bin2hex(random_bytes(24)), PHP_EOL;"
+        'secreto_webhook' => '',
+
+        // Y da de alta ESTAS direcciones en el panel del Sandbox, en la
+        // pestaña EndPoint, con tu secreto pegado al final:
+        //
+        //   Comercios (efectivo en tienda)
+        //     Consultar referencia  https://TU-DOMINIO/pagadetodo/consulta-referencia?k=SECRETO
+        //     Pagar referencia      https://TU-DOMINIO/pagadetodo/pago-referencia?k=SECRETO
+        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+        //
+        //   Pago por SPEI
+        //     Consultar clabe       https://TU-DOMINIO/pagadetodo/consulta-clabe?k=SECRETO
+        //     Pagar clabe           https://TU-DOMINIO/pagadetodo/pago-clabe?k=SECRETO
+        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+        //
+        //   Pago en línea (tarjeta)
+        //     Pagar liga            https://TU-DOMINIO/pagadetodo/pago-liga?k=SECRETO
+        //
+        // En producción tienen que ser HTTPS. El proveedor lo exige.
+
         // ── CONTADO ────────────────────────────────────────────
         //
-        // `41` en produccion y `401` en el Sandbox de pagadetodo.mx.
-        // Son LA MISMA cosa: el proveedor lo confirmo por correo. No
-        // sirven para elegir metodo de pago.
+        // `41` en producción y `401` en el Sandbox. Son LA MISMA cosa: el
+        // proveedor lo confirmó por correo. NO sirven para elegir método
+        // de pago, y solo los recibe la liga de tarjeta.
         //
-        // Vacio = se elige solo segun `sandbox`.
+        // Vacío = se elige solo según `sandbox`.
         'payment_types' => '',
 
         // ── EL LARGO DE LA REFERENCIA ──────────────────────────
         //
-        // 13 digitos en produccion, 15 en el Sandbox de pagadetodo.mx.
-        // Con el largo equivocado contesta el codigo 22, "El formato de
-        // la referencia es incorrecto".
+        // 15 dígitos en Paga de Todo. Con 13 el proveedor contesta el
+        // código 22, "El formato de la referencia es incorrecto".
         //
-        // Vacio = se elige solo segun `sandbox`.
+        // Vacío = 15.
         'digitos_referencia' => '',
 
+        // ── LÍMITES DEL CONVENIO ───────────────────────────────
+        //
+        // El proveedor rechaza fuera de rango con el código 18. Se revisa
+        // antes de llamarlo para que el cajero lea algo que entienda en
+        // vez de un número.
+        'monto_min' => 50,
+        'monto_max' => 15000,
+
+        'dias_vigencia'  => 3,
+        'timeout'        => 30,
+
+        // CÓMO APARECE TU NEGOCIO EN LA CAJA DE LA TIENDA.
+        // Casi nunca es el nombre comercial: es el que registró el
+        // proveedor al abrir el convenio. Si el cliente dice el
+        // equivocado, el cajero no lo encuentra y lo manda de regreso.
         'nombre_convenio' => '',
+
         // Dónde se puede pagar, separadas por coma. Depende del
         // convenio: no todos aceptan las mismas cadenas, y una lista
         // fija manda gente a una tienda donde la van a rechazar.
         'tiendas' => 'OXXO, 7-Eleven, Farmacias Guadalajara, Circle K',
-
-        'activo'         => false,
-        'usuario'        => '',
-        'clave'          => '',
-        'usuario_prueba' => '',
-        'clave_prueba'   => '',
-        'integracion_id' => '',
-        'negocio_id'     => '',
-        'url'            => '',
-        'url_sandbox'    => '',
-        'dias_vigencia'  => 3,
-        'timeout'        => 30,
-        'sandbox'        => true,
     ],
-
     // ── Cargos recurrentes ──────────────────────────────────────
     'domiciliacion' => [
         'activo'         => false,

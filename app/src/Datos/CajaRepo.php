@@ -12,13 +12,30 @@ namespace LibertyFin\Datos;
  */
 final class CajaRepo extends Repo
 {
-    /** La caja abierta de este usuario en esta sucursal, si hay. */
+    /**
+     * La caja abierta de este usuario. Si hay varias, la de su sucursal.
+     *
+     * ANTES EXIGÍA QUE LA SUCURSAL COINCIDIERA EXACTO, y eso escondía
+     * turnos que sí estaban abiertos:
+     *
+     *   · Un usuario sin sucursal asignada abría con `sucursal_id = 0`
+     *     —null se vuelve 0 al insertar—, y después, ya con sucursal,
+     *     su propio turno dejaba de aparecer.
+     *   · A quien le movían de sucursal se le perdía el turno que tenía
+     *     abierto, con el dinero del cajón dentro.
+     *
+     * Una persona trae un cajón, no uno por sucursal. Se busca por
+     * usuario y se prefiere el de su sucursal actual; si no hay, vale el
+     * que tenga abierto. El turno fantasma aparece y se puede cerrar,
+     * que es justo lo que no pasaba antes.
+     */
     public function abierta($usuarioId, $sucursalId)
     {
         return $this->uno("
             SELECT * FROM caja
-            WHERE usuario_id = ? AND sucursal_id = ? AND estado = 'abierta'
-            ORDER BY id DESC LIMIT 1", [(int)$usuarioId, (int)$sucursalId]);
+            WHERE usuario_id = ? AND estado = 'abierta'
+            ORDER BY (sucursal_id = ?) DESC, id DESC
+            LIMIT 1", [(int)$usuarioId, (int)$sucursalId]);
     }
 
     /** Lo cobrado desde que se abrió la caja, separado por método. */
@@ -62,6 +79,12 @@ final class CajaRepo extends Repo
         ")->execute([(int)$sucursalId, (int)$usuarioId,
                      \LibertyFin\Dominio\Dinero::centavos($monto), trim($nota)]);
         return (int)$this->db->lastInsertId();
+    }
+
+    /** Una caja por id. Para releer la que se acaba de abrir. */
+    public function porId($id)
+    {
+        return $this->uno("SELECT * FROM caja WHERE id = ?", [(int)$id]);
     }
 
     /**

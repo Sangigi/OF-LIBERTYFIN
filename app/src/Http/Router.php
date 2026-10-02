@@ -15,6 +15,17 @@ final class Router
     public function get($ruta, array $destino)  { $this->agregar('GET',  $ruta, $destino); }
     public function post($ruta, array $destino) { $this->agregar('POST', $ruta, $destino); }
 
+    /**
+     * DELETE existe por los avisos de Paga de Todo.
+     *
+     * La cancelación de un pago llega por DELETE o por POST «según la
+     * configuración que haya definido el Emisor», dice su documentación.
+     * Como el proveedor elige cuál, hay que atender los dos: si solo se
+     * responde a uno, el día que cambien la casilla en su panel dejamos
+     * de cancelar pagos sin que nadie toque una línea de código.
+     */
+    public function delete($ruta, array $destino) { $this->agregar('DELETE', $ruta, $destino); }
+
     private function agregar($metodo, $ruta, array $destino)
     {
         $nombres = [];

@@ -232,12 +232,20 @@ final class AjustesControlador
 
     /**
      * Cambia si los pagos en linea se aplican solos o esperan aprobacion.
+     *
+     * OJO CON `volver()`: pide TRES argumentos y el primero es la
+     * pestaña. Estas llamadas pasaban solo dos —texto y tipo— y PHP 8
+     * tira ArgumentCountError en vez de rellenar con null, así que la
+     * pantalla reventaba justo al intentar avisar de un error. La
+     * pestaña de este ajuste es `empresa`, que es donde vive el
+     * interruptor.
      */
     public function aprobacion()
     {
+        $this->soloAdmin();
         if (empty($_SESSION['lf_token']) || empty($_POST['token'])
             || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
-            $this->volver('No se pudo verificar el formulario.', 'error');
+            $this->volver('empresa', 'No se pudo verificar el formulario.', 'error');
         }
         $db = Conexion::de($_SESSION['empresa_db']);
         try {
@@ -245,14 +253,14 @@ final class AjustesControlador
             (new ConfigRepo($db))->fijarAprobacion($_POST['modo'] ?? 'auto');
             \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar',
                 'aprobación de pagos', $antes, $_POST['modo'] ?? 'auto');
-            $this->volver(($_POST['modo'] ?? '') === 'revisar'
+            $this->volver('empresa', ($_POST['modo'] ?? '') === 'revisar'
                 ? 'Los pagos en línea van a esperar tu aprobación.'
                 : 'Los pagos en línea se van a aplicar solos al confirmarse.', 'ok');
         } catch (\InvalidArgumentException $e) {
-            $this->volver($e->getMessage(), 'error');
+            $this->volver('empresa', $e->getMessage(), 'error');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] aprobación: ' . $e->getMessage());
-            $this->volver('No se pudo cambiar.', 'error');
+            $this->volver('empresa', 'No se pudo cambiar el modo de aprobación.', 'error');
         }
     }
 }

@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 10;
+    const VERSION = 11;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -393,6 +393,43 @@ final class Migraciones
         }
     }
 
+    /**
+     * 11 · Lo que traen los avisos de Paga de Todo.
+     *
+     * Hasta ahora un cobro solo guardaba qué se le pidió al proveedor.
+     * Cuando el proveedor contesta —y sobre todo cuando avisa que ya
+     * pagaron— trae datos que había que poder guardar:
+     *
+     *   transaccion   su folio de la operación. Es lo que hace que un
+     *                 reintento no abone dos veces: si ya entró con ese
+     *                 número, se contesta que sí y no se toca nada.
+     *   autorizacion  el número que la tienda imprime en el ticket. Es
+     *                 por donde pregunta el cliente cuando reclama.
+     *   pagado_monto  cuánto pagó DE VERDAD. En SPEI el cliente deposita
+     *                 lo que quiere, y sin esto no había forma de ver
+     *                 que pagó de menos.
+     *   imagen        el PNG del código de barras.
+     *   formato       el PDF que el proveedor arma con las instrucciones.
+     */
+    private static function v11(PDO $db)
+    {
+        if (!self::hayTabla($db, 'lf_ligas_pago')) return;   // nace con todo
+        foreach ([
+            'imagen'       => "ALTER TABLE lf_ligas_pago ADD COLUMN imagen VARCHAR(500) NULL AFTER barras",
+            'formato'      => "ALTER TABLE lf_ligas_pago ADD COLUMN formato VARCHAR(500) NULL AFTER imagen",
+            'pagado_monto' => "ALTER TABLE lf_ligas_pago ADD COLUMN pagado_monto DECIMAL(12,2) NULL AFTER pagado_en",
+            'transaccion'  => "ALTER TABLE lf_ligas_pago ADD COLUMN transaccion VARCHAR(32) NULL AFTER pagado_monto",
+            'autorizacion' => "ALTER TABLE lf_ligas_pago ADD COLUMN autorizacion VARCHAR(32) NULL AFTER transaccion",
+        ] as $columna => $sql) {
+            if (self::hayColumna($db, 'lf_ligas_pago', $columna)) continue;
+            try { $db->exec($sql); } catch (\Throwable $e) { /* ya existe */ }
+        }
+        if (!self::hayIndice($db, 'lf_ligas_pago', 'ix_lp_trans')) {
+            try { $db->exec("ALTER TABLE lf_ligas_pago ADD INDEX ix_lp_trans (transaccion)"); }
+            catch (\Throwable $e) { /* ya existe */ }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -405,5 +442,6 @@ final class Migraciones
         8 => 'Catálogo y transacciones de Emida',
         9 => 'Ligas de pago (tarjeta, SPEI, tiendas)',
         10 => 'Especialista asignado a la venta',
+        11 => 'Avisos de pago de Paga de Todo (transacción, autorización, comprobante)',
     ];
 }

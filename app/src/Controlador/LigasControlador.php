@@ -108,10 +108,15 @@ final class LigasControlador
                 'referencia' => $r['referencia'], 'venta_id' => $ventaId ?: null,
                 'cliente' => $cliente, 'monto' => $monto, 'metodo' => $metodo,
                 'descripcion' => $desc, 'liga' => $r['liga'], 'clabe' => $r['clabe'],
-                'barras' => $r['barras'], 'vence' => $r['vence'], 'pruebas' => $r['pruebas'],
+                'barras' => $r['barras'], 'imagen' => $r['imagen'] ?? null,
+                'formato' => $r['formato'] ?? null,
+                'vence' => $r['vence'], 'pruebas' => $r['pruebas'],
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
             ]);
+            // En qué base vive esta referencia, para que el aviso del
+            // proveedor la encuentre sin recorrer todas.
+            \LibertyFin\Servicio\Cobros::apuntar($r['referencia'], $metodo);
             Auditoria::anota('pago.registrar', 'liga de pago · ' . $desc,
                 null, Dinero::pesos($monto) . ' · ' . $metodo);
             $_SESSION['lf_liga'] = $repo->porId($id);
@@ -142,10 +147,18 @@ final class LigasControlador
         if (!$lista) $this->a('No hay ligas pendientes que revisar.', 'ok');
 
         $exige = (new \LibertyFin\Datos\ConfigRepo($db))->exigeAprobacion();
-        $cobradas = 0; $revisadas = 0; $fallos = 0; $porAprobar = 0;
+        $cobradas = 0; $revisadas = 0; $fallos = 0; $porAprobar = 0; $avisan = 0;
         foreach ($lista as $l) {
             if ($l['estado'] === 'pagada') continue;
-            $r = $api->estado($l['referencia']);
+
+            // SPEI Y TIENDA NO SE CONSULTAN. El proveedor no tiene
+            // servicio para preguntarles: avisa él cuando el dinero
+            // entra. Antes se les preguntaba igual y cada vuelta sumaba
+            // un fallo, así que el aviso decía "no se pudieron
+            // consultar" de cobros que estaban perfectamente bien.
+            if (!LigaPago::consultable($l['metodo'])) { $avisan++; continue; }
+
+            $r = $api->estado($l['referencia'], $l['metodo']);
             $revisadas++;
             if ($r === null) { $fallos++; continue; }
 
@@ -188,11 +201,17 @@ final class LigasControlador
                 . ($porAprobar==1?'':'s') . ' por el proveedor, esperando tu aprobación. '
                 . 'El abono entra cuando lo apruebes.', 'ok');
         }
+        $cola = $avisan
+            ? ' ' . $avisan . ' de SPEI o tienda no se consultan: el proveedor avisa cuando '
+              . 'entra el dinero.'
+            : '';
         $this->a($cobradas
             ? $cobradas . ' liga' . ($cobradas==1?'':'s') . ' cobrada'
-              . ($cobradas==1?'':'s') . '. El abono ya está aplicado.'
-            : $revisadas . ' revisada' . ($revisadas==1?'':'s') . ', ninguna pagada todavía.'
-              . ($fallos ? ' ' . $fallos . ' no se pudieron consultar: ' . $api->error() : ''),
+              . ($cobradas==1?'':'s') . '. El abono ya está aplicado.' . $cola
+            : $revisadas . ' revisada' . ($revisadas==1?'':'s')
+              . ($revisadas ? ', ninguna pagada todavía.' : '.')
+              . ($fallos ? ' ' . $fallos . ' no se pudieron consultar: ' . $api->error() : '')
+              . $cola,
             $fallos && !$cobradas ? 'error' : 'ok');
     }
 

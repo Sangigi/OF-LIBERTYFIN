@@ -434,6 +434,10 @@ $listas = 0; foreach ($integraciones as $i) if ($i['activa']) $listas++;
           <td data-label="Falta" style="font-size:12px;color:var(--lf-tinta-4)">
             <?php if ($i['faltan']): ?>
               <span class="lf-mono"><?= P::e(implode(', ', $i['faltan'])) ?></span>
+            <?php elseif (!empty($i['aviso'])): ?>
+              <?php /* Encendida pero a medias. Sin esto solo se descubre
+                       el día que un cliente paga y el pago no aparece. */ ?>
+              <span style="color:var(--lf-amb)"><?= P::e($i['aviso']) ?></span>
             <?php elseif (!$i['activa']): ?>
               poner <span class="lf-mono">'activo' =&gt; true</span>
             <?php else: ?>—<?php endif; ?>

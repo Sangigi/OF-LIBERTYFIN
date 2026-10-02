@@ -2,60 +2,59 @@
 namespace LibertyFin\Servicio;
 
 /**
- * Ligas de pago: tarjeta, SPEI y efectivo en tiendas.
+ * Cobros en línea de Paga de Todo: tarjeta, SPEI y efectivo en tiendas.
  *
  * CÓMO FUNCIONA ESTO DE VERDAD
  *
- * Una liga NO es un cobro. Es una instrucción de pago que el cliente
+ * Un cobro en línea NO es un pago. Es una instrucción que el cliente
  * todavía tiene que cumplir: entrar y pasar su tarjeta, hacer la
  * transferencia, o ir al OXXO con el código.
  *
  * Por eso la venta se registra con SALDO, no como pagada. El abono se
  * aplica cuando el proveedor confirma, ni un minuto antes. Darla por
- * cobrada al generar la liga haría que el corte de caja mintiera todos
- * los días: diría que entraron $4,000 que nadie ha pagado.
+ * cobrada al generar la referencia haría que el corte mintiera todos los
+ * días: diría que entraron $4,000 que nadie ha pagado.
  *
- * Esa es la diferencia con el sistema anterior, que marcaba la venta al
- * generar la referencia.
+ * EL PROVEEDOR ES PAGA DE TODO, NO PAGA LA ESCUELA
  *
- * EL PROVEEDOR
+ * Son dos plataformas del mismo dueño (Cobroscontarjeta.com) y la
+ * documentación viene mezclada, pero NO son intercambiables:
  *
- * Pagadetodo, por HTTP con JSON. Los montos van en CENTAVOS y como
- * cadena; la descripción se corta a 40 caracteres; y la referencia son
- * 15 dígitos que tienen que ser únicos por comercio: si se repite, el
- * proveedor devuelve la liga anterior en vez de crear una nueva.
+ *                     Paga la Escuela          Paga de Todo
+ *   host              pagalaescuela.mx         pagadetodo.mx
+ *   identificador     SchoolID                 BusinessID
+ *
+ * Apuntar a una con las credenciales de la otra devuelve "El ID de la
+ * escuela es obligatorio" aunque todo lo demás esté bien.
+ *
+ * CADA FORMA DE PAGO ES UN SERVICIO DISTINTO
+ *
+ * No se elige con un código: se elige con la dirección a la que se pega.
+ *
+ *   GenerarLigaIndi        liga de tarjeta, pago en línea
+ *   GenerarClabeIndi       la CLABE para recibir SPEI
+ *   GenerarReferenciaIndi  la referencia para pagar en tienda
+ *
+ * `PaymentTypes` no selecciona el método. `41` y `401` son LA MISMA
+ * cosa —"Contado"—: 401 en Sandbox y 41 en producción. Solo lo recibe la
+ * liga de tarjeta; los otros dos servicios ni lo miran.
+ *
+ * QUIÉN AVISA QUE YA PAGARON
+ *
+ * Solo la liga de tarjeta se puede consultar (ConsultarEstatusLigaIndi).
+ * SPEI y tienda NO tienen servicio de consulta: el proveedor avisa
+ * llamando a los endpoints que publica PagosEntrantesControlador. Pedirle
+ * el estatus de una CLABE es preguntarle algo que no sabe contestar.
  */
 final class LigaPago
 {
     /**
-     * Qué métodos acepta cada liga.
+     * Las formas que se le ofrecen al cliente.
      *
-     * `PaymentTypes` es un código del proveedor, no una lista legible.
-     * El sistema anterior usaba "41" en un lado y "401" en otro sin
-     * explicar la diferencia. Estos son los valores que se vieron
-     * funcionando; si tu asesor da otros, se cambian en
-     * config/integraciones.php sin tocar código.
-     */
-    /**
-     * Cada forma de pago es un ENDPOINT distinto, no un codigo.
+     *   clave => [rótulo, servicio, explicación]
      *
-     * LO QUE ME TENIA EQUIVOCADO
-     *
-     * `PaymentTypes` no elige el metodo. `41` y `401` son LA MISMA cosa
-     * —"Contado"—: 401 es el de Sandbox y 41 el de produccion. El
-     * proveedor lo confirmo por correo. Por eso daba igual cual mandara
-     * y todo acababa en lo mismo.
-     *
-     * El metodo lo decide a que servicio se le pega:
-     *
-     *   GenerarLigaIndi        liga de tarjeta, pago simple
-     *   GenerarLigaDomiciliacionIndi   igual, pero deja la tarjeta
-     *                          tokenizada para cobros recurrentes
-     *   GenerarClabeIndi       la CLABE para SPEI
-     *   GenerarReferenciaIndi  la referencia para pagar en tienda
-     *
-     * Y cada uno pide campos distintos. Mandarle a uno el cuerpo de
-     * otro es lo que producia "El Account es obligatorio".
+     * `todos` es un alias viejo que quedó en registros ya guardados: se
+     * deja para que una liga antigua siga abriendo, apuntando a tarjeta.
      */
     const METODOS = [
         'tarjeta'  => ['Tarjeta',            'liga',       'Débito o crédito, en línea'],
@@ -65,33 +64,25 @@ final class LigaPago
     ];
 
     /**
-     * Que servicio y que campos necesita cada forma.
+     * El contrato de cada servicio, sacado de la documentación.
      *
-     * Las rutas salen de la configuracion para que un cambio del
-     * proveedor no obligue a tocar codigo; aqui van las que se han
-     * visto funcionando.
-     */
-    /**
-     * El contrato de cada servicio, sacado de la documentacion.
-     *
-     *   ruta  ·  campos del cuerpo  ·  campos de la respuesta
+     *   ruta · campos del cuerpo · campos de la respuesta
      *
      * NO SON INTERCAMBIABLES, Y LAS DIFERENCIAS IMPORTAN:
      *
-     *   · La LIGA pide `SchoolID`; SPEI y REFERENCIA piden `BusinessID`.
-     *     Mandar el equivocado da "El ID de la escuela es obligatorio".
-     *
      *   · SPEI NO LLEVA MONTO. Devuelve una CLABE que acepta lo que el
-     *     cliente deposite; el monto se cuadra despues contra la venta.
+     *     cliente deposite; el monto se cuadra después contra la venta.
      *     Mandarle `Amount` lo hace rechazar.
      *
-     *   · Solo la LIGA lleva `PaymentTypes`. Es el codigo de Contado,
-     *     no un selector de metodo: 41 en produccion, 401 en Sandbox.
+     *   · SPEI pide `Account` en vez de `Reference`. Es el identificador
+     *     del cliente del lado del proveedor, no el del pago.
+     *
+     *   · Solo la liga lleva `PaymentTypes` e `Id`.
      */
     const SERVICIOS = [
         'liga' => [
             '/Service/GenerarLigaIndi',
-            ['SchoolID','PaymentTypes','Id','Description','Amount','Reference','ExpirationDate'],
+            ['BusinessID','PaymentTypes','Id','Description','Amount','Reference','ExpirationDate'],
             ['url','Url'],
         ],
         'clabe' => [
@@ -106,53 +97,31 @@ final class LigaPago
         ],
     ];
 
-    /** Donde se consulta si ya pagaron. */
+    /**
+     * Dónde se pregunta si ya pagaron.
+     *
+     * SOLO LA LIGA. Antes aquí estaban las tres, con `clabe` y
+     * `referencia` apuntando a `/Service/ConsultaReferencia`, que es un
+     * endpoint NUESTRO —el que el proveedor llama a nosotros—, no suyo.
+     * Consultarlo era pegarle a nuestro propio servidor y leer basura.
+     */
     const CONSULTA = [
-        'liga'       => '/Service/ConsultarEstatusLigaIndi',
-        'clabe'      => '/Service/ConsultaReferencia',
-        'referencia' => '/Service/ConsultaReferencia',
+        'liga' => '/Service/ConsultarEstatusLigaIndi',
     ];
 
-    /**
-     * El codigo de Contado.
-     *
-     *   401  Sandbox
-     *    41  produccion
-     *
-     * Solo lo usa la liga de tarjeta; los otros dos servicios ni
-     * siquiera lo reciben.
-     */
-    private function contado()
-    {
-        $propio = trim((string)($this->cfg['payment_types'] ?? ''));
-        if ($propio !== '') return $propio;
-        return $this->enPruebas() ? '401' : '41';
-    }
-
-    /**
-     * Cuantos digitos lleva la referencia.
-     *
-     * Trece en produccion y quince en el Sandbox de pagadetodo.mx. Con
-     * el largo equivocado el proveedor contesta el codigo 22, "El
-     * formato de la referencia es incorrecto".
-     */
-    private function largoReferencia()
-    {
-        $n = (int)($this->cfg['digitos_referencia'] ?? 0);
-        if ($n >= 10 && $n <= 20) return $n;
-        return $this->enPruebas() ? 15 : 13;
-    }
+    /** La base de Paga de Todo, si no se configuró otra. */
+    const HOST = 'https://pagadetodo.mx/Pagadetodo';
 
     private $cfg;
     private $ultimoError = '';
     private $ultimaRespuesta = '';
 
-    /** Lo ultimo que contesto el proveedor, para diagnosticar. */
-    public function respuesta() { return $this->ultimaRespuesta; }
-
     public function __construct(array $cfg) { $this->cfg = $cfg; }
 
     public function error() { return $this->ultimoError; }
+
+    /** Lo último que contestó el proveedor, para diagnosticar. */
+    public function respuesta() { return $this->ultimaRespuesta; }
 
     public function listo()
     {
@@ -164,142 +133,186 @@ final class LigaPago
 
     public function enPruebas() { return !empty($this->cfg['sandbox']); }
 
+    /** Qué servicio atiende una forma de pago. */
+    public static function servicioDe($metodo)
+    {
+        return self::METODOS[$metodo][1] ?? 'liga';
+    }
+
     /**
-     * Genera la liga.
+     * ¿Se le puede preguntar al proveedor por esta forma?
      *
-     * @param array $d  monto, descripcion, referencia, metodo, dias
+     * La caja lo usa para decidir si vale la pena seguir consultando o
+     * si toca esperar el aviso del proveedor. Sin esto el modal giraba
+     * para siempre en SPEI y en tienda.
+     */
+    public static function consultable($metodo)
+    {
+        return isset(self::CONSULTA[self::servicioDe($metodo)]);
+    }
+
+    /**
+     * El código de Contado.
+     *
+     *   401  Sandbox
+     *    41  producción
+     *
+     * Solo lo usa la liga de tarjeta.
+     */
+    private function contado()
+    {
+        $propio = trim((string)($this->cfg['payment_types'] ?? ''));
+        if ($propio !== '') return $propio;
+        return $this->enPruebas() ? '401' : '41';
+    }
+
+    /**
+     * Cuántos dígitos lleva la referencia.
+     *
+     * Quince en Paga de Todo. Con trece el proveedor contesta el código
+     * 22, "El formato de la referencia es incorrecto": es el mismo golpe
+     * que ya se había cobrado en la integración anterior.
+     */
+    private function largoReferencia()
+    {
+        $n = (int)($this->cfg['digitos_referencia'] ?? 0);
+        if ($n >= 10 && $n <= 20) return $n;
+        return 15;
+    }
+
+    /** El identificador del comercio. BusinessID en Paga de Todo. */
+    private function negocio()
+    {
+        $b = trim((string)($this->cfg['negocio_id'] ?? ''));
+        // `escuela_id` queda como respaldo para quien venía de Paga la
+        // Escuela y todavía no mueve su configuración.
+        return $b !== '' ? $b : trim((string)($this->cfg['escuela_id'] ?? ''));
+    }
+
+    /** La dirección de un servicio: la configurada, o host + ruta. */
+    private function url($servicio, $ruta)
+    {
+        $propia = trim((string)($this->cfg['url_' . $servicio] ?? ''));
+        if ($propia !== '') return $propia;
+        $base = rtrim(trim((string)($this->cfg['host'] ?? $this->cfg['url'] ?? '')), '/');
+        if ($base === '') $base = self::HOST;
+        return $base . $ruta;
+    }
+
+    private function usuario()
+    {
+        return $this->enPruebas() && trim((string)($this->cfg['usuario_prueba'] ?? '')) !== ''
+             ? $this->cfg['usuario_prueba'] : $this->cfg['usuario'];
+    }
+
+    private function clave()
+    {
+        return $this->enPruebas() && trim((string)($this->cfg['clave_prueba'] ?? '')) !== ''
+             ? $this->cfg['clave_prueba'] : $this->cfg['clave'];
+    }
+
+    /**
+     * Genera el cobro.
+     *
+     * @param array $d  monto, descripcion, referencia, metodo, cliente, correo, dias
      * @return array|null
      */
     public function generar(array $d)
     {
         $this->ultimoError = '';
-        if (!$this->listo()) { $this->ultimoError = 'SPEI sin configurar'; return null; }
+        if (!$this->listo()) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
+        if ($this->negocio() === '') {
+            $this->ultimoError = 'Falta `negocio_id` (BusinessID) en config/integraciones.php';
+            return null;
+        }
 
         $monto = round((float)($d['monto'] ?? 0), 2);
         if ($monto <= 0) { $this->ultimoError = 'El monto tiene que ser mayor a cero'; return null; }
 
-        $metodo = $d['metodo'] ?? 'tarjeta';
-        if (!isset(self::METODOS[$metodo])) $metodo = 'tarjeta';
-        $servicio = self::METODOS[$metodo][1];
+        $metodo   = isset(self::METODOS[$d['metodo'] ?? '']) ? $d['metodo'] : 'tarjeta';
+        $servicio = self::servicioDe($metodo);
         list($ruta, $campos, $devuelve) = self::SERVICIOS[$servicio];
 
-        // La direccion: la del servicio si se configuro, si no la base
-        // mas su ruta. Asi un cambio del proveedor se arregla en el
-        // config y no en el codigo.
-        $url = trim((string)($this->cfg['url_' . $servicio] ?? ''));
-        if ($url === '') {
-            $base = rtrim(trim((string)($this->cfg['host'] ?? $this->cfg['url'] ?? '')), '/');
-            if ($base === '') {
-                $this->ultimoError = 'Falta `host` o `url_' . $servicio
-                                   . '` en config/integraciones.php';
-                return null;
-            }
-            $url = $base . $ruta;
+        // El proveedor rechaza fuera de rango con el código 18. Se avisa
+        // aquí para no gastar una llamada y, sobre todo, para que el
+        // cajero lea algo que entienda.
+        $min = (float)($this->cfg['monto_min'] ?? 50);
+        $max = (float)($this->cfg['monto_max'] ?? 15000);
+        if ($servicio !== 'clabe' && ($monto < $min || $monto > $max)) {
+            $this->ultimoError = 'El importe debe estar entre '
+                . \LibertyFin\Dominio\Dinero::pesos($min) . ' y '
+                . \LibertyFin\Dominio\Dinero::pesos($max) . '. Este cobro es de '
+                . \LibertyFin\Dominio\Dinero::pesos($monto) . '.';
+            return null;
         }
 
+        $url        = $this->url($servicio, $ruta);
         $pruebas    = $this->enPruebas();
         $referencia = self::referencia($d['referencia'] ?? '', $this->largoReferencia());
-        $dias       = max(1, (int)($d['dias'] ?? $this->cfg['dias_vigencia'] ?? 3));
-        $cliente    = mb_substr(trim((string)($d['cliente'] ?? '')), 0, 60) ?: 'Publico general';
+        $dias       = max(1, (int)($d['dias'] ?? 0) ?: (int)($this->cfg['dias_vigencia'] ?? 3));
+        $cliente    = mb_substr(trim((string)($d['cliente'] ?? '')), 0, 50) ?: 'Publico general';
         $correo     = filter_var($d['correo'] ?? '', FILTER_VALIDATE_EMAIL) ? $d['correo'] : '';
 
-        // Credenciales e identificadores: los pide siempre, los tres.
+        // Credenciales: las pide siempre, las tres.
         $cuerpo = [
-            'User'          => $pruebas ? ($this->cfg['usuario_prueba'] ?: $this->cfg['usuario'])
-                                        : $this->cfg['usuario'],
-            'Password'      => $pruebas ? ($this->cfg['clave_prueba'] ?: $this->cfg['clave'])
-                                        : $this->cfg['clave'],
+            'User'          => $this->usuario(),
+            'Password'      => $this->clave(),
             'IntegrationID' => $this->cfg['integracion_id'],
         ];
 
-        // Y despues, SOLO los campos que ese servicio espera. Mandarle
-        // de mas es lo que lo hace rechazar la peticion.
         $posibles = [
-            // Los dos identificadores son distintos y cada servicio pide
-            // el suyo. Si solo hay uno configurado, se usa para ambos:
-            // en muchos convenios son el mismo numero.
-            'SchoolID'       => $this->cfg['escuela_id'] ?? $this->cfg['negocio_id'] ?? '',
-            'BusinessID'     => $this->cfg['negocio_id'] ?? $this->cfg['escuela_id'] ?? '',
+            'BusinessID'     => $this->negocio(),
             'PaymentTypes'   => $this->contado(),
-            'Id'             => (string)($d['id'] ?? $referencia),
+            // `Id` es Numérico(10) en la documentación. Mandarle los 15
+            // de la referencia devuelve el código 15, "El formato del ID
+            // es incorrecto": se toman los últimos diez.
+            'Id'             => substr((string)($d['id'] ?? $referencia), -10),
             // El proveedor corta a 40 y si se pasa, rechaza.
             'Description'    => mb_substr((string)($d['descripcion'] ?? 'Pago'), 0, 40),
             // En CENTAVOS y como cadena: mandar "150.00" en vez de
             // "15000" genera un cobro por peso y medio.
             'Amount'         => (string)(int)round($monto * 100),
             'Reference'      => $referencia,
-            // `Account` identifica el cobro del lado del proveedor. Va
-            // el mismo valor que la referencia: dos identificadores para
-            // una sola operacion harian imposible conciliar.
+            // SPEI identifica al cliente con `Account`. Va el mismo valor
+            // que la referencia: dos identificadores para una sola
+            // operación harían imposible conciliar.
             'Account'        => $referencia,
             'CustomerName'   => $cliente,
             'CustomerEmail'  => $correo,
             'ExpirationDate' => date('Y-m-d', strtotime('+' . $dias . ' days')),
         ];
+        // Y después, SOLO los campos que ese servicio espera. Mandarle de
+        // más es lo que lo hace rechazar la petición.
         foreach ($campos as $c) {
             if (isset($posibles[$c])) $cuerpo[$c] = $posibles[$c];
         }
 
-        $ch = curl_init($url);
-        curl_setopt_array($ch, [
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($cuerpo),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json', 'Accept: application/json'],
-            CURLOPT_TIMEOUT        => max(10, (int)($this->cfg['timeout'] ?? 30)),
-            // El certificado SI se verifica. Por aqui viajan montos y
-            // referencias de pago.
-            CURLOPT_SSL_VERIFYPEER => true,
-            CURLOPT_SSL_VERIFYHOST => 2,
-        ]);
-        $resp    = curl_exec($ch);
-        $codigo  = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $errCurl = curl_error($ch);
-        curl_close($ch);
-
-        if ($resp === false) {
-            $this->ultimoError = 'No se pudo contactar al proveedor: ' . $errCurl;
-            return null;
-        }
-        $this->ultimaRespuesta = mb_substr((string)$resp, 0, 800);
-
-        $j = json_decode($resp, true);
-        if (!is_array($j)) {
-            $this->ultimoError = 'El proveedor respondió algo que no se entiende (HTTP '
-                               . $codigo . '): ' . mb_substr(strip_tags($resp), 0, 160);
-            return null;
-        }
+        $j = $this->pegar($url, $cuerpo);
+        if ($j === null) return null;
 
         // Cada servicio devuelve lo suyo, con el nombre que dice su
-        // documentacion. Buscar en todos daria falsos positivos: la
-        // liga tambien trae un `reference` que NO es un codigo de
-        // barras, y mostrarlo como tal manda al cliente al OXXO con un
-        // numero que ahi no sirve.
+        // documentación. Buscar en todos daría falsos positivos: la liga
+        // también trae un `reference` que NO es un código de barras, y
+        // mostrarlo como tal manda al cliente al OXXO con un número que
+        // ahí no sirve.
         $valor  = self::campo($j, $devuelve);
         $liga   = $servicio === 'liga'       ? $valor : null;
         $clabe  = $servicio === 'clabe'      ? $valor : null;
         $barras = $servicio === 'referencia' ? $valor : null;
 
-        // La referencia trae ademas la imagen del codigo de barras y el
+        // La referencia trae además la imagen del código de barras y el
         // formato de pago, cuando el convenio los genera.
         $imagen  = $servicio === 'referencia' ? self::campo($j, ['BarCode','barCode']) : null;
         $formato = $servicio === 'referencia' ? self::campo($j, ['PayFormat','payFormat']) : null;
 
         if (!$liga && !$clabe && !$barras) {
-            $msg = self::campo($j, ['Message','message','mensaje','Error','error','ErrorMessage']);
-            $this->ultimoError = $msg
-                ? 'El proveedor rechazó el cobro: ' . $msg
-                : 'El proveedor no devolvió ninguna forma de pagar.';
+            $this->ultimoError = self::motivo($j);
             error_log('[LibertyFin] cobro rechazado · ' . $url
-                . ' · enviado: ' . json_encode($cuerpo)
+                . ' · enviado: ' . json_encode(self::sinSecretos($cuerpo))
                 . ' · recibido: ' . $this->ultimaRespuesta);
             return null;
         }
 
-        // Cada servicio devuelve lo suyo. Se guarda solo eso: si la
-        // liga de tarjeta trae una referencia, no es un codigo de
-        // barras y mostrarla como tal manda al cliente al OXXO con un
-        // numero que no sirve.
         return [
             'liga'       => $liga,
             'clabe'      => $clabe,
@@ -307,7 +320,12 @@ final class LigaPago
             'imagen'     => $imagen,
             'formato'    => $formato,
             'falta'      => '',
+            // La referencia con la que el cobro queda registrado de
+            // NUESTRO lado. Es la que viaja en los avisos del proveedor.
             'referencia' => $referencia,
+            'remota'     => (string)(self::campo($j, ['Reference','reference']) ?: ''),
+            'account'    => $servicio === 'clabe' ? $referencia : null,
+            'folio'      => self::campo($j, ['Folio','folio']),
             'vence'      => $cuerpo['ExpirationDate'],
             'metodo'     => $metodo,
             'servicio'   => $servicio,
@@ -316,72 +334,181 @@ final class LigaPago
         ];
     }
 
-
     /**
-     * Pregunta si ya pagaron.
+     * Pregunta si ya pagaron. Solo sirve para la liga de tarjeta.
      *
-     * Se consulta a mano o desde la pantalla. No hay webhook todavía: el
-     * proveedor puede avisar, pero recibir ese aviso sin verificar que
-     * venga de él sería dejar que cualquiera marque una venta como
-     * pagada escribiendo una URL.
+     * Las otras dos formas no se consultan: el proveedor avisa llamando
+     * a nuestros endpoints. Devolver null con el motivo escrito es mejor
+     * que inventar un "no pagado" que haga girar la pantalla sin fin.
+     *
+     * @param string $referencia
+     * @param string $metodo  tarjeta | spei | efectivo
      */
-    public function estado($referencia)
+    public function estado($referencia, $metodo = 'tarjeta')
     {
         $this->ultimoError = '';
-        $url = trim((string)($this->cfg['url_estado'] ?? ''));
-        if ($url === '') {
-            $this->ultimoError = 'Falta `url_estado` en config/integraciones.php para consultar pagos';
+        $servicio = self::servicioDe($metodo);
+
+        if (!isset(self::CONSULTA[$servicio])) {
+            $this->ultimoError = $servicio === 'clabe'
+                ? 'El SPEI no se consulta: el banco avisa cuando llega el depósito.'
+                : 'El pago en tienda no se consulta: la tienda avisa cuando cobra.';
             return null;
         }
-        $pruebas = $this->enPruebas();
+        if (!$this->listo()) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
+
+        $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
+            'User'          => $this->usuario(),
+            'Password'      => $this->clave(),
+            'IntegrationID' => $this->cfg['integracion_id'],
+            'BusinessID'    => $this->negocio(),
+            'Reference'     => (string)$referencia,
+        ]);
+        if ($j === null) return null;
+
+        // LA RESPUESTA VIENE ANIDADA, y antes se buscaba un campo
+        // `Status` que no existe en ningún lado. Por eso la consulta
+        // jamás detectaba un pago: siempre contestaba "desconocido".
+        //
+        //   { "code": "00", "message": "...",
+        //     "paymentResponse": { "response": "approved", ... } }
+        //
+        // `response` trae approved, denied, error o pending.
+        $anidada = isset($j['paymentResponse']) && is_array($j['paymentResponse']);
+        $p = $anidada ? $j['paymentResponse'] : $j;
+
+        $codigo = (string)(self::campo($j, ['code','Code']) ?: '');
+        if (!$anidada && $codigo !== '' && $codigo !== '00') {
+            // Un código distinto de 00 sin cuerpo de pago es un rechazo
+            // de la consulta, no un "todavía no paga".
+            $this->ultimoError = self::motivo($j);
+            return null;
+        }
+
+        $estado = strtolower(trim((string)(
+            self::campo($p, ['response','Response','status','Status','estado']) ?: '')));
+        $pagado = in_array($estado, ['approved','aprobado','paid','pagado','success','completed'], true);
+
+        return [
+            'pagado'       => $pagado,
+            'estado'       => $estado ?: 'pendiente',
+            'monto'        => self::numero($p['amount'] ?? null),
+            'autorizacion' => (string)($p['auth'] ?? ''),
+            'folio'        => (string)($p['foliocpagos'] ?? ''),
+            'fecha'        => (string)($p['date'] ?? ''),
+            'crudo'        => $j,
+        ];
+    }
+
+    /**
+     * Una llamada al proveedor. Devuelve el JSON o null con el motivo.
+     *
+     * Centraliza el cURL porque antes estaba copiado en dos métodos con
+     * diferencias que nadie había pedido: uno mandaba `Accept` y el otro
+     * no, y los tiempos de espera eran distintos.
+     */
+    private function pegar($url, array $cuerpo)
+    {
+        $this->ultimaRespuesta = '';
+
         $ch = curl_init($url);
         curl_setopt_array($ch, [
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode([
-                'User'          => $pruebas ? ($this->cfg['usuario_prueba'] ?: $this->cfg['usuario'])
-                                            : $this->cfg['usuario'],
-                'Password'      => $pruebas ? ($this->cfg['clave_prueba'] ?: $this->cfg['clave'])
-                                            : $this->cfg['clave'],
-                'IntegrationID' => $this->cfg['integracion_id'],
-                'Reference'     => (string)$referencia,
-            ]),
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_POSTFIELDS     => json_encode($cuerpo, JSON_UNESCAPED_UNICODE),
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json; charset=utf-8',
+                                       'Accept: application/json'],
             CURLOPT_TIMEOUT        => max(10, (int)($this->cfg['timeout'] ?? 30)),
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => false,
+            // El certificado SÍ se verifica. Por aquí viajan montos y
+            // referencias de pago.
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
-        $resp = curl_exec($ch);
-        $err  = curl_error($ch);
+        $resp   = curl_exec($ch);
+        $codigo = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $err    = curl_error($ch);
         curl_close($ch);
 
-        if ($resp === false) { $this->ultimoError = $err; return null; }
-        // Lo que respondio, tal cual, para poder verlo si falla. Sin
-        // esto un rechazo del proveedor obliga a adivinar que campo
-        // esta mal.
+        if ($resp === false) {
+            $this->ultimoError = 'No se pudo contactar al proveedor: ' . $err;
+            return null;
+        }
         $this->ultimaRespuesta = mb_substr((string)$resp, 0, 800);
 
         $j = json_decode($resp, true);
-        if (!is_array($j)) { $this->ultimoError = 'Respuesta ilegible del proveedor'; return null; }
+        if (!is_array($j)) {
+            $this->ultimoError = 'El proveedor respondió algo que no se entiende (HTTP '
+                               . $codigo . '): ' . mb_substr(strip_tags((string)$resp), 0, 160);
+            return null;
+        }
+        // Las claves llegan con espacios de vez en cuando ("url ").
+        $limpio = [];
+        foreach ($j as $k => $v) $limpio[trim((string)$k)] = $v;
+        return $limpio;
+    }
 
-        $estado = strtolower((string)self::campo($j, ['Status','status','estado']));
-        $pagado = in_array($estado, ['paid','pagado','success','completed','liquidado'], true);
-
-        return ['pagado' => $pagado, 'estado' => $estado ?: 'desconocido',
-                'monto' => self::campo($j, ['Amount','amount','monto']),
-                'fecha' => self::campo($j, ['PaymentDate','fecha_pago','date']),
-                'crudo' => $j];
+    /** Por qué rechazó, en palabras. */
+    private static function motivo(array $j)
+    {
+        $codigo = (string)(self::campo($j, ['Error','error','code','Code']) ?: '');
+        $msg    = (string)(self::campo($j, ['Message','message','mensaje','ErrorMessage']) ?: '');
+        $texto  = self::CODIGOS[$codigo] ?? '';
+        if ($texto === '' && $msg !== '') $texto = $msg;
+        if ($texto === '') {
+            return 'El proveedor no devolvió ninguna forma de pagar.';
+        }
+        return 'El proveedor rechazó el cobro: ' . $texto
+             . ($codigo !== '' ? ' (código ' . $codigo . ')' : '');
     }
 
     /**
-     * La referencia: exactamente 15 dígitos.
+     * Los códigos de la documentación, traducidos.
      *
-     * Si se repite, el proveedor devuelve la liga ANTERIOR en vez de
-     * crear una nueva. Eso es lo que se quiere al reintentar una venta
+     * Sin esto el cajero leía "22" y no había forma de saber que la
+     * referencia iba con el largo equivocado.
+     */
+    const CODIGOS = [
+        '00'  => 'los datos enviados vienen vacíos',
+        '1'   => 'el usuario o la contraseña son inválidos',
+        '2'   => 'faltan el usuario y la contraseña',
+        '3'   => 'el ID de la integración no existe',
+        '4'   => 'el ID de la integración trae mal el formato',
+        '5'   => 'falta el ID de la integración',
+        '6'   => 'el ID del comercio no existe',
+        '7'   => 'el ID del comercio trae mal el formato',
+        '8'   => 'falta el ID del comercio',
+        '9'   => 'falta la descripción',
+        '10'  => 'falta el Account',
+        '11'  => 'el Account trae mal el formato',
+        '12'  => 'el Account ya se usó: tiene que ser único',
+        '14'  => 'el formato de la fecha de vencimiento es incorrecto',
+        '15'  => 'este comercio no está vinculado a la integración',
+        '17'  => 'falta la descripción',
+        '18'  => 'el importe debe ser mínimo $50.00 y máximo $15,000.00',
+        '19'  => 'el formato del importe es incorrecto',
+        '20'  => 'falta el importe',
+        '21'  => 'falta la referencia',
+        '22'  => 'el formato de la referencia es incorrecto (lleva 15 dígitos)',
+        '23'  => 'esa referencia ya se usó: tiene que ser única',
+        '24'  => 'la fecha de vencimiento tiene que ser de hoy en adelante',
+        '25'  => 'el formato de la fecha de vencimiento es incorrecto',
+        '26'  => 'este comercio no está vinculado a la integración',
+        '400' => 'la CLABE no se pudo generar: habla con el proveedor',
+        '401' => 'la cuenta no tiene acceso: habla con el proveedor',
+        '404' => 'la cuenta no tiene permiso para generar esta forma de pago',
+    ];
+
+    /**
+     * La referencia: exactamente los dígitos que pida el convenio.
+     *
+     * Si se repite, el proveedor devuelve el cobro ANTERIOR en vez de
+     * crear uno nuevo. Eso es lo que se quiere al reintentar una venta
      * que no se completó, y un desastre si dos ventas distintas la
      * comparten: la segunda cobraría el monto de la primera.
      */
-    public static function referencia($semilla = '', $largo = 13)
+    public static function referencia($semilla = '', $largo = 15)
     {
         $largo = max(10, min(20, (int)$largo));
         $s = preg_replace('/\D/', '', (string)$semilla);
@@ -389,13 +516,28 @@ final class LigaPago
         return str_pad($s, $largo, (string)random_int(0, 9), STR_PAD_LEFT);
     }
 
+    /** "1,156.00" -> 1156.00 */
+    private static function numero($v)
+    {
+        if ($v === null || $v === '') return null;
+        return (float)str_replace([',', '$', ' '], '', (string)$v);
+    }
+
+    /** Para el log: todo menos la contraseña. */
+    private static function sinSecretos(array $c)
+    {
+        if (isset($c['Password'])) $c['Password'] = '•••';
+        return $c;
+    }
+
     private static function campo(array $j, array $nombres)
     {
         foreach ($nombres as $n) {
-            if (!empty($j[$n])) return $j[$n];
+            if (isset($j[$n]) && $j[$n] !== '' && $j[$n] !== null) return $j[$n];
             // A veces viene envuelto en Data / Result
             foreach (['Data','data','Result','result','Response'] as $w) {
-                if (isset($j[$w]) && is_array($j[$w]) && !empty($j[$w][$n])) return $j[$w][$n];
+                if (isset($j[$w]) && is_array($j[$w])
+                    && isset($j[$w][$n]) && $j[$w][$n] !== '') return $j[$w][$n];
             }
         }
         return null;

@@ -116,6 +116,20 @@ Si hay diferencia, la nota es obligatoria. Y se guarda **con signo**: positiva
 si sobró, negativa si faltó. Guardar el valor absoluto esconde justo lo que
 importa saber.
 
+**El turno se lee de la base, no de la sesión.** Antes `$_SESSION['caja_id']`
+solo se escribía al entrar a `/corte`, así que el cajero que iba derecho a
+cobrar veía "no tienes caja abierta" teniéndola. Y lo grave no era el aviso:
+las ventas se guardaban con `caja_id = NULL` y al cerrar **no aparecían en el
+corte**. Se cuadraba contra un total al que le faltaban ventas reales. Ahora
+lo resuelve `Servicio\Caja`, que pregunta una vez por petición y usa la sesión
+como caché.
+
+Y el turno se busca **por usuario, no por usuario y sucursal exactos**. Una
+persona trae un cajón, no uno por sucursal: a quien le cambiaban de sucursal
+se le perdía el turno abierto con el dinero adentro, y quien no tenía sucursal
+asignada abría con `sucursal_id = 0` y después su propio turno dejaba de
+aparecer.
+
 ## Asignar comisiones
 
 Se hace desde el detalle de la venta. Eliges colaborador y porcentaje, y ves
@@ -711,3 +725,121 @@ donde `rancio` es la fracción del saldo que lleva más de 30 días sin un solo
 abono. El factor 0.35 es una decisión, no una verdad: castiga el saldo viejo
 sin que domine la cifra. Si quieres otro peso, está en
 `PanelControlador::salud()`, una sola línea.
+
+## Cobros en línea · Paga de Todo
+
+Son **cuatro formas de cobrar** y conviene tener claro que no se parecen:
+
+| Forma | Quién la cobra | Entra al cajón | Cómo nos enteramos |
+|---|---|---|---|
+| Efectivo | el cajero, ahí mismo | sí | ya está cobrado |
+| Tarjeta | el cliente, en una liga | no | consultando, y por aviso |
+| SPEI | el cliente, desde su banco | no | solo por aviso |
+| Efectivo en tienda | la tienda (OXXO y demás) | no | solo por aviso |
+
+Las tres de en línea **registran la venta con saldo, no como pagada**. El abono
+entra cuando el proveedor confirma, ni un minuto antes. Darla por cobrada al
+generar la referencia haría que el corte mintiera todos los días: diría que
+entraron $4,000 que nadie ha pagado.
+
+### Cada forma es un servicio distinto
+
+No se elige con un código: se elige con la dirección a la que se pega.
+
+    /Service/GenerarLigaIndi            tarjeta
+    /Service/GenerarClabeIndi           SPEI
+    /Service/GenerarReferenciaIndi      efectivo en tienda
+
+`PaymentTypes` **no** selecciona el método. `41` y `401` son la misma cosa
+—"Contado"—: 401 en Sandbox y 41 en producción. Solo lo recibe la liga.
+
+Y los contratos no son intercambiables:
+
+- **SPEI no lleva monto.** Devuelve una CLABE que acepta lo que el cliente
+  deposite. Mandarle `Amount` lo hace rechazar.
+- **SPEI pide `Account`,** no `Reference`.
+- **La referencia lleva 15 dígitos.** Con 13 contesta el código 22,
+  "El formato de la referencia es incorrecto".
+
+### Paga de Todo, no Paga la Escuela
+
+Son dos plataformas del mismo proveedor y la documentación viene mezclada,
+pero no son intercambiables:
+
+|  | Paga la Escuela | Paga de Todo |
+|---|---|---|
+| host | pagalaescuela.mx | **pagadetodo.mx** |
+| identificador | SchoolID | **BusinessID** |
+
+Con el host de una y las credenciales de la otra contesta "El ID de la escuela
+es obligatorio" aunque todo lo demás esté bien. Ajustes → Integraciones avisa
+si la configuración quedó apuntando al lado equivocado.
+
+### La integración tiene dos direcciones
+
+**Nosotros → ellos.** Generar la liga, la CLABE o la referencia. Eso es
+`Servicio\LigaPago`.
+
+**Ellos → nosotros.** "Este cliente está pagando, ¿lo autorizo?", "ya pagó,
+aquí está el folio", "hubo un problema, cancélalo". Eso es
+`Controlador\PagosEntrantesControlador`, y sin esa mitad **SPEI y efectivo en
+tienda no se aplican nunca**: el proveedor no tiene servicio para
+consultarlos. Solo la tarjeta se puede preguntar
+(`ConsultarEstatusLigaIndi`).
+
+Las direcciones que hay que dar de alta en el panel del Sandbox, pestaña
+**EndPoint**, con tu secreto pegado:
+
+    Comercios (efectivo en tienda)
+      Consultar referencia  https://TU-DOMINIO/pagadetodo/consulta-referencia?k=SECRETO
+      Pagar referencia      https://TU-DOMINIO/pagadetodo/pago-referencia?k=SECRETO
+      Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+
+    Pago por SPEI
+      Consultar clabe       https://TU-DOMINIO/pagadetodo/consulta-clabe?k=SECRETO
+      Pagar clabe           https://TU-DOMINIO/pagadetodo/pago-clabe?k=SECRETO
+      Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+
+    Pago en línea (tarjeta)
+      Pagar liga            https://TU-DOMINIO/pagadetodo/pago-liga?k=SECRETO
+
+El secreto va en `config/integraciones.php` como `secreto_webhook`. Genéralo
+con `php -r "echo bin2hex(random_bytes(24));"`. **Sin él los avisos se
+rechazan**, porque esas direcciones no pueden pedir usuario y contraseña
+—quien llama es un servidor del proveedor, sin sesión— y lo único que las
+separa de cualquiera con un navegador es ese secreto.
+
+### Tres reglas que no se negocian en los avisos
+
+1. **Responder siempre HTTP 200** con el JSON que la documentación pide. Un
+   500 hace que el proveedor dé el pago por fallido y lo cancele, con el
+   cliente ya pagado y el ticket en la mano. Por eso `index.php` intercepta
+   cualquier excepción en `/pagadetodo/*` y contesta el código 50.
+2. **Idempotencia.** El proveedor reintenta cuando no le contestamos a tiempo.
+   El mismo número de transacción no puede abonar dos veces; se guarda en
+   `lf_ligas_pago.transaccion` y se revisa antes de abonar.
+3. **Los montos viajan en centavos** y como entero. Salvo el aviso de la liga,
+   que los manda en pesos y con comas ("1,156.00"). Es del proveedor, no un
+   descuido nuestro.
+
+### Cómo se sabe de qué empresa es un pago
+
+Hay una base por empresa, pero las credenciales del proveedor son unas para
+toda la instalación. Cuando llega "pagaron la referencia 7744330000…" no trae
+sesión ni empresa: solo el número.
+
+`lf_ruta_cobros`, en la base **principal**, apunta qué referencia vive en qué
+base. Una fila por cobro, dos columnas, búsqueda directa. Sin eso habría que
+abrir las treinta bases por cada aviso, y el proveedor espera respuesta en
+segundos.
+
+No guarda dinero: es un índice. Si se perdiera se reconstruye solo, porque
+cuando una referencia no está apuntada se recorren las bases y se apunta al
+encontrarla.
+
+### Lo que se cobra es el saldo, no el monto del cobro
+
+Entre que se genera la referencia y que el cliente llega al OXXO pueden pasar
+tres días, y en ese rato pudo haber abonado en el mostrador. Por eso la
+consulta devuelve el **saldo de la venta**, releído en ese momento, y no el
+monto con el que se generó. Cobrarle el total otra vez obliga a devolverle.

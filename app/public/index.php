@@ -62,6 +62,25 @@ if (\LibertyFin\Servicio\Integraciones::activa('cpanel')) {
     $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
 }
 
+// ── Los avisos de Paga de Todo ──
+// Son públicas porque el proveedor pega desde sus servidores: no trae
+// cookie, ni sesión, ni usuario. Lo que las protege es el secreto que va
+// en la URL (?k=...), guardado en config/integraciones.php.
+//
+// Las direcciones que hay que dar de alta en el panel del Sandbox son
+// estas mismas con el secreto pegado. Ver LEEME.md.
+if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
+    $pdt = 'LibertyFin\\Controlador\\PagosEntrantesControlador';
+    $r->get ('/pagadetodo/consulta-referencia', [$pdt, 'consultaReferencia']);
+    $r->post('/pagadetodo/pago-referencia',     [$pdt, 'pagoReferencia']);
+    $r->get ('/pagadetodo/consulta-clabe',      [$pdt, 'consultaClabe']);
+    $r->post('/pagadetodo/pago-clabe',          [$pdt, 'pagoClabe']);
+    $r->post('/pagadetodo/pago-liga',           [$pdt, 'pagoLiga']);
+    // La cancelación llega por DELETE o por POST: el proveedor decide.
+    $r->post  ('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
+    $r->delete('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
+}
+
 // Privadas
 // La raíz lleva a un panel u otro según el nivel del rol. Un rol de
 // plataforma en el panel de empresa vería las ventas de quien le prestó
@@ -274,7 +293,14 @@ $permisos = [
   '/cuenta/documento' => 'editar.empresa',
 ];
 
-$publicas = ['/login', '/salir', '/registro', '/ayuda-acceso'];
+$publicas = ['/login', '/salir', '/registro', '/ayuda-acceso',
+    // Los avisos del proveedor de pago. No pueden pedir sesión: quien
+    // llama es un servidor de Paga de Todo, no una persona con cookie.
+    // Su puerta es el secreto de la URL, que revisa el controlador.
+    '/pagadetodo/consulta-referencia', '/pagadetodo/pago-referencia',
+    '/pagadetodo/consulta-clabe',      '/pagadetodo/pago-clabe',
+    '/pagadetodo/cancela-pago',        '/pagadetodo/pago-liga',
+];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 
 // El portero: una sola línea decide quién pasa, en vez de repetir la
@@ -352,6 +378,23 @@ try {
     call_user_func_array([new $clase(), $metodo], $hallazgo['args']);
 } catch (Throwable $e) {
     error_log('[LibertyFin] ' . $e->getMessage() . ' en ' . $e->getFile() . ':' . $e->getLine());
+
+    // UN AVISO DE PAGO NUNCA SE CONTESTA CON 500.
+    //
+    // Paga de Todo lee un 500 como "el emisor no lo autorizó" y cancela
+    // la operación. El cliente ya pagó en la tienda y ya tiene su
+    // ticket: deshacerlo del lado del proveedor deja un cobro que la
+    // tienda hizo y que nadie reconoce. Se contesta el código 50 que su
+    // documentación pide para esto, con HTTP 200, y el error queda en
+    // el log para revisarlo con calma.
+    if (strncmp($ruta, '/pagadetodo/', 12) === 0) {
+        http_response_code(200);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['codigo' => 50, 'mensaje' => 'Error de sistema',
+                          'code' => '99', 'message' => 'Error interno.']);
+        exit;
+    }
+
     http_response_code(500);
     if (!empty($cfg['depurar'])) {
         echo '<pre style="padding:20px;font:13px ui-monospace">'
