@@ -48,7 +48,8 @@
    ══════════════════════════════════════════════════════ */
 :root{
   /* Marca */
-  --lf-brand:#27ae60;
+  /* --lf-brand:#27ae60; */
+  --lf-brand: #4baa5c;
   --lf-brand-2:color-mix(in srgb, var(--lf-brand) 82%, #000);
   --lf-brand-3:color-mix(in srgb, var(--lf-brand) 65%, #fff);
   --lf-brand-soft:color-mix(in srgb, var(--lf-brand) 11%, #fff);
@@ -1649,11 +1650,12 @@ body.lf-centro{
 /* La tarjeta */
 .lf-tarjeta{
   width:100%;
-  background:color-mix(in srgb, #0b2d18 72%, var(--lf-brand));
+  background:#26512e;
   border-radius:16px;
+  border: 1px solid #bebebe;
   /* Más aire abajo que arriba: el botón pegado al borde se ve apretado,
      y es lo último que mira quien va a entrar. */
-  padding:26px 26px 32px;
+  padding:26px 46px 52px;
   box-shadow:0 18px 44px rgba(0,0,0,.18);
 }
 .lf-tarjeta h1{font-size:17px;font-weight:700;color:#fff;letter-spacing:-.2px;
