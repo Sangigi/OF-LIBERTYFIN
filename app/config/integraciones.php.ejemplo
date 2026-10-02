@@ -105,6 +105,29 @@ return [
         // Casi nunca es el nombre comercial: es el que registró el
         // proveedor al abrir el convenio. Si el cliente dice el
         // equivocado, el cajero no lo encuentra y lo manda de regreso.
+        // ── LAS DOS DIRECCIONES DEL PROVEEDOR ──────────────────
+        //
+        // No es una sola. El sistema anterior usaba dos endpoints
+        // distintos y cada uno pide campos distintos:
+        //
+        //   `url`        la liga de pago (tarjeta, tienda).
+        //                Campos: PaymentTypes, Amount, Reference...
+        //
+        //   `url_clabe`  la CLABE para SPEI.
+        //                Campos: Account, CustomerName, MontoTotal...
+        //
+        // Si se le manda a uno el cuerpo del otro, contesta cosas como
+        // "El Account es obligatorio". Si tu convenio usa una sola,
+        // deja `url_clabe` vacio y se usa `url` para todo.
+        'url'       => '',
+        'url_clabe' => '',
+        'url_estado'=> '',
+
+        // Algunos convenios piden `MontoTotal` ademas de `Amount`.
+        // Mandarlo cuando no lo esperan hace que rechacen la peticion,
+        // asi que va apagado por omision.
+        'manda_montototal' => false,
+
         'nombre_convenio' => '',
         // Dónde se puede pagar, separadas por coma. Depende del
         // convenio: no todos aceptan las mismas cadenas, y una lista

@@ -45,6 +45,10 @@ final class LigaPago
 
     private $cfg;
     private $ultimoError = '';
+    private $ultimaRespuesta = '';
+
+    /** Lo ultimo que contesto el proveedor, para diagnosticar. */
+    public function respuesta() { return $this->ultimaRespuesta; }
 
     public function __construct(array $cfg) { $this->cfg = $cfg; }
 
@@ -79,15 +83,23 @@ final class LigaPago
         $tipo = $this->cfg['tipo_' . $metodo] ?? self::METODOS[$metodo][1];
 
         $pruebas = $this->enPruebas();
-        $url = $pruebas
+        // SPEI va a su propia direccion cuando esta configurada: es el
+        // endpoint que entrega la CLABE, y pide campos distintos al de
+        // la liga. Mandarle el cuerpo equivocado es lo que produce "El
+        // Account es obligatorio".
+        $propia = ($metodo === 'spei' && !empty($this->cfg['url_clabe']))
+                ? $this->cfg['url_clabe'] : null;
+        $url = $propia ?: ($pruebas
              ? ($this->cfg['url_sandbox'] ?? $this->cfg['url'] ?? '')
-             : ($this->cfg['url'] ?? '');
+             : ($this->cfg['url'] ?? ''));
         if (trim((string)$url) === '') {
             $this->ultimoError = 'Falta la dirección del servicio en config/integraciones.php';
             return null;
         }
 
         $dias = max(1, (int)($d['dias'] ?? $this->cfg['dias_vigencia'] ?? 3));
+
+        $referencia = self::referencia($d['referencia'] ?? '');
 
         $cuerpo = [
             'User'           => $pruebas ? ($this->cfg['usuario_prueba'] ?: $this->cfg['usuario'])
@@ -104,9 +116,27 @@ final class LigaPago
             // En CENTAVOS y como cadena. Mandar "150.00" en vez de "15000"
             // genera una liga por un peso y medio.
             'Amount'         => (string)(int)round($monto * 100),
-            'Reference'      => self::referencia($d['referencia'] ?? ''),
+            'Reference'      => $referencia,
+            // `Account` es OBLIGATORIO y no estaba.
+            //
+            // Son 15 digitos que identifican el cobro del lado del
+            // proveedor. En el sistema anterior se generaba igual que la
+            // referencia, y se manda el MISMO valor: si fueran distintos
+            // habria dos identificadores para una sola operacion y
+            // conciliar seria adivinar cual mirar.
+            'Account'        => $referencia,
+            'CustomerName'   => mb_substr(trim((string)($d['cliente'] ?? '')), 0, 60) ?: 'Publico general',
+            'CustomerEmail'  => filter_var($d['correo'] ?? '', FILTER_VALIDATE_EMAIL)
+                                ? $d['correo'] : '',
             'ExpirationDate' => date('Y-m-d', strtotime('+' . $dias . ' days')),
         ];
+
+        // Campos que algunos convenios piden y otros no. Se mandan solo
+        // si estan configurados: enviarlos vacios hace que el proveedor
+        // los rechace por invalidos en vez de ignorarlos.
+        foreach (['MontoTotal' => $monto] as $k => $v) {
+            if (!empty($this->cfg['manda_' . strtolower($k)])) $cuerpo[$k] = $v;
+        }
 
         $ch = curl_init($url);
         curl_setopt_array($ch, [
@@ -129,6 +159,11 @@ final class LigaPago
             $this->ultimoError = 'No se pudo contactar al proveedor: ' . $errCurl;
             return null;
         }
+        // Lo que respondio, tal cual, para poder verlo si falla. Sin
+        // esto un rechazo del proveedor obliga a adivinar que campo
+        // esta mal.
+        $this->ultimaRespuesta = mb_substr((string)$resp, 0, 800);
+
         $j = json_decode($resp, true);
         if (!is_array($j)) {
             $this->ultimoError = 'El proveedor respondió algo que no se entiende (HTTP '
@@ -137,7 +172,8 @@ final class LigaPago
         }
 
         $liga = self::campo($j, ['Url','url','liga','PaymentUrl','link']);
-        $clabe = self::campo($j, ['CLABE','Clabe','clabe']);
+        // El proveedor escribe 'Clabe' en un endpoint y 'CLABE' en otro.
+        $clabe = self::campo($j, ['Clabe','CLABE','clabe','Cuenta','account']);
         $barras = self::campo($j, ['Barcode','barcode','codigo_barras','Reference']);
 
         if (!$liga && !$clabe && !$barras) {
@@ -145,6 +181,8 @@ final class LigaPago
             $this->ultimoError = $msg
                 ? 'El proveedor rechazó la liga: ' . $msg
                 : 'El proveedor no devolvió ninguna forma de pagar.';
+            error_log('[LibertyFin] liga rechazada · enviado: ' . json_encode($cuerpo)
+                . ' · recibido: ' . $this->ultimaRespuesta);
             return null;
         }
 
@@ -199,6 +237,11 @@ final class LigaPago
         curl_close($ch);
 
         if ($resp === false) { $this->ultimoError = $err; return null; }
+        // Lo que respondio, tal cual, para poder verlo si falla. Sin
+        // esto un rechazo del proveedor obliga a adivinar que campo
+        // esta mal.
+        $this->ultimaRespuesta = mb_substr((string)$resp, 0, 800);
+
         $j = json_decode($resp, true);
         if (!is_array($j)) { $this->ultimoError = 'Respuesta ilegible del proveedor'; return null; }
 

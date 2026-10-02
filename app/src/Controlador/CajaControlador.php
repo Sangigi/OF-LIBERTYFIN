@@ -232,12 +232,16 @@ final class CajaControlador
             'monto' => $saldo, 'metodo' => $forma,
             'descripcion' => 'Venta ' . $venta['codigo_venta'],
             'referencia' => $semilla, 'id' => $semilla,
+            // El proveedor pide el nombre del cliente; sin el rechaza.
+            'cliente' => $venta['cliente'] ?: 'Publico general',
+            'correo'  => $venta['cliente_email'] ?? '',
         ]);
         if (!$g) {
             if ($this->pideJson()) {
                 $this->json(['ok' => false, 'venta_ok' => true,
                     'error' => 'La venta ' . $venta['codigo_venta'] . ' quedó registrada con '
-                             . 'saldo, pero el cobro no se generó: ' . $api->error()], 200);
+                             . 'saldo, pero el cobro no se generó: ' . $api->error(),
+                    'detalle' => $api->respuesta()], 200);
             }
             // La venta SÍ quedó. Se dice qué pasó y dónde seguir, en vez
             // de dejar creer que no se registró nada.

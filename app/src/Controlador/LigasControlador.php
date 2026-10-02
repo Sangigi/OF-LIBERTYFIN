@@ -98,6 +98,7 @@ final class LigasControlador
         $r = $api->generar([
             'monto' => $monto, 'descripcion' => $desc, 'metodo' => $metodo,
             'referencia' => $semilla, 'id' => $semilla,
+            'cliente' => $cliente ?: 'Publico general',
             'dias' => (int)($_POST['dias'] ?? 0) ?: null,
         ]);
         if (!$r) $this->a('No se generó la liga: ' . $api->error(), 'error');
