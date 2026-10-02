@@ -1699,8 +1699,8 @@ body.lf-centro{
   margin:4px 0 26px;font-size:12.5px;
   color:color-mix(in srgb,#fff 78%,transparent)}
 .lf-recordar input{width:16px;height:16px;margin:0;accent-color:var(--lf-brand);
-  cursor:pointer;flex-shrink:0;display:block}
-.lf-recordar span{line-height:16px;display:inline-block;}
+  cursor:pointer;flex-shrink:0;display:inline;}
+.lf-recordar span{line-height:16px;display:inline;}
 
 /* El botón, verde claro sobre el oscuro */
 .lf-boton{
