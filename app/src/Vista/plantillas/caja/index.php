@@ -33,6 +33,15 @@ $token = $_SESSION['lf_token'];
 </section>
 <?php endif; ?>
 
+<?php if (!$cajaAbierta && \LibertyFin\Dominio\Permisos::puede('abrir.caja')): ?>
+<div class="alert alert-warning" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b>No tienes caja abierta.</b> Las ventas se registran igual, pero no entran
+    al corte del turno y al cerrar no van a cuadrar.
+    <a href="/corte" style="font-weight:600">Abrir caja</a></span>
+</div>
+<?php endif; ?>
+
 <div class="lf-pos">
   <section class="card">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
@@ -116,6 +125,13 @@ $token = $_SESSION['lf_token'];
                  value="0" min="0" step="0.01" style="width:104px;padding:4px 7px">
         </span></div>
       <div class="tt"><span>Total</span><span id="sTot">$0.00</span></div>
+    </div>
+
+    <div class="lf-pagacon" id="cajaPagaCon" hidden>
+      <label for="pagaCon">¿Con cuánto te paga?</label>
+      <input class="lf-mono" type="number" name="paga_con" id="pagaCon"
+             min="0" step="0.50" placeholder="0.00" inputmode="decimal">
+      <p class="cambio" id="verCambio"></p>
     </div>
 
     <div class="lf-anticipo" id="cajaAnticipo">
@@ -257,6 +273,8 @@ $token = $_SESSION['lf_token'];
     $('btnTexto').textContent = enLinea
       ? 'Cobrar ' + pesos(cap)
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
+    $('btnTexto').dataset.total = (ant > 0 ? ant : cap).toFixed(2);
+    document.dispatchEvent(new Event('lf-recalcular'));
     $('btnCobrar').disabled = lineas.length === 0;
   }
 
@@ -300,10 +318,17 @@ $token = $_SESSION['lf_token'];
            total y entonces la venta queda liquidada sin que haya entrado
            un peso. */
         var caja = $('cajaAnticipo');
+        var linea = !!b.dataset.linea;
         if (caja) {
-          var linea = !!b.dataset.linea;
           caja.hidden = linea;
           if (linea) $('anticipo').value = '0';
+        }
+        /* "Paga con" solo tiene sentido en efectivo: en una
+           transferencia nadie entrega cambio. */
+        var pc = $('cajaPagaCon');
+        if (pc) {
+          pc.hidden = (b.dataset.metodo !== 'efectivo');
+          if (pc.hidden) { $('pagaCon').value = ''; $('verCambio').textContent = ''; }
         }
         calcular();
       });
@@ -338,6 +363,28 @@ $token = $_SESSION['lf_token'];
   ['ivaPct','anticipo','gastos'].forEach(function(id){
     $(id).addEventListener('input', calcular);
   });
+
+  /* El cambio, mientras escribe. Es la cuenta que el cajero hace de
+     cabeza cada venta y donde mas se equivoca con prisa. */
+  (function(){
+    var i = $('pagaCon'), out = $('verCambio');
+    if (!i || !out) return;
+    function ver(){
+      var da = parseFloat(i.value) || 0;
+      var ant = parseFloat($('anticipo').value) || 0;
+      var cobra = ant > 0 ? ant : (parseFloat($('btnTexto').dataset.total) || 0);
+      if (!da) { out.textContent = ''; out.className = 'cambio'; return; }
+      if (da < cobra) {
+        out.textContent = 'Faltan ' + pesos(cobra - da);
+        out.className = 'cambio falta';
+      } else {
+        out.textContent = 'Cambio ' + pesos(da - cobra);
+        out.className = 'cambio ok';
+      }
+    }
+    i.addEventListener('input', ver);
+    document.addEventListener('lf-recalcular', ver);
+  })();
 
   document.querySelectorAll('input[name="metodo"]').forEach(function(r){
     r.addEventListener('change', function(){
@@ -453,11 +500,29 @@ $token = $_SESSION['lf_token'];
     var l = d.liga || {}, modo = d.modo;
 
     if (modo === 'cobrado') {
+      var v = d.venta;
       titulo.textContent = 'Cobrado';
-      sub.textContent = 'Venta ' + (d.venta ? d.venta.codigo : '');
-      cuerpo.innerHTML = '<p class="ok-grande">' + money(d.venta.cobrado) + '</p>'
-        + '<p class="msg">Listo. La venta quedó registrada.</p>';
-      pie.innerHTML = '<a class="btn btn-secondary" href="/ventas/' + d.venta.id
+      sub.textContent = 'Venta ' + v.codigo;
+
+      /* El CAMBIO va primero y en grande. Es lo unico que el cajero
+         necesita en este segundo: tiene la mano en el cajon y al
+         cliente esperando. Lo cobrado ya lo sabia. */
+      var html = '';
+      if (v.cambio > 0) {
+        html += '<p class="etiqueta">Cambio</p>'
+             +  '<p class="ok-grande">' + money(v.cambio) + '</p>'
+             +  '<p class="msg centro">Cobró ' + money(v.cobrado)
+             +  ' de ' + money(v.paga_con) + '</p>';
+      } else {
+        html += '<p class="ok-grande">' + money(v.cobrado) + '</p>'
+             +  '<p class="msg centro">Listo, la venta quedó registrada.</p>';
+      }
+      if (!v.en_corte) {
+        html += '<div class="espera"><b>Sin caja abierta.</b> Esta venta no entra al '
+             +  'corte del turno.</div>';
+      }
+      cuerpo.innerHTML = html;
+      pie.innerHTML = '<a class="btn btn-secondary" href="/ventas/' + v.id
         + '/ticket?auto=1" target="_blank">Imprimir ticket</a>'
         + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
       return;

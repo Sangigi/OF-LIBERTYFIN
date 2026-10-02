@@ -31,10 +31,16 @@ final class CajaControlador
             // por area, no los usuarios del sistema. Un contador puede
             // atender sin tener cuenta para entrar.
             'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
+            // Sin caja abierta la venta se registra igual, pero no entra
+            // al corte del turno. Se avisa antes, no despues.
+            'cajaAbierta' => !empty($_SESSION['caja_id']),
             // Quien va a HACER el trabajo: los COLABORADORES, agrupados
             // por area, no los usuarios del sistema. Un contador puede
             // atender sin tener cuenta para entrar.
             'equipo'    => (new \LibertyFin\Datos\ComisionRepo($db))->equipoPorArea(),
+            // Sin caja abierta la venta se registra igual, pero no entra
+            // al corte del turno. Se avisa antes, no despues.
+            'cajaAbierta' => !empty($_SESSION['caja_id']),
             // Cobrar con liga solo aparece si hay con qué generarla.
             'ligas'     => \LibertyFin\Servicio\Integraciones::activa('spei')
                          && (new \LibertyFin\Datos\ConfigRepo($db))->seccionActiva('ligas'),
@@ -161,10 +167,18 @@ final class CajaControlador
         // Cobro en el mostrador. Si lo pidio el modal se contesta en
         // JSON; si no, se sigue como siempre y se va al ticket.
         if ($this->pideJson()) {
+            // El cambio se calcula aqui y no en el navegador: es dinero
+            // que el cajero va a entregar, y tiene que salir de la misma
+            // cuenta que registro la venta.
+            $pagaCon = round((float)($_POST['paga_con'] ?? 0), 2);
+            $cobrado = (float)$r['cobrado'];
+            $cambio  = ($pagaCon > $cobrado) ? round($pagaCon - $cobrado, 2) : 0.0;
+
             $this->json(['ok' => true, 'modo' => 'cobrado',
                 'venta' => ['id' => (int)$r['id'], 'codigo' => $r['codigo'],
-                            'total' => (float)$r['total'],
-                            'cobrado' => (float)$r['cobrado']]]);
+                            'total' => (float)$r['total'], 'cobrado' => $cobrado,
+                            'paga_con' => $pagaCon, 'cambio' => $cambio,
+                            'en_corte' => !empty($_SESSION['caja_id'])]]);
         }
 
         header('Location: /ventas/' . $r['id'] . '?nueva=1');
