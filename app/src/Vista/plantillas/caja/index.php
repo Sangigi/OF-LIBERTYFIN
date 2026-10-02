@@ -33,6 +33,14 @@ $token = $_SESSION['lf_token'];
 </section>
 <?php endif; ?>
 
+<?php if ($cobrada = \LibertyFin\Http\Peticion::texto('ok', '')): ?>
+<div class="alert alert-success" style="margin-bottom:14px">
+  <?= W::icono('ok','18px') ?>
+  <span>Venta <b><?= P::e($cobrada) ?></b> cobrada.
+    <a href="/ventas?q=<?= urlencode($cobrada) ?>" style="font-weight:600">Verla</a></span>
+</div>
+<?php endif; ?>
+
 <?php if (!$cajaAbierta && \LibertyFin\Dominio\Permisos::puede('abrir.caja')): ?>
 <div class="alert alert-warning" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?>
@@ -145,53 +153,19 @@ $token = $_SESSION['lf_token'];
       // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a quien
       // la tiene apagada hace que el cajero la elija y la venta falle al
       // guardar, cuando el cliente ya está esperando.
-      $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
-      foreach ($metodos as $k): $v = $rot[$k] ?? $k; ?>
-        <label class="lf-pill<?= $k==='efectivo'?' active':'' ?>" style="cursor:pointer">
-          <input type="radio" name="metodo" value="<?= $k ?>" <?= $k==='efectivo'?'checked':'' ?> hidden>
-          <?= $v ?>
-        </label>
-      <?php endforeach; ?>
-    </div>
-
-    <div style="padding:0 20px 14px">
-      <label class="form-label">Especialista asignado</label>
-      <select class="form-select form-select-sm" name="especialista">
-        <option value="">Sin asignar</option>
-        <?php foreach ($equipo as $area => $gente): ?>
-          <optgroup label="<?= P::e($area) ?>">
-            <?php foreach ($gente as $c): ?>
-              <option value="<?= (int)$c['id'] ?>"><?= P::e($c['nombre']) ?></option>
-            <?php endforeach; ?>
-          </optgroup>
-        <?php endforeach; ?>
-      </select>
-      <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 0 14px;line-height:1.45">
-        Quién va a hacer el trabajo, no quién está cobrando. Son los
-        colaboradores de <a href="/ajustes?t=comisiones">Áreas y colaboradores</a>.
-      </p>
-
-      <label class="form-label">Descripción de la venta</label>
-      <textarea class="form-control lf-desc" name="descripcion" rows="3"
-                placeholder="Qué se vendió, condiciones, referencias… (opcional)"></textarea>
-    </div>
-
-    <?php
-    /* UN MÉTODO, UN BOTÓN, UN MODAL.
-       Se elige cómo paga, se cobra, y sale lo que hace falta: el código
-       para la tarjeta, la CLABE para SPEI, el comprobante para la
-       tienda. Sin recargar y sin preguntar dos veces lo mismo. */
-    $rot = ['efectivo'=>'Efectivo','transferencia'=>'Transferencia','tarjeta'=>'Tarjeta'];
-    $opciones = [];
-    foreach ($metodos as $k) {
-        $opciones[] = ['id'=>$k, 'rotulo'=>$rot[$k] ?? ucfirst($k),
-                       'icono'=>$k==='efectivo'?'caja':'venta', 'linea'=>''];
-    }
-    if ($ligas) {
-        $opciones[] = ['id'=>'_tarjeta','rotulo'=>'Tarjeta','icono'=>'cobro','linea'=>'tarjeta'];
-        $opciones[] = ['id'=>'_spei','rotulo'=>'SPEI','icono'=>'venta','linea'=>'spei'];
-        $opciones[] = ['id'=>'_tienda','rotulo'=>'Efectivo (tienda)','icono'=>'bolsa','linea'=>'efectivo'];
-    }
+      /* LOS CUATRO, NI UNO MAS.
+       Antes salian seis o siete porque se mezclaban los metodos del
+       mostrador con los de linea. Con tantos botones el cajero tiene
+       que leerlos cada vez en vez de dar al de siempre. */
+    $opciones = [
+        ['id'=>'efectivo', 'rotulo'=>'Efectivo',          'icono'=>'caja',  'linea'=>''],
+        ['id'=>'_tarjeta', 'rotulo'=>'Tarjeta',           'icono'=>'cobro', 'linea'=>'tarjeta'],
+        ['id'=>'_spei',    'rotulo'=>'SPEI',              'icono'=>'venta', 'linea'=>'spei'],
+        ['id'=>'_tienda',  'rotulo'=>'Efectivo (tienda)', 'icono'=>'bolsa', 'linea'=>'efectivo'],
+    ];
+    // Los de linea solo si el proveedor esta configurado; si no, el
+    // boton promete algo que va a fallar.
+    if (!$ligas) $opciones = [$opciones[0]];
     ?>
     <div class="lf-metodos">
       <label class="form-label">¿Cómo paga?</label>
@@ -496,6 +470,15 @@ $token = $_SESSION['lf_token'];
     }, 4000);
   }
 
+  /* El boton de confirmar a mano.
+     No siempre llega el aviso del proveedor: el pago en tienda tarda
+     horas y a veces el cliente ensena el comprobante en el mostrador.
+     Sin esto el cajero se queda esperando con el cliente enfrente. */
+  function confirmar(l){
+    return '<button type="button" class="btn btn-secondary" data-confirmar="'
+         + l.id + '">Ya me pagó</button>';
+  }
+
   function pintar(d){
     var l = d.liga || {}, modo = d.modo;
 
@@ -545,7 +528,7 @@ $token = $_SESSION['lf_token'];
         + 'Esperando a que pague. Esto se actualiza solo.</div>' + aviso;
       cargarQr(l.liga);
       pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.liga)
-        + '" target="_blank" rel="noopener">Abrir la página</a>'
+        + '" target="_blank" rel="noopener">Abrir la página</a>' + confirmar(l)
         + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
       vigilar(l.id);
 
@@ -558,7 +541,7 @@ $token = $_SESSION['lf_token'];
         + '<p class="aviso">Una cantidad distinta no se asocia sola y hay que buscarla a mano.</p>'
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
         + 'Esperando el depósito. En cuanto llegue, aparece aquí.</div>' + aviso;
-      pie.innerHTML = '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
+      pie.innerHTML = confirmar(l) + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
       vigilar(l.id);
 
     } else if (modo === 'efectivo') {
@@ -572,7 +555,7 @@ $token = $_SESSION['lf_token'];
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
         + 'El pago en tienda puede tardar unas horas en reflejarse.</div>' + aviso;
       pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.doc)
-        + '" target="_blank">Ver el comprobante</a>'
+        + '" target="_blank">Ver el comprobante</a>' + confirmar(l)
         + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
       vigilar(l.id);
     }
@@ -600,7 +583,30 @@ $token = $_SESSION['lf_token'];
       }).catch(function(){ i.select(); });
       return;
     }
-    if (e.target.closest('[data-seguir]')) { location.href = '/caja'; }
+    if (e.target.closest('[data-seguir]')) { location.href = '/caja'; return; }
+
+    var cf = e.target.closest('[data-confirmar]');
+    if (cf) {
+      if (!window.confirm('¿El cliente ya pagó? El abono se aplica de inmediato y '
+                        + 'queda anotado como confirmación manual.')) return;
+      cf.disabled = true; cf.textContent = 'Aplicando…';
+      var fd = new FormData();
+      fd.append('token', <?= json_encode($token) ?>);
+      fd.append('id', cf.dataset.confirmar);
+      fetch('/ligas/confirmar', { method:'POST', body:fd, credentials:'same-origin' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.ok) { cf.disabled = false; cf.textContent = 'Ya me pagó';
+                       alert(d.error || 'No se pudo.'); return; }
+          var esp = document.getElementById('mEspera');
+          if (esp) { esp.className = 'espera ok';
+                     esp.innerHTML = '<b>Pago aplicado.</b> Confirmado a mano.'; }
+          cf.remove();
+          if (reloj) { clearInterval(reloj); reloj = null; }
+        })
+        .catch(function(){ cf.disabled = false; cf.textContent = 'Ya me pagó';
+                           alert('No se pudo conectar.'); });
+    }
   });
 
   /* El envío ya no recarga: se manda, se recibe y se abre el modal. */
@@ -617,6 +623,15 @@ $token = $_SESSION['lf_token'];
       .then(function(d){
         if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
         if (!d.ok) { alert(d.error || 'No se pudo cobrar.'); return; }
+
+        /* EFECTIVO SIN CAMBIO: NI SIQUIERA ABRE EL MODAL.
+           Si pagó justo, no hay nada que decirle al cajero y un modal
+           que solo pide cerrarse es un clic de más en la operación que
+           más se repite en el día. Se avisa arriba y a la siguiente. */
+        if (d.modo === 'cobrado' && !(d.venta.cambio > 0) && d.venta.en_corte) {
+          location.href = '/caja?ok=' + encodeURIComponent(d.venta.codigo);
+          return;
+        }
         pintar(d);
         abrir();
       })

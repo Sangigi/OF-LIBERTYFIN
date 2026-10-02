@@ -71,13 +71,46 @@ final class LigaPago
      * proveedor no obligue a tocar codigo; aqui van las que se han
      * visto funcionando.
      */
+    /**
+     * El contrato de cada servicio, sacado de la documentacion.
+     *
+     *   ruta  ·  campos del cuerpo  ·  campos de la respuesta
+     *
+     * NO SON INTERCAMBIABLES, Y LAS DIFERENCIAS IMPORTAN:
+     *
+     *   · La LIGA pide `SchoolID`; SPEI y REFERENCIA piden `BusinessID`.
+     *     Mandar el equivocado da "El ID de la escuela es obligatorio".
+     *
+     *   · SPEI NO LLEVA MONTO. Devuelve una CLABE que acepta lo que el
+     *     cliente deposite; el monto se cuadra despues contra la venta.
+     *     Mandarle `Amount` lo hace rechazar.
+     *
+     *   · Solo la LIGA lleva `PaymentTypes`. Es el codigo de Contado,
+     *     no un selector de metodo: 41 en produccion, 401 en Sandbox.
+     */
     const SERVICIOS = [
-        'liga'       => ['/Service/GenerarLigaIndi',
-                         ['PaymentTypes','Id','Description','Amount','Reference','ExpirationDate']],
-        'clabe'      => ['/Service/GenerarClabeIndi',
-                         ['Description','Account','CustomerEmail','CustomerName','ExpirationDate']],
-        'referencia' => ['/Service/GenerarReferenciaIndi',
-                         ['Description','Amount','Reference','CustomerEmail','CustomerName','ExpirationDate']],
+        'liga' => [
+            '/Service/GenerarLigaIndi',
+            ['SchoolID','PaymentTypes','Id','Description','Amount','Reference','ExpirationDate'],
+            ['url','Url'],
+        ],
+        'clabe' => [
+            '/Service/GenerarClabeIndi',
+            ['BusinessID','Description','Account','CustomerEmail','CustomerName','ExpirationDate'],
+            ['Clabe','clabe'],
+        ],
+        'referencia' => [
+            '/Service/GenerarReferenciaIndi',
+            ['BusinessID','Description','Amount','Reference','CustomerEmail','CustomerName','ExpirationDate'],
+            ['Reference','reference'],
+        ],
+    ];
+
+    /** Donde se consulta si ya pagaron. */
+    const CONSULTA = [
+        'liga'       => '/Service/ConsultarEstatusLigaIndi',
+        'clabe'      => '/Service/ConsultaReferencia',
+        'referencia' => '/Service/ConsultaReferencia',
     ];
 
     /**
@@ -148,7 +181,7 @@ final class LigaPago
         $metodo = $d['metodo'] ?? 'tarjeta';
         if (!isset(self::METODOS[$metodo])) $metodo = 'tarjeta';
         $servicio = self::METODOS[$metodo][1];
-        list($ruta, $campos) = self::SERVICIOS[$servicio];
+        list($ruta, $campos, $devuelve) = self::SERVICIOS[$servicio];
 
         // La direccion: la del servicio si se configuro, si no la base
         // mas su ruta. Asi un cambio del proveedor se arregla en el
@@ -177,13 +210,16 @@ final class LigaPago
             'Password'      => $pruebas ? ($this->cfg['clave_prueba'] ?: $this->cfg['clave'])
                                         : $this->cfg['clave'],
             'IntegrationID' => $this->cfg['integracion_id'],
-            'BusinessID'    => $this->cfg['negocio_id'] ?? '',
         ];
-        if (!empty($this->cfg['escuela_id'])) $cuerpo['SchoolID'] = $this->cfg['escuela_id'];
 
         // Y despues, SOLO los campos que ese servicio espera. Mandarle
         // de mas es lo que lo hace rechazar la peticion.
         $posibles = [
+            // Los dos identificadores son distintos y cada servicio pide
+            // el suyo. Si solo hay uno configurado, se usa para ambos:
+            // en muchos convenios son el mismo numero.
+            'SchoolID'       => $this->cfg['escuela_id'] ?? $this->cfg['negocio_id'] ?? '',
+            'BusinessID'     => $this->cfg['negocio_id'] ?? $this->cfg['escuela_id'] ?? '',
             'PaymentTypes'   => $this->contado(),
             'Id'             => (string)($d['id'] ?? $referencia),
             // El proveedor corta a 40 y si se pasa, rechaza.
@@ -234,12 +270,23 @@ final class LigaPago
             return null;
         }
 
-        $liga   = self::campo($j, ['Url','url','liga','PaymentUrl','link']);
-        $clabe  = self::campo($j, ['Clabe','CLABE','clabe','Cuenta']);
-        $barras = self::campo($j, ['Reference','Barcode','barcode','referencia','codigo_barras']);
+        // Cada servicio devuelve lo suyo, con el nombre que dice su
+        // documentacion. Buscar en todos daria falsos positivos: la
+        // liga tambien trae un `reference` que NO es un codigo de
+        // barras, y mostrarlo como tal manda al cliente al OXXO con un
+        // numero que ahi no sirve.
+        $valor  = self::campo($j, $devuelve);
+        $liga   = $servicio === 'liga'       ? $valor : null;
+        $clabe  = $servicio === 'clabe'      ? $valor : null;
+        $barras = $servicio === 'referencia' ? $valor : null;
+
+        // La referencia trae ademas la imagen del codigo de barras y el
+        // formato de pago, cuando el convenio los genera.
+        $imagen  = $servicio === 'referencia' ? self::campo($j, ['BarCode','barCode']) : null;
+        $formato = $servicio === 'referencia' ? self::campo($j, ['PayFormat','payFormat']) : null;
 
         if (!$liga && !$clabe && !$barras) {
-            $msg = self::campo($j, ['Message','message','error','Error','ErrorMessage','Mensaje']);
+            $msg = self::campo($j, ['Message','message','mensaje','Error','error','ErrorMessage']);
             $this->ultimoError = $msg
                 ? 'El proveedor rechazó el cobro: ' . $msg
                 : 'El proveedor no devolvió ninguna forma de pagar.';
@@ -254,9 +301,11 @@ final class LigaPago
         // barras y mostrarla como tal manda al cliente al OXXO con un
         // numero que no sirve.
         return [
-            'liga'       => $servicio === 'liga'       ? $liga   : null,
-            'clabe'      => $servicio === 'clabe'      ? $clabe  : null,
-            'barras'     => $servicio === 'referencia' ? $barras : null,
+            'liga'       => $liga,
+            'clabe'      => $clabe,
+            'barras'     => $barras,
+            'imagen'     => $imagen,
+            'formato'    => $formato,
             'falta'      => '',
             'referencia' => $referencia,
             'vence'      => $cuerpo['ExpirationDate'],

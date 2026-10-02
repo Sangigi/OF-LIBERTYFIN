@@ -104,7 +104,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
     $r->post('/ligas/generar', ['LibertyFin\Controlador\LigasControlador', 'generar']);
     $r->post('/ligas/revisar', ['LibertyFin\Controlador\LigasControlador', 'revisar']);
     $r->get('/ligas/{id}/documento', ['LibertyFin\Controlador\LigasControlador', 'documento']);
-    $r->post('/ligas/aprobar', ['LibertyFin\Controlador\LigasControlador', 'aprobar']);
+    $r->post('/ligas/confirmar', ['LibertyFin\Controlador\LigasControlador', 'confirmar']);
+$r->post('/ligas/aprobar', ['LibertyFin\Controlador\LigasControlador', 'aprobar']);
 }
 
 // Facturación: igual que recargas, solo existe con credenciales.
@@ -225,6 +226,7 @@ $permisos = [
   '/ligas/revisar'          => 'ver.ligas',
   '/ligas/{id}/documento'   => 'ver.ligas',
   '/ligas/aprobar'          => 'cobrar',
+  '/ligas/confirmar'        => 'cobrar',
   '/facturacion'            => 'ver.facturacion',
   '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',

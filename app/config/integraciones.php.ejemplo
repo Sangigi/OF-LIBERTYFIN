@@ -117,7 +117,23 @@ return [
         // Con `host` basta: el sistema le agrega la ruta de cada uno.
         // Las tres de abajo solo hacen falta si el proveedor te dio
         // direcciones distintas a las normales.
-        'host'            => 'https://pagalaescuela.mx/Pagadetodo',
+        // ── LOS DOS IDENTIFICADORES ────────────────────────────
+        //
+        // La documentacion los separa y cada servicio pide el suyo:
+        //
+        //   SchoolID    la liga de tarjeta
+        //   BusinessID  la CLABE y la referencia de tienda
+        //
+        // En muchos convenios son el mismo numero. Si solo tienes uno,
+        // ponlo en los dos: el sistema usa el que falte del otro.
+        'escuela_id' => '',   // SchoolID
+        'negocio_id' => '',   // BusinessID
+
+        // La base. El sistema le agrega la ruta de cada servicio:
+        //   /Service/GenerarLigaIndi        tarjeta
+        //   /Service/GenerarClabeIndi       SPEI
+        //   /Service/GenerarReferenciaIndi  tienda
+        'host'            => 'https://pagalaescuela.mx/Pagalaescuela',
         'url_liga'        => '',
         'url_clabe'       => '',
         'url_referencia'  => '',

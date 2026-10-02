@@ -295,4 +295,57 @@ final class LigasControlador
             $this->a('No se pudo aplicar: ' . $e->getMessage(), 'error');
         }
     }
+
+    /**
+     * Confirmar un cobro a mano, desde el modal de la caja.
+     *
+     * PARA QUE, SI EL SISTEMA LO DETECTA SOLO
+     *
+     * Porque no siempre lo detecta. El pago en tienda tarda horas, el
+     * SPEI de un banco chico puede tardar, y a veces el cliente ensena
+     * el comprobante en el mostrador. Obligar al cajero a esperar lo
+     * deja con el cliente enfrente sin poder cerrar la venta.
+     *
+     * Queda anotado como confirmacion manual, con quien la hizo: si
+     * despues no aparece el deposito, se sabe a quien preguntarle.
+     */
+    public function confirmar()
+    {
+        if (!$this->token()) $this->aJson(['ok'=>false,'error'=>'No se pudo verificar el formulario.']);
+
+        $db   = Conexion::de($_SESSION['empresa_db']);
+        $repo = new LigaRepo($db);
+        $l    = $repo->porId((int)($_POST['id'] ?? 0));
+        if (!$l) $this->aJson(['ok'=>false,'error'=>'Ese cobro no existe.']);
+        if ($l['estado'] === 'pagada') $this->aJson(['ok'=>true,'ya'=>true]);
+
+        try {
+            $pagoId = null;
+            if ($l['venta_id']) {
+                $res = (new RegistrarPago($db))->abonar((int)$l['venta_id'], [
+                    'monto'      => $l['monto'],
+                    'metodo'     => $l['metodo'] === 'tarjeta' ? 'tarjeta' : 'transferencia',
+                    'referencia' => 'Cobro ' . $l['referencia'] . ' (confirmado a mano)',
+                    'fecha'      => date('Y-m-d'),
+                    'usuario_id' => $_SESSION['usuario_id'] ?? null,
+                ]);
+                $pagoId = $res['pago_id'] ?? null;
+            }
+            $repo->marcarPagada($l['id'], $pagoId);
+            Auditoria::anota('pago.registrar',
+                'confirmado a mano · ' . $l['referencia'], 'esperando',
+                Dinero::pesos($l['monto']));
+            $this->aJson(['ok' => true, 'monto' => (float)$l['monto']]);
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] confirmar a mano: ' . $e->getMessage());
+            $this->aJson(['ok'=>false,'error'=>'No se pudo aplicar: ' . $e->getMessage()]);
+        }
+    }
+
+    private function aJson(array $d)
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($d, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
 }
