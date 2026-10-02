@@ -1697,7 +1697,10 @@ body.lf-centro{
    un par de píxeles abajo. */
 .lf-recordar {
     display: flex;
+    flex-direction: row;
     align-items: center;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
     gap: 10px;
     cursor: pointer;
     margin: 4px 0 26px;
@@ -1706,28 +1709,20 @@ body.lf-centro{
 }
 
 .lf-recordar input {
-    appearance: none;
-    -webkit-appearance: none;
+    display: block;
     width: 16px;
     height: 16px;
     min-width: 16px;
     margin: 0;
-    border: 1px solid rgba(255,255,255,.5);
-    border-radius: 3px;
-    background: transparent;
     accent-color: var(--lf-brand);
     cursor: pointer;
     flex-shrink: 0;
 }
 
-.lf-recordar input:checked {
-    background: var(--lf-brand);
-    border-color: var(--lf-brand);
-}
-
 .lf-recordar span {
+    display: inline-block;
     line-height: 16px;
-    display: block;
+    white-space: nowrap;
 }
 
 /* El botón, verde claro sobre el oscuro */
