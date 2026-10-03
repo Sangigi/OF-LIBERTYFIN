@@ -46,12 +46,18 @@ final class RegistrarPago
         $tipo  = ($saldo - $monto) <= 0.005 ? 'liquidacion' : 'abono';
         $fecha = !empty($datos['fecha']) ? $datos['fecha'] . ' ' . date('H:i:s') : date('Y-m-d H:i:s');
 
+        // EL SUBFOLIO. Sin esto los doce abonos de una clienta que deja
+        // $1,500 cada mes salían los doce con el folio de la venta, y
+        // no había forma de referirse a uno por teléfono ni de cuadrar
+        // un depósito contra el abono que le toca. Ver Servicio\Folio.
+        $folio = Folio::siguiente($this->db, $ventaId);
+
         $this->db->prepare("
             INSERT INTO venta_pagos
-                (venta_id, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id)
-            VALUES (?,?,?,?,?,?,0,?)
+                (venta_id, folio, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id)
+            VALUES (?,?,?,?,?,?,?,0,?)
         ")->execute([
-            $ventaId, $monto, $tipo,
+            $ventaId, $folio, $monto, $tipo,
             $datos['metodo'] ?? 'efectivo',
             !empty($datos['referencia']) ? $datos['referencia'] : null,
             $fecha,
@@ -63,7 +69,7 @@ final class RegistrarPago
         // El id del abono se devuelve para que quien lo haya disparado
         // —una liga de pago, por ejemplo— pueda dejar constancia de cuál
         // fue, y no vuelva a abonar si se consulta dos veces.
-        return ['monto' => $monto, 'tipo' => $tipo,
+        return ['monto' => $monto, 'tipo' => $tipo, 'folio' => $folio,
                 'saldo' => Dinero::centavos($saldo - $monto),
                 'pago_id' => $pagoId];
     }

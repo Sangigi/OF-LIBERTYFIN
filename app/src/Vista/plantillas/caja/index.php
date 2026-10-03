@@ -100,11 +100,51 @@ $token = $_SESSION['lf_token'];
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <input type="hidden" name="lineas" id="lineas" value="[]">
     <input type="hidden" name="cliente_id" id="cliente_id" value="">
+    <?php /* Con valor, las lineas entran a ESA venta en vez de abrir
+             una nueva. Ver Servicio\AmpliarVenta. */ ?>
+    <input type="hidden" name="ampliar_venta" id="ampliarVenta" value="">
 
     <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <span>Ticket</span>
+      <span id="tituloTicket">Ticket</span>
       <span class="badge bg-secondary" id="conteo">0 conceptos</span>
     </header>
+
+    <?php /* ─────────────────────────────────────────────────────
+         AGREGAR A UNA VENTA QUE YA EXISTE
+
+         El cliente paga tres servicios, se le hace el folio, y a los
+         dos minutos se acuerda de otros tres. Sin esto la unica salida
+         era otra venta: dos folios y un historial que cuenta dos
+         visitas donde hubo una.
+
+         Va cerrado por omision. Abrirlo es la excepcion, no el camino
+         de todos los dias, y un selector siempre abierto invita a
+         agregarle cosas a la venta de otro por equivocacion.
+         ───────────────────────────────────────────────────── */ ?>
+    <details class="lf-ampliar" id="cajaAmpliar">
+      <summary>
+        <?= W::icono('venta','15px') ?>
+        <span>Agregar a una venta que ya existe</span>
+      </summary>
+      <div class="cuerpo">
+        <div class="lf-search">
+          <?= W::icono('buscar','15px') ?>
+          <input type="text" id="buscaVenta" autocomplete="off"
+                 placeholder="Folio o nombre del cliente">
+        </div>
+        <p class="pista">Salen las de hoy y las que siguen debiendo.</p>
+        <div id="listaVentas" class="lista"></div>
+      </div>
+    </details>
+
+    <div class="lf-ampliando" id="avisoAmpliar" hidden>
+      <div>
+        <b>Se agrega a la venta <span id="folioAmpliar" class="lf-mono"></span></b>
+        <small id="detalleAmpliar"></small>
+      </div>
+      <button type="button" class="lf-btn-ghost" id="quitarAmpliar"
+              title="Hacer una venta nueva" aria-label="Hacer una venta nueva">&times;</button>
+    </div>
 
     <div style="padding:0 20px 12px">
       <div class="lf-search">
@@ -189,6 +229,126 @@ $token = $_SESSION['lf_token'];
     </button>
   </form>
 </div>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   AGREGAR A UNA VENTA QUE YA EXISTE
+   Elegir una venta cambia el destino del ticket: en vez de
+   abrir un folio nuevo, las lineas entran a esa.
+   ══════════════════════════════════════════════════════ */
+(function(){
+  var det   = document.getElementById('cajaAmpliar');
+  if (!det) return;
+  var campo = document.getElementById('buscaVenta'),
+      lista = document.getElementById('listaVentas'),
+      campoId = document.getElementById('ampliarVenta'),
+      aviso = document.getElementById('avisoAmpliar'),
+      folio = document.getElementById('folioAmpliar'),
+      detalle = document.getElementById('detalleAmpliar'),
+      quitar = document.getElementById('quitarAmpliar'),
+      titulo = document.getElementById('tituloTicket'),
+      btn = document.getElementById('btnCobrar'),
+      btnTexto = document.getElementById('btnTexto'),
+      pagaCon = document.getElementById('cajaPagaCon'),
+      anticipo = document.getElementById('cajaAnticipo'),
+      metodos = document.querySelector('.lf-metodos'),
+      elegida = null, pidiendo = null, reloj = null;
+
+  function pintar(ventas){
+    lista.innerHTML = '';
+    if (!ventas.length) {
+      lista.innerHTML = '<p class="nada">No hay ventas abiertas que coincidan.</p>';
+      return;
+    }
+    ventas.forEach(function(v){
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'v' + (v.debe ? ' debe' : '');
+      b.innerHTML =
+        '<span class="f lf-mono">' + v.folio + '</span>' +
+        '<span class="c">' + v.cliente + '</span>' +
+        '<span class="d">' + v.fecha + (v.de_hoy ? '' : ' · otro día') +
+        ' · ' + v.lineas + (v.lineas === 1 ? ' servicio' : ' servicios') + '</span>' +
+        '<span class="s">' + (v.debe ? 'debe ' + v.saldo : 'liquidada') + '</span>';
+      b.addEventListener('click', function(){ elegir(v); });
+      lista.appendChild(b);
+    });
+  }
+
+  function buscar(){
+    if (pidiendo) pidiendo.abort();
+    pidiendo = new AbortController();
+    lista.innerHTML = '<p class="nada">Buscando…</p>';
+    var cli = document.getElementById('cliente_id');
+    var u = '/caja/ventas-abiertas?q=' + encodeURIComponent(campo.value.trim())
+          + (cli && cli.value ? '&cliente=' + encodeURIComponent(cli.value) : '');
+    fetch(u, { signal: pidiendo.signal, credentials:'same-origin' })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ pintar(j.ventas || []); })
+      .catch(function(e){
+        if (e.name === 'AbortError') return;
+        lista.innerHTML = '<p class="nada">No se pudo consultar.</p>';
+      });
+  }
+
+  function elegir(v){
+    elegida = v;
+    campoId.value = v.id;
+    folio.textContent = v.folio;
+    detalle.textContent = v.cliente + ' · ' + v.fecha
+      + (v.debe ? ' · debe ' + v.saldo : ' · liquidada')
+      + (v.de_hoy ? '' : ' · OJO: es de otro día, el corte de ese día cambia');
+    aviso.hidden = false;
+    det.open = false;
+    if (titulo) titulo.textContent = 'Servicios que se agregan';
+    /* AMPLIAR NO COBRA. Se agrega lo vendido y se abre saldo: el dinero
+       entra despues por donde entra siempre, un abono. Dejar a la vista
+       "anticipo" y "como paga" haria creer que el cliente esta pagando
+       algo aqui, y no es asi. */
+    if (pagaCon)  pagaCon.hidden  = true;
+    if (anticipo) anticipo.hidden = true;
+    if (metodos)  metodos.hidden  = true;
+    refrescarBoton();
+  }
+
+  function soltar(){
+    elegida = null;
+    campoId.value = '';
+    aviso.hidden = true;
+    campo.value = '';
+    lista.innerHTML = '';
+    if (titulo) titulo.textContent = 'Ticket';
+    if (anticipo) anticipo.hidden = false;
+    if (metodos)  metodos.hidden  = false;
+    refrescarBoton();
+    /* El metodo de pago decide si "con cuanto te paga" vuelve: lo sabe
+       el bloque de abajo, asi que se le avisa en vez de adivinarlo. */
+    document.dispatchEvent(new CustomEvent('lf:ticket-cambio'));
+  }
+
+  function refrescarBoton(){
+    if (!btnTexto) return;
+    btnTexto.textContent = elegida ? 'Agregar a ' + elegida.folio : 'Cobrar';
+    if (btn) btn.classList.toggle('lf-agregando', !!elegida);
+  }
+
+  det.addEventListener('toggle', function(){ if (det.open) buscar(); });
+  campo.addEventListener('input', function(){
+    clearTimeout(reloj); reloj = setTimeout(buscar, 220);
+  });
+  campo.addEventListener('keydown', function(e){
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(reloj); buscar(); }
+  });
+  quitar.addEventListener('click', soltar);
+
+  /* Si se elige otro cliente con una venta ya elegida, la venta manda:
+     cambiar el cliente de una venta existente no es lo que se pidio. */
+  var bc = document.getElementById('buscaCliente');
+  if (bc) bc.addEventListener('input', function(){ if (elegida) soltar(); });
+
+  window.lfVentaElegida = function(){ return elegida; };
+})();
+</script>
 
 <script>
 (function(){
@@ -623,6 +783,15 @@ $token = $_SESSION['lf_token'];
       .then(function(d){
         if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
         if (!d.ok) { alert(d.error || 'No se pudo cobrar.'); return; }
+
+        /* SE AGREGO A UNA VENTA QUE YA EXISTIA.
+           No hay nada que cobrar aqui —se abrio saldo— asi que no hay
+           modal de cambio ni de liga: se va a la venta, que es donde
+           esta lo que acaba de pasar y desde donde se cobra. */
+        if (d.ampliada) {
+          location.href = '/ventas/' + d.venta.id;
+          return;
+        }
 
         /* EFECTIVO SIN CAMBIO: NI SIQUIERA ABRE EL MODAL.
            Si pagó justo, no hay nada que decirle al cajero y un modal

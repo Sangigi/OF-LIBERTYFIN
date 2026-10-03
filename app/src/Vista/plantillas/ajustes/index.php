@@ -66,7 +66,12 @@ $em = $empresa; ?>
                     style="<?= $marca['logo'] ? "background-image:url('".P::e($marca['logo'])."')" : '' ?>">
                 <?= $marca['logo'] ? '' : P::e(mb_strtoupper(mb_substr($em['nombre_empresa'],0,1))) ?></span>
               <div style="flex:1;min-width:0">
-                <input type="file" name="logo" id="inpLogo" accept="image/png,image/jpeg,image/webp">
+                <span class="lf-file">
+                  <input type="file" name="logo" id="inpLogo"
+                         accept="image/png,image/jpeg,image/webp">
+                  <label class="bt" for="inpLogo">Elegir imagen</label>
+                  <span class="n" data-vacio="Ninguna imagen elegida">Ninguna imagen elegida</span>
+                </span>
                 <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:6px;line-height:1.4">
                   Cuadrado, mínimo 128 px. Aparece arriba del menú y en los tickets.
                 </p>
@@ -192,7 +197,12 @@ $em = $empresa; ?>
         Qué pasa cuando el proveedor confirma que el cliente pagó</p></div>
   </header>
   <div class="card-body">
-    <form method="post" action="/ajustes/aprobacion" class="lf-modos">
+    <?php /* `data-guardar` lo envía por detrás y `data-al-elegir` hace
+             que baste con escoger la opción. Sin JavaScript sigue siendo
+             un formulario normal con su botón, que recarga como antes.
+             Ver el layout. */ ?>
+    <form method="post" action="/ajustes/aprobacion" class="lf-modos"
+          data-guardar data-al-elegir>
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <?php foreach ($modosAprobacion as $k => $m): ?>
         <label class="m<?= $aprobacion===$k ? ' on' : '' ?>">
@@ -201,7 +211,8 @@ $em = $empresa; ?>
           <span><b><?= P::e($m[0]) ?></b><small><?= P::e($m[1]) ?></small></span>
         </label>
       <?php endforeach; ?>
-      <button class="btn btn-primary btn-sm" type="submit">Guardar</button>
+      <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
+      <p data-aviso hidden></p>
     </form>
     <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:14px;line-height:1.6;
               padding-top:13px;border-top:1px solid var(--lf-linea)">

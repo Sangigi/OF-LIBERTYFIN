@@ -130,11 +130,17 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
       $rot = array_map(function($m){ return date('M Y', strtotime($m['mes'].'-01')); }, $meses);
       W::curvas([['datos'=>$sc], ['datos'=>$sv]], $rot);
       ?>
-      <div style="display:flex;gap:10px;padding-top:8px">
+      <?php /* Los importes van en forma MICRO y la rejilla reparte el
+               ancho en partes iguales que no pueden crecer. Antes era un
+               flex sin `min-width:0` con el importe completo dentro:
+               `$181,098` no cabe en un septimo de tarjeta y se encimaba
+               con el mes de al lado. El importe exacto sigue a un palmo,
+               en el tooltip y en Reportes. */ ?>
+      <div class="lf-ejex" style="--n:<?= count($meses) ?>">
         <?php foreach ($meses as $m): ?>
-          <div style="flex:1;text-align:center">
-            <b style="display:block;font-size:12px"><?= P::e(date('M', strtotime($m['mes'].'-01'))) ?></b>
-            <span class="lf-mono" style="font-size:11px;color:var(--lf-tinta-4)"><?= D::corto($m['cobrado']) ?></span>
+          <div title="<?= P::e(date('F Y', strtotime($m['mes'].'-01'))) ?> · <?= P::e(D::pesos($m['cobrado'])) ?> cobrado">
+            <b><?= P::e(date('M', strtotime($m['mes'].'-01'))) ?></b>
+            <span class="lf-mono"><?= D::micro($m['cobrado']) ?></span>
           </div>
         <?php endforeach; ?>
       </div>
@@ -157,7 +163,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
           $liquidada = ((float)$m['cobrado_total'] >= (float)$m['total'] - 0.01);
           $clase = $liquidada ? '' : ' amb';
         ?>
-          <a class="ev<?= $clase ?>" href="/ventas/<?= (int)$m['venta_id'] ?>">
+          <a class="ev<?= $clase ?>" href="/ventas/<?= (int)$m['venta_id'] ?>" data-modal>
             <span style="flex:1;min-width:0">
               <b><?= P::e($m['cliente'] ?: 'Público general') ?>
                  <?= $liquidada ? 'liquidó' : 'abonó' ?></b>

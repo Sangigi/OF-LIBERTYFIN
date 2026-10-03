@@ -62,7 +62,10 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros) {
         <?php foreach ($ventas as $v): ?>
           <tr>
             <td data-label="Cliente">
-              <a href="/ventas/<?= (int)$v['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+              <?php /* `data-modal`: se abre encima y al cerrar sigues en la lista,
+                       con tu filtro y tu scroll. Ver el layout. */ ?>
+              <a href="/ventas/<?= (int)$v['id'] ?>" data-modal
+                 style="font-weight:600;color:var(--lf-tinta)">
                 <?= P::e($v['cliente'] ?: 'Público general') ?></a>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
                 <?= P::e($v['codigo_venta']) ?> · <?= date('d M', strtotime($v['fecha'])) ?></span>
@@ -95,7 +98,7 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros) {
             Nadie debe nada. Todo liquidado.</p>
         <?php endif; ?>
         <?php foreach ($saldos as $s): ?>
-          <a class="lf-row" href="/ventas/<?= (int)$s['id'] ?>">
+          <a class="lf-row" href="/ventas/<?= (int)$s['id'] ?>" data-modal>
             <span class="lf-av gris"><?= P::e(strtoupper(mb_substr($s['cliente'] ?: '?', 0, 2))) ?></span>
             <span style="flex:1;min-width:0">
               <b style="display:block;font-size:13.5px"><?= P::e($s['cliente'] ?: 'Público general') ?></b>

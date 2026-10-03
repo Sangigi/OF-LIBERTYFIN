@@ -189,27 +189,121 @@ final class LigaPago
         return $b !== '' ? $b : trim((string)($this->cfg['escuela_id'] ?? ''));
     }
 
-    /** La dirección de un servicio: la configurada, o host + ruta. */
+    /**
+     * La dirección de un servicio: la configurada, o host + ruta.
+     *
+     * UNA URL PUESTA A MANO SE REVISA ANTES DE USARLA.
+     *
+     * Estos campos existen para un caso raro —que el proveedor te dé una
+     * dirección distinta a la normal— y se pagan caro cuando se llenan
+     * mal, porque pegarle al servicio equivocado no da un error claro:
+     * da un rechazo genérico, o peor, hace algo que nadie pidió.
+     *
+     * Dos cosas que se han visto de verdad en una configuración:
+     *
+     *   url_referencia → .../GenerarLigaDomiciliacionIndi
+     *       El cobro en tienda pegándole al servicio de tarjeta
+     *       tokenizada. Nunca iba a devolver un código de barras.
+     *
+     *   url_estado → .../PagarDomiciliacionIndi
+     *       Preguntar "¿ya pagó?" al servicio que COBRA una tarjeta
+     *       guardada. Eso no consulta: cobra.
+     *
+     * Así que si la dirección no tiene un host con forma de host, o si
+     * apunta a un servicio que no es el que toca, se ignora y se usa la
+     * buena. Queda en el log y en Ajustes → Integraciones, porque
+     * ignorar algo en silencio es su propia clase de problema.
+     */
     private function url($servicio, $ruta)
     {
         $propia = trim((string)($this->cfg['url_' . $servicio] ?? ''));
-        if ($propia !== '') return $propia;
+        if ($propia !== '') {
+            $queja = self::revisarUrl($propia, $ruta);
+            if ($queja === '') return $propia;
+            error_log('[LibertyFin] `url_' . $servicio . '` se ignora: ' . $queja
+                . ' · se usa ' . self::HOST . $ruta);
+        }
         $base = rtrim(trim((string)($this->cfg['host'] ?? $this->cfg['url'] ?? '')), '/');
+        if ($base !== '' && self::revisarUrl($base . $ruta, $ruta) !== '') {
+            error_log('[LibertyFin] `host` se ignora: ' . self::revisarUrl($base . $ruta, $ruta));
+            $base = '';
+        }
         if ($base === '') $base = self::HOST;
         return $base . $ruta;
     }
 
-    private function usuario()
+    /**
+     * Qué tiene de malo una dirección. Cadena vacía = está bien.
+     *
+     * Se compara contra el nombre del servicio que toca, sin la ruta
+     * completa: así una dirección con otro host o otra carpeta sigue
+     * valiendo —que para eso está el campo— pero una que apunta a otro
+     * servicio, no.
+     */
+    public static function revisarUrl($url, $ruta)
     {
-        return $this->enPruebas() && trim((string)($this->cfg['usuario_prueba'] ?? '')) !== ''
-             ? $this->cfg['usuario_prueba'] : $this->cfg['usuario'];
+        $partes = parse_url(trim((string)$url));
+        if (!$partes || empty($partes['host'])) return 'no se entiende como dirección';
+
+        $host = $partes['host'];
+        // "https://.mx/..." pasa el filtro de arriba con host ".mx", y
+        // "paadetodo.mx" también: por eso además se exige que el nombre
+        // antes del punto exista y tenga cuerpo.
+        if (strpos($host, '.') === false)  return 'al host le falta el dominio: ' . $host;
+        $etiquetas = explode('.', trim($host, '.'));
+        if (count($etiquetas) < 2)         return 'host incompleto: ' . $host;
+        foreach ($etiquetas as $e) {
+            if ($e === '') return 'host con un punto de más o un pedazo vacío: ' . $host;
+        }
+        if (strlen($etiquetas[count($etiquetas) - 2]) < 2) {
+            return 'host incompleto: ' . $host;
+        }
+        if (($partes['scheme'] ?? '') === '') return 'le falta https://';
+
+        // El nombre del servicio, sin "Indi" ni la ruta: GenerarReferencia,
+        // GenerarClabe, GenerarLiga, ConsultarEstatusLiga.
+        $espera = preg_replace('~^.*/|Indi$~', '', $ruta);
+        $camino = $partes['path'] ?? '';
+        if ($espera !== '' && stripos($camino, $espera) === false) {
+            return 'apunta a ' . trim(basename($camino)) . ' y debería apuntar a '
+                 . $espera . 'Indi';
+        }
+        // GenerarLiga es prefijo de GenerarLigaDomiciliacion, así que la
+        // comparación de arriba lo deja pasar. Aquí se corta.
+        if (stripos($espera, 'Domiciliacion') === false
+            && stripos($camino, 'Domiciliacion') !== false) {
+            return 'apunta al servicio de domiciliación (tarjeta guardada), '
+                 . 'no a ' . $espera . 'Indi';
+        }
+        return '';
     }
 
-    private function clave()
+    /**
+     * El usuario y la clave SON UNA PAREJA. Nunca se mezclan.
+     *
+     * Antes cada uno decidía por su cuenta si usar el de Sandbox:
+     *
+     *     usuario = usuario_prueba ?: usuario
+     *     clave   = clave_prueba   ?: clave
+     *
+     * Con `usuario_prueba` vacío y `clave_prueba` llena —que es como
+     * queda una configuración a medio llenar— salía el usuario de
+     * producción con la contraseña de Sandbox. El proveedor contesta
+     * "El usuario y/o contraseña son inválidos" y uno jura que las
+     * credenciales están mal cuando lo que está mal es la mezcla.
+     *
+     * @return array [usuario, clave]
+     */
+    private function credenciales()
     {
-        return $this->enPruebas() && trim((string)($this->cfg['clave_prueba'] ?? '')) !== ''
-             ? $this->cfg['clave_prueba'] : $this->cfg['clave'];
+        if ($this->enPruebas() && trim((string)($this->cfg['usuario_prueba'] ?? '')) !== '') {
+            return [(string)$this->cfg['usuario_prueba'], (string)($this->cfg['clave_prueba'] ?? '')];
+        }
+        return [(string)($this->cfg['usuario'] ?? ''), (string)($this->cfg['clave'] ?? '')];
     }
+
+    private function usuario() { list($u, ) = $this->credenciales(); return $u; }
+    private function clave()   { list( , $c) = $this->credenciales(); return $c; }
 
     /**
      * Genera el cobro.

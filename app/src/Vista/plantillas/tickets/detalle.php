@@ -108,7 +108,7 @@ document.addEventListener('click', function(ev){
             <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
               <input type="checkbox" name="interno" value="1"> Nota interna
             </label>
-            <input type="file" name="adjunto" style="font-size:11.5px;flex:1;min-width:180px"
+            <input type="file" name="adjunto" style="font-size:11.5px;flex:1 1 150px;min-width:0;max-width:100%"
                    accept="image/png,image/jpeg,image/webp,application/pdf">
             <button class="btn btn-primary" type="submit">Enviar</button>
           </div>

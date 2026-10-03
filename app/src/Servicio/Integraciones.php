@@ -116,6 +116,25 @@ final class Integraciones
     {
         if ($nombre !== 'spei' || empty($c['activo'])) return '';
 
+        // Una `url_*` puesta a mano que apunta al servicio equivocado. El
+        // sistema la ignora y usa la buena, pero hay que decirlo: si no,
+        // el archivo se queda mintiendo para siempre.
+        foreach ([
+            'liga'       => '/Service/GenerarLigaIndi',
+            'clabe'      => '/Service/GenerarClabeIndi',
+            'referencia' => '/Service/GenerarReferenciaIndi',
+            'estado'     => '/Service/ConsultarEstatusLigaIndi',
+        ] as $servicio => $ruta) {
+            $puesta = trim((string)($c['url_' . $servicio] ?? ''));
+            if ($puesta === '') continue;
+            $queja = \LibertyFin\Servicio\LigaPago::revisarUrl($puesta, $ruta);
+            if ($queja !== '') {
+                return '`url_' . $servicio . '` ' . $queja . '. Se ignora y se usa la '
+                     . 'dirección normal, pero bórrala del archivo. '
+                     . 'Corre php app/bin/revisar-pagos.php para ver todas.';
+            }
+        }
+
         if (trim((string)($c['secreto_webhook'] ?? '')) === '') {
             return 'Falta `secreto_webhook`: sin él los avisos del proveedor se '
                  . 'rechazan y los pagos por SPEI y en tienda nunca se van a aplicar solos.';

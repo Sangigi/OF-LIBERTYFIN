@@ -99,14 +99,15 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
       ['datos' => array_map(function($m){ return $m['queda'];   }, $meses)],
     ], $rot);
     ?>
-    <div style="display:flex;gap:8px;padding-top:8px">
+    <?php /* Misma rejilla que el panel: partes iguales que no crecen e
+             importes en forma micro. Ver .lf-ejex en el CSS. */ ?>
+    <div class="lf-ejex" style="--n:<?= count($meses) ?>">
       <?php foreach ($meses as $m): ?>
-        <div style="flex:1;text-align:center;min-width:0">
-          <b style="display:block;font-size:12px"><?= P::e(date('M', strtotime($m['mes'].'-01'))) ?></b>
-          <span class="lf-mono" style="font-size:11px;color:var(--lf-tinta-4)"><?= D::corto($m['cobrado']) ?></span>
-          <span class="lf-mono" style="display:block;font-size:10.5px;
-                color:<?= $m['queda']>=0?'var(--lf-brand-2)':'var(--lf-rojo)' ?>">
-            <?= D::corto($m['queda']) ?></span>
+        <div title="<?= P::e(date('F Y', strtotime($m['mes'].'-01'))) ?> · cobrado <?= P::e(D::pesos($m['cobrado'])) ?> · quedó <?= P::e(D::pesos($m['queda'])) ?>">
+          <b><?= P::e(date('M', strtotime($m['mes'].'-01'))) ?></b>
+          <span class="lf-mono"><?= D::micro($m['cobrado']) ?></span>
+          <span class="lf-mono q" style="color:<?= $m['queda']>=0?'var(--lf-brand-2)':'var(--lf-rojo)' ?>">
+            <?= D::micro($m['queda']) ?></span>
         </div>
       <?php endforeach; ?>
     </div>

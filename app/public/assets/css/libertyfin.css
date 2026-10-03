@@ -2152,3 +2152,258 @@ body.lf-modal-abierto{overflow:hidden}
    y sus propios estilos, así que las mías sobraban —y
    además pisaban `.lf-pers`, que es tu tarjeta—.
    ══════════════════════════════════════════════════════ */
+
+
+/* ══════════════════════════════════════════════════════
+   29 · EL EJE DE MESES DE LAS GRÁFICAS
+   Era un flex con los importes completos dentro. `$181,098`
+   no cabe en un séptimo de tarjeta —en un teléfono son unos
+   45px— y se encimaba con el mes de al lado, en móvil y en
+   computadora.
+
+   Rejilla de partes iguales que NO pueden crecer: `1fr` en
+   `grid` ya implica `minmax(0,1fr)` solo cuando se declara
+   así explícitamente, porque el mínimo por omisión es `auto`
+   —el ancho del contenido— y eso es justo lo que desbordaba.
+   ══════════════════════════════════════════════════════ */
+.lf-ejex{display:grid;grid-template-columns:repeat(var(--n,7),minmax(0,1fr));
+  gap:6px;padding-top:8px}
+.lf-ejex > div{min-width:0;text-align:center;overflow:hidden}
+.lf-ejex b{display:block;font-size:12px;line-height:1.3;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* El importe se encoge con el ancho disponible en vez de salirse.
+   El exacto sigue a un palmo: está en el `title` de la columna. */
+.lf-ejex span{display:block;font-size:clamp(9px,2.2vw,11px);color:var(--lf-tinta-4);
+  line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ejex span.q{font-size:clamp(8.5px,2vw,10.5px)}
+@media(max-width:420px){
+  .lf-ejex{gap:3px}
+  .lf-ejex b{font-size:10.5px}
+}
+
+
+/* ══════════════════════════════════════════════════════
+   30 · ARCHIVO: UN CONTROL QUE NO SE DESBORDA
+   El `<input type=file>` nativo mide lo que mida el nombre
+   del archivo. No se le puede poner puntos suspensivos ni
+   obligarlo a encogerse: con un nombre largo se sale de su
+   tarjeta y empuja el resto de la columna.
+
+   Aquí el input real queda oculto —accesible, no
+   `display:none`— y se dibuja un botón y una etiqueta que
+   sí obedecen. El nombre lo escribe el JS del layout.
+   ══════════════════════════════════════════════════════ */
+.lf-file{display:flex;align-items:center;gap:10px;min-width:0;max-width:100%;
+  flex-wrap:wrap}
+.lf-file > input[type=file]{position:absolute;width:1px;height:1px;
+  padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+.lf-file .bt{display:inline-flex;align-items:center;gap:7px;flex-shrink:0;
+  padding:8px 13px;border-radius:var(--lf-r);cursor:pointer;
+  border:1px solid var(--lf-linea);background:var(--lf-sup);
+  font:inherit;font-size:12.5px;font-weight:600;color:var(--lf-tinta-2);
+  transition:border-color .15s,background .15s,color .15s}
+.lf-file .bt:hover{border-color:var(--lf-brand);color:var(--lf-brand-2);
+  background:var(--lf-brand-glow)}
+/* El foco se ve en el botón aunque el que lo tiene sea el input oculto:
+   si no, quien navega con teclado no sabe dónde está parado. */
+.lf-file > input[type=file]:focus-visible + .bt{border-color:var(--lf-brand);
+  box-shadow:0 0 0 3px var(--lf-brand-glow)}
+.lf-file .n{flex:1 1 120px;min-width:0;font-size:12px;color:var(--lf-tinta-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-file .n.hay{color:var(--lf-tinta-2);font-weight:500}
+/* Red de seguridad para los que sigan siendo nativos */
+input[type=file]{max-width:100%}
+
+
+/* ══════════════════════════════════════════════════════
+   31 · EL LATERAL, MÁS AJUSTADO
+   240px con etiquetas de siete letras dejaba una franja
+   muerta de más de cien píxeles entre el texto y el panel.
+   Se recorta el ancho y se reparte el margen interior, que
+   estaba cargado a la izquierda.
+   ══════════════════════════════════════════════════════ */
+@media(min-width:941px){
+  :root{--lf-side-w:208px}
+  .lf-marca{padding:18px 14px 14px}
+  .lf-nav{padding:8px 10px}
+  .lf-nav .sec{padding:14px 10px 6px}
+  .lf-nav a{padding:9px 10px;gap:10px}
+  /* La pestaña de la sección activa vivía fuera del lateral, a -12px del
+     borde del enlace. Con menos margen se salía del propio lateral y la
+     tapaba el panel. Ahora se pega al borde derecho del lateral. */
+  .lf-nav a.on::after{right:-10px;height:20px}
+  .lf-pie{padding:10px;margin:0 10px 10px}
+}
+/* Pantallas anchas: el lateral puede crecer un poco sin dejar hueco,
+   porque el panel también crece. */
+@media(min-width:1500px){
+  :root{--lf-side-w:224px}
+}
+
+/* El aviso de "guardado" que aparece junto al formulario */
+.lf-guardado{font-size:12px;font-weight:600;margin-top:10px;padding:8px 11px;
+  border-radius:var(--lf-r);animation:lf-guardado .18s ease}
+.lf-guardado.bien{color:var(--lf-brand-2);background:var(--lf-brand-glow)}
+.lf-guardado.mal{color:var(--lf-rojo);background:var(--lf-rojo-soft)}
+@keyframes lf-guardado{from{opacity:0;transform:translateY(-3px)}}
+.lf-guardado[hidden]{display:none}
+/* Mientras guarda, la tarjeta elegida no debe parpadear */
+form[data-guardar] .m{transition:border-color .15s,background .15s}
+
+
+/* ══════════════════════════════════════════════════════
+   32 · ENTRAR: EL BOTÓN SE CIERRA SOBRE SÍ MISMO
+   El ingreso espera 350 ms a propósito, para que un usuario
+   que no existe tarde lo mismo que uno que sí. Ese silencio
+   se sentía como que el clic no había funcionado.
+
+   Las letras se juntan en el centro del botón, el botón se
+   encoge hasta volverse un círculo y el círculo gira. Al
+   entrar, ese mismo círculo se va al centro de la pantalla
+   y se abre hasta taparla: lo que hay debajo ya es el
+   sistema, así que no se ve ningún salto en blanco.
+   ══════════════════════════════════════════════════════ */
+.lf-boton{position:relative;overflow:hidden;
+  transition:filter .15s, transform .08s,
+             width .46s cubic-bezier(.66,0,.34,1),
+             border-radius .46s cubic-bezier(.66,0,.34,1),
+             gap .3s ease;
+  will-change:width}
+.lf-boton .txt i{display:inline-block;font-style:normal;white-space:pre;
+  transition:transform .44s cubic-bezier(.55,-.3,.35,1.35), opacity .3s ease}
+
+/* Encogido: un círculo del alto del botón, centrado en su sitio. */
+.lf-boton.lf-cerrando{
+  width:46px;min-width:46px;border-radius:50%;gap:0;
+  margin-left:auto;margin-right:auto;pointer-events:none;cursor:progress}
+.lf-boton.lf-cerrando .txt i{
+  transform:translate(var(--dx,0),var(--dy,0)) scale(.35);opacity:0}
+.lf-boton.lf-cerrando .fl{opacity:0;transform:scale(.3);transition:opacity .2s,transform .3s}
+
+/* El anillo que gira dentro del círculo. */
+.lf-anillo{position:absolute;inset:9px;border-radius:50%;opacity:0;
+  border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;
+  transition:opacity .22s ease .2s}
+.lf-boton.lf-cerrando .lf-anillo{opacity:1;animation:lf-giro .72s linear infinite}
+
+/* La mancha que se abre al entrar. Blanca en claro, oscura en oscuro:
+   si fuera blanca siempre, entrar de noche daría un fogonazo. */
+.lf-mancha{position:fixed;border-radius:50%;z-index:9999;pointer-events:none;
+  background:#fff;transform:translate(-50%,-50%) scale(0);
+  transition:transform .6s cubic-bezier(.72,0,.3,1),
+             left .6s cubic-bezier(.72,0,.3,1),
+             top .6s cubic-bezier(.72,0,.3,1)}
+[data-theme=dark] .lf-mancha{background:#0f1512}
+
+/* Quien pidió menos movimiento recibe el mismo aviso, sin el viaje:
+   la animación informa, y quitarla no puede dejarlo sin información. */
+@media (prefers-reduced-motion:reduce){
+  .lf-boton,.lf-boton .txt i,.lf-mancha{transition:none}
+  .lf-boton.lf-cerrando .lf-anillo{animation-duration:1.6s}
+  .lf-mancha{transform:translate(-50%,-50%) scale(1)}
+}
+
+
+/* ══════════════════════════════════════════════════════
+   33 · AGREGAR A UNA VENTA QUE YA EXISTE
+   Cerrado por omisión: abrirlo es la excepción, no el camino
+   de todos los días, y un selector siempre abierto invita a
+   agregarle cosas a la venta de otro por equivocación.
+   ══════════════════════════════════════════════════════ */
+.lf-ampliar{margin:0 20px 12px;border:1px dashed var(--lf-linea);border-radius:var(--lf-r);
+  overflow:hidden}
+.lf-ampliar > summary{display:flex;align-items:center;gap:9px;padding:10px 13px;
+  cursor:pointer;font-size:12.5px;font-weight:600;color:var(--lf-tinta-3);
+  list-style:none;transition:background .15s,color .15s}
+.lf-ampliar > summary::-webkit-details-marker{display:none}
+.lf-ampliar > summary:hover{background:var(--lf-vidrio);color:var(--lf-tinta-2)}
+.lf-ampliar[open] > summary{border-bottom:1px solid var(--lf-linea);color:var(--lf-tinta)}
+.lf-ampliar .cuerpo{padding:12px 13px 13px}
+.lf-ampliar .pista{font-size:11px;color:var(--lf-tinta-4);margin:7px 2px 9px}
+.lf-ampliar .lista{display:flex;flex-direction:column;gap:6px;
+  max-height:260px;overflow-y:auto}
+.lf-ampliar .nada{font-size:12px;color:var(--lf-tinta-4);text-align:center;padding:14px 0}
+.lf-ampliar .v{display:grid;grid-template-columns:1fr auto;gap:2px 10px;
+  width:100%;text-align:left;padding:9px 11px;cursor:pointer;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  background:var(--lf-sup);font:inherit;transition:border-color .15s,background .15s}
+.lf-ampliar .v:hover{border-color:var(--lf-brand);background:var(--lf-brand-glow)}
+.lf-ampliar .v .f{font-size:11.5px;font-weight:600;color:var(--lf-tinta-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ampliar .v .c{grid-column:1;font-size:12.5px;font-weight:600;color:var(--lf-tinta);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ampliar .v .d{grid-column:1;font-size:10.5px;color:var(--lf-tinta-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ampliar .v .s{grid-column:2;grid-row:1/4;align-self:center;
+  font-size:11px;font-weight:700;color:var(--lf-tinta-4);white-space:nowrap}
+.lf-ampliar .v.debe .s{color:var(--lf-amb)}
+
+/* La barra que recuerda a qué venta se está agregando. Tiene que ser
+   imposible de pasar por alto: agregarle servicios a la venta
+   equivocada se descubre cuando el cliente reclama. */
+.lf-ampliando{display:flex;align-items:center;gap:10px;margin:0 20px 12px;
+  padding:10px 12px;border-radius:var(--lf-r);
+  background:var(--lf-brand-soft);border:1px solid var(--lf-brand)}
+.lf-ampliando[hidden]{display:none}
+.lf-ampliando > div{flex:1;min-width:0}
+.lf-ampliando b{display:block;font-size:12.5px;color:var(--lf-brand-2)}
+.lf-ampliando small{display:block;font-size:11px;color:var(--lf-tinta-3);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ampliando .lf-btn-ghost{flex-shrink:0;width:28px;height:28px;font-size:18px;
+  line-height:1;color:var(--lf-tinta-3)}
+.lf-ampliando .lf-btn-ghost:hover{color:var(--lf-rojo);background:var(--lf-rojo-soft)}
+.btn.lf-agregando{background:var(--lf-brand-2)}
+@media(max-width:940px){
+  .lf-ampliar,.lf-ampliando{margin-left:14px;margin-right:14px}
+}
+
+
+/* ══════════════════════════════════════════════════════
+   34 · VER SIN PERDER EL SITIO
+   Un panel encima en vez de cambiar de página. Al cerrar
+   sigues en tu lista, con tu filtro y tu scroll.
+   ══════════════════════════════════════════════════════ */
+.lf-vistazo[hidden]{display:none}
+.lf-vistazo{position:fixed;inset:0;z-index:70;display:flex;
+  align-items:flex-end;justify-content:center}
+@media(min-width:721px){.lf-vistazo{align-items:center}}
+.lf-vistazo .velo{position:absolute;inset:0;background:rgba(16,22,19,.42);
+  -webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);
+  animation:lf-velo .2s ease}
+.lf-vistazo .hoja{position:relative;display:flex;flex-direction:column;
+  width:min(860px,100%);max-height:92vh;max-height:92dvh;
+  background:var(--lf-panel);border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r-panel) var(--lf-r-panel) 0 0;
+  box-shadow:var(--lf-s3);overflow:hidden;
+  animation:lf-sube .26s cubic-bezier(.32,.72,.3,1)}
+@media(min-width:721px){
+  .lf-vistazo .hoja{border-radius:var(--lf-r-panel);max-height:86vh;
+    animation:lf-asoma .2s ease}
+}
+@keyframes lf-sube{from{transform:translateY(22px);opacity:.6}}
+@keyframes lf-asoma{from{transform:scale(.975);opacity:0}}
+.lf-vistazo header{display:flex;align-items:center;gap:10px;flex-shrink:0;
+  padding:13px 14px;border-bottom:1px solid var(--lf-linea);background:var(--lf-sup)}
+.lf-vistazo header .tit{flex:1;min-width:0;font-size:14px;font-weight:700;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-vistazo header .abrir{font-size:11.5px;font-weight:600;color:var(--lf-tinta-4);
+  text-decoration:none;white-space:nowrap;flex-shrink:0}
+.lf-vistazo header .abrir:hover{color:var(--lf-brand-2)}
+.lf-vistazo header button{flex-shrink:0;width:30px;height:30px;border-radius:50%;
+  border:1px solid var(--lf-linea);background:var(--lf-panel);cursor:pointer;
+  color:var(--lf-tinta-3);font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center}
+.lf-vistazo header button:hover{color:var(--lf-tinta);border-color:var(--lf-tinta-4)}
+.lf-vistazo header .atras[hidden]{display:none}
+.lf-vistazo .cuerpo{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:14px}
+.lf-vistazo .cargando{padding:40px 0;text-align:center;font-size:13px;
+  color:var(--lf-tinta-4)}
+/* Dentro del panel no hace falta el margen de la página ni una segunda
+   tarjeta flotando dentro de otra. */
+.lf-vistazo .cuerpo > .lf-rejilla,
+.lf-vistazo .cuerpo > div{margin:0}
+.lf-vistazo .cuerpo .card{box-shadow:none}
+body.lf-vistazo-abierto{overflow:hidden}
+/* La fila que se puede mirar sin salir de la lista */
+tr[data-modal],a[data-modal]{cursor:pointer}

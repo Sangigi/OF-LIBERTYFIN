@@ -127,7 +127,7 @@ $tono = function ($d) { return $d > 60 ? 'r' : ($d > 30 ? 'a' : ''); };
       <?php foreach ($filas as $f): $t = $tono($f['dias']); ?>
         <tr>
           <td data-label="Cliente">
-            <a href="/ventas/<?= (int)$f['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a href="/ventas/<?= (int)$f['id'] ?>" data-modal style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($f['cliente'] ?: 'Público general') ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
               <?= P::e($f['codigo_venta']) ?> · <?= date('d M Y', strtotime($f['fecha'])) ?>

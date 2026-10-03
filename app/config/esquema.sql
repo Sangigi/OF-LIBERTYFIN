@@ -309,6 +309,9 @@ CREATE TABLE IF NOT EXISTS `venta_detalles` (
   `cambio` decimal(10,2) DEFAULT '0.00',
   `unidad_medida` varchar(20) COLLATE utf8_unicode_ci DEFAULT 'unidad',
   `efectivo_recibido` decimal(10,2) DEFAULT '0.00',
+  -- NULL = la línea nació con la venta. Con fecha = se agregó después,
+  -- cuando el cliente se acordó de otro servicio. Ver Servicio\AmpliarVenta.
+  `agregado_en` datetime DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `venta_id` (`venta_id`),
   KEY `producto_id` (`producto_id`),
@@ -592,6 +595,8 @@ CREATE TABLE IF NOT EXISTS `emida_transacciones` (
 CREATE TABLE IF NOT EXISTS `venta_pagos` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `venta_id` int(11) NOT NULL,
+  -- El subfolio del cobro: 20260102143022-02. Ver Servicio\Folio.
+  `folio` varchar(24) DEFAULT NULL,
   `tipo` enum('anticipo','abono','liquidacion') NOT NULL DEFAULT 'abono',
   `monto` decimal(12,2) NOT NULL,
   `fecha_pago` date NOT NULL,
@@ -608,6 +613,7 @@ CREATE TABLE IF NOT EXISTS `venta_pagos` (
   `creado_en` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_vp_venta` (`venta_id`),
+  KEY `ix_vp_folio` (`folio`),
   KEY `idx_vp_fecha` (`fecha_pago`),
   KEY `idx_vp_cancelado` (`cancelado`),
   CONSTRAINT `venta_pagos_ibfk_1` FOREIGN KEY (`venta_id`) REFERENCES `ventas` (`id`) ON DELETE CASCADE

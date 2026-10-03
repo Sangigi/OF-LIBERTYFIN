@@ -77,7 +77,12 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
                   style="<?= $foto ? "background-image:url('".P::e($foto)."')" : '' ?>">
               <?= $foto ? '' : P::e(mb_strtoupper(mb_substr($_SESSION['usuario_nombre'] ?? 'U',0,1))) ?></span>
             <div style="flex:1;min-width:0">
-              <input type="file" name="foto" id="inpFoto" accept="image/png,image/jpeg,image/webp">
+              <span class="lf-file">
+                <input type="file" name="foto" id="inpFoto"
+                       accept="image/png,image/jpeg,image/webp">
+                <label class="bt" for="inpFoto">Elegir foto</label>
+                <span class="n" data-vacio="Ninguna foto elegida">Ninguna foto elegida</span>
+              </span>
               <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:6px">
                 Cuadrada. Se recorta en círculo y aparece en el menú.</p>
             </div>

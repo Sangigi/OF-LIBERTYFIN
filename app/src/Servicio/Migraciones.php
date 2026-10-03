@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 11;
+    const VERSION = 12;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -430,6 +430,52 @@ final class Migraciones
         }
     }
 
+    /**
+     * 12 · Subfolios de cobro y ampliación de ventas.
+     *
+     *   venta_pagos.folio       el subfolio: 20260102143022-02
+     *   venta_detalles.agregado_en  cuándo se agregó esta línea
+     *
+     * POR QUÉ EL SUBFOLIO
+     *
+     * Los cobros no tenían folio propio. Una clienta que deja $1,500 al
+     * mes generaba doce renglones identificados todos con el folio de la
+     * venta, indistinguibles entre sí y confundibles con una venta de
+     * caja. Nadie podía referirse a uno por teléfono.
+     *
+     * LOS QUE YA ESTABAN NO SE RELLENAN
+     *
+     * Se podría recorrer la tabla y numerarlos por fecha. No se hace: el
+     * orden de dos cobros del mismo día no siempre es el de su id, y un
+     * número inventado hoy contradiría un ticket impreso hace meses.
+     * Los viejos se muestran con un número calculado al vuelo, marcado
+     * como tal. Ver Servicio\Folio::deRespaldo().
+     */
+    private static function v12(PDO $db)
+    {
+        if (self::hayTabla($db, 'venta_pagos')
+            && !self::hayColumna($db, 'venta_pagos', 'folio')) {
+            try {
+                $db->exec("ALTER TABLE venta_pagos
+                           ADD COLUMN folio VARCHAR(24) NULL AFTER venta_id");
+            } catch (\Throwable $e) { /* ya existe */ }
+            // No es UNIQUE: los cobros viejos van en NULL y MySQL permite
+            // varios NULL en un índice único, pero un índice normal
+            // basta para lo único que se hace, que es buscar por folio.
+            if (!self::hayIndice($db, 'venta_pagos', 'ix_vp_folio')) {
+                try { $db->exec("ALTER TABLE venta_pagos ADD INDEX ix_vp_folio (folio)"); }
+                catch (\Throwable $e) { /* ya existe */ }
+            }
+        }
+        if (self::hayTabla($db, 'venta_detalles')
+            && !self::hayColumna($db, 'venta_detalles', 'agregado_en')) {
+            try {
+                $db->exec("ALTER TABLE venta_detalles
+                           ADD COLUMN agregado_en DATETIME NULL");
+            } catch (\Throwable $e) { /* ya existe */ }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -443,5 +489,6 @@ final class Migraciones
         9 => 'Ligas de pago (tarjeta, SPEI, tiendas)',
         10 => 'Especialista asignado a la venta',
         11 => 'Avisos de pago de Paga de Todo (transacción, autorización, comprobante)',
+        12 => 'Subfolios de cobro y servicios agregados a una venta existente',
     ];
 }

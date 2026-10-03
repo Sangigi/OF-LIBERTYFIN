@@ -3,6 +3,7 @@ namespace LibertyFin\Controlador;
 
 use LibertyFin\Datos\CatalogoRepo;
 use LibertyFin\Datos\Conexion;
+use LibertyFin\Dominio\Dinero;
 use LibertyFin\Dominio\Iva;
 use LibertyFin\Dominio\Ticket;
 use LibertyFin\Http\Peticion;
@@ -122,6 +123,19 @@ final class CajaControlador
         }
         $ticket->gastosOperacion((float)($_POST['gastos'] ?? 0));
 
+        // ── AGREGAR A UNA VENTA QUE YA EXISTE ──
+        //
+        // El cliente pagó tres servicios, le hicimos el folio, y a los
+        // dos minutos se acordó de otros tres. Hasta ahora la única
+        // salida era otra venta: dos folios y un historial que cuenta
+        // dos visitas donde hubo una.
+        //
+        // Aquí las líneas entran a la MISMA venta. No se cobra nada: se
+        // agrega lo vendido y se abre saldo, que es lo que de verdad
+        // pasó. El dinero entra después por donde entra siempre.
+        $ampliar = (int)($_POST['ampliar_venta'] ?? 0);
+        if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket);
+
         try {
             $r = (new RegistrarVenta($db))->cobrar($ticket, [
                 'cliente_id'     => (int)($_POST['cliente_id'] ?? 0) ?: null,
@@ -213,6 +227,106 @@ final class CajaControlador
      * fallara y la venta no existiera, el cliente se iría sin nada y sin
      * rastro de lo que se intentó cobrarle.
      */
+    /**
+     * Mete las líneas nuevas en una venta que ya existe.
+     *
+     * No cobra. Agrega lo vendido y deja el saldo abierto, porque eso es
+     * lo que pasó: el cliente pidió más, no pagó más.
+     */
+    private function ampliar($db, $ventaId, $ticket)
+    {
+        try {
+            $r = (new \LibertyFin\Servicio\AmpliarVenta($db))
+                 ->agregar($ventaId, $ticket, [
+                     'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
+                 ]);
+        } catch (\InvalidArgumentException $e) {
+            if ($this->pideJson()) {
+                $this->json(['ok' => false, 'error' => $e->getMessage()]);
+            }
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] ampliar venta ' . $ventaId . ': ' . $e->getMessage());
+            if ($this->pideJson()) {
+                $this->json(['ok' => false, 'error' => 'No se pudo agregar. Quedó anotado el error.']);
+            }
+            $this->volver('No se pudo agregar a esa venta.', 'error');
+        }
+
+        \LibertyFin\Servicio\Auditoria::anota('venta.ampliar',
+            'venta ' . $r['codigo'],
+            Dinero::pesos($r['total'] - $r['agregado']),
+            Dinero::pesos($r['total']) . ' · ' . $r['lineas'] . ' servicio'
+            . ($r['lineas'] == 1 ? '' : 's') . ' más', $db);
+
+        // Ampliar algo de otro día mueve el total de un corte que ya se
+        // cerró. Se hace —hay negocios que dejan la cuenta abierta— pero
+        // se dice, porque quien cuadró ayer va a ver otro número.
+        $aviso = 'Se agregaron ' . $r['lineas'] . ' servicio'
+               . ($r['lineas'] == 1 ? '' : 's') . ' a la venta ' . $r['codigo']
+               . ' por ' . Dinero::pesos($r['agregado']) . '. '
+               . 'Ahora debe ' . Dinero::pesos($r['saldo']) . '.';
+        if (!$r['de_hoy']) {
+            $aviso .= ' Ojo: esa venta es del '
+                   . date('d/m/Y', strtotime($r['fecha']))
+                   . ', así que el corte de ese día cambia.';
+        }
+
+        if ($this->pideJson()) {
+            $this->json(['ok' => true, 'ampliada' => true, 'venta' => $r,
+                         'mensaje' => $aviso]);
+        }
+        $_SESSION['lf_aviso'] = ['texto' => $aviso, 'tipo' => $r['de_hoy'] ? 'ok' : 'alerta'];
+        $this->a('/ventas/' . $r['id']);
+    }
+
+    /**
+     * Las ventas a las que se les puede agregar algo. JSON, para la caja.
+     *
+     * Se ofrecen las del día y las que siguen con saldo: el cliente que
+     * se acordó de otro servicio y la clienta que viene cada mes. Con
+     * texto, busca por folio —el de la venta o el de cualquiera de sus
+     * cobros— y por nombre de cliente.
+     */
+    public function ventasAbiertas()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        $q  = trim(Peticion::texto('q'));
+        $srv = new \LibertyFin\Servicio\AmpliarVenta($db);
+
+        $lista = [];
+        if ($q !== '') {
+            $una = $srv->porFolio($q);
+            if ($una) $lista[] = $una;
+        }
+        if (!$lista) {
+            $lista = $srv->candidatas((int)Peticion::entero('cliente', 0) ?: null, 25);
+            if ($q !== '') {
+                $lista = array_values(array_filter($lista, function ($v) use ($q) {
+                    return stripos((string)$v['codigo_venta'], $q) !== false
+                        || stripos((string)$v['cliente'], $q) !== false;
+                }));
+            }
+        }
+
+        $salida = [];
+        foreach ($lista as $v) {
+            $salida[] = [
+                'id'      => (int)$v['id'],
+                'folio'   => $v['codigo_venta'],
+                'cliente' => $v['cliente'] ?: 'Público general',
+                'fecha'   => date('d/m/Y H:i', strtotime($v['fecha'])),
+                'de_hoy'  => date('Y-m-d', strtotime($v['fecha'])) === date('Y-m-d'),
+                'total'   => Dinero::pesos($v['total']),
+                'saldo'   => Dinero::pesos($v['saldo']),
+                'debe'    => (float)$v['saldo'] > 0.005,
+                'lineas'  => (int)$v['lineas'],
+                'iva_modo'=> $v['iva_modo'] ?: 'incluido',
+            ];
+        }
+        $this->json(['ok' => true, 'ventas' => $salida]);
+    }
+
     private function conLiga($db, array $r, $forma)
     {
         $venta = (new \LibertyFin\Datos\VentaRepo($db))->detalle($r['id']);

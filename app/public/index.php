@@ -99,6 +99,9 @@ $r->post('/ventas/{id}/comision',        ['LibertyFin\Controlador\VentasControla
 $r->post('/ventas/{id}/quitar-comision', ['LibertyFin\Controlador\VentasControlador', 'quitarComision']);
 $r->get('/caja',          ['LibertyFin\Controlador\CajaControlador', 'index']);
 $r->get('/caja/clientes', ['LibertyFin\Controlador\CajaControlador', 'clientes']);
+// Las ventas a las que se les puede agregar algo, para no abrir otro
+// folio cuando el cliente se acuerda de un servicio mas.
+$r->get('/caja/ventas-abiertas', ['LibertyFin\Controlador\CajaControlador', 'ventasAbiertas']);
 $r->get('/qr',              ['LibertyFin\Controlador\CajaControlador', 'qr']);
 $r->get('/caja/estado/{id}', ['LibertyFin\Controlador\CajaControlador', 'estado']);
 $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
@@ -209,6 +212,7 @@ $permisos = [
   '/ventas/{id}/quitar-comision' => 'quitar.comision',
   '/caja'                   => 'cobrar',
   '/caja/clientes'          => 'cobrar',
+  '/caja/ventas-abiertas'   => 'cobrar',
   '/caja/cobrar'            => 'cobrar',
   '/caja/estado/{id}'       => 'cobrar',
   '/qr'                     => 'cobrar',

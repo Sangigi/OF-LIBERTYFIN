@@ -148,9 +148,34 @@ return [
         //   /Service/GenerarReferenciaIndi      efectivo en tienda
         //   /Service/ConsultarEstatusLigaIndi   ¿ya pagó la tarjeta?
         //
-        // Con `host` basta: el sistema le agrega la ruta de cada uno. Las
-        // de abajo solo hacen falta si el proveedor te dio direcciones
-        // distintas a las normales.
+        // CON `host` BASTA. El sistema le agrega la ruta de cada servicio.
+        //
+        // LAS CUATRO DE ABAJO DÉJALAS VACÍAS salvo que el proveedor te
+        // haya dado una dirección distinta a la normal. Son el campo que
+        // más caro se paga cuando se llena de más, porque pegarle al
+        // servicio equivocado no da un error claro: da un rechazo
+        // genérico, o peor, hace algo que nadie pidió.
+        //
+        // Dos que han pasado de verdad:
+        //
+        //   url_referencia => .../GenerarLigaDomiciliacionIndi
+        //       El cobro en tienda pegándole al servicio de tarjeta
+        //       tokenizada. Nunca iba a devolver un código de barras.
+        //
+        //   url_estado => .../PagarDomiciliacionIndi
+        //       Preguntar "¿ya pagó?" al servicio que COBRA una tarjeta
+        //       guardada. Eso no consulta: cobra.
+        //
+        // El sistema revisa que cada una apunte a su servicio y, si no,
+        // la ignora y usa la buena. Pero lo avisa en Ajustes y en el log:
+        // una dirección mal puesta no debe quedarse ahí.
+        //
+        // Para ver a dónde va a pegar cada forma de pago antes de
+        // intentar cobrar:
+        //
+        //   php app/bin/revisar-pagos.php
+        //   php app/bin/revisar-pagos.php --probar
+        //
         'host'            => 'https://pagadetodo.mx/Pagadetodo',
         'url_liga'        => '',
         'url_clabe'       => '',

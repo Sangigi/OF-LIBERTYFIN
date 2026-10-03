@@ -107,20 +107,172 @@ $token = $_SESSION['lf_token'];
     c.focus();
   });
 
-  // El ingreso espera 350 ms a propósito para que un usuario que no
-  // existe tarde lo mismo que uno que sí. Sin señal visible, ese
-  // silencio se siente como que el clic no funcionó.
-  var f = document.getElementById('lfForm'), b = document.getElementById('btnEntrar');
-  if (f && b) f.addEventListener('submit', function(){
-    if (!f.checkValidity || f.checkValidity()) {
-      b.classList.add('cargando'); b.disabled = true;
-      setTimeout(function(){ b.classList.remove('cargando'); b.disabled = false; }, 12000);
+  var f = document.getElementById('lfForm'),
+      b = document.getElementById('btnEntrar');
+  if (!f || !b) return;
+
+  var txt   = b.querySelector('.txt'),
+      lento = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Cada letra por su cuenta, para que puedan juntarse. Se hace al
+     cargar y no al enviar: medir y reescribir en el mismo cuadro en que
+     empieza la animación la deja a medias. El texto sigue leyéndose
+     igual para un lector de pantalla porque no cambia, solo se parte. */
+  var letras = [];
+  if (txt && !lento) {
+    var frase = txt.textContent;
+    txt.textContent = '';
+    for (var k = 0; k < frase.length; k++) {
+      var i2 = document.createElement('i');
+      i2.textContent = frase[k];
+      txt.appendChild(i2);
+      letras.push(i2);
     }
+    var anillo = document.createElement('span');
+    anillo.className = 'lf-anillo';
+    anillo.setAttribute('aria-hidden', 'true');
+    b.appendChild(anillo);
+  }
+
+  /* Hacia dónde viaja cada letra: al centro del botón. Se mide ANTES de
+     encoger, porque después el botón ya no mide lo mismo. */
+  function juntar() {
+    if (letras.length) {
+      var cb = b.getBoundingClientRect(),
+          cx = cb.left + cb.width / 2,
+          cy = cb.top + cb.height / 2;
+      letras.forEach(function (el) {
+        var r = el.getBoundingClientRect();
+        el.style.setProperty('--dx', (cx - (r.left + r.width / 2)).toFixed(1) + 'px');
+        el.style.setProperty('--dy', (cy - (r.top + r.height / 2)).toFixed(1) + 'px');
+      });
+    }
+    b.classList.add('lf-cerrando');
+    b.setAttribute('aria-busy', 'true');
+  }
+
+  function abrir(cuando) {
+    var r = b.getBoundingClientRect(),
+        cx = r.left + r.width / 2, cy = r.top + r.height / 2,
+        W = innerWidth, H = innerHeight,
+        /* El diámetro llega a la esquina más lejana desde el centro de
+           la pantalla, con holgura: si se queda corto se ven cuatro
+           picos de fondo en las esquinas. */
+        d = Math.hypot(W, H) * 1.15;
+    var m = document.createElement('div');
+    m.className = 'lf-mancha';
+    m.style.width = m.style.height = d + 'px';
+    m.style.left = cx + 'px';
+    m.style.top  = cy + 'px';
+    document.body.appendChild(m);
+
+    if (lento) { cuando(); return; }
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        m.style.left = (W / 2) + 'px';
+        m.style.top  = (H / 2) + 'px';
+        m.style.transform = 'translate(-50%,-50%) scale(1)';
+      });
+    });
+    /* Se navega cuando la pantalla ya está tapada, no cuando termina la
+       animación: los últimos milisegundos no aportan y retrasar la
+       llegada sí se nota. */
+    setTimeout(cuando, 470);
+  }
+
+  function soltar() {
+    b.classList.remove('lf-cerrando');
+    b.removeAttribute('aria-busy');
+    b.disabled = false;
+    letras.forEach(function (el) {
+      el.style.removeProperty('--dx'); el.style.removeProperty('--dy');
+    });
+  }
+
+  function decir(texto) {
+    var caja = f.parentNode.querySelector('.lf-msg.err');
+    if (!caja) {
+      caja = document.createElement('div');
+      caja.className = 'lf-msg err';
+      f.parentNode.insertBefore(caja, f);
+    }
+    caja.textContent = texto;
+    caja.setAttribute('role', 'alert');
+  }
+
+  /* Sin fetch se envía como siempre: la animación es un adorno, no
+     puede ser el único camino para entrar. */
+  if (!window.fetch || !window.FormData) {
+    f.addEventListener('submit', function () {
+      if (!f.checkValidity || f.checkValidity()) { juntar(); b.disabled = true; }
+    });
+    return;
+  }
+
+  f.addEventListener('submit', function (ev) {
+    if (f.checkValidity && !f.checkValidity()) return;
+    ev.preventDefault();
+    if (b.disabled) return;
+    b.disabled = true;
+    juntar();
+
+    /* Se envía POR DETRÁS para poder animar la salida. El servidor hace
+       exactamente lo mismo que con un envío normal —misma validación,
+       mismo conteo de intentos— y redirige; aquí solo se mira a dónde
+       acabó para saber si entró. */
+    fetch(f.action, {
+      method: 'POST',
+      body: new FormData(f),
+      credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) {
+        return r.text().then(function (t) { return { url: r.url, html: t, ok: r.ok }; });
+      })
+      .then(function (res) {
+        var destino = res.url || '/';
+        var siguePidiendo = /\/login\/?($|\?)/.test(destino);
+
+        if (!siguePidiendo) { abrir(function () { location.replace(destino); }); return; }
+
+        /* No entró. El motivo viene dentro de la página que contestó el
+           servidor; se saca de ahí en vez de inventarlo, para que diga
+           lo mismo que diría sin JavaScript —incluido el bloqueo por
+           intentos, que trae su propio texto—. */
+        var doc = new DOMParser().parseFromString(res.html, 'text/html'),
+            msg = doc.querySelector('.lf-msg');
+        soltar();
+        if (msg) {
+          var vieja = f.parentNode.querySelector('.lf-msg');
+          if (vieja) vieja.replaceWith(msg.cloneNode(true));
+          else f.parentNode.insertBefore(msg.cloneNode(true), f);
+        } else {
+          decir('No se pudo entrar. Revisa tu correo y tu contraseña.');
+        }
+        /* El token puede haber rotado: reenviar el viejo daría un error
+           de formulario en vez del de contraseña, y nadie entendería
+           por qué el segundo intento falla distinto. */
+        var tk = doc.querySelector('input[name=token]');
+        var mio = f.querySelector('input[name=token]');
+        if (tk && mio && tk.value) mio.value = tk.value;
+        /* Si el servidor deshabilitó los campos por bloqueo, se respeta. */
+        if (doc.querySelector('#usuario[disabled]')) {
+          f.querySelectorAll('input,button').forEach(function (e2) { e2.disabled = true; });
+        }
+        var cl = document.getElementById('clave');
+        if (cl && !cl.disabled) { cl.value = ''; cl.focus(); }
+      })
+      .catch(function () {
+        soltar();
+        decir('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
+      });
   });
 })();
+/* Volver con el botón de atrás no debe dejar el botón girando. */
 window.addEventListener('pageshow', function(e){
   if (!e.persisted) return;
   var b = document.getElementById('btnEntrar');
-  if (b) { b.classList.remove('cargando'); b.disabled = false; }
+  if (b) { b.classList.remove('lf-cerrando','cargando'); b.disabled = false; }
+  document.querySelectorAll('.lf-mancha').forEach(function(m){ m.remove(); });
 });
 </script>

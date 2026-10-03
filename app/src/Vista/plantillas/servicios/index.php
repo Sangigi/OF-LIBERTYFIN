@@ -64,7 +64,12 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
               <?= !empty($e['imagen']) ? "background-image:url('".P::e($e['imagen'])."')" : '' ?>">
           <?= !empty($e['imagen']) ? '' : '+' ?></span>
         <div style="flex:1;min-width:0">
-          <input type="file" name="imagen" id="inpServ" accept="image/png,image/jpeg,image/webp">
+          <span class="lf-file">
+            <input type="file" name="imagen" id="inpServ"
+                   accept="image/png,image/jpeg,image/webp">
+            <label class="bt" for="inpServ">Elegir imagen</label>
+            <span class="n" data-vacio="Ninguna imagen elegida">Ninguna imagen elegida</span>
+          </span>
           <?php if (!empty($e['imagen'])): ?>
             <label style="font-size:11px;color:var(--lf-tinta-3);display:flex;
                    align-items:center;gap:6px;margin-top:5px;cursor:pointer">

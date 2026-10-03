@@ -88,9 +88,25 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
             <tr><td colspan="6" style="text-align:center;color:var(--lf-tinta-4);padding:28px">
               Todavía no hay ningún cobro.</td></tr>
           <?php endif; ?>
-          <?php foreach ($pagos as $p): $canc = (int)$p['cancelado'] === 1; ?>
+          <?php foreach ($pagos as $n => $p): $canc = (int)$p['cancelado'] === 1;
+                /* EL SUBFOLIO DEL COBRO.
+                   Doce abonos de una clienta que deja $1,500 al mes
+                   salian los doce con el folio de la venta: nadie podia
+                   referirse a uno por telefono ni cuadrar un deposito
+                   contra el abono que le toca. Ver Servicio\Folio.
+
+                   Los cobros guardados ANTES de que existiera la
+                   columna no lo traen. Se arma al vuelo con su posicion
+                   y se marca con ~, para no enseñar un hueco pero
+                   tampoco hacer pasar por folio un numero inventado. */
+                $sub = trim((string)($p['folio'] ?? ''));
+                $suyo = $sub !== '';
+                if (!$suyo) $sub = \LibertyFin\Servicio\Folio::deRespaldo($venta['codigo_venta'], $n + 1); ?>
             <tr style="<?= $canc ? 'opacity:.5' : '' ?>">
               <td data-label="Fecha" class="lf-mono" style="font-size:12px">
+                <span style="display:block;font-weight:600;color:var(--lf-tinta-2)"
+                      <?= $suyo ? '' : 'title="Cobro anterior a los subfolios: este número es aproximado"' ?>>
+                  <?= P::e($sub) ?><?= $suyo ? '' : '<span style="opacity:.5">~</span>' ?></span>
                 <?= date('d/m/Y', strtotime($p['fecha_pago'])) ?>
                 <?php if ($p['referencia']): ?>
                   <span style="display:block;color:var(--lf-tinta-4);font-size:11px"><?= P::e($p['referencia']) ?></span>

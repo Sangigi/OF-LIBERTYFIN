@@ -25,6 +25,36 @@ final class Dinero
         return '$' . number_format($v, 0);
     }
 
+    /**
+     * Todavia mas corto, para rotulos de eje.
+     *
+     * `corto()` deja $181,098: ocho caracteres. En la grafica del panel
+     * eso va dentro de una columna que mide un septimo del ancho, y en
+     * un telefono son unos 45 pixeles. El numero se salia de su columna
+     * y se encimaba con el de al lado.
+     *
+     *     $0        $0
+     *     $181,098  $181k
+     *     $1,250    $1.2k
+     *
+     * Se usa SOLO donde el ancho manda. Un importe que el usuario va a
+     * cuadrar contra su cajon se escribe completo, siempre: redondear
+     * $181,098 a $181k en un corte seria mentir para que quepa.
+     */
+    public static function micro($v)
+    {
+        $v = (float)$v;
+        $a = abs($v);
+        $s = $v < 0 ? '-' : '';
+        // El corte va en 999,500 y no en 1,000,000: por encima de eso la
+        // division entre mil redondea a 1,000 y salia `$1,000k`, que
+        // ademas de feo es un caracter mas de los que caben.
+        if ($a >= 999500) return $s . '$' . number_format($a / 1000000, 1) . 'M';
+        if ($a >= 100000) return $s . '$' . number_format($a / 1000, 0) . 'k';
+        if ($a >= 1000)    return $s . '$' . rtrim(rtrim(number_format($a / 1000, 1), '0'), '.') . 'k';
+        return $s . '$' . number_format($a, 0);
+    }
+
     /** Porcentaje de a sobre b, sin dividir entre cero. */
     public static function pct($a, $b)
     {

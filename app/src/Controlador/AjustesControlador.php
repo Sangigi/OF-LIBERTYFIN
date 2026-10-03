@@ -224,10 +224,37 @@ final class AjustesControlador
         }
     }
 
+    /**
+     * Devuelve al usuario a su pestaña con un aviso.
+     *
+     * Si el formulario se envió por detrás —ver `data-guardar` en el
+     * layout— se contesta JSON y nadie recarga nada. Elegir "los pagos
+     * se aplican solos" no debería costar una página entera: se perdía
+     * el scroll, la pestaña abierta y el sitio donde ibas leyendo para
+     * cambiar una palabra.
+     *
+     * El redirect se queda para quien no tenga JavaScript. Es el mismo
+     * método, la misma validación y el mismo mensaje: lo único que
+     * cambia es el envoltorio.
+     */
     private function volver($pestana, $texto, $tipo)
     {
+        if ($this->porDetras()) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => $tipo !== 'error', 'mensaje' => $texto,
+                              'tipo' => $tipo, 'pestana' => $pestana],
+                             JSON_UNESCAPED_UNICODE);
+            exit;
+        }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /ajustes?t=' . $pestana); exit;
+    }
+
+    /** ¿Lo pidió el navegador por detrás, sin recargar? */
+    private function porDetras()
+    {
+        return !empty($_SERVER['HTTP_X_LF_JSON'])
+            || (($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest');
     }
 
     /**

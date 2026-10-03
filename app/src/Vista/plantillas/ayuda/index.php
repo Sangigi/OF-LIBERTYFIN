@@ -86,7 +86,7 @@ $comoVa = [
       <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
                 placeholder="Agrega algo al reporte"></textarea>
       <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
-        <input type="file" name="adjunto" style="font-size:11.5px;flex:1;min-width:180px"
+        <input type="file" name="adjunto" style="font-size:11.5px;flex:1 1 150px;min-width:0;max-width:100%"
                accept="image/png,image/jpeg,image/webp,application/pdf">
         <button class="btn btn-primary" type="submit">Enviar</button>
       </div>

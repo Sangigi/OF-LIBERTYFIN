@@ -25,6 +25,7 @@ final class Auditoria
 {
     /** Lo que se audita, y cómo se lee. */
     const ACCIONES = [
+        'venta.ampliar'     => 'Agregó servicios a una venta',
         'pago.cancelar'     => 'Canceló un pago',
         'pago.registrar'    => 'Registró un pago',
         'comision.asignar'  => 'Asignó una comisión',
