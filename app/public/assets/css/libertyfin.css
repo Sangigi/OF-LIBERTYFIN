@@ -2271,26 +2271,44 @@ form[data-guardar] .m{transition:border-color .15s,background .15s}
    sistema, así que no se ve ningún salto en blanco.
    ══════════════════════════════════════════════════════ */
 .lf-boton{position:relative;overflow:hidden;
+  /* EL ANCHO SE MUEVE DESPUÉS, NO A LA VEZ.
+     Antes las letras se juntaban mientras el botón se encogía, y como
+     las letras siguen siendo elementos de un flex, el propio encogido
+     las iba apretando: se veían estirarse y saltar antes de
+     desaparecer. Con el retraso, para cuando el botón empieza a
+     cerrarse las letras ya son invisibles y lo que se aprieta no se ve.
+     `gap` lleva el mismo retraso: cambiarlo de golpe corre el texto
+     nueve píxeles en el primer cuadro. */
   transition:filter .15s, transform .08s,
-             width .46s cubic-bezier(.66,0,.34,1),
-             border-radius .46s cubic-bezier(.66,0,.34,1),
-             gap .3s ease;
+             width .38s cubic-bezier(.66,0,.34,1) .3s,
+             border-radius .38s cubic-bezier(.66,0,.34,1) .3s,
+             gap .3s ease .3s;
   will-change:width}
 .lf-boton .txt i{display:inline-block;font-style:normal;white-space:pre;
-  transition:transform .44s cubic-bezier(.55,-.3,.35,1.35), opacity .3s ease}
+  transition:transform .34s cubic-bezier(.5,-.2,.35,1.3), opacity .24s ease}
 
-/* Encogido: un círculo del alto del botón, centrado en su sitio. */
+/* Encogido. El radio va a 23px —la mitad del alto— y no a 50%.
+   Un 50% sobre un botón ancho es una ELIPSE: por el camino salían unas
+   esquinas ovaladas que no eran ni el botón ni el círculo. En píxeles,
+   el recorrido entero es una pastilla que acaba siendo circular. */
 .lf-boton.lf-cerrando{
-  width:46px;min-width:46px;border-radius:50%;gap:0;
+  width:46px;min-width:46px;border-radius:23px;gap:0;
   margin-left:auto;margin-right:auto;pointer-events:none;cursor:progress}
 .lf-boton.lf-cerrando .txt i{
   transform:translate(var(--dx,0),var(--dy,0)) scale(.35);opacity:0}
-.lf-boton.lf-cerrando .fl{opacity:0;transform:scale(.3);transition:opacity .2s,transform .3s}
+.lf-boton.lf-cerrando .fl{opacity:0;transform:scale(.3);transition:opacity .18s,transform .26s}
 
-/* El anillo que gira dentro del círculo. */
-.lf-anillo{position:absolute;inset:9px;border-radius:50%;opacity:0;
+/* El anillo que gira.
+   MEDÍA LO QUE MIDIERA EL BOTÓN: con `inset:9px` sobre un botón de
+   trescientos píxeles de ancho, un `border-radius:50%` dibuja una
+   elipse larguísima. Aparecía antes de que el botón terminara de
+   cerrarse, así que lo que se veía era un óvalo plano girando. Ahora
+   mide 26px fijos y está clavado en el centro: es un círculo desde el
+   primer cuadro, mida lo que mida el botón. */
+.lf-anillo{position:absolute;left:50%;top:50%;width:26px;height:26px;
+  margin:-13px 0 0 -13px;border-radius:50%;opacity:0;
   border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;
-  transition:opacity .22s ease .2s}
+  transition:opacity .2s ease .3s}
 .lf-boton.lf-cerrando .lf-anillo{opacity:1;animation:lf-giro .72s linear infinite}
 
 /* La mancha que se abre al entrar. Blanca en claro, oscura en oscuro:

@@ -348,6 +348,11 @@ $qs = function ($x = []) use ($desde, $hasta) {
     if (w._ac) w._ac.abort();
     w._ac = window.AbortController ? new AbortController() : null;
     w.classList.add('cargando');
+    /* Se apunta ANTES de pedirlo, no solo si falla. El módulo compartido
+       lo necesita para volver a abrir la ventana donde iba después de
+       una recarga; sin esto, la ventana de un colaborador no sobrevivía
+       a cambiar de sección. */
+    w.dataset.url = url;
     fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'fetch' },
                  signal: w._ac ? w._ac.signal : undefined })
       .then(function (r) {

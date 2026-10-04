@@ -570,13 +570,69 @@ use LibertyFin\Vista\Widget as W;
   }
 
   function guardarSitio(w) {
-    if (w.classList.contains('mini') || w.classList.contains('grande')) return;
+    if (!w.classList.contains('mini') && !w.classList.contains('grande')) {
+      try {
+        localStorage.setItem('lf-ventana', JSON.stringify({
+          x: parseInt(w.style.left, 10), y: parseInt(w.style.top, 10),
+          w: parseInt(w.style.width, 10), h: parseInt(w.style.height, 10)
+        }));
+      } catch (e) { /* modo privado: se pierde la posición, nada más */ }
+    }
+    guardarAbiertas();
+  }
+
+  /* ── QUE LA VENTANA SOBREVIVA AL CAMBIO DE SECCIÓN ──
+     Las ventanas viven en <body>, fuera de `.lf-cont`, así que cambiar
+     de sección sin recargar no las toca. Pero basta UNA recarga
+     completa —entrar por la barra de direcciones, enviar un formulario,
+     volver con el botón de atrás— para que desaparezcan, y con ellas lo
+     que el usuario estaba consultando al lado.
+
+     Se apunta lo que hay abierto y se vuelve a abrir al cargar. Va en
+     `sessionStorage` y no en `localStorage` a propósito: es de ESTA
+     pestaña. Compartirlo haría que abrir una segunda pestaña arrastrara
+     las ventanas de la primera, que es justo lo que nadie pidió. */
+  var LLAVE = 'lf-ventanas-abiertas';
+
+  function guardarAbiertas() {
     try {
-      localStorage.setItem('lf-ventana', JSON.stringify({
-        x: parseInt(w.style.left, 10), y: parseInt(w.style.top, 10),
-        w: parseInt(w.style.width, 10), h: parseInt(w.style.height, 10)
-      }));
-    } catch (e) { /* modo privado: se pierde la posición, nada más */ }
+      var datos = abiertas.map(function (w) {
+        return {
+          url: w.dataset.url || '',
+          tit: (w.querySelector('.lf-win-tit b') || {}).textContent || '',
+          x: parseInt(w.style.left, 10) || 0, y: parseInt(w.style.top, 10) || 0,
+          w: parseInt(w.style.width, 10) || 0, h: parseInt(w.style.height, 10) || 0,
+          mini: w.classList.contains('mini'),
+          grande: w.classList.contains('grande')
+        };
+      }).filter(function (d) { return d.url; });
+      sessionStorage.setItem(LLAVE, JSON.stringify(datos));
+    } catch (e) { /* sin sessionStorage se pierde al recargar, nada más */ }
+  }
+
+  function restaurarAbiertas() {
+    var datos;
+    try { datos = JSON.parse(sessionStorage.getItem(LLAVE) || '[]'); }
+    catch (e) { return; }
+    if (!datos || !datos.length) return;
+    datos.forEach(function (d) {
+      var ya = false;
+      abiertas.forEach(function (o) { if (o.dataset.url === d.url) ya = true; });
+      if (ya) return;
+      var w = abrir(d.url, d.tit || 'Ventana');
+      if (!w) return;
+      /* Se le devuelve EXACTAMENTE el sitio y el tamaño que tenía, no
+         el de por omisión: una ventana que vuelve a aparecer en otro
+         lado obliga a recolocarla cada vez. */
+      if (d.w) w.style.width  = lim(d.w, MINW, innerWidth - 16) + 'px';
+      if (d.h) w.style.height = lim(d.h, MINH, innerHeight - 16) + 'px';
+      if (d.x || d.y) {
+        w.style.left = lim(d.x, 2, Math.max(2, innerWidth - 90)) + 'px';
+        w.style.top  = lim(d.y, 2, Math.max(2, innerHeight - 40)) + 'px';
+      }
+      if (d.mini) w.classList.add('mini');
+      if (d.grande) w.classList.add('grande');
+    });
   }
 
   /* ── Mover y cambiar de tamaño ─────────────────────── */
@@ -655,8 +711,13 @@ use LibertyFin\Vista\Widget as W;
                      scroll: cuerpo.scrollTop, url: w.dataset.url || '' });
     }
     w.dataset.url = url;
-    w.querySelector('.atras').hidden = !w._pila.length;
+    /* Una ventana adoptada de otro código puede no traer estos botones:
+       no son suyos hasta que se navega por primera vez. */
+    var at = w.querySelector('.atras'); if (at) at.hidden = !w._pila.length;
     var ab = w.querySelector('.abrir'); if (ab) ab.href = url;
+    /* Al navegar cambia lo que la ventana está enseñando: si se
+       recarga después, tiene que volver donde iba, no al principio. */
+    guardarAbiertas();
 
     if (w._ac) w._ac.abort();
     w._ac = new AbortController();
@@ -703,7 +764,8 @@ use LibertyFin\Vista\Widget as W;
     w.querySelector('.lf-win-tit b').textContent = v.tit;
     cuerpo.scrollTop = v.scroll || 0;
     if (v.url) w.dataset.url = v.url;
-    w.querySelector('.atras').hidden = !w._pila.length;
+    var at2 = w.querySelector('.atras'); if (at2) at2.hidden = !w._pila.length;
+    guardarAbiertas();
     /* De vuelta en el contenido propio de la ventana, su buscador
        vuelve a servir. */
     if (!w._pila.length) {
@@ -717,6 +779,7 @@ use LibertyFin\Vista\Widget as W;
     if (i >= 0) abiertas.splice(i, 1);
     if (w._ac) w._ac.abort();
     w.remove();
+    guardarAbiertas();
   }
 
   /* ── Abrir ─────────────────────────────────────────── */
@@ -761,6 +824,7 @@ use LibertyFin\Vista\Widget as W;
     w.querySelector('.mini').addEventListener('click', function () {
       w.classList.toggle('mini');
       w.classList.remove('grande');
+      guardarAbiertas();
     });
     w.querySelector('.maxi').addEventListener('click', function () {
       w.classList.remove('mini');
@@ -773,9 +837,11 @@ use LibertyFin\Vista\Widget as W;
         guardarSitio(w);
         w.classList.add('grande');
       }
+      guardarAbiertas();
     });
 
     cargar(w, url, false);
+    guardarAbiertas();
     return w;
   }
 
@@ -818,7 +884,44 @@ use LibertyFin\Vista\Widget as W;
     cargar(w, u.pathname + u.search, true);
   });
 
+  /* ── ADOPTAR LAS VENTANAS QUE ABRE OTRO ──
+     Comisiones crea las suyas con su propio código y no pasan por
+     `abrir()`, así que el módulo no las conocía: ni entraban en el
+     orden de apilado ni sobrevivían a una recarga. Se vigila <body> y
+     se adoptan en cuanto aparecen. Vigilar es mejor que pedirle a
+     Comisiones que avise: así funciona también con cualquier ventana
+     que se añada mañana sin saber que esto existe. */
+  if (window.MutationObserver) {
+    new MutationObserver(function (cambios) {
+      var hubo = false;
+      cambios.forEach(function (c) {
+        [].forEach.call(c.addedNodes, function (n) {
+          if (n.nodeType !== 1 || !n.classList || !n.classList.contains('lf-win')) return;
+          if (abiertas.indexOf(n) >= 0) return;
+          if (!n._pila) n._pila = [];
+          abiertas.push(n);
+          hubo = true;
+        });
+        [].forEach.call(c.removedNodes, function (n) {
+          if (n.nodeType !== 1 || !n.classList || !n.classList.contains('lf-win')) return;
+          var i = abiertas.indexOf(n);
+          if (i >= 0) { abiertas.splice(i, 1); hubo = true; }
+        });
+      });
+      if (hubo) setTimeout(guardarAbiertas, 60);   /* tras su primera carga */
+    }).observe(document.body, { childList: true });
+  }
+
+  /* Solo al CARGAR la página, no al cambiar de sección sin recargar:
+     ahí las ventanas siguen puestas y volver a abrirlas las duplicaría. */
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', restaurarAbiertas);
+  } else {
+    restaurarAbiertas();
+  }
+
   window.lfVentana = abrir;
+  window.lfVentanasAbiertas = function () { return abiertas.slice(); };
 })();
 </script>
 
