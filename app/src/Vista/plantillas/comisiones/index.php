@@ -247,9 +247,11 @@ $qs = function ($x = []) use ($desde, $hasta) {
 </div>
 
 <style>
-/* Estilos de las ventanas flotantes. Van aquí y no en libertyfin.css a
-   propósito: ese archivo lo guarda el navegador (?v=2) y una actualización
-   no se vería hasta vaciar la caché; así viajan siempre con la pantalla. */
+/* Las ventanas flotantes ya NO viven aquí: se movieron a libertyfin.css
+   para que cualquier sección pueda abrir una. Estaban aquí porque la
+   hoja global se guardaba con `?v=2` y un cambio no se veía hasta
+   vaciar la caché; eso ya se arregló —ahora la versión sale de la fecha del
+   archivo— así que el motivo desapareció. */
 /* Ventana flotante por colaborador.
    Vive en <body>, fuera de la rejilla: no mueve nada de lo que hay debajo.
    z-index 200-290: encima de menú y velos móviles (<=60), debajo de los
@@ -259,53 +261,6 @@ $qs = function ($x = []) use ($desde, $hasta) {
 .lf-pers[data-id]:focus-visible{outline:2px solid var(--lf-brand);outline-offset:2px}
 .lf-pers.abierta{border-color:var(--lf-brand);background:var(--lf-brand-glow)}
 
-.lf-win{position:fixed;display:flex;flex-direction:column;box-sizing:border-box;
-  min-width:300px;min-height:0;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);
-  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r);
-  box-shadow:var(--lf-shadow-lg);overflow:hidden;animation:lf-win-in .16s ease-out}
-.lf-win.activa{border-color:var(--lf-brand)}
-@keyframes lf-win-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
-.lf-win-bar{display:flex;align-items:center;gap:10px;padding:9px 8px 9px 14px;
-  background:var(--lf-vidrio);border-bottom:1px solid var(--lf-linea);
-  cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;flex-shrink:0}
-.lf-win.moviendo .lf-win-bar{cursor:grabbing}
-.lf-win.moviendo,.lf-win.redim{user-select:none;-webkit-user-select:none}
-.lf-win-tit{flex:1;min-width:0}
-.lf-win-tit b{display:block;font-size:13px;font-weight:600;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lf-win-tit small{display:block;font-size:11px;color:var(--lf-tinta-4);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.lf-win-btns{display:flex;gap:4px;flex-shrink:0}
-.lf-win-btns button{width:28px;height:28px;display:flex;align-items:center;justify-content:center;
-  border:0;border-radius:var(--lf-r-sm);background:transparent;color:var(--lf-tinta-3);cursor:pointer;padding:0}
-.lf-win-btns button:hover{background:var(--lf-sup-2);color:var(--lf-tinta)}
-.lf-win-btns button.cerrar:hover{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
-.lf-win-btns button:focus-visible{outline:2px solid var(--lf-brand);outline-offset:1px}
-.lf-win-btns svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;
-  stroke-width:2;stroke-linecap:round}
-.lf-win-busca{padding:8px 12px;border-bottom:1px solid var(--lf-linea);flex-shrink:0}
-.lf-win-busca .lf-search input{padding-top:7px;padding-bottom:7px;font-size:12.5px}
-.lf-win.mini .lf-win-busca{display:none}
-.lf-win-cuerpo{flex:1;min-height:0;overflow:auto;position:relative}
-.lf-win-cuerpo .table-responsive{padding:2px 8px 0}
-.lf-win.cargando .lf-win-cuerpo{opacity:.55;pointer-events:none}
-.lf-win.mini .lf-win-cuerpo,.lf-win.mini .lf-win-grip{display:none}
-.lf-win.mini{height:auto!important;min-width:0}
-.lf-win.mini .lf-win-bar{border-bottom:0}
-.lf-win-msj,.lf-det-vacio{padding:22px;text-align:center;color:var(--lf-tinta-4);font-size:13px;margin:0}
-.lf-det-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;
-  flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--lf-linea);
-  font-size:12px;color:var(--lf-tinta-4);position:sticky;bottom:0;background:var(--lf-sup)}
-/* Esquinas inferiores para cambiar el tamaño */
-.lf-win-grip{position:absolute;bottom:0;width:18px;height:18px;z-index:2;touch-action:none}
-.lf-win-grip.se{right:0;cursor:nwse-resize}
-.lf-win-grip.sw{left:0;cursor:nesw-resize}
-.lf-win-grip::after{content:"";position:absolute;bottom:4px;width:8px;height:8px;
-  border-bottom:2px solid var(--lf-tinta-4);opacity:.55}
-.lf-win-grip.se::after{right:4px;border-right:2px solid var(--lf-tinta-4)}
-.lf-win-grip.sw::after{left:4px;border-left:2px solid var(--lf-tinta-4)}
-.lf-win-grip:hover::after{opacity:1;border-color:var(--lf-brand)}
-@media (prefers-reduced-motion:reduce){.lf-win{animation:none}}
 </style>
 
 <script>

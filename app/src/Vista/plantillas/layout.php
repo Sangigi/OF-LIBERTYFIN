@@ -105,8 +105,11 @@ use LibertyFin\Vista\Widget as W;
      Un enlace puede descargar un archivo, imprimir un ticket, salir de
      la sesión o disparar una acción. Cambiar media pantalla en esos
      casos deja la aplicación mintiendo sobre dónde está. */
-  var FUERA = ['/salir', '/login', '/registro', '/ticket', '/imprimir',
-               '/descargar', '/exportar', '/pdf', '/qr'];
+  /* Se compara por TRAMO COMPLETO, no por prefijo de texto.
+     Con `indexOf(prefijo) === 0` la sección `/tickets` quedaba
+     bloqueada por la regla de `/ticket` —el ticket de una venta— y era
+     la única que seguía recargando la página entera. */
+  var FUERA = /^\/(salir|login|registro|ticket|imprimir|descargar|exportar|pdf|qr)(\/|$)/;
 
   function esNuestro(a) {
     if (!a || !a.getAttribute('href')) return false;
@@ -116,10 +119,7 @@ use LibertyFin\Vista\Widget as W;
     try { u = new URL(a.href, location.href); } catch (e) { return false; }
     if (u.origin !== location.origin) return false;
     if (u.pathname === location.pathname && u.hash && u.search === location.search) return false;
-    for (var i = 0; i < FUERA.length; i++) {
-      if (u.pathname === FUERA[i] || u.pathname.indexOf(FUERA[i] + '/') === 0
-          || u.pathname.indexOf(FUERA[i]) === 0) return false;
-    }
+    if (FUERA.test(u.pathname)) return false;
     /* Pestañas, filtros y paginación —lo de siempre— y además las
        SECCIONES del menú y los enlaces que se marquen a mano.
        Cambiar de sección volvía a pedir la página entera: su menú, su
@@ -142,7 +142,15 @@ use LibertyFin\Vista\Widget as W;
     });
   }
 
+  /* La primera parte de la ruta: /ventas/137 y /ventas son la misma
+     sección, /clientes es otra. */
+  function seccionDe(u) {
+    try { return '/' + (new URL(u, location.href)).pathname.split('/')[1]; }
+    catch (e) { return u; }
+  }
+
   function ir(url, empujar) {
+    var antes = seccionDe(location.pathname);
     if (enCurso) enCurso.abort();
     enCurso = new AbortController();
     cont.classList.add('cargando');
@@ -187,6 +195,15 @@ use LibertyFin\Vista\Widget as W;
         /* Quien escucha —un lector de pantalla, por ejemplo— no se
            entera de que cambió medio documento si nadie lo dice. */
         document.dispatchEvent(new CustomEvent('lf:cargado', { detail: { url: url } }));
+
+        /* Cambiar de sección deja arriba. Antes solo se subía si había
+           una tarjeta por encima del borde, pensando en los filtros;
+           al saltar de Ventas a Clientes eso dejaba a medio documento,
+           leyendo el final de una lista que ya no era la suya. */
+        if (seccionDe(url) !== antes) {
+          window.scrollTo({ top: 0, behavior: 'instant' in document.documentElement.style
+                            ? 'instant' : 'auto' });
+        }
         /* Se sube al principio del bloque, no de la página: con el
            filtro arriba, quedarse donde estaba hace creer que no pasó
            nada. */
@@ -375,6 +392,8 @@ use LibertyFin\Vista\Widget as W;
         '<header>' +
           '<button type="button" class="atras" hidden aria-label="Volver">&#8249;</button>' +
           '<b class="tit">Cargando…</b>' +
+          '<button type="button" class="libre" title="Abrir como ventana que se mueve">' +
+            'Ventana libre</button>' +
           '<a class="abrir" href="#" target="_blank" rel="noopener">Abrir completo</a>' +
           '<button type="button" class="cerrar" data-cerrar aria-label="Cerrar">&times;</button>' +
         '</header>' +
@@ -390,6 +409,17 @@ use LibertyFin\Vista\Widget as W;
     });
     caja.querySelector('.atras').addEventListener('click', function () {
       if (pila.length > 1) { pila.pop(); traer(pila[pila.length - 1], false); }
+    });
+    /* SACARLO A UNA VENTANA QUE SE MUEVE.
+       El panel tapa la pantalla: sirve para mirar una cosa, no para
+       trabajar con dos a la vez. Pasa a la ventana la direccion que se
+       esta viendo —no la primera— y se queda donde ibas. */
+    caja.querySelector('.libre').addEventListener('click', function () {
+      var url = pila.length ? pila[pila.length - 1] : enlace.getAttribute('href');
+      var t = titulo.textContent;
+      cerrar();
+      if (window.lfVentana) window.lfVentana(url, t);
+      else location.href = url;
     });
     /* Dentro del panel, los enlaces siguen dentro del panel. Saltar a
        página completa desde aquí tiraría el contexto que el panel
@@ -482,6 +512,313 @@ use LibertyFin\Vista\Widget as W;
   });
 
   window.lfVistazo = abrir;
+  window.lfVistazoCerrar = cerrar;
+})();
+
+/* ══════════════════════════════════════════════════════
+   VENTANA LIBRE
+   El panel tapa la pantalla: sirve para mirar una cosa,
+   no para trabajar con dos a la vez. La ventana libre se
+   mueve, se agranda, se encoge y deja ver lo de abajo, así
+   que puedes tener la venta abierta mientras sigues en la
+   lista —o dos ventas lado a lado—.
+
+   La maquinaria venía de Comisiones, donde ya existía pero
+   solo para los colaboradores. Aquí sirve en cualquier
+   sección, y DENTRO de la ventana se puede seguir
+   navegando: de una venta a su cliente, del cliente a otra
+   sección. Eso es lo que antes no se podía.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  if (!window.fetch || window.lfVentana) return;
+
+  var abiertas = [], Z = 200, MINW = 320, MINH = 180;
+  var ICO = {
+    atras: '<svg viewBox="0 0 16 16"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>',
+    mini:  '<svg viewBox="0 0 16 16"><path d="M3.5 8h9"/></svg>',
+    max:   '<svg viewBox="0 0 16 16"><rect x="3.5" y="3.5" width="9" height="9" rx="1.5"/></svg>',
+    x:     '<svg viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg>'
+  };
+
+  function lim(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  function alFrente(w) {
+    abiertas.forEach(function (o) { o.classList.remove('activa'); });
+    w.classList.add('activa');
+    w.style.zIndex = ++Z > 290 ? (Z = 200) : Z;
+    var i = abiertas.indexOf(w);
+    if (i >= 0) { abiertas.splice(i, 1); abiertas.push(w); }
+  }
+
+  /* Dónde se abre y de qué tamaño. Se recuerda entre visitas: quien
+     acomodó la ventana donde le sirve no tiene que volver a hacerlo
+     cada vez. En cascada cuando hay varias, para que no se tapen. */
+  function sitio(w) {
+    var g = null;
+    try { g = JSON.parse(localStorage.getItem('lf-ventana') || 'null'); } catch (e) {}
+    var an = g && g.w ? g.w : Math.min(760, innerWidth - 32),
+        al = g && g.h ? g.h : Math.min(540, innerHeight - 120);
+    an = lim(an, MINW, innerWidth - 16);
+    al = lim(al, MINH, innerHeight - 16);
+    var n = (abiertas.length % 7) * 26;
+    w.style.width  = an + 'px';
+    w.style.height = al + 'px';
+    w.style.left = lim((g && g.x != null ? g.x : (innerWidth - an) / 2) + n,
+                       4, Math.max(4, innerWidth - an - 4)) + 'px';
+    w.style.top  = lim((g && g.y != null ? g.y : 76) + n,
+                       4, Math.max(4, innerHeight - 90)) + 'px';
+  }
+
+  function guardarSitio(w) {
+    if (w.classList.contains('mini') || w.classList.contains('grande')) return;
+    try {
+      localStorage.setItem('lf-ventana', JSON.stringify({
+        x: parseInt(w.style.left, 10), y: parseInt(w.style.top, 10),
+        w: parseInt(w.style.width, 10), h: parseInt(w.style.height, 10)
+      }));
+    } catch (e) { /* modo privado: se pierde la posición, nada más */ }
+  }
+
+  /* ── Mover y cambiar de tamaño ─────────────────────── */
+  function arrastrar(w) {
+    var bar = w.querySelector('.lf-win-bar');
+    bar.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return;         /* los botones no mueven */
+      if (w.classList.contains('grande')) return;
+      alFrente(w);
+      var r = w.getBoundingClientRect(),
+          dx = e.clientX - r.left, dy = e.clientY - r.top;
+      w.classList.add('moviendo');
+      bar.setPointerCapture(e.pointerId);
+      function mover(ev) {
+        /* No se deja arrastrar fuera de la pantalla: una ventana que se
+           va al otro lado del borde ya no se puede recuperar. */
+        w.style.left = lim(ev.clientX - dx, -r.width + 90, innerWidth - 90) + 'px';
+        w.style.top  = lim(ev.clientY - dy, 2, innerHeight - 40) + 'px';
+      }
+      function soltar() {
+        bar.removeEventListener('pointermove', mover);
+        bar.removeEventListener('pointerup', soltar);
+        bar.removeEventListener('pointercancel', soltar);
+        w.classList.remove('moviendo');
+        guardarSitio(w);
+      }
+      bar.addEventListener('pointermove', mover);
+      bar.addEventListener('pointerup', soltar);
+      bar.addEventListener('pointercancel', soltar);
+      e.preventDefault();
+    });
+  }
+
+  function redimensionar(w) {
+    w.querySelectorAll('.lf-win-grip').forEach(function (g) {
+      g.addEventListener('pointerdown', function (e) {
+        alFrente(w);
+        var r = w.getBoundingClientRect(),
+            oeste = g.dataset.grip === 'sw',
+            x0 = e.clientX, y0 = e.clientY,
+            a0 = r.width, h0 = r.height, l0 = r.left;
+        w.classList.add('redim');
+        g.setPointerCapture(e.pointerId);
+        function mover(ev) {
+          var da = oeste ? (x0 - ev.clientX) : (ev.clientX - x0);
+          var an = lim(a0 + da, MINW, innerWidth - 8);
+          w.style.width  = an + 'px';
+          w.style.height = lim(h0 + (ev.clientY - y0), MINH, innerHeight - 8) + 'px';
+          if (oeste) w.style.left = lim(l0 - (an - a0), 2, innerWidth - MINW) + 'px';
+        }
+        function soltar() {
+          g.removeEventListener('pointermove', mover);
+          g.removeEventListener('pointerup', soltar);
+          g.removeEventListener('pointercancel', soltar);
+          w.classList.remove('redim');
+          guardarSitio(w);
+        }
+        g.addEventListener('pointermove', mover);
+        g.addEventListener('pointerup', soltar);
+        g.addEventListener('pointercancel', soltar);
+        e.preventDefault();
+      });
+    });
+  }
+
+  /* ── Traer contenido ───────────────────────────────── */
+  function cargar(w, url, apilar) {
+    var cuerpo = w.querySelector('.lf-win-cuerpo'),
+        tit = w.querySelector('.lf-win-tit b');
+
+    if (apilar && cuerpo.innerHTML.indexOf('Cargando') === -1) {
+      /* Se guarda lo que había tal cual. No hace falta saber cómo se
+         cargó —puede venir de otra sección con su propia forma de
+         pedirlo— y así volver atrás funciona igual en todos los casos. */
+      w._pila.push({ html: cuerpo.innerHTML, tit: tit.textContent,
+                     scroll: cuerpo.scrollTop, url: w.dataset.url || '' });
+    }
+    w.dataset.url = url;
+    w.querySelector('.atras').hidden = !w._pila.length;
+    var ab = w.querySelector('.abrir'); if (ab) ab.href = url;
+
+    if (w._ac) w._ac.abort();
+    w._ac = new AbortController();
+    w.classList.add('cargando');
+    fetch(url, { signal: w._ac.signal, credentials: 'same-origin',
+                 headers: { 'X-LF-Parcial': '1' } })
+      .then(function (r) {
+        if (!r.ok) throw new Error(r.status);
+        return r.text();
+      })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html'),
+            dentro = doc.querySelector('.lf-cont');
+        /* Una página completa trae su `.lf-cont`; un trozo pedido a un
+           endpoint parcial viene suelto y se usa como está. */
+        cuerpo.innerHTML = dentro ? dentro.innerHTML : html;
+        cuerpo.querySelectorAll('script').forEach(function (v) {
+          var n = document.createElement('script');
+          for (var i = 0; i < v.attributes.length; i++) {
+            n.setAttribute(v.attributes[i].name, v.attributes[i].value);
+          }
+          n.textContent = v.textContent;
+          v.parentNode.replaceChild(n, v);
+        });
+        var t = doc.querySelector('.lf-top-tit b, .lf-top-tit h1, h1');
+        if (t) tit.textContent = t.textContent.trim();
+        else if (doc.title) tit.textContent = doc.title.split('·')[0].trim();
+        cuerpo.scrollTop = 0;
+        w.classList.remove('cargando');
+      })
+      .catch(function (e) {
+        if (e.name === 'AbortError') return;
+        w.classList.remove('cargando');
+        cuerpo.innerHTML = '<p class="lf-win-msj">No se pudo cargar. ' +
+          '<a href="' + url + '">Abrir en la página</a></p>';
+      });
+  }
+
+  function atras(w) {
+    var v = w._pila.pop();
+    if (!v) return;
+    var cuerpo = w.querySelector('.lf-win-cuerpo');
+    cuerpo.innerHTML = v.html;
+    w.querySelector('.lf-win-tit b').textContent = v.tit;
+    cuerpo.scrollTop = v.scroll || 0;
+    if (v.url) w.dataset.url = v.url;
+    w.querySelector('.atras').hidden = !w._pila.length;
+    /* De vuelta en el contenido propio de la ventana, su buscador
+       vuelve a servir. */
+    if (!w._pila.length) {
+      var b = w.querySelector('.lf-win-busca');
+      if (b) b.hidden = false;
+    }
+  }
+
+  function cerrar(w) {
+    var i = abiertas.indexOf(w);
+    if (i >= 0) abiertas.splice(i, 1);
+    if (w._ac) w._ac.abort();
+    w.remove();
+  }
+
+  /* ── Abrir ─────────────────────────────────────────── */
+  function abrir(url, titulo) {
+    /* La misma dirección no se abre dos veces: se trae al frente. */
+    for (var i = 0; i < abiertas.length; i++) {
+      if (abiertas[i].dataset.url === url) {
+        abiertas[i].classList.remove('mini');
+        alFrente(abiertas[i]);
+        return abiertas[i];
+      }
+    }
+    var w = document.createElement('div');
+    w.className = 'lf-win lf-win-libre';
+    w.setAttribute('role', 'dialog');
+    w.setAttribute('aria-label', titulo || 'Ventana');
+    w._pila = [];
+    w.innerHTML =
+      '<div class="lf-win-bar">' +
+        '<button type="button" class="atras" hidden title="Volver" aria-label="Volver">' + ICO.atras + '</button>' +
+        '<div class="lf-win-tit"><b>' + (titulo || 'Cargando…') + '</b></div>' +
+        '<a class="abrir" href="' + url + '" title="Abrir en la página completa">Abrir</a>' +
+        '<div class="lf-win-btns">' +
+          '<button type="button" class="mini" title="Minimizar" aria-label="Minimizar">' + ICO.mini + '</button>' +
+          '<button type="button" class="maxi" title="Agrandar" aria-label="Agrandar">' + ICO.max + '</button>' +
+          '<button type="button" class="cerrar" title="Cerrar" aria-label="Cerrar">' + ICO.x + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="lf-win-cuerpo"><p class="lf-win-msj">Cargando…</p></div>' +
+      '<span class="lf-win-grip sw" data-grip="sw"></span>' +
+      '<span class="lf-win-grip se" data-grip="se"></span>';
+    sitio(w);
+    document.body.appendChild(w);
+    abiertas.push(w);
+    alFrente(w);
+    arrastrar(w);
+    redimensionar(w);
+
+    w.addEventListener('pointerdown', function () { alFrente(w); });
+    w.querySelector('.atras').addEventListener('click', function () { atras(w); });
+    w.querySelector('.cerrar').addEventListener('click', function () { cerrar(w); });
+    w.querySelector('.mini').addEventListener('click', function () {
+      w.classList.toggle('mini');
+      w.classList.remove('grande');
+    });
+    w.querySelector('.maxi').addEventListener('click', function () {
+      w.classList.remove('mini');
+      if (w.classList.contains('grande')) {
+        w.classList.remove('grande');
+        sitio(w);
+      } else {
+        /* Antes de agrandar se apunta dónde estaba, para devolverla ahí
+           y no al sitio por omisión. */
+        guardarSitio(w);
+        w.classList.add('grande');
+      }
+    });
+
+    cargar(w, url, false);
+    return w;
+  }
+
+  /* ── Navegar DENTRO de la ventana ──────────────────── */
+  /* Esto es lo que faltaba: en Comisiones se podía abrir la ventana de
+     un colaborador pero cualquier enlace de dentro sacaba de ahí y
+     recargaba la página entera. Ahora el enlace se queda en la ventana,
+     con su botón de volver. Vale para las de Comisiones y para las
+     nuevas, porque escucha en el cuerpo de cualquiera. */
+  var FUERA = /\/(salir|login|registro|ticket|imprimir|descargar|exportar|pdf|qr)(\/|$|\?)/;
+  document.addEventListener('click', function (e) {
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    var cuerpo = e.target.closest('.lf-win-cuerpo');
+    if (!cuerpo) return;
+    var a = e.target.closest('a');
+    if (!a || !a.getAttribute('href') || a.target || a.hasAttribute('download')) return;
+    var href = a.getAttribute('href');
+    if (href.charAt(0) === '#' || /^(javascript|mailto|tel):/i.test(href)) return;
+    var u;
+    try { u = new URL(a.href, location.href); } catch (err) { return; }
+    if (u.origin !== location.origin || FUERA.test(u.pathname)) return;
+
+    var w = cuerpo.closest('.lf-win');
+    if (!w) return;
+    if (!w._pila) w._pila = [];
+    /* Una ventana de Comisiones no trae estos botones: se le ponen la
+       primera vez que se navega, para que pueda volver. */
+    if (!w.querySelector('.atras')) {
+      var b = document.createElement('button');
+      b.type = 'button'; b.className = 'atras'; b.title = 'Volver';
+      b.setAttribute('aria-label', 'Volver');
+      b.innerHTML = ICO.atras;
+      b.addEventListener('click', function () { atras(w); });
+      w.querySelector('.lf-win-bar').insertBefore(b, w.querySelector('.lf-win-bar').firstChild);
+    }
+    var busca = w.querySelector('.lf-win-busca');
+    if (busca) busca.hidden = true;
+    e.preventDefault();
+    alFrente(w);
+    cargar(w, u.pathname + u.search, true);
+  });
+
+  window.lfVentana = abrir;
 })();
 </script>
 
@@ -491,7 +828,15 @@ use LibertyFin\Vista\Widget as W;
 <meta name="theme-color" content="#27ae60">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/libertyfin.css?v=2">
+<?php
+// LA VERSIÓN SALE DE LA FECHA DEL ARCHIVO, no de un número a mano.
+// Con `?v=2` fijo, cada cambio de estilos exigía acordarse de subirlo, y
+// cuando a alguien se le olvidaba —siempre— el navegador seguía
+// enseñando la hoja vieja. Tanto, que las ventanas flotantes se
+// escribieron dentro de su vista solo para esquivar este problema.
+$hoja = __DIR__ . '/../../../public/assets/css/libertyfin.css';
+?>
+<link rel="stylesheet" href="/assets/css/libertyfin.css?v=<?= is_file($hoja) ? filemtime($hoja) : '3' ?>">
 <?php
 // El color de la empresa se inyecta como variable. Todo lo demás
 // —hovers, fondos tenues, anillos de foco— se calcula con color-mix,

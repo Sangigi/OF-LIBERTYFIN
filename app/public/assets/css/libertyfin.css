@@ -651,6 +651,13 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .lf-hero .lf-prog > i{background:#fff}
 @keyframes lf-gro{from{width:0}}
 
+/* ESTE FALTABA.
+   `lf-giro` se usa en cinco sitios —el boton de entrar, los botones que
+   estan trabajando, los indicadores de carga— y no estaba definido en
+   ninguna parte. El resultado: ningun circulo de la aplicacion giraba.
+   Un indicador de carga quieto no dice "esperando": dice "colgado". */
+@keyframes lf-giro{to{transform:rotate(360deg)}}
+
 /* Avance dentro de una celda de tabla */
 .lf-mini{display:flex;align-items:center;gap:9px;min-width:112px}
 .lf-mini .lf-prog{flex:1;margin:0;height:5px}
@@ -2375,12 +2382,12 @@ form[data-guardar] .m{transition:border-color .15s,background .15s}
   background:var(--lf-panel);border:1px solid var(--lf-linea);
   border-radius:var(--lf-r-panel) var(--lf-r-panel) 0 0;
   box-shadow:var(--lf-s3);overflow:hidden;
-  animation:lf-sube .26s cubic-bezier(.32,.72,.3,1)}
+  animation:lf-vistazo-sube .26s cubic-bezier(.32,.72,.3,1)}
 @media(min-width:721px){
   .lf-vistazo .hoja{border-radius:var(--lf-r-panel);max-height:86vh;
     animation:lf-asoma .2s ease}
 }
-@keyframes lf-sube{from{transform:translateY(22px);opacity:.6}}
+@keyframes lf-vistazo-sube{from{transform:translateY(22px);opacity:.6}}
 @keyframes lf-asoma{from{transform:scale(.975);opacity:0}}
 .lf-vistazo header{display:flex;align-items:center;gap:10px;flex-shrink:0;
   padding:13px 14px;border-bottom:1px solid var(--lf-linea);background:var(--lf-sup)}
@@ -2407,3 +2414,103 @@ form[data-guardar] .m{transition:border-color .15s,background .15s}
 body.lf-vistazo-abierto{overflow:hidden}
 /* La fila que se puede mirar sin salir de la lista */
 tr[data-modal],a[data-modal]{cursor:pointer}
+
+
+/* ══════════════════════════════════════════════════════
+   35 · VENTANAS FLOTANTES
+   Vienen de Comisiones, donde ya se usaban para mirar las
+   ventas de un colaborador sin salir de la lista. Estaban
+   dentro de esa vista, así que ninguna otra sección podía
+   abrir una. Aquí sirven para todas.
+
+   Viven en <body>, fuera de la rejilla: no mueven nada de
+   lo que hay debajo. z-index 200-290: encima del menú y de
+   los velos (<=60), debajo de la guía (9000).
+   ══════════════════════════════════════════════════════ */
+.lf-win{position:fixed;display:flex;flex-direction:column;box-sizing:border-box;
+  min-width:300px;min-height:0;max-width:calc(100vw - 8px);max-height:calc(100vh - 8px);
+  background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  box-shadow:var(--lf-shadow-lg);overflow:hidden;animation:lf-win-in .16s ease-out}
+.lf-win.activa{border-color:var(--lf-brand)}
+@keyframes lf-win-in{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+.lf-win-bar{display:flex;align-items:center;gap:10px;padding:9px 8px 9px 14px;
+  background:var(--lf-vidrio);border-bottom:1px solid var(--lf-linea);
+  cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none;flex-shrink:0}
+.lf-win.moviendo .lf-win-bar{cursor:grabbing}
+.lf-win.moviendo,.lf-win.redim{user-select:none;-webkit-user-select:none}
+.lf-win-tit{flex:1;min-width:0}
+.lf-win-tit b{display:block;font-size:13px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-win-tit small{display:block;font-size:11px;color:var(--lf-tinta-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-win-btns{display:flex;gap:4px;flex-shrink:0}
+.lf-win-btns button{width:28px;height:28px;display:flex;align-items:center;justify-content:center;
+  border:0;border-radius:var(--lf-r-sm);background:transparent;color:var(--lf-tinta-3);cursor:pointer;padding:0}
+.lf-win-btns button:hover{background:var(--lf-sup-2);color:var(--lf-tinta)}
+.lf-win-btns button.cerrar:hover{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-win-btns button:focus-visible{outline:2px solid var(--lf-brand);outline-offset:1px}
+.lf-win-btns svg{width:14px;height:14px;display:block;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round}
+.lf-win-busca{padding:8px 12px;border-bottom:1px solid var(--lf-linea);flex-shrink:0}
+.lf-win-busca .lf-search input{padding-top:7px;padding-bottom:7px;font-size:12.5px}
+.lf-win.mini .lf-win-busca{display:none}
+.lf-win-cuerpo{flex:1;min-height:0;overflow:auto;position:relative}
+.lf-win-cuerpo .table-responsive{padding:2px 8px 0}
+.lf-win.cargando .lf-win-cuerpo{opacity:.55;pointer-events:none}
+.lf-win.mini .lf-win-cuerpo,.lf-win.mini .lf-win-grip{display:none}
+.lf-win.mini{height:auto!important;min-width:0}
+.lf-win.mini .lf-win-bar{border-bottom:0}
+.lf-win-msj,.lf-det-vacio{padding:22px;text-align:center;color:var(--lf-tinta-4);font-size:13px;margin:0}
+.lf-det-pie{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  flex-wrap:wrap;padding:10px 16px;border-top:1px solid var(--lf-linea);
+  font-size:12px;color:var(--lf-tinta-4);position:sticky;bottom:0;background:var(--lf-sup)}
+/* Esquinas inferiores para cambiar el tamaño */
+.lf-win-grip{position:absolute;bottom:0;width:18px;height:18px;z-index:2;touch-action:none}
+.lf-win-grip.se{right:0;cursor:nwse-resize}
+.lf-win-grip.sw{left:0;cursor:nesw-resize}
+.lf-win-grip::after{content:"";position:absolute;bottom:4px;width:8px;height:8px;
+  border-bottom:2px solid var(--lf-tinta-4);opacity:.55}
+.lf-win-grip.se::after{right:4px;border-right:2px solid var(--lf-tinta-4)}
+.lf-win-grip.sw::after{left:4px;border-left:2px solid var(--lf-tinta-4)}
+.lf-win-grip:hover::after{opacity:1;border-color:var(--lf-brand)}
+@media (prefers-reduced-motion:reduce){.lf-win{animation:none}}
+
+/* El botón que saca el panel a una ventana que se mueve */
+.lf-vistazo header .libre{width:auto!important;height:28px;padding:0 11px;
+  border-radius:999px;font:inherit;font-size:11.5px;font-weight:600;
+  color:var(--lf-tinta-3);white-space:nowrap}
+.lf-vistazo header .libre:hover{color:var(--lf-brand-2);border-color:var(--lf-brand);
+  background:var(--lf-brand-glow)}
+@media(max-width:620px){
+  /* En un teléfono no hay dónde mover una ventana: la hoja ya ocupa
+     todo. Ofrecerlo sería prometer algo que no cabe. */
+  .lf-vistazo header .libre{display:none}
+  .lf-win-libre{inset:0!important;width:auto!important;height:auto!important;
+    border-radius:0}
+  .lf-win-libre .lf-win-grip{display:none}
+}
+
+/* Lo que la ventana libre añade sobre la de Comisiones */
+.lf-win-bar .atras{width:28px;height:28px;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center;border:0;background:none;cursor:pointer;
+  border-radius:7px;color:var(--lf-tinta-3);padding:0}
+.lf-win-bar .atras:hover{background:var(--lf-sup-2);color:var(--lf-tinta)}
+.lf-win-bar .atras[hidden]{display:none}
+.lf-win-bar .atras svg{width:14px;height:14px;fill:none;stroke:currentColor;
+  stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+.lf-win-bar .abrir{flex-shrink:0;font-size:11px;font-weight:600;
+  color:var(--lf-tinta-4);text-decoration:none;padding:0 6px}
+.lf-win-bar .abrir:hover{color:var(--lf-brand-2)}
+.lf-win-btns button.maxi:hover{background:var(--lf-brand-glow);color:var(--lf-brand-2)}
+/* Agrandada: ocupa la pantalla sin perder la barra, así se puede
+   devolver a su tamaño sin adivinar dónde estaba. */
+.lf-win.grande{left:8px!important;top:8px!important;
+  width:calc(100vw - 16px)!important;height:calc(100vh - 16px)!important}
+.lf-win.grande .lf-win-grip{display:none}
+.lf-win.grande .lf-win-bar{cursor:default}
+/* El cuerpo de una ventana libre trae una página entera: necesita aire
+   que el fragmento de Comisiones no necesitaba. */
+.lf-win-libre .lf-win-cuerpo{padding:12px}
+.lf-win-libre .lf-win-cuerpo .card{box-shadow:none}
+.lf-win-libre .lf-win-cuerpo > div{margin:0}
+.lf-win-busca[hidden]{display:none}
