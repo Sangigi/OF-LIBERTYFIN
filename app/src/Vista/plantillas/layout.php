@@ -21,7 +21,68 @@ use LibertyFin\Vista\Widget as W;
   // el usuario lo pida.
   document.documentElement.setAttribute('data-theme', 'light');
 })();
+</script>
 
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title><?= P::e($titulo ?? 'LibertyFin') ?> · LibertyFin</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2327ae60'/><text x='50' y='50' font-family='DM Sans,system-ui,sans-serif' font-size='62' font-weight='800' fill='white' text-anchor='middle' dominant-baseline='central'>L</text></svg>">
+<meta name="theme-color" content="#27ae60">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<?php
+// LA VERSIÓN SALE DE LA FECHA DEL ARCHIVO, no de un número a mano.
+// Con `?v=2` fijo, cada cambio de estilos exigía acordarse de subirlo, y
+// cuando a alguien se le olvidaba —siempre— el navegador seguía
+// enseñando la hoja vieja. Tanto, que las ventanas flotantes se
+// escribieron dentro de su vista solo para esquivar este problema.
+$hoja = __DIR__ . '/../../../public/assets/css/libertyfin.css';
+?>
+<link rel="stylesheet" href="/assets/css/libertyfin.css?v=<?= is_file($hoja) ? filemtime($hoja) : '3' ?>">
+<?php
+// El color de la empresa se inyecta como variable. Todo lo demás
+// —hovers, fondos tenues, anillos de foco— se calcula con color-mix,
+// así que basta con este dato para que el sistema entero cambie.
+$marca = $_SESSION['lf_marca_color'] ?? '';
+if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
+<style>:root{--lf-brand:<?= $marca ?>}</style>
+<?php endif; ?>
+</head>
+<body>
+<div class="lf-app">
+  <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
+  <div class="lf-main">
+    <?php P::parcial('parciales/topbar', ['titulo' => $titulo ?? '', 'icono' => $icono ?? 'panel', 'subtitulo' => $subtitulo ?? '']); ?>
+    <div class="lf-cont"><?= $contenido ?></div>
+  </div>
+  <?php if (!empty($_SESSION['lf_mostrar_guia'])): unset($_SESSION['lf_mostrar_guia']);
+        P::parcial('parciales/guia'); endif; ?>
+  </div>
+</div>
+
+<?php /* ═══════════════════════════════════════════════════════
+     ESTE JAVASCRIPT VA AL FINAL DEL CUERPO, NO EN LA CABEZA.
+
+     Estaba arriba, en el mismo bloque que elige el tema, y eso
+     rompía dos cosas de golpe porque allí el documento todavía no
+     existe:
+
+       · `document.querySelector('.lf-cont')` devolvía null, y el módulo
+         de navegación se iba por su propia salida de emergencia en la
+         primera línea. Nunca llegó a correr: por eso cambiar de sección
+         seguía recargando la página entera.
+
+       · `observe(document.body)` reventaba con "parameter 1 is not of
+         type 'Node'". Y una excepción ahí mata el RESTO del bloque, así
+         que `window.lfVentana` no llegaba a definirse y el botón de
+         ventana libre caía en su respaldo: abrir la página.
+
+     El detector de tema sí se queda arriba, y tiene que quedarse: si
+     esperara hasta aquí, la página aparecería en claro y saltaría a
+     oscuro. Ese parpadeo es lo que hace que un modo oscuro se sienta
+     barato.
+     ═══════════════════════════════════════════════════════ */ ?>
+<script>
 /* ══════════════════════════════════════════════════════
    PESTAÑAS SIN RECARGAR
    Sirve para cualquier sección: un contenedor con
@@ -96,8 +157,15 @@ use LibertyFin\Vista\Widget as W;
    menú, su barra y sus estilos.
    ══════════════════════════════════════════════════════ */
 (function () {
-  var cont = document.querySelector('.lf-cont');
-  if (!cont || !window.history || !window.fetch) return;
+  if (!window.history || !window.fetch) return;
+
+  /* Se busca CADA VEZ, no una sola al arrancar.
+     Guardarlo en una variable al cargar ataba el módulo entero al orden
+     del documento: si por lo que fuera no estaba todavía, la primera
+     línea se iba por la salida de emergencia y la navegación sin
+     recarga quedaba muerta sin que nada lo dijera. Buscarlo al usarlo
+     cuesta nada y no se puede romper así. */
+  function caja() { return document.querySelector('.lf-cont'); }
 
   var enCurso = null;
 
@@ -150,6 +218,10 @@ use LibertyFin\Vista\Widget as W;
   }
 
   function ir(url, empujar) {
+    var cont = caja();
+    /* Sin dónde ponerlo, se navega como siempre. Mejor una recarga que
+       una pantalla que no responde al clic. */
+    if (!cont) { location.href = url; return; }
     var antes = seccionDe(location.pathname);
     if (enCurso) enCurso.abort();
     enCurso = new AbortController();
@@ -891,7 +963,14 @@ use LibertyFin\Vista\Widget as W;
      se adoptan en cuanto aparecen. Vigilar es mejor que pedirle a
      Comisiones que avise: así funciona también con cualquier ventana
      que se añada mañana sin saber que esto existe. */
-  if (window.MutationObserver) {
+  function vigilarVentanas() {
+    /* `observe` sobre null lanza "parameter 1 is not of type 'Node'", y
+       una excepción aquí mata el resto del bloque: `window.lfVentana`
+       no se definía y el botón de ventana libre acababa abriendo la
+       página. Ahora el cuerpo ya existe —esto corre al final— pero la
+       comprobación se queda: es una línea y evita que mover el script
+       lo rompa otra vez. */
+    if (!window.MutationObserver || !document.body) return;
     new MutationObserver(function (cambios) {
       var hubo = false;
       cambios.forEach(function (c) {
@@ -911,6 +990,8 @@ use LibertyFin\Vista\Widget as W;
       if (hubo) setTimeout(guardarAbiertas, 60);   /* tras su primera carga */
     }).observe(document.body, { childList: true });
   }
+  if (document.body) vigilarVentanas();
+  else document.addEventListener('DOMContentLoaded', vigilarVentanas);
 
   /* Solo al CARGAR la página, no al cambiar de sección sin recargar:
      ahí las ventanas siguen puestas y volver a abrirlas las duplicaría. */
@@ -924,41 +1005,5 @@ use LibertyFin\Vista\Widget as W;
   window.lfVentanasAbiertas = function () { return abiertas.slice(); };
 })();
 </script>
-
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title><?= P::e($titulo ?? 'LibertyFin') ?> · LibertyFin</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2327ae60'/><text x='50' y='50' font-family='DM Sans,system-ui,sans-serif' font-size='62' font-weight='800' fill='white' text-anchor='middle' dominant-baseline='central'>L</text></svg>">
-<meta name="theme-color" content="#27ae60">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<?php
-// LA VERSIÓN SALE DE LA FECHA DEL ARCHIVO, no de un número a mano.
-// Con `?v=2` fijo, cada cambio de estilos exigía acordarse de subirlo, y
-// cuando a alguien se le olvidaba —siempre— el navegador seguía
-// enseñando la hoja vieja. Tanto, que las ventanas flotantes se
-// escribieron dentro de su vista solo para esquivar este problema.
-$hoja = __DIR__ . '/../../../public/assets/css/libertyfin.css';
-?>
-<link rel="stylesheet" href="/assets/css/libertyfin.css?v=<?= is_file($hoja) ? filemtime($hoja) : '3' ?>">
-<?php
-// El color de la empresa se inyecta como variable. Todo lo demás
-// —hovers, fondos tenues, anillos de foco— se calcula con color-mix,
-// así que basta con este dato para que el sistema entero cambie.
-$marca = $_SESSION['lf_marca_color'] ?? '';
-if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
-<style>:root{--lf-brand:<?= $marca ?>}</style>
-<?php endif; ?>
-</head>
-<body>
-<div class="lf-app">
-  <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
-  <div class="lf-main">
-    <?php P::parcial('parciales/topbar', ['titulo' => $titulo ?? '', 'icono' => $icono ?? 'panel', 'subtitulo' => $subtitulo ?? '']); ?>
-    <div class="lf-cont"><?= $contenido ?></div>
-  </div>
-  <?php if (!empty($_SESSION['lf_mostrar_guia'])): unset($_SESSION['lf_mostrar_guia']);
-        P::parcial('parciales/guia'); endif; ?>
-  </div>
-</div>
 </body>
 </html>
