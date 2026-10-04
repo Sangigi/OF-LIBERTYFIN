@@ -672,6 +672,9 @@ if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
         return {
           url: w.dataset.url || '',
           tit: (w.querySelector('.lf-win-tit b') || {}).textContent || '',
+          /* Comisiones identifica sus ventanas con esto. Se guarda para
+             que al volver reconozca la suya y no abra una segunda. */
+          llave: w.dataset.llave || '',
           x: parseInt(w.style.left, 10) || 0, y: parseInt(w.style.top, 10) || 0,
           w: parseInt(w.style.width, 10) || 0, h: parseInt(w.style.height, 10) || 0,
           mini: w.classList.contains('mini'),
@@ -693,6 +696,7 @@ if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
       if (ya) return;
       var w = abrir(d.url, d.tit || 'Ventana');
       if (!w) return;
+      if (d.llave) w.dataset.llave = d.llave;
       /* Se le devuelve EXACTAMENTE el sitio y el tamaño que tenía, no
          el de por omisión: una ventana que vuelve a aparecer en otro
          lado obliga a recolocarla cada vez. */

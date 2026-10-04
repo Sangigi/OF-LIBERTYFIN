@@ -321,10 +321,15 @@ $qs = function ($x = []) use ($desde, $hasta) {
   function minimizar(w, forzar) {
     var mini = (forzar === undefined) ? !w.classList.contains('mini') : forzar;
     w.classList.toggle('mini', mini);
+    /* Una ventana restaurada por el layout trae `.mini` en vez de
+       `.minimizar`: ese botón no existe y las tres líneas de abajo
+       reventaban. Se envuelven las tres, no solo la primera. */
     var b = w.querySelector('.minimizar');
-    b.innerHTML = mini ? ICO_MAX : ICO_MIN;
-    b.title = mini ? 'Restaurar' : 'Minimizar';
-    b.setAttribute('aria-label', b.title);
+    if (b) {
+      b.innerHTML = mini ? ICO_MAX : ICO_MIN;
+      b.title = mini ? 'Restaurar' : 'Minimizar';
+      b.setAttribute('aria-label', b.title);
+    }
     if (!mini) acomodar(w);
   }
 
@@ -381,13 +386,27 @@ $qs = function ($x = []) use ($desde, $hasta) {
     var llave = [card.dataset.id, card.dataset.nombre, card.dataset.equipo,
                  cont.dataset.desde, cont.dataset.hasta].join('|');
 
-    /* La misma persona y periodo: se trae al frente en vez de duplicarla. */
-    for (var i = 0; i < ventanas.length; i++) {
-      if (ventanas[i].dataset.llave === llave) {
-        minimizar(ventanas[i], false);
-        alFrente(ventanas[i]);
-        return;
-      }
+    /* La misma persona y periodo: se trae al frente en vez de duplicarla.
+       Se busca en el DOCUMENTO y no solo en la lista propia: tras una
+       recarga la ventana la vuelve a poner el módulo compartido del
+       layout, y esa nunca pasó por aquí. Sin esto saldría una segunda
+       ventana del mismo colaborador encima de la primera. */
+    var previa = null;
+    [].forEach.call(document.querySelectorAll('.lf-win'), function (x) {
+      if (previa) return;
+      if (x.dataset.llave === llave) previa = x;
+      else if ((x.dataset.url || '')
+               .indexOf('/comisiones/colaborador/' + card.dataset.id + '?') === 0) previa = x;
+    });
+    if (previa) {
+      /* Si venía de fuera, se adopta: `alFrente` ordena esta lista y
+         con un elemento que no está en ella haría un splice(-1). */
+      if (ventanas.indexOf(previa) === -1) ventanas.push(previa);
+      previa.dataset.llave = llave;
+      previa._card = card;
+      minimizar(previa, false);
+      alFrente(previa);
+      return;
     }
 
     var w = document.createElement('div');
@@ -559,14 +578,21 @@ $qs = function ($x = []) use ($desde, $hasta) {
     });
   });
 
-  /* Las ventanas son de esta pantalla: si se navega a otra sin recargar,
-     se cierran en vez de quedarse flotando sobre ella. */
+  /* ANTES SE CERRABAN AL CAMBIAR DE SECCIÓN. Ya no.
+     La idea era que una ventana de Comisiones flotando sobre Ventas
+     confundía, y cuando las ventanas solo existían aquí tenía sentido.
+     Resultó al revés: tener las ventas de un colaborador abiertas
+     MIENTRAS se trabaja en otra sección es justo para lo que sirve una
+     ventana que se mueve. Cerrarlas era tirar el trabajo de quien las
+     había abierto para eso.
+     Ahora persisten: el módulo compartido del layout las adopta, las
+     apunta y las vuelve a abrir si se recarga. Lo único que queda por
+     hacer aquí es soltar la tarjeta, que ya no está en el documento. */
   var cont = document.querySelector('.lf-cont');
   if (cont && window.MutationObserver) {
     new MutationObserver(function () {
-      if (!document.querySelector('.lf-equipo')) {
-        ventanas.slice().forEach(cerrar);
-      }
+      if (document.querySelector('.lf-equipo')) return;
+      ventanas.forEach(function (w) { w._card = null; });
     }).observe(cont, { childList: true });
   }
 })();
