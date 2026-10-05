@@ -2568,3 +2568,13 @@ tr[data-modal],a[data-modal]{cursor:pointer}
   .lf-side .lf-nav a{padding:10px 10px;margin:0}
   .lf-side .lf-pie{margin:0 10px 10px;padding:10px}
 }
+
+/* CAUSA DEL ESPACIO A LA IZQUIERDA EN EL LATERAL MÓVIL: la regla base de
+   móvil lo declara como fila con `align-items:center`. Al pasar a columna
+   ese centrado se queda, y el logo y el menú se encogían al ancho de su
+   contenido y quedaban centrados, con un hueco enorme a la izquierda. */
+@media(max-width:940px){
+  .lf-side{align-items:stretch;overflow-x:hidden}
+  .lf-side .lf-marca,.lf-side .lf-nav,.lf-side .lf-pie{width:auto;align-self:stretch}
+  .lf-side .lf-marca{padding:16px 52px 12px 16px}
+}
