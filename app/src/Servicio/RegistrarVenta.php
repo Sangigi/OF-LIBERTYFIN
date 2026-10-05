@@ -72,6 +72,28 @@ final class RegistrarVenta
                 ]);
             }
 
+            // ── El área de la venta ──
+            //
+            // Se guardaba vacía: el INSERT de arriba nunca la escribía, y la
+            // lista y el detalle de Ventas la leen de aquí. Es el área del
+            // producto que más pesó en dinero (la categoría), la misma regla
+            // con la que se resume el área de un cliente.
+            $q = $this->db->prepare("
+                SELECT cat.nombre
+                  FROM venta_detalles d
+                  INNER JOIN productos p   ON p.id = d.producto_id
+                  INNER JOIN categorias cat ON cat.id = p.categoria_id
+                 WHERE d.venta_id = ? AND cat.nombre IS NOT NULL AND cat.nombre <> ''
+                 GROUP BY cat.nombre
+                 ORDER BY SUM(d.subtotal) DESC
+                 LIMIT 1");
+            $q->execute([$ventaId]);
+            $area = $q->fetchColumn();
+            if ($area) {
+                $this->db->prepare("UPDATE ventas SET area_nombre = ? WHERE id = ?")
+                         ->execute([$area, $ventaId]);
+            }
+
             // ── Gasto de operación. Se resta de la utilidad ANTES de comisionar. ──
             if ($t['gastos'] > 0) {
                 $this->db->prepare("

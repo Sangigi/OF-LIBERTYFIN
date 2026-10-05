@@ -155,6 +155,25 @@ $token = $_SESSION['lf_token'];
       <div id="sugerencias" class="lf-sugerencias" hidden></div>
     </div>
 
+    <?php /* Quién va a hacer el trabajo, no quién cobra. De aquí sale a quién
+             se le asigna la comisión: sin esto toda venta queda "POR ASIGNAR". */ ?>
+    <div style="padding:0 20px 12px">
+      <label class="form-label" for="selEspecialista">Especialista asignado</label>
+      <select class="form-select form-select-sm" name="especialista" id="selEspecialista">
+        <option value="">Sin asignar</option>
+        <?php foreach (($equipo ?? []) as $nombreArea => $gente): ?>
+          <optgroup label="<?= P::e($nombreArea) ?>">
+            <?php foreach ($gente as $c): ?>
+              <option value="<?= (int)$c['id'] ?>"><?= P::e($c['nombre']) ?></option>
+            <?php endforeach; ?>
+          </optgroup>
+        <?php endforeach; ?>
+      </select>
+      <label class="form-label" for="descVenta" style="margin-top:12px">Descripción <small style="font-weight:400;color:var(--lf-tinta-4)">(opcional)</small></label>
+      <textarea class="form-control lf-desc" name="descripcion" id="descVenta" rows="2"
+                placeholder="Qué se vendió, condiciones, referencias…"></textarea>
+    </div>
+
     <div id="lista"></div>
     <p id="vacio" style="padding:26px 20px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
       Toca un producto para agregarlo.</p>
@@ -825,6 +844,20 @@ $token = $_SESSION['lf_token'];
   /* El envío ya no recarga: se manda, se recibe y se abre el modal. */
   if (form) form.addEventListener('submit', function(ev){
     ev.preventDefault();
+
+    /* Un nombre escrito en "Cliente" que NO se eligió de la lista no
+       guarda nada: la venta salía sin cliente y sin avisar. Aquí se
+       detiene y se explica. Con una venta existente elegida no aplica. */
+    var campoCli = document.getElementById('buscaCliente');
+    var idCli = document.getElementById('cliente_id');
+    var amplia = window.lfVentaElegida && window.lfVentaElegida();
+    if (campoCli && idCli && campoCli.value.trim() !== '' && !idCli.value && !amplia) {
+      alert('Elige al cliente de la lista de sugerencias para que se guarde en la venta, '
+          + 'o borra el nombre para vender sin cliente.');
+      campoCli.focus();
+      return;
+    }
+
     var btn = document.getElementById('btnCobrar');
     if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
 

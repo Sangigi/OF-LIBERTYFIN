@@ -86,7 +86,7 @@ final class VentaRepo extends Repo
 
         return $this->todos("
             SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado,
-                   v.area_nombre,
+                   COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
                    COALESCE(pg.cobrado,0) AS cobrado,
                    v.total - COALESCE(pg.cobrado,0) AS saldo
@@ -120,7 +120,7 @@ final class VentaRepo extends Repo
     public function saldosAbiertos($tope = 5)
     {
         return $this->todos("
-            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.area_nombre,
+            SELECT v.id, v.codigo_venta, v.fecha, v.total, COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
                    COALESCE(pg.cobrado,0) AS cobrado,
                    v.total - COALESCE(pg.cobrado,0) AS saldo
