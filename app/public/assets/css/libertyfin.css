@@ -2726,9 +2726,14 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-nota-busqueda{margin:-6px 0 16px;padding:9px 13px;font-size:12.5px;line-height:1.5;
   color:var(--lf-brand-2);background:var(--lf-brand-soft);border-radius:var(--lf-r)}
 
-/* Caja · referencia de la transferencia manual */
-.lf-ref{padding:0 20px 14px}
-.lf-ref label{display:block;font-size:12px;font-weight:600;color:var(--lf-tinta-2);margin-bottom:6px}
-.lf-ref label small{font-weight:400;color:var(--lf-tinta-4)}
-.lf-ref p{font-size:11.5px;color:var(--lf-tinta-4);margin:6px 0 0;line-height:1.45}
-.lf-ref[hidden]{display:none}
+/* Caja · "Ya me pagaron": no generar liga y cobrar como pagado */
+.lf-sinliga{margin:0 20px 14px;padding:11px 13px;border-radius:var(--lf-r);
+  background:var(--lf-vidrio);border:1px solid var(--lf-linea)}
+.lf-sinliga > label{display:flex;align-items:flex-start;gap:10px;cursor:pointer;margin:0;
+  font-size:13px;line-height:1.4;color:var(--lf-tinta-2)}
+.lf-sinliga > label input{width:16px;height:16px;margin-top:2px;flex-shrink:0;accent-color:var(--lf-brand)}
+.lf-sinliga small{display:block;font-size:11.5px;color:var(--lf-tinta-4);margin-top:2px}
+.lf-sinliga .ref{margin-top:11px;padding-top:11px;border-top:1px dashed var(--lf-linea-f)}
+.lf-sinliga .ref label{display:block;font-size:12px;font-weight:600;color:var(--lf-tinta-2);margin-bottom:6px}
+.lf-sinliga .ref label small{display:inline;font-weight:400}
+.lf-sinliga[hidden],.lf-sinliga .ref[hidden]{display:none}

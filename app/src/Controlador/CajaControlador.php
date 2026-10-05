@@ -136,6 +136,15 @@ final class CajaControlador
         $ampliar = (int)($_POST['ampliar_venta'] ?? 0);
         if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket);
 
+        // ¿Se pidió un método de liga (tarjeta, SPEI, efectivo en tienda)?
+        // Y si sí: ¿se marcó "Ya me pagaron", o no hay proveedor con qué
+        // generarla? En esos casos NO se llama al proveedor y el cobro
+        // pasa como pagado, con el método que se eligió.
+        $enLineaPedida = self::formaEnLinea($_POST['como_paga'] ?? '');
+        $sinLiga = $enLineaPedida !== ''
+                && (!empty($_POST['sin_liga'])
+                    || !\LibertyFin\Servicio\Integraciones::activa('spei'));
+
         try {
             $r = (new RegistrarVenta($db))->cobrar($ticket, [
                 'cliente_id'     => (int)($_POST['cliente_id'] ?? 0) ?: null,
@@ -153,7 +162,11 @@ final class CajaControlador
                 // ademas dejaba la venta liquidada: al ir a generar el
                 // cobro no quedaba saldo que cobrar y el sistema
                 // contestaba "no hizo falta".
-                'anticipo'       => self::formaEnLinea($_POST['como_paga'] ?? '')
+                //
+                // SALVO "YA ME PAGARON": ahí el cliente sí pagó (transfirió
+                // o pagó por otro lado) y no se genera liga, así que lo que
+                // se captura como anticipo es lo que entró.
+                'anticipo'       => ($enLineaPedida && !$sinLiga)
                                     ? 0.0 : (float)($_POST['anticipo'] ?? 0),
                 // El nombre se guarda además del id: si esa persona se va y su
                 // usuario se desactiva, el reporte de hace seis meses tiene que
@@ -176,8 +189,8 @@ final class CajaControlador
 
         // Pago en linea: se genera el cobro y se devuelven los datos
         // para el modal, sin salir de la caja.
-        $enLinea = self::formaEnLinea($_POST['como_paga'] ?? '');
-        if ($enLinea && \LibertyFin\Servicio\Integraciones::activa('spei')) {
+        $enLinea = $enLineaPedida;
+        if ($enLinea && !$sinLiga && \LibertyFin\Servicio\Integraciones::activa('spei')) {
             return $this->conLiga($db, $r, $enLinea);
         }
 

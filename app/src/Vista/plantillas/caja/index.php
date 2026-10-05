@@ -194,19 +194,19 @@ $token = $_SESSION['lf_token'];
     $opciones = [
         ['id'=>'efectivo', 'rotulo'=>'Efectivo', 'icono'=>'caja', 'linea'=>''],
     ];
-    // TRANSFERENCIA MANUAL: el cliente ya transfirió, o lo va a hacer a tu
-    // cuenta, y tú lo anotas. NO genera liga ni llama a ningún proveedor,
-    // por eso no depende de que haya uno configurado. Solo se ofrece si la
-    // empresa tiene el método de transferencia encendido.
-    if (in_array('transferencia', $metodos ?? [], true)) {
-        $opciones[] = ['id'=>'transferencia', 'rotulo'=>'Transferencia', 'icono'=>'venta', 'linea'=>''];
+    // Tarjeta y SPEI (transferencia) se ofrecen si hay proveedor para
+    // generar la liga, O si el método está encendido: en ese caso se cobra
+    // marcando "Ya me pagaron", que no genera ninguna liga. Efectivo en
+    // tienda siempre necesita el proveedor.
+    $mets = $metodos ?? [];
+    if ($ligas || in_array('tarjeta', $mets, true)) {
+        $opciones[] = ['id'=>'_tarjeta', 'rotulo'=>'Tarjeta', 'icono'=>'cobro', 'linea'=>'tarjeta'];
     }
-    // Los de linea solo si el proveedor esta configurado; si no, el
-    // boton promete algo que va a fallar. Estos SÍ generan una liga.
+    if ($ligas || in_array('transferencia', $mets, true)) {
+        $opciones[] = ['id'=>'_spei', 'rotulo'=>'SPEI', 'icono'=>'venta', 'linea'=>'spei'];
+    }
     if ($ligas) {
-        $opciones[] = ['id'=>'_tarjeta', 'rotulo'=>'Tarjeta · liga',     'icono'=>'cobro', 'linea'=>'tarjeta'];
-        $opciones[] = ['id'=>'_spei',    'rotulo'=>'SPEI · liga',        'icono'=>'venta', 'linea'=>'spei'];
-        $opciones[] = ['id'=>'_tienda',  'rotulo'=>'Efectivo (tienda)',  'icono'=>'bolsa', 'linea'=>'efectivo'];
+        $opciones[] = ['id'=>'_tienda', 'rotulo'=>'Efectivo (tienda)', 'icono'=>'bolsa', 'linea'=>'efectivo'];
     }
     ?>
     <div class="lf-metodos">
@@ -224,13 +224,22 @@ $token = $_SESSION['lf_token'];
              value="<?= P::e($opciones[0]['id'] ?? 'efectivo') ?>">
     </div>
 
-    <?php /* Solo con Transferencia: la referencia sirve para cuadrar el
-             depósito contra el estado de cuenta. Es opcional. */ ?>
-    <div class="lf-ref" id="cajaRef" hidden>
-      <label for="refTransf">Referencia o clave de rastreo <small>(opcional)</small></label>
-      <input class="form-control lf-mono" type="text" name="referencia" id="refTransf"
-             maxlength="60" autocomplete="off" placeholder="Para cuadrar el depósito después">
-      <p>Se anota como cobrado en transferencia. No se genera ninguna liga de pago.</p>
+    <?php /* Solo con Tarjeta, SPEI o Efectivo (tienda), que normalmente
+             generan una liga. Marcado: NO se genera y el cobro pasa como
+             pagado, para cuando el cliente ya transfirió o pagó por otro
+             lado. Sin proveedor configurado es la única opción, así que
+             va marcado. */ ?>
+    <div class="lf-sinliga" id="cajaSinLiga" hidden>
+      <label>
+        <input type="checkbox" name="sin_liga" id="sinLiga" value="1" <?= $ligas ? '' : 'checked' ?>>
+        <span><b>Ya me pagaron</b> — no generar liga de pago
+          <small>El cobro se registra como pagado en este momento.</small></span>
+      </label>
+      <div class="ref" id="cajaRef" hidden>
+        <label for="refTransf">Referencia o clave de rastreo <small>(opcional)</small></label>
+        <input class="form-control lf-mono" type="text" name="referencia" id="refTransf"
+               maxlength="60" autocomplete="off" placeholder="Para cuadrar el depósito después">
+      </div>
     </div>
 
 
@@ -319,6 +328,7 @@ $token = $_SESSION['lf_token'];
     if (pagaCon)  pagaCon.hidden  = true;
     if (anticipo) anticipo.hidden = true;
     if (metodos)  metodos.hidden  = true;
+    var sinl = document.getElementById('cajaSinLiga'); if (sinl) sinl.hidden = true;
     refrescarBoton();
   }
 
@@ -406,6 +416,16 @@ $token = $_SESSION['lf_token'];
     $('sIva').textContent = pesos(iva);
     $('sTot').textContent = pesos(cap);
 
+    /* "Ya me pagaron": con un método de liga, marcado = NO se genera la
+       liga y el cobro pasa como pagado. Entonces el anticipo es lo que
+       entró, y por defecto es el total: así cobrar completo no obliga a
+       escribir nada. Si el cajero lo cambia a mano, se respeta. */
+    var act = document.querySelector('.lf-metodos .m.on');
+    var esLinea = !!(act && act.dataset.linea);
+    var sl = $('sinLiga');
+    var omitir = esLinea && sl && sl.checked;
+    if (omitir && !$('anticipo').dataset.manual) $('anticipo').value = cap.toFixed(2);
+
     var ant = parseFloat($('anticipo').value) || 0;
     if (ant > cap) { $('anticipo').value = cap.toFixed(2); ant = cap; }
     var saldo = cap - ant;
@@ -413,8 +433,7 @@ $token = $_SESSION['lf_token'];
       ? 'Se liquida completa. La comisión se libera toda.'
       : 'Queda un saldo de <b class="lf-mono" style="color:var(--lf-amb)">' + pesos(saldo)
         + '</b>. La comisión se libera conforme el cliente pague.';
-    var act = document.querySelector('.lf-metodos .m.on');
-    var enLinea = act && act.dataset.linea;
+    var enLinea = esLinea && !omitir;
     $('btnTexto').textContent = enLinea
       ? 'Cobrar ' + pesos(cap)
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
@@ -452,6 +471,32 @@ $token = $_SESSION['lf_token'];
      el elegido: con el mismo texto, el cajero cree que ya cobró cuando
      el cliente se va a pagar a otro lado. */
   (function(){
+    /* Qué se ve según el método y "Ya me pagaron":
+         · método de liga SIN marcar → no hay anticipo (el cliente todavía no
+           pagó; anotarlo dejaría la venta liquidada sin que entre un peso)
+         · método de liga CON "Ya me pagaron" → sin liga, anticipo = total,
+           y aparece la referencia para cuadrar el depósito
+         · efectivo → como siempre */
+    function aplicarSinLiga(){
+      var act = document.querySelector('.lf-metodos .m.on');
+      var linea = !!(act && act.dataset.linea);
+      var wrap = $('cajaSinLiga'), sl = $('sinLiga'), rf = $('cajaRef'), caja = $('cajaAnticipo');
+      if (wrap) wrap.hidden = !linea;
+      var omitir = linea && sl && sl.checked;
+      if (caja) caja.hidden = linea && !omitir;
+      if (rf) { rf.hidden = !omitir; if (rf.hidden) $('refTransf').value = ''; }
+      if (linea && !omitir) { $('anticipo').dataset.manual = ''; $('anticipo').value = '0'; }
+      calcular();
+    }
+    /* Al soltar una venta ampliada se vuelve a decidir qué se ve. */
+    document.addEventListener('lf:ticket-cambio', aplicarSinLiga);
+    if ($('sinLiga')) $('sinLiga').addEventListener('change', function(){
+      $('anticipo').dataset.manual = '';
+      aplicarSinLiga();
+    });
+    /* Si el cajero escribe un anticipo a mano, deja de seguir al total. */
+    $('anticipo').addEventListener('input', function(){ this.dataset.manual = '1'; });
+
     document.querySelectorAll('.lf-metodos .m').forEach(function(b){
       b.addEventListener('click', function(){
         document.querySelectorAll('.lf-metodos .m').forEach(function(x){
@@ -462,19 +507,9 @@ $token = $_SESSION['lf_token'];
            no ha pagado nada. Dejarlo a la vista invita a escribir ahí el
            total y entonces la venta queda liquidada sin que haya entrado
            un peso. */
-        var caja = $('cajaAnticipo');
-        var linea = !!b.dataset.linea;
-        if (caja) {
-          caja.hidden = linea;
-          if (linea) $('anticipo').value = '0';
-        }
-        /* La referencia solo aplica a la transferencia manual. Se limpia
-           al cambiar de método para que no viaje un dato de otro cobro. */
-        var rf = $('cajaRef');
-        if (rf) {
-          rf.hidden = (b.dataset.metodo !== 'transferencia');
-          if (rf.hidden) $('refTransf').value = '';
-        }
+        $('anticipo').dataset.manual = '';
+        $('anticipo').value = '0';
+        aplicarSinLiga();
         /* "Paga con" solo tiene sentido en efectivo: en una
            transferencia nadie entrega cambio. */
         var pc = $('cajaPagaCon');
