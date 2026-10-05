@@ -244,9 +244,21 @@ foreach ($pasos as $p) {
     foco.style.height = (b.height + 12) + 'px';
 
     card.className = 'lf-guia-card';
-    var alto = card.offsetHeight || 300;
-    card.style.left = Math.min(b.right + 18, innerWidth - 348) + 'px';
-    card.style.top = Math.max(14, Math.min(b.top - 30, innerHeight - alto - 14)) + 'px';
+    var alto = card.offsetHeight || 300, ancho = card.offsetWidth || 330;
+    var izq = Math.min(b.right + 18, innerWidth - ancho - 14);
+    if (izq < b.right + 8) {
+      /* No cabe a un costado: el ancla (el botón de tema, arriba a la
+         derecha) quedaba TAPADA por la tarjeta. Se pone debajo, alineada
+         a su borde derecho; si abajo no hay lugar, encima. */
+      var lef = Math.max(14, Math.min(b.right - ancho, innerWidth - ancho - 14));
+      var abajo = b.bottom + 16;
+      card.style.left = lef + 'px';
+      card.style.top = (abajo + alto <= innerHeight - 14
+        ? abajo : Math.max(14, b.top - alto - 16)) + 'px';
+    } else {
+      card.style.left = izq + 'px';
+      card.style.top = Math.max(14, Math.min(b.top - 30, innerHeight - alto - 14)) + 'px';
+    }
   }
 
   function cerrar(irA){

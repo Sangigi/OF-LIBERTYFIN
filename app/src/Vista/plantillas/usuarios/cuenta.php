@@ -215,10 +215,10 @@ $dias = $venc ? floor(($venc - strtotime('today')) / 86400) : null;
         Los que el SAT necesita para timbrar tus facturas</p></div>
   </header>
   <div class="card-body">
-    <form method="post" action="/cuenta/fiscales" style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+    <form method="post" action="/cuenta/fiscales" class="lf-form-g">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
 
-      <div style="width:100%">
+      <div class="todo">
         <label class="form-label">Tipo de persona</label>
         <div style="display:flex;gap:9px;flex-wrap:wrap">
           <?php foreach (['fisica'=>'Persona física','moral'=>'Persona moral'] as $k=>$v): ?>
@@ -230,16 +230,16 @@ $dias = $venc ? floor(($venc - strtotime('today')) / 86400) : null;
         </div>
       </div>
 
-      <div style="flex:1;min-width:190px"><label class="form-label">RFC</label>
+      <div><label class="form-label">RFC</label>
         <input class="form-control lf-mono" name="rfc_fiscal" style="text-transform:uppercase"
                value="<?= P::e($fiscales['rfc_fiscal'] ?? '') ?>" maxlength="13"></div>
-      <div style="width:150px"><label class="form-label">CP fiscal</label>
+      <div><label class="form-label">CP fiscal</label>
         <input class="form-control lf-mono" name="cp_fiscal" inputmode="numeric" maxlength="5"
                value="<?= P::e($fiscales['cp_fiscal'] ?? '') ?>"></div>
-      <div style="flex:2;min-width:250px"><label class="form-label">Razón social</label>
+      <div class="todo"><label class="form-label">Razón social</label>
         <input class="form-control" name="razon_social"
                value="<?= P::e($fiscales['razon_social'] ?? '') ?>"></div>
-      <div style="width:100%"><label class="form-label">Régimen fiscal</label>
+      <div class="todo"><label class="form-label">Régimen fiscal</label>
         <select class="form-select" name="regimen_sat">
           <option value="">Sin definir</option>
           <?php foreach (C::REGIMENES as $k=>$v): ?>
@@ -248,8 +248,8 @@ $dias = $venc ? floor(($venc - strtotime('today')) / 86400) : null;
           <?php endforeach; ?>
         </select></div>
 
-      <button class="btn btn-primary" type="submit">Guardar</button>
-      <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.5">
+      <div class="todo"><button class="btn btn-primary" type="submit">Guardar</button></div>
+      <p class="todo" style="font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.5">
         Tienen que coincidir <b>exactamente</b> con tu constancia de situación fiscal.
         Un solo carácter distinto y el SAT rechaza el timbrado.
       </p>

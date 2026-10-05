@@ -2555,3 +2555,16 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-form-g > .ancho{grid-column:span 2}
 .lf-form-g .form-control,.lf-form-g .form-select{width:100%}
 @media(max-width:560px){.lf-form-g{grid-template-columns:1fr}.lf-form-g > .ancho{grid-column:auto}}
+.lf-form-g > .todo{grid-column:1/-1}
+
+/* Lateral en móvil: sin margen muerto a la izquierda. Se fijan los
+   márgenes de cada bloque por separado y con más especificidad, para que
+   ninguna regla anterior los sume. */
+@media(max-width:940px){
+  .lf-side{padding-left:0;padding-right:0;margin:0}
+  .lf-side .lf-marca{padding:16px 52px 12px 14px;margin:0}
+  .lf-side .lf-nav{padding:4px 10px;margin:0}
+  .lf-side .lf-nav .sec{padding:14px 8px 6px}
+  .lf-side .lf-nav a{padding:10px 10px;margin:0}
+  .lf-side .lf-pie{margin:0 10px 10px;padding:10px}
+}
