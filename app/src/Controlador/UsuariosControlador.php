@@ -249,8 +249,9 @@ final class UsuariosControlador
         try {
             $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
             $clave = (string)($_POST['plan'] ?? '');
-            (new PlanRepo($principal))->solicitar((int)$_SESSION['empresa_id'], $clave);
-            Auditoria::anota('plan.solicitar', $clave, null, 'por pagar');
+            $periodo = ($_POST['periodo'] ?? '') === 'anual' ? 'anual' : 'mensual';
+            (new PlanRepo($principal))->solicitar((int)$_SESSION['empresa_id'], $clave, $periodo);
+            Auditoria::anota('plan.solicitar', $clave . ' · ' . $periodo, null, 'por pagar');
             $this->volver('/cuenta?t=plan',
                 'Listo. Haz la transferencia con la referencia que aparece abajo y sube tu comprobante.', 'ok');
         } catch (\InvalidArgumentException $e) {

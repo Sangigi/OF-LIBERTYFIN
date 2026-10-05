@@ -40,19 +40,42 @@ final class PlanRepo
         $c = include $ruta;
         if (!is_array($c) || empty($c['planes']) || !is_array($c['planes'])) return null;
 
+        // Descuento por pagar el año completo, en %. Se limita para que un
+        // error de captura no regale el plan.
+        $desc = max(0, min(60, (float)($c['descuento_anual'] ?? 0)));
+
         $planes = [];
         foreach ($c['planes'] as $clave => $p) {
             if (!preg_match('/^[a-z0-9_-]{1,40}$/', (string)$clave)) continue;
             if (empty($p['nombre']) || !isset($p['precio']) || (float)$p['precio'] <= 0) continue;
+            $mensual = round((float)$p['precio'], 2);
+            $anual   = round($mensual * 12 * (1 - $desc / 100), 2);
+
+            // Características agrupadas: ['Punto de venta' => ['1 caja', ...]].
+            // `incluye` (lista plana) sigue valiendo y cae en un grupo sin título.
+            $grupos = [];
+            foreach ((array)($p['grupos'] ?? []) as $titulo => $items) {
+                $items = array_values(array_filter((array)$items));
+                if ($items) $grupos[(string)$titulo] = $items;
+            }
+            if (!$grupos && !empty($p['incluye'])) $grupos[''] = array_values(array_filter((array)$p['incluye']));
+
             $planes[$clave] = [
-                'nombre'  => (string)$p['nombre'],
-                'precio'  => round((float)$p['precio'], 2),
-                'meses'   => max(1, (int)($p['meses'] ?? 1)),
-                'incluye' => array_values(array_filter((array)($p['incluye'] ?? []))),
+                'nombre'   => (string)$p['nombre'],
+                'precio'   => $mensual,                      // por mes
+                'usuarios' => (int)($p['usuarios'] ?? 0),
+                'popular'  => !empty($p['popular']),
+                'grupos'   => $grupos,
+                'periodos' => [
+                    'mensual' => ['monto' => $mensual, 'meses' => 1,  'por_mes' => $mensual],
+                    'anual'   => ['monto' => $anual,   'meses' => 12, 'por_mes' => round($anual / 12, 2)],
+                ],
             ];
         }
         if (!$planes) return null;
-        return ['planes' => $planes, 'cuenta' => (array)($c['cuenta'] ?? [])];
+        return ['planes' => $planes, 'cuenta' => (array)($c['cuenta'] ?? []),
+                'descuento_anual' => $desc,
+                'leyenda' => (string)($c['leyenda'] ?? '')];
     }
 
     /** Se crea sola la primera vez. */
@@ -103,14 +126,22 @@ final class PlanRepo
      * dos pagos abiertos a la vez confunden a quien revisa.
      * @throws \InvalidArgumentException
      */
-    public function solicitar($empresaId, $clave)
+    public function solicitar($empresaId, $clave, $periodo = 'mensual')
     {
         $cat = self::catalogo();
         if (!$cat || !isset($cat['planes'][$clave])) {
             throw new \InvalidArgumentException('Ese plan no existe');
         }
+        // El monto y los meses salen del catálogo, NUNCA de lo que mande el
+        // navegador: el cliente solo elige plan y periodo.
+        if (!in_array($periodo, ['mensual', 'anual'], true)) $periodo = 'mensual';
         $this->asegurar();
-        $p = $cat['planes'][$clave];
+        $pl = $cat['planes'][$clave];
+        $p  = [
+            'nombre' => $pl['nombre'] . ($periodo === 'anual' ? ' · anual' : ' · mensual'),
+            'precio' => $pl['periodos'][$periodo]['monto'],
+            'meses'  => $pl['periodos'][$periodo]['meses'],
+        ];
 
         $this->principal->beginTransaction();
         try {
