@@ -62,13 +62,47 @@ final class ServiciosControlador
                         $antes['precio'], $_POST['precio'] ?? 0);
                 }
             }
-            else     { $repo->crear($_POST);           $msg = 'Servicio dado de alta.'; }
+            else     { $id = $repo->crear($_POST);     $msg = 'Servicio dado de alta.'; }
+
+            // La imagen va aparte de los datos: si falla, el servicio ya
+            // quedó guardado y solo se avisa de la imagen.
+            $msg .= $this->imagen($repo, $id);
             $this->volver($msg, 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] guardar servicio: ' . $e->getMessage());
             $this->volver('No se pudo guardar el servicio.', 'error');
+        }
+    }
+
+    /**
+     * Sube, reemplaza o quita la imagen del servicio. Devuelve un texto
+     * para añadir al aviso ('' si no hubo nada que hacer).
+     */
+    private function imagen(ServicioRepo $repo, $id)
+    {
+        $id = (int)$id;
+        if (!$id) return '';
+        $anterior = $repo->imagenDe($id);
+
+        if (!empty($_POST['quitar_imagen']) && empty($_FILES['imagen']['name'])) {
+            $repo->guardarImagen($id, null);
+            \LibertyFin\Servicio\Archivos::borrar($anterior);
+            return ' Imagen quitada.';
+        }
+        if (empty($_FILES['imagen']['name'])) return '';
+
+        try {
+            $ruta = \LibertyFin\Servicio\Archivos::imagen($_FILES['imagen'], 'serv');
+            $repo->guardarImagen($id, $ruta);
+            if ($anterior) \LibertyFin\Servicio\Archivos::borrar($anterior);
+            return ' Imagen guardada.';
+        } catch (\InvalidArgumentException $e) {
+            return ' Pero la imagen no se guardó: ' . $e->getMessage() . '.';
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] imagen de servicio: ' . $e->getMessage());
+            return ' Pero la imagen no se pudo guardar.';
         }
     }
 

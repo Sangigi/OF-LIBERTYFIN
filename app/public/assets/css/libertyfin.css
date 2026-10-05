@@ -2600,3 +2600,12 @@ tr[data-modal],a[data-modal]{cursor:pointer}
   .lf-row{gap:10px;padding:10px 8px;align-items:flex-start}
   .lf-row > .lf-av{margin-top:2px}
 }
+
+/* Caja: un servicio con imagen la muestra grande, de borde a borde de la
+   tarjeta. Sin imagen se queda el ícono de siempre. */
+.lf-serv{overflow:hidden}
+.lf-serv .e[style*="background-image"]{width:calc(100% + 22px);height:92px;margin:-13px -11px 10px;
+  border-radius:0;background-position:center;background-repeat:no-repeat}
+@media(max-width:560px){
+  .lf-serv .e[style*="background-image"]{height:76px}
+}
