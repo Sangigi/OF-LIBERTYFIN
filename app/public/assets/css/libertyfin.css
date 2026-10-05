@@ -50,6 +50,8 @@
   /* Marca */
   --lf-brand:#4baa5c;
   --lf-brand-2:color-mix(in srgb, var(--lf-brand) 82%, #000);
+  /* Versión oscura del color, solo para FONDOS con texto blanco encima. */
+  --lf-brand-d:color-mix(in srgb, var(--lf-brand) 82%, #000);
   --lf-brand-3:color-mix(in srgb, var(--lf-brand) 65%, #fff);
   --lf-brand-soft:color-mix(in srgb, var(--lf-brand) 11%, #fff);
   --lf-brand-glow:color-mix(in srgb, var(--lf-brand) 10%, transparent);
@@ -144,6 +146,8 @@
   --lf-tinta:#e9efec; --lf-tinta-2:#c0cbc6; --lf-tinta-3:#9aa8a2;--lf-tinta-4:#86948e;
   --lf-linea:rgba(255,255,255,.09); --lf-linea-f:rgba(255,255,255,.16);
   --lf-brand-soft:color-mix(in srgb, var(--lf-brand) 18%, #0c110f);
+  /* Texto de color de marca: más claro que en el tema claro, para que se lea sobre fondo oscuro con cualquier color elegido. */
+  --lf-brand-2:color-mix(in srgb, var(--lf-brand) 58%, #fff);
   --lf-lima-soft:rgba(127,194,65,.14); --lf-pizarra-soft:rgba(255,255,255,.06);
   --lf-amb-soft:rgba(197,138,20,.16); --lf-rojo-soft:rgba(207,68,54,.16);
   --lf-info-soft:rgba(29,127,165,.16);
@@ -266,7 +270,7 @@ small,.small{font-size:12px}
 .btn-lg{padding:13px 24px;font-size:15px}
 
 .btn-primary,.btn-success{background:var(--lf-brand);border-color:var(--lf-brand);color:#fff}
-.btn-primary:hover,.btn-success:hover{background:var(--lf-brand-2);border-color:var(--lf-brand-2);color:#fff}
+.btn-primary:hover,.btn-success:hover{background:var(--lf-brand-d);border-color:var(--lf-brand-d);color:#fff}
 .btn-secondary{background:var(--lf-sup);border-color:var(--lf-linea);color:var(--lf-tinta-2);box-shadow:0 1px 2px rgba(27,36,32,.04)}
 .btn-secondary:hover{background:var(--lf-vidrio);border-color:var(--lf-linea-f);color:var(--lf-tinta)}
 .btn-danger{background:var(--lf-rojo-soft);border-color:color-mix(in srgb,var(--lf-rojo) 24%,transparent);color:var(--lf-rojo)}
@@ -351,7 +355,7 @@ small,.small{font-size:12px}
 
 /* Tarjeta destacada con degradado */
 .stat-card.lf-hero,.card.lf-hero{
-  background:linear-gradient(135deg, var(--lf-brand) 0%, var(--lf-brand-2) 100%);
+  background:linear-gradient(135deg, var(--lf-brand) 0%, var(--lf-brand-d) 100%);
   border:none;color:#fff}
 .lf-hero .stat-value,.lf-hero h1,.lf-hero h2,.lf-hero h3,.lf-hero .card-title{color:#fff}
 .lf-hero .stat-label,.lf-hero .stat-meta,.lf-hero .text-muted{color:rgba(255,255,255,.85)!important}
@@ -612,7 +616,7 @@ input[type="number"],.form-control.lf-num{font-family:var(--lf-mono);font-varian
 .bg-secondary{background:var(--lf-pizarra)!important}
 .bg-dark{background:var(--lf-tinta)!important}
 .bg-gradient-primary,.bg-brand{
-  background:linear-gradient(135deg,var(--lf-brand) 0%,var(--lf-brand-2) 100%)!important;color:#fff}
+  background:linear-gradient(135deg,var(--lf-brand) 0%,var(--lf-brand-d) 100%)!important;color:#fff}
 .border{border-color:var(--lf-linea)!important}
 .shadow-sm{box-shadow:var(--lf-s1)!important}
 .shadow{box-shadow:var(--lf-s1)!important}
@@ -1891,7 +1895,7 @@ body.lf-centro .lf-registro{background:var(--lf-sup)}
   background:var(--lf-brand);color:#fff;font-family:var(--lf-font);font-size:14.5px;
   font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;
   transition:background .15s,transform .08s,box-shadow .15s}
-.lf-entrar:hover:not(:disabled){background:var(--lf-brand-2);
+.lf-entrar:hover:not(:disabled){background:var(--lf-brand-d);
   box-shadow:0 6px 18px rgba(39,174,96,.28)}
 .lf-entrar:active:not(:disabled){transform:translateY(1px)}
 .lf-entrar:disabled{opacity:.45;cursor:not-allowed}
@@ -2377,7 +2381,7 @@ form[data-guardar] .m{transition:border-color .15s,background .15s}
 .lf-ampliando .lf-btn-ghost{flex-shrink:0;width:28px;height:28px;font-size:18px;
   line-height:1;color:var(--lf-tinta-3)}
 .lf-ampliando .lf-btn-ghost:hover{color:var(--lf-rojo);background:var(--lf-rojo-soft)}
-.btn.lf-agregando{background:var(--lf-brand-2)}
+.btn.lf-agregando{background:var(--lf-brand-d)}
 @media(max-width:940px){
   .lf-ampliar,.lf-ampliando{margin-left:14px;margin-right:14px}
 }
