@@ -2619,10 +2619,10 @@ tr[data-modal],a[data-modal]{cursor:pointer}
    ══════════════════════════════════════════════════════ */
 .lf-grid-serv{grid-auto-rows:minmax(0,auto)}
 .lf-serv{display:flex;flex-direction:column;align-items:stretch;
-  height:212px;padding:0 11px 12px;overflow:hidden}
+  height:224px;padding:0 11px 12px;overflow:hidden}
 .lf-serv .e,
 .lf-serv .e[style*="background-image"]{
-  flex:0 0 84px;width:calc(100% + 22px);height:84px;margin:0 -11px 10px;
+  flex:0 0 96px;width:calc(100% + 22px);height:96px;margin:0 -11px 10px;
   border-radius:0;background-position:center;background-repeat:no-repeat;background-size:cover}
 .lf-serv .e svg{width:26px;height:26px}
 .lf-serv b{display:block;flex:0 0 auto;min-height:0;height:calc(1.3em * 3);
@@ -2631,6 +2631,6 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-serv small{flex:0 0 auto;margin-bottom:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lf-serv .p{margin-top:auto;padding-top:6px}
 @media(max-width:560px){
-  .lf-serv{height:192px}
-  .lf-serv .e,.lf-serv .e[style*="background-image"]{flex-basis:68px;height:68px}
+  .lf-serv{height:204px}
+  .lf-serv .e,.lf-serv .e[style*="background-image"]{flex-basis:80px;height:80px}
 }
