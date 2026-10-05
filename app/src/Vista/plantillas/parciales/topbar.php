@@ -47,9 +47,13 @@ $aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '
 
 <script>
 (function(){
-  var b = document.getElementById('lfTema');
-  if (!b) return;
-  b.addEventListener('click', function(){
+  /* Delegado en document: la navegación sin recarga reemplaza el
+     innerHTML de la barra, y un listener puesto directo en el botón
+     se perdía en la primera navegación. */
+  if (window.lfTemaListo) return;
+  window.lfTemaListo = true;
+  document.addEventListener('click', function(ev){
+    if (!ev.target.closest('#lfTema')) return;
     var raiz = document.documentElement;
     var nuevo = raiz.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     raiz.setAttribute('data-theme', nuevo);
