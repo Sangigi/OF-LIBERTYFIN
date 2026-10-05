@@ -30,7 +30,7 @@ final class BaseConocimientoRepo
         'cobro'       => 'Caja y cobros',
         'cifras'      => 'Números y reportes',
         'facturacion' => 'Facturación',
-        'catalogo'    => 'Servicios y precios',
+        'catalogo'    => 'Productos y precios',
         'usuarios'    => 'Usuarios y permisos',
         'recargas'    => 'Recargas',
         'plataforma'  => 'Plataforma y altas',

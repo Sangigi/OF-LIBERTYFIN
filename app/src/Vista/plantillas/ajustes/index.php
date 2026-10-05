@@ -506,18 +506,18 @@ $e = $buscar_ed($categorias); ?>
       <?php if ($e): ?><a class="btn btn-secondary" href="/ajustes?t=categorias">Cancelar</a><?php endif; ?>
     </div>
     <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
-      Las categorías agrupan los servicios del catálogo. Una categoría con
-      servicios no se puede quitar: sus ventas quedarían sin clasificar.
+      Las categorías agrupan los productos del catálogo. Una categoría con
+      productos no se puede quitar: sus ventas quedarían sin clasificar.
     </p>
   </form>
 </details>
 
 <section class="card">
-  <header class="card-header">Categorías de servicio</header>
+  <header class="card-header">Categorías de producto</header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
     <table class="table table-hover">
       <thead><tr><th>Categoría</th><th>Descripción</th>
-        <th class="text-end">Servicios</th><th></th></tr></thead>
+        <th class="text-end">Productos</th><th></th></tr></thead>
       <tbody>
       <?php if (!$categorias): ?>
         <tr><td colspan="4" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
@@ -528,7 +528,7 @@ $e = $buscar_ed($categorias); ?>
           <td data-label="Categoría"><b style="font-weight:600"><?= P::e($c['nombre']) ?></b></td>
           <td data-label="Descripción" style="font-size:12.5px;color:var(--lf-tinta-3)">
             <?= P::e($c['descripcion'] ?: '—') ?></td>
-          <td data-label="Servicios" class="text-end">
+          <td data-label="Productos" class="text-end">
             <?php if ((int)$c['servicios'] > 0): ?>
               <a href="/servicios" class="badge bg-secondary" style="text-decoration:none">
                 <?= (int)$c['servicios'] ?></a>

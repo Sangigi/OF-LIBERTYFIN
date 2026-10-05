@@ -159,7 +159,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
 <div class="lf-split">
   <?php if ($servicios): ?>
   <section class="card">
-    <header class="card-header">Servicios que más facturan</header>
+    <header class="card-header">Productos que más facturan</header>
     <div class="card-body">
       <?php W::barrasH(array_map(function($s){
         return ['rotulo'=>$s['nombre'],'monto'=>$s['facturado']]; }, $servicios)); ?>
@@ -323,7 +323,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
       <div class="lf-pills" style="margin:0">
         <a class="lf-pill <?= $por==='servicio'?'active':'' ?>"
            href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose','por'=>'servicio']) ?>">
-          del servicio contratado</a>
+          del producto contratado</a>
         <a class="lf-pill <?= $por==='origen'?'active':'' ?>"
            href="?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose','por'=>'origen']) ?>">
           de donde salió la venta</a>
@@ -340,7 +340,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
         <b>El total no cambia</b> al cambiar la agrupación — es el mismo dinero contado
         de dos maneras.
         <?php if ($por === 'servicio'): ?>
-          Agrupando por servicio, contabilidad se parte en personas físicas y morales.
+          Agrupando por producto, contabilidad se parte en personas físicas y morales.
         <?php else: ?>
           Agrupando por origen no se parte contabilidad: ahí la pregunta es de qué
           equipo salió la venta.

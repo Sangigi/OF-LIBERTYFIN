@@ -34,7 +34,7 @@ $pasos = [
 
   ['ruta' => '/servicios', 'p' => 'ver.servicios', 'icono' => 'servicios',
    'titulo' => 'Qué vas a cobrar',
-   'texto'  => 'Da de alta tus servicios con su precio. Los que se cotizan por caso '
+   'texto'  => 'Da de alta tus productos con su precio. Los que se cotizan por caso '
              . 'déjalos en cero: el precio se pone al vender.'],
 
   ['ruta' => '/clientes', 'p' => 'ver.clientes', 'icono' => 'clientes',

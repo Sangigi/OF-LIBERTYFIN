@@ -75,7 +75,7 @@ body{font-family:'DM Sans',system-ui,sans-serif;background:#f1f4f2;
   <div class="it">
     <?php foreach ($lineas as $l): ?>
       <div class="l">
-        <span><b><?= P::e($l['producto'] ?: 'Servicio') ?></b>
+        <span><b><?= P::e($l['producto'] ?: 'Producto') ?></b>
           <small><?= (float)$l['cantidad'] ?> × <?= D::pesos($l['precio_unitario']) ?></small></span>
         <span class="m"><?= D::pesos($l['subtotal']) ?></span>
       </div>

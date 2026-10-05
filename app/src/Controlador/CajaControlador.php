@@ -119,7 +119,7 @@ final class CajaControlador
 
         // Un ticket entero en cero casi siempre es un dedazo, no una cortesía.
         if ($ticket->subtotalCapturado() <= 0) {
-            $this->volver('El ticket suma cero. Pon el precio de cada servicio antes de cobrar.', 'error');
+            $this->volver('El ticket suma cero. Pon el precio de cada producto antes de cobrar.', 'error');
         }
         $ticket->gastosOperacion((float)($_POST['gastos'] ?? 0));
 
@@ -256,13 +256,13 @@ final class CajaControlador
         \LibertyFin\Servicio\Auditoria::anota('venta.ampliar',
             'venta ' . $r['codigo'],
             Dinero::pesos($r['total'] - $r['agregado']),
-            Dinero::pesos($r['total']) . ' · ' . $r['lineas'] . ' servicio'
+            Dinero::pesos($r['total']) . ' · ' . $r['lineas'] . ' producto'
             . ($r['lineas'] == 1 ? '' : 's') . ' más', $db);
 
         // Ampliar algo de otro día mueve el total de un corte que ya se
         // cerró. Se hace —hay negocios que dejan la cuenta abierta— pero
         // se dice, porque quien cuadró ayer va a ver otro número.
-        $aviso = 'Se agregaron ' . $r['lineas'] . ' servicio'
+        $aviso = 'Se agregaron ' . $r['lineas'] . ' producto'
                . ($r['lineas'] == 1 ? '' : 's') . ' a la venta ' . $r['codigo']
                . ' por ' . Dinero::pesos($r['agregado']) . '. '
                . 'Ahora debe ' . Dinero::pesos($r['saldo']) . '.';

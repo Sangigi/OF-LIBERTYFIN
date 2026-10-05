@@ -16,7 +16,7 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros) {
 <form class="lf-filtros" method="get">
   <div class="lf-search">
     <?= W::icono('buscar','15px') ?>
-    <input type="search" name="q" value="<?= P::e($filtros['buscar']) ?>" placeholder="Cliente, folio o servicio">
+    <input type="search" name="q" value="<?= P::e($filtros['buscar']) ?>" placeholder="Cliente, folio o producto">
   </div>
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">

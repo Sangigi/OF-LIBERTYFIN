@@ -281,7 +281,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         <?php foreach ($lineas as $l): ?>
           <div style="display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--lf-linea)">
             <div style="flex:1;min-width:0">
-              <b style="display:block;font-size:13px;font-weight:600"><?= P::e($l['producto'] ?: 'Servicio') ?></b>
+              <b style="display:block;font-size:13px;font-weight:600"><?= P::e($l['producto'] ?: 'Producto') ?></b>
               <small style="color:var(--lf-tinta-4);font-size:11px">
                 <?= (float)$l['cantidad'] ?> × <?= D::pesos($l['precio_unitario']) ?>
                 <?= $l['codigo'] ? ' · ' . P::e($l['codigo']) : '' ?></small>

@@ -142,7 +142,7 @@ final class PlataformaRepo
             ['sin_cliente', 'Ventas sin cliente',
              "SELECT COUNT(*) FROM ventas WHERE estado <> 'cancelada' AND cliente_id IS NULL",
              'No se pueden perseguir ni facturar'],
-            ['sin_precio', 'Servicios en cero',
+            ['sin_precio', 'Productos en cero',
              "SELECT COUNT(*) FROM productos
                 WHERE activo = 1 AND COALESCE(NULLIF(subprecio,0), precio, 0) <= 0",
              'Hay que ponerles precio al vender'],

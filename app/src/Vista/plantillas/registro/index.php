@@ -19,7 +19,7 @@ $d = function ($k) use ($datos) { return P::e($datos[$k] ?? ''); };
         <?php foreach ([
           ['Revisamos tus datos',  'Una persona la lee. Tardamos menos de un día hábil.'],
           ['Creamos tu cuenta',    'Te llega tu usuario y tu contraseña por correo.'],
-          ['Entras y configuras',  'Tus servicios, tu equipo y tus datos fiscales.'],
+          ['Entras y configuras',  'Tus productos, tu equipo y tus datos fiscales.'],
         ] as $i => $ps): ?>
           <div class="p">
             <span class="n"><?= $i + 1 ?></span>

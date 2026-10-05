@@ -39,7 +39,7 @@ $deEmpresa = [
    'sec' => 'comisiones'],
   ['ruta' => '/gastos',     'icono' => 'baja',    'texto' => 'Gastos',        'p' => 'ver.gastos',
    'sec' => 'gastos'],
-  ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Servicios/productos', 'p' => 'ver.servicios'],
+  ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Productos', 'p' => 'ver.servicios'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
   ['ruta' => '/facturacion','icono' => 'serv',    'texto' => 'Facturación',   'p' => 'ver.facturacion',

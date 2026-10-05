@@ -53,7 +53,7 @@ $token = $_SESSION['lf_token'];
 <div class="lf-pos">
   <section class="card">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
-      <span>Servicios</span>
+      <span>Productos</span>
       <div class="lf-pag-serv" id="pagServ" hidden>
         <button type="button" id="servAnt" aria-label="Anterior">&lsaquo;</button>
         <span><b id="servPag">1</b> de <b id="servTot">1</b></span>
@@ -78,7 +78,7 @@ $token = $_SESSION['lf_token'];
     <div class="lf-grid-serv">
       <?php if (!$servicios): ?>
         <p style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
-          No hay servicios que coincidan.</p>
+          No hay productos que coincidan.</p>
       <?php endif; ?>
       <?php foreach ($servicios as $s): ?>
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
@@ -156,7 +156,7 @@ $token = $_SESSION['lf_token'];
 
     <div id="lista"></div>
     <p id="vacio" style="padding:26px 20px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
-      Toca un servicio para agregarlo.</p>
+      Toca un producto para agregarlo.</p>
 
     <div class="lf-sumas">
       <div><span>Subtotal</span><span class="lf-mono" id="sSub">$0.00</span></div>
@@ -268,7 +268,7 @@ $token = $_SESSION['lf_token'];
         '<span class="f lf-mono">' + v.folio + '</span>' +
         '<span class="c">' + v.cliente + '</span>' +
         '<span class="d">' + v.fecha + (v.de_hoy ? '' : ' · otro día') +
-        ' · ' + v.lineas + (v.lineas === 1 ? ' servicio' : ' servicios') + '</span>' +
+        ' · ' + v.lineas + (v.lineas === 1 ? ' producto' : ' productos') + '</span>' +
         '<span class="s">' + (v.debe ? 'debe ' + v.saldo : 'liquidada') + '</span>';
       b.addEventListener('click', function(){ elegir(v); });
       lista.appendChild(b);
@@ -300,7 +300,7 @@ $token = $_SESSION['lf_token'];
       + (v.de_hoy ? '' : ' · OJO: es de otro día, el corte de ese día cambia');
     aviso.hidden = false;
     det.open = false;
-    if (titulo) titulo.textContent = 'Servicios que se agregan';
+    if (titulo) titulo.textContent = 'Productos que se agregan';
     /* AMPLIAR NO COBRA. Se agrega lo vendido y se abre saldo: el dinero
        entra despues por donde entra siempre, un abono. Dejar a la vista
        "anticipo" y "como paga" haria creer que el cliente esta pagando

@@ -23,7 +23,7 @@ final class ServiciosControlador
         $total  = $repo->cuantos($buscar);
 
         Plantilla::pagina('servicios/index', [
-            'titulo'    => 'Servicios/productos',
+            'titulo'    => 'Productos',
             'icono'     => 'serv',
             'subtitulo' => Fechas::rotulo($desde, $hasta) . ' · catálogo y desempeño',
             'resumen'   => $repo->resumen($desde, $hasta),
@@ -56,13 +56,13 @@ final class ServiciosControlador
                 // que alguien bajó un servicio de $26,000 a $1, sí.
                 $antes = $repo->porId($id);
                 $repo->actualizar($id, $_POST);
-                $msg = 'Servicio/producto actualizado.';
+                $msg = 'Producto actualizado.';
                 if ($antes && (float)($antes['precio'] ?? 0) !== (float)($_POST['precio'] ?? 0)) {
                     Auditoria::anota('servicio.precio', $antes['nombre'],
                         $antes['precio'], $_POST['precio'] ?? 0);
                 }
             }
-            else     { $id = $repo->crear($_POST);     $msg = 'Servicio/producto dado de alta.'; }
+            else     { $id = $repo->crear($_POST);     $msg = 'Producto dado de alta.'; }
 
             // La imagen va aparte de los datos: si falla, el servicio ya
             // quedó guardado y solo se avisa de la imagen.
@@ -72,7 +72,7 @@ final class ServiciosControlador
             $this->volver($e->getMessage(), 'error');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] guardar servicio: ' . $e->getMessage());
-            $this->volver('No se pudo guardar el servicio/producto.', 'error');
+            $this->volver('No se pudo guardar el producto.', 'error');
         }
     }
 
@@ -115,7 +115,7 @@ final class ServiciosControlador
             $a = (new ServicioRepo($db))->alternar((int)($_POST['id'] ?? 0));
             Auditoria::anota('servicio.alternar', 'servicio ' . (int)($_POST['id'] ?? 0),
                 $a ? 'inactivo' : 'activo', $a ? 'activo' : 'inactivo');
-            $this->volver($a ? 'Servicio/producto activado.' : 'Servicio/producto desactivado. Ya no aparece en Caja.', 'ok');
+            $this->volver($a ? 'Producto activado.' : 'Producto desactivado. Ya no aparece en Caja.', 'ok');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] alternar servicio: ' . $e->getMessage());
             $this->volver('No se pudo cambiar el estado.', 'error');

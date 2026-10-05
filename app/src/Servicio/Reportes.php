@@ -19,15 +19,15 @@ final class Reportes
     const TIPOS = [
         'area' => [
             'rotulo' => 'Por área',
-            'nota'   => 'El área sale del servicio contratado, no del cliente. Una venta con '
-                      . 'servicios de dos áreas reparte su dinero entre las dos.',
+            'nota'   => 'El área sale del producto contratado, no del cliente. Una venta con '
+                      . 'productos de dos áreas reparte su dinero entre las dos.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
             'nota'   => 'Comisiones generadas por los pagos recibidos en el periodo.',
         ],
         'servicio' => [
-            'rotulo' => 'Por servicio',
+            'rotulo' => 'Por producto',
             'nota'   => 'Qué se vende más y qué deja más. No son lo mismo.',
         ],
         'cliente' => [
@@ -102,7 +102,7 @@ final class Reportes
             case 'servicio':
                 $f = $r->porServicio($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
-                    [['Servicio', Libro::TEXTO, 44], ['Veces', Libro::NUMERO, 10],
+                    [['Producto', Libro::TEXTO, 44], ['Veces', Libro::NUMERO, 10],
                      ['Vendido', Libro::MONEDA, 16]],
                     array_map(function ($x) {
                         return [$x['nombre'], (int)$x['veces'], $x['facturado']];
@@ -351,7 +351,7 @@ final class Reportes
         }
         return [
             'por'     => $por,
-            'rotulo'  => $por === 'origen' ? 'de donde salió la venta' : 'del servicio contratado',
+            'rotulo'  => $por === 'origen' ? 'de donde salió la venta' : 'del producto contratado',
             'tablas'  => $tablas,
             'cuantas' => count($tablas),
             'total'   => array_sum(array_column($filas, 'cobrado')),

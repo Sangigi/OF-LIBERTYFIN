@@ -79,7 +79,7 @@ $malas = array_filter($f['senales'], function ($s) { return (int)$s['valor'] > 0
     <div class="lf-tile"><?= W::icono('cliente','19px') ?></div>
     <div class="stat-value"><?= number_format((int)($c['clientes'] ?? 0)) ?></div>
     <div class="stat-label">Clientes</div>
-    <div class="stat-meta"><?= (int)($c['servicios'] ?? 0) ?> servicios activos</div>
+    <div class="stat-meta"><?= (int)($c['servicios'] ?? 0) ?> productos activos</div>
   </div>
   <div class="stat-card">
     <div class="lf-tile <?= (int)($c['cajas_abiertas'] ?? 0) ? '' : 'g' ?>">

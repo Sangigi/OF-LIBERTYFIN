@@ -48,7 +48,7 @@ final class TicketRepo
         'cobro'       => 'Problemas al cobrar',
         'cifras'      => 'Números que no cuadran',
         'facturacion' => 'Facturación y CFDI',
-        'catalogo'    => 'Servicios y precios',
+        'catalogo'    => 'Productos y precios',
         'usuarios'    => 'Usuarios y permisos',
         'recargas'    => 'Recargas',
         'otro'        => 'Otro',
