@@ -144,6 +144,7 @@ final class VentaRepo extends Repo
     {
         return $this->uno("
             SELECT v.*,
+                   COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente, c.telefono,
                    u.nombre AS vendedor,
                    COALESCE(pg.cobrado,0) AS cobrado,

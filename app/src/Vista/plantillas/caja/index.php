@@ -150,9 +150,15 @@ $token = $_SESSION['lf_token'];
     <div style="padding:0 20px 12px">
       <div class="lf-search">
         <?= W::icono('cliente','15px') ?>
-        <input type="text" id="buscaCliente" placeholder="Cliente (opcional)" autocomplete="off">
+        <?php /* `name="cliente_nombre"`: si el nombre NO se eligió de la lista,
+                 el servidor lo busca por nombre exacto o crea el cliente.
+                 Antes ese texto se perdía y la venta salía sin cliente. */ ?>
+        <input type="text" id="buscaCliente" name="cliente_nombre" maxlength="150"
+               placeholder="Cliente (opcional)" autocomplete="off">
       </div>
       <div id="sugerencias" class="lf-sugerencias" hidden></div>
+      <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 2px 0;line-height:1.4">
+        Elígelo de la lista o escribe su nombre: si no existe, se crea al cobrar.</p>
     </div>
 
     <?php /* Quién va a hacer el trabajo, no quién cobra. De aquí sale a quién
@@ -844,19 +850,6 @@ $token = $_SESSION['lf_token'];
   /* El envío ya no recarga: se manda, se recibe y se abre el modal. */
   if (form) form.addEventListener('submit', function(ev){
     ev.preventDefault();
-
-    /* Un nombre escrito en "Cliente" que NO se eligió de la lista no
-       guarda nada: la venta salía sin cliente y sin avisar. Aquí se
-       detiene y se explica. Con una venta existente elegida no aplica. */
-    var campoCli = document.getElementById('buscaCliente');
-    var idCli = document.getElementById('cliente_id');
-    var amplia = window.lfVentaElegida && window.lfVentaElegida();
-    if (campoCli && idCli && campoCli.value.trim() !== '' && !idCli.value && !amplia) {
-      alert('Elige al cliente de la lista de sugerencias para que se guarde en la venta, '
-          + 'o borra el nombre para vender sin cliente.');
-      campoCli.focus();
-      return;
-    }
 
     var btn = document.getElementById('btnCobrar');
     if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
