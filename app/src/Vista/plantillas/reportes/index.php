@@ -201,9 +201,9 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
           <b style="display:block;font-size:13.5px"><?= P::e($c['nombre']) ?></b>
           <small style="color:var(--lf-tinta-4);font-size:11.5px">
             <?= P::e($c['area']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
+          <?php if ($sd): ?><span class="badge bg-warning" style="display:inline-block;margin-top:4px">No se paga</span><?php endif; ?>
         </span>
-        <?php if ($sd): ?><span class="badge bg-warning" style="margin-right:8px">No se paga</span><?php endif; ?>
-        <b class="lf-mono" style="font-size:14px"><?= D::pesos($c['devengado']) ?></b>
+        <b class="lf-mono" style="font-size:14px;flex-shrink:0"><?= D::pesos($c['devengado']) ?></b>
       </div>
     <?php endforeach; ?>
   </div>

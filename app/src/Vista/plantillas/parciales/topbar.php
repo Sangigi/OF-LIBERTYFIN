@@ -17,8 +17,11 @@ $acciones = [
   'reloj'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
   'baja'    => [['/gastos?nuevo=1', 'mas', 'Nuevo gasto', 'primary']],
   'serv'    => [['/servicios?nuevo=1', 'mas', 'Nuevo servicio', 'primary']],
-  // Reportes sí exporta de verdad: baja el detalle en CSV.
-  'pct'     => [['/reportes/csv', 'baja', 'Descargar CSV', 'secondary']],
+  // Reportes exporta un .xlsx (el CSV se reemplazó: mandaba "$1,234.00" como
+  // texto). Lleva el periodo que se está viendo.
+  'pct'     => [['/reportes/excel?' . http_build_query(array_filter([
+                   'desde' => $_GET['desde'] ?? '', 'hasta' => $_GET['hasta'] ?? ''])),
+                 'baja', 'Descargar Excel', 'secondary']],
 ];
 // Un rol de plataforma no vende ni da de alta clientes: esas acciones
 // operarían sobre la empresa de la sesión, que no es la suya.
