@@ -2652,3 +2652,10 @@ tr[data-modal],a[data-modal]{cursor:pointer}
   .lf-serv{height:auto}
   .lf-serv .e,.lf-serv .e[style*="background-image"]{flex-basis:auto;height:auto}
 }
+
+/* Aviso de suscripción por vencer, arriba de cada pantalla */
+.lf-aviso-plan{display:flex;align-items:flex-start;gap:10px;margin-bottom:18px;
+  text-decoration:none;color:inherit;line-height:1.45}
+.lf-aviso-plan svg{flex-shrink:0;margin-top:1px}
+.lf-aviso-plan u{text-underline-offset:2px;font-weight:600;white-space:nowrap}
+.lf-aviso-plan:hover{color:inherit;filter:brightness(1.04)}

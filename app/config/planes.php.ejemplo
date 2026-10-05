@@ -1,0 +1,40 @@
+<?php
+/**
+ * Planes que se pueden contratar desde Mi cuenta → Plan.
+ *
+ * Copia este archivo como `planes.php` y pon tus planes y precios reales.
+ * Mientras no exista `planes.php`, la pestaña Plan muestra el plan actual
+ * y pide escribir a LibertyFin, como hasta ahora.
+ *
+ * Los valores de abajo son SOLO UN EJEMPLO.
+ *
+ *   clave    minúsculas, números, - y _ (se guarda en empresas.plan)
+ *   nombre   como lo ve el cliente
+ *   precio   lo que se transfiere por todo el periodo, en pesos
+ *   meses    cuánto se extiende el vencimiento al aprobar el pago
+ *   incluye  renglones cortos que se muestran en la tarjeta
+ *
+ * `cuenta` son los datos a donde el cliente hace la transferencia.
+ */
+return [
+    'planes' => [
+        'basico' => [
+            'nombre'  => 'Básico',
+            'precio'  => 0.00,          // ← pon el precio real (debe ser mayor a 0)
+            'meses'   => 12,
+            'incluye' => ['Ventas, cobranza y reportes', '1 sucursal'],
+        ],
+        'premium' => [
+            'nombre'  => 'Premium',
+            'precio'  => 0.00,          // ← pon el precio real (debe ser mayor a 0)
+            'meses'   => 12,
+            'incluye' => ['Todo lo del Básico', 'Varias sucursales', 'Ligas de pago'],
+        ],
+    ],
+
+    'cuenta' => [
+        'banco'   => '',
+        'titular' => '',
+        'clabe'   => '',
+    ],
+];
