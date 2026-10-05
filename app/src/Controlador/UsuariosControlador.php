@@ -303,6 +303,13 @@ final class UsuariosControlador
 
     private function volver($destino, $texto, $tipo)
     {
+        // Subida sin recargar: se contesta en JSON y NO se deja aviso en la
+        // sesión, que si no saldría de nuevo en la siguiente carga.
+        if (($_SERVER['HTTP_X_LF_AJAX'] ?? '') === '1') {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => $tipo === 'ok', 'texto' => $texto]);
+            exit;
+        }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: ' . $destino); exit;
     }

@@ -306,11 +306,14 @@ $grupos = [
     <section class="card">
       <header class="card-header"><?= P::e($g[0]) ?></header>
       <div class="card-body">
-        <div style="display:flex;gap:16px;flex-wrap:wrap">
+        <?php /* Rejilla, no flex: con flex los campos angostos se encogían
+                 debajo de su mínimo y se encimaban (Celular, Oficina,
+                 Interior, Colonia). Aquí cada campo ocupa su columna y los
+                 anchos (peso >= 2) abarcan dos. */ ?>
+        <div class="lf-form-g">
           <?php foreach ($g[1] as $campo):
-            $k = $campo[0]; $tipo = $campo[4] ?? 'text';
-            $ancho = max(150, (int)($campo[3] * 170)); ?>
-            <div style="flex:<?= $campo[3] ?>;min-width:<?= $ancho ?>px">
+            $k = $campo[0]; $tipo = $campo[4] ?? 'text'; ?>
+            <div<?= $campo[3] >= 2 ? ' class="ancho"' : '' ?>>
               <label class="form-label"><?= P::e($campo[1]) ?></label>
               <input class="form-control<?= in_array($k,['cuenta_clabe','cuenta_cheques'],true)?' lf-mono':'' ?>"
                      type="<?= $tipo ?>" name="<?= $k ?>" value="<?= $v($k) ?>"
@@ -354,7 +357,7 @@ $grupos = [
 
 <?php /* ═══════ DOCUMENTOS ═══════ */ else: ?>
 <div class="alert alert-<?= $ed['estado']==='aprobada'?'success':($ed['estado']==='rechazada'?'danger':'info') ?>"
-     style="margin-bottom:18px">
+     style="margin-bottom:18px" id="resumenDocs">
   <?= W::icono('alerta','18px') ?>
   <span><b><?= P::e($textoDoc) ?>.</b>
     <?= (int)$ed['aprobados'] ?> de <?= (int)$ed['total'] ?> obligatorios aprobados.
@@ -365,7 +368,7 @@ $grupos = [
   <?php foreach (C::DOCUMENTOS as $k => $d):
     $doc = $documentos[$k] ?? null;
     $est = $doc['estado'] ?? null; ?>
-    <section class="card lf-doc">
+    <section class="card lf-doc" data-doc="<?= P::e($k) ?>">
       <div class="card-body">
         <div style="display:flex;align-items:flex-start;gap:12px;margin-bottom:14px">
           <span class="lf-tile <?= $est==='aprobado'?'':($est==='rechazado'?'r':'g') ?>"
@@ -416,4 +419,66 @@ $grupos = [
     </section>
   <?php endforeach; ?>
 </div>
+
+<script>
+/* Subir un documento SIN recargar la página.
+   Cada tarjeta es su propio formulario: al enviar uno, la página entera
+   se recargaba y los archivos que ya se habían elegido en las demás
+   tarjetas se perdían. Ahora se envía solo ese, y solo esa tarjeta se
+   vuelve a pintar; los demás campos de archivo no se tocan. */
+(function () {
+  var rejilla = document.querySelector('.lf-docs');
+  if (!rejilla || !window.fetch || !window.FormData) return;
+
+  rejilla.addEventListener('submit', function (ev) {
+    var f = ev.target.closest('form[action="/cuenta/documento"]');
+    if (!f) return;
+    ev.preventDefault();
+
+    var tarjeta = f.closest('.lf-doc');
+    var btn = f.querySelector('button[type=submit]');
+    var txt = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Subiendo…';
+
+    function msj(t, ok) {
+      var p = f.querySelector('.lf-msj-doc');
+      if (!p) {
+        p = document.createElement('p');
+        p.className = 'lf-msj-doc';
+        p.style.cssText = 'font-size:11.5px;margin:8px 0 0;line-height:1.45';
+        f.appendChild(p);
+      }
+      p.style.color = ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)';
+      p.textContent = t;
+    }
+
+    fetch(f.action, { method: 'POST', body: new FormData(f), credentials: 'same-origin',
+                      headers: { 'X-LF-Ajax': '1' } })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (!j.ok) { btn.disabled = false; btn.textContent = txt; msj(j.texto, false); return; }
+        /* Se trae la página otra vez, pero solo se cambia esta tarjeta y
+           el resumen de arriba. */
+        return fetch('/cuenta?t=documentos', { credentials: 'same-origin',
+                                               headers: { 'X-LF-Parcial': '1' } })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var nueva = doc.querySelector('.lf-doc[data-doc="' + tarjeta.dataset.doc + '"]');
+            if (nueva) tarjeta.replaceWith(nueva);
+            var r0 = document.getElementById('resumenDocs'), r1 = doc.getElementById('resumenDocs');
+            if (r0 && r1) r0.replaceWith(r1);
+            var n = document.querySelector('.lf-doc[data-doc="' + tarjeta.dataset.doc + '"] form');
+            if (n) { var p = document.createElement('p');
+              p.style.cssText = 'font-size:11.5px;margin:8px 0 0;color:var(--lf-brand-2)';
+              p.textContent = j.texto; n.appendChild(p); }
+          });
+      })
+      .catch(function () {
+        btn.disabled = false; btn.textContent = txt;
+        msj('No se pudo subir. Revisa tu conexión e inténtalo de nuevo.', false);
+      });
+  });
+})();
+</script>
 <?php endif; ?>

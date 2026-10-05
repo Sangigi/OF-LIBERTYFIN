@@ -2547,3 +2547,11 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-elegir .cols-it .cn{font-family:var(--lf-mono);font-size:10px}
 .lf-elegir .cols-l{display:grid;grid-template-columns:1fr;gap:0;margin-top:2px}
 .lf-elegir .cols-l label{padding:3px 6px;font-size:12px}
+
+/* Formulario en rejilla: columnas iguales que nunca se encimen. Los campos
+   marcados .ancho ocupan dos; en pantallas angostas todo va a una columna. */
+.lf-form-g{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:16px 18px}
+.lf-form-g > div{min-width:0}
+.lf-form-g > .ancho{grid-column:span 2}
+.lf-form-g .form-control,.lf-form-g .form-select{width:100%}
+@media(max-width:560px){.lf-form-g{grid-template-columns:1fr}.lf-form-g > .ancho{grid-column:auto}}
