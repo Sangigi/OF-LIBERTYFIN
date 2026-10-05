@@ -176,13 +176,6 @@ $token = $_SESSION['lf_token'];
       <div class="tt"><span>Total</span><span id="sTot">$0.00</span></div>
     </div>
 
-    <div class="lf-pagacon" id="cajaPagaCon" hidden>
-      <label for="pagaCon">¿Con cuánto te paga?</label>
-      <input class="lf-mono" type="number" name="paga_con" id="pagaCon"
-             min="0" step="0.50" placeholder="0.00" inputmode="decimal">
-      <p class="cambio" id="verCambio"></p>
-    </div>
-
     <div class="lf-anticipo" id="cajaAnticipo">
       <label for="anticipo">Anticipo que se cobra hoy</label>
       <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01">
