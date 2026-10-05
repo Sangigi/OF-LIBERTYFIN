@@ -238,9 +238,10 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
 
 /* Columnas de UNA tabla, para elegir cuáles imprimir. Cada reporte o área
    tiene las suyas: lo que se desmarca aquí no toca a las demás. */
-$columnasDe = function (array $cols) {
+$columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $extra = '') {
     if (count($cols) < 2) return;
-    echo '<details class="cols-it"><summary>Columnas <small class="cn"></small></summary><div class="cols-l">';
+    echo '<details class="cols-it ' . $extra . '"' . ($extra ? ' hidden' : '') . '><summary>' . $rotulo
+       . ' <small class="cn"></small></summary><div class="' . $clase . '">';
     foreach ($cols as $c) {
         echo '<label><input type="checkbox" value="' . P::e($c[0]) . '" checked>'
            . '<span>' . P::e($c[0]) . '</span></label>';
@@ -282,15 +283,19 @@ $columnasDe = function (array $cols) {
                          ? $desglose['cuantas'] . ' tablas'
                          : count($reportes[$k]['filas']) ?></small></span>
           </label>
-          <?php $columnasDe($k === 'desglose'
-                ? ($desglose['tablas'] ? $desglose['tablas'][0]['columnas'] : [])
-                : $reportes[$k]['columnas']); ?>
-          <?php if ($k === 'colaborador' && $comisiones['tablas']): ?>
-            <div class="detalle-it">
-              <label><input type="checkbox" data-detalle="1">
-                <span>Con el detalle de cada comisión</span></label>
-            </div>
-          <?php endif; ?>
+          <div class="sub">
+            <?php $columnasDe($k === 'desglose'
+                  ? ($desglose['tablas'] ? $desglose['tablas'][0]['columnas'] : [])
+                  : $reportes[$k]['columnas']); ?>
+            <?php if ($k === 'colaborador' && $comisiones['tablas']): ?>
+              <label class="det" title="Agrega una tabla por colaborador con el porqué de cada comisión">
+                <input type="checkbox" data-detalle="1"><span>Con detalle</span></label>
+              <?php /* Las columnas de las tablas del detalle, aparte de las del
+                       resumen. Solo se muestran con "Con detalle" marcado. */
+                    $columnasDe($comisiones['tablas'][0]['columnas'], 'cols-l cols-d',
+                                'Columnas del detalle', 'cols-det'); ?>
+            <?php endif; ?>
+          </div>
         </div>
       <?php endforeach; ?>
     </div>
@@ -595,16 +600,33 @@ $columnasDe = function (array $cols) {
 
       items.forEach(function (it) {
         var chk  = it.querySelector('label input');
-        var cols = it.querySelectorAll('.cols-l input');
+        /* Las del resumen y las del detalle van aparte: `.cols-d` es de
+           las tablas de detalle del colaborador. */
+        var cols = it.querySelectorAll('.cols-l:not(.cols-d) input');
         var off  = [];
         cols.forEach(function (c) { if (!c.checked) off.push(c.value); });
-        var cn = it.querySelector('.cn');
+        var cn = it.querySelector('details:not(.cols-det) .cn');
         if (cn) cn.textContent = off.length
           ? '(' + (cols.length - off.length) + ' de ' + cols.length + ')' : '';
+
+        var det = it.querySelector('[data-detalle]');
+        var dcols = it.querySelectorAll('.cols-d input');
+        var caja2 = it.querySelector('.cols-det');
+        if (caja2) caja2.hidden = !(det && det.checked && chk.checked);
+        var doff = [];
+        dcols.forEach(function (c) { if (!c.checked) doff.push(c.value); });
+        var dn = it.querySelector('.cols-det .cn');
+        if (dn) dn.textContent = doff.length
+          ? '(' + (dcols.length - doff.length) + ' de ' + dcols.length + ')' : '';
+
         if (!chk.checked) return;
         marcadas.push(chk.value);
         if (cols.length && off.length === cols.length) sinCols = true;
         if (off.length) ocultas.push([chk.value, off]);
+        if (det && det.checked) {
+          if (dcols.length && doff.length === dcols.length) sinCols = true;
+          if (doff.length) ocultas.push(['comisiones', doff]);
+        }
       });
       var total = items.length;
 
