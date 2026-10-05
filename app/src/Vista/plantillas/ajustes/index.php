@@ -153,7 +153,6 @@ $em = $empresa; ?>
       $dias = $venc ? floor(($venc - strtotime('today')) / 86400) : null;
       foreach ([
         'Plan'        => ucfirst($em['plan'] ?? 'prueba'),
-        'Base'        => $em['nombre_base_datos'],
         'Distribuidor'=> $em['no_distribuidor'] ?: null,
       ] as $k => $v): if ($v === null) continue; ?>
         <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0">
@@ -177,7 +176,7 @@ $em = $empresa; ?>
       <?php endif; ?>
       <p style="margin-top:14px;padding-top:14px;border-top:1px solid var(--lf-linea);
                 font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5">
-        El plan, la base de datos y la fecha de vencimiento no se editan aquí:
+        El plan y la fecha de vencimiento no se editan aquí:
         cambiarlos dejaría a la empresa sin poder entrar. Eso lo maneja quien
         administra la plataforma.
       </p>
