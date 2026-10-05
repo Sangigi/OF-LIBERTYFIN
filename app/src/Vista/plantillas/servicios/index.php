@@ -22,7 +22,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>
   <summary>
     <?= W::icono($e ? 'serv' : 'mas','16px') ?>
-    <?= $e ? 'Editar ' . P::e($e['nombre']) : 'Dar de alta un servicio' ?>
+    <?= $e ? 'Editar ' . P::e($e['nombre']) : 'Dar de alta un servicio/producto' ?>
   </summary>
   <form method="post" action="/servicios/guardar" class="lf-form" enctype="multipart/form-data">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
@@ -49,7 +49,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     </div>
     <div style="width:130px">
       <label class="form-label">Precio</label>
-      <input class="form-control lf-mono" type="number" name="precio" step="0.01" min="0.01"
+      <input class="form-control lf-mono" type="number" name="precio" step="0.01" min="0" placeholder="0.00"
              value="<?= P::e($e['subprecio'] ?? $e['precio'] ?? '') ?>" required>
     </div>
     <div style="width:130px">
@@ -93,7 +93,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
 <form class="lf-filtros" method="get">
   <div class="lf-search">
     <?= W::icono('buscar','15px') ?>
-    <input type="search" name="q" value="<?= P::e($buscar) ?>" placeholder="Servicio o código">
+    <input type="search" name="q" value="<?= P::e($buscar) ?>" placeholder="Servicio/producto o código">
   </div>
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
@@ -103,7 +103,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
 <div class="lf-stats">
   <div class="stat-card"><div class="lf-tile g"><?= W::icono('serv','19px') ?></div>
     <div class="stat-value"><?= (int)($resumen['activos'] ?? 0) ?></div>
-    <div class="stat-label">Servicios activos</div>
+    <div class="stat-label">Servicios/productos activos</div>
     <div class="stat-meta">en el catálogo</div></div>
 
   <div class="stat-card lf-hero"><div class="lf-tile"><?= W::icono('bolsa','19px') ?></div>
@@ -128,7 +128,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
   <?php if ($top): ?>
   <section class="card">
     <header class="card-header">
-      <div><span>Servicios que más facturan</span>
+      <div><span>Servicios/productos que más facturan</span>
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
           Del periodo filtrado</p></div>
     </header>
@@ -160,18 +160,18 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
     <table class="table table-hover">
       <thead><tr>
-        <th>Servicio</th><th>Código</th><th>Área</th>
+        <th>Servicio/producto</th><th>Código</th><th>Área</th>
         <th class="text-end">Precio</th><th class="text-end">Ventas</th>
         <th class="text-end">Ingreso</th><th></th>
       </tr></thead>
       <tbody>
       <?php if (!$catalogo): ?>
         <tr><td colspan="7" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
-          No hay servicios que coincidan.</td></tr>
+          No hay servicios/productos que coincidan.</td></tr>
       <?php endif; ?>
       <?php foreach ($catalogo as $s): ?>
         <tr>
-          <td data-label="Servicio">
+          <td data-label="Servicio/producto">
             <span style="display:flex;align-items:center;gap:10px">
               <span class="lf-mini-img"
                     style="<?= !empty($s['imagen']) ? "background-image:url('".P::e($s['imagen'])."')" : '' ?>">
@@ -203,7 +203,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     </table>
   </div>
   <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-    <span><?= count($catalogo) ?> de <?= number_format($total) ?> servicios</span>
+    <span><?= count($catalogo) ?> de <?= number_format($total) ?> servicios/productos</span>
     <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
       'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
   </div>

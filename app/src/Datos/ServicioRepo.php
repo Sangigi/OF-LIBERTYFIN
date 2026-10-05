@@ -123,7 +123,9 @@ final class ServicioRepo extends Repo
         // rechazar un precio en cero no cuesta nada. Validar en ese orden
         // evita ir a la base para descubrir algo que ya se sabía.
         $precio = round((float)($d['precio'] ?? 0), 2);
-        if ($precio <= 0) throw new \InvalidArgumentException('El precio debe ser mayor a cero');
+        // Cero es válido: lo que se cotiza por caso lleva el precio en cero
+        // y se fija al vender.
+        if ($precio < 0) throw new \InvalidArgumentException('El precio no puede ser negativo');
         $costo = round((float)($d['costo'] ?? 0), 2);
         if ($costo < 0) throw new \InvalidArgumentException('El costo no puede ser negativo');
         if ($costo > $precio) {
