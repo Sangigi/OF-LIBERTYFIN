@@ -192,14 +192,22 @@ $token = $_SESSION['lf_token'];
        mostrador con los de linea. Con tantos botones el cajero tiene
        que leerlos cada vez en vez de dar al de siempre. */
     $opciones = [
-        ['id'=>'efectivo', 'rotulo'=>'Efectivo',          'icono'=>'caja',  'linea'=>''],
-        ['id'=>'_tarjeta', 'rotulo'=>'Tarjeta',           'icono'=>'cobro', 'linea'=>'tarjeta'],
-        ['id'=>'_spei',    'rotulo'=>'SPEI',              'icono'=>'venta', 'linea'=>'spei'],
-        ['id'=>'_tienda',  'rotulo'=>'Efectivo (tienda)', 'icono'=>'bolsa', 'linea'=>'efectivo'],
+        ['id'=>'efectivo', 'rotulo'=>'Efectivo', 'icono'=>'caja', 'linea'=>''],
     ];
+    // TRANSFERENCIA MANUAL: el cliente ya transfirió, o lo va a hacer a tu
+    // cuenta, y tú lo anotas. NO genera liga ni llama a ningún proveedor,
+    // por eso no depende de que haya uno configurado. Solo se ofrece si la
+    // empresa tiene el método de transferencia encendido.
+    if (in_array('transferencia', $metodos ?? [], true)) {
+        $opciones[] = ['id'=>'transferencia', 'rotulo'=>'Transferencia', 'icono'=>'venta', 'linea'=>''];
+    }
     // Los de linea solo si el proveedor esta configurado; si no, el
-    // boton promete algo que va a fallar.
-    if (!$ligas) $opciones = [$opciones[0]];
+    // boton promete algo que va a fallar. Estos SÍ generan una liga.
+    if ($ligas) {
+        $opciones[] = ['id'=>'_tarjeta', 'rotulo'=>'Tarjeta · liga',     'icono'=>'cobro', 'linea'=>'tarjeta'];
+        $opciones[] = ['id'=>'_spei',    'rotulo'=>'SPEI · liga',        'icono'=>'venta', 'linea'=>'spei'];
+        $opciones[] = ['id'=>'_tienda',  'rotulo'=>'Efectivo (tienda)',  'icono'=>'bolsa', 'linea'=>'efectivo'];
+    }
     ?>
     <div class="lf-metodos">
       <label class="form-label">¿Cómo paga?</label>
@@ -214,6 +222,15 @@ $token = $_SESSION['lf_token'];
       </div>
       <input type="hidden" name="como_paga" id="comoPaga"
              value="<?= P::e($opciones[0]['id'] ?? 'efectivo') ?>">
+    </div>
+
+    <?php /* Solo con Transferencia: la referencia sirve para cuadrar el
+             depósito contra el estado de cuenta. Es opcional. */ ?>
+    <div class="lf-ref" id="cajaRef" hidden>
+      <label for="refTransf">Referencia o clave de rastreo <small>(opcional)</small></label>
+      <input class="form-control lf-mono" type="text" name="referencia" id="refTransf"
+             maxlength="60" autocomplete="off" placeholder="Para cuadrar el depósito después">
+      <p>Se anota como cobrado en transferencia. No se genera ninguna liga de pago.</p>
     </div>
 
 
@@ -450,6 +467,13 @@ $token = $_SESSION['lf_token'];
         if (caja) {
           caja.hidden = linea;
           if (linea) $('anticipo').value = '0';
+        }
+        /* La referencia solo aplica a la transferencia manual. Se limpia
+           al cambiar de método para que no viaje un dato de otro cobro. */
+        var rf = $('cajaRef');
+        if (rf) {
+          rf.hidden = (b.dataset.metodo !== 'transferencia');
+          if (rf.hidden) $('refTransf').value = '';
         }
         /* "Paga con" solo tiene sentido en efectivo: en una
            transferencia nadie entrega cambio. */
