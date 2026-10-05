@@ -235,6 +235,29 @@ $celda = function ($v, $t) {
     return $v;
 };
 $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
+
+/* Casillas de columnas para imprimir: los rótulos sin repetir, en el orden
+   en que aparecen. */
+$casillasColumnas = function (array $grupos) {
+    $vistos = [];
+    foreach ($grupos as $cols) foreach ($cols as $c) $vistos[$c[0]] = true;
+    if (!$vistos) return;
+    echo '<div class="cab cols-cab"><b>Columnas</b><span class="todas">'
+       . '<button type="button" data-cols="1">Todas</button>'
+       . '<button type="button" data-cols="0">Ninguna</button></span></div>'
+       . '<div class="ops cols">';
+    foreach (array_keys($vistos) as $r) {
+        echo '<label><input type="checkbox" value="' . P::e($r) . '" checked>'
+           . '<span>' . P::e($r) . '</span></label>';
+    }
+    echo '</div>';
+};
+$colsDesglose = $desglose['tablas'] ? [$desglose['tablas'][0]['columnas']] : [];
+$colsTipos = [];
+foreach ($reportes as $k => $rp) {
+    $colsTipos[] = ($k === 'desglose' && $desglose['tablas'])
+        ? $desglose['tablas'][0]['columnas'] : ($rp['columnas'] ?? []);
+}
 ?>
 <section class="card lf-tabs" data-tabs="reportes">
   <header class="card-header">
@@ -271,9 +294,12 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
         </label>
       <?php endforeach; ?>
     </div>
+    <?php $casillasColumnas($colsTipos); ?>
     <a class="btn btn-primary btn-sm ir" href="#" target="_blank">Imprimir</a>
     <p class="nota">El desglose sale con una tabla por área. Para elegir
-      <b>cuáles</b> áreas, hazlo desde su propia pestaña.</p>
+      <b>cuáles</b> áreas, hazlo desde su propia pestaña. Las columnas se
+      eligen por nombre; un reporte que no tenga ninguna de las marcadas
+      sale completo.</p>
   </div>
 
   <div class="lf-pills" style="padding:4px 20px 14px" role="tablist">
@@ -343,6 +369,7 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
             </label>
           <?php endforeach; ?>
         </div>
+        <?php $casillasColumnas($colsDesglose); ?>
         <a class="btn btn-primary btn-sm ir" href="#" target="_blank">
           Imprimir las <?= count($desglose['tablas']) ?></a>
       </div>
@@ -558,16 +585,24 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
     var base  = caja.dataset.base;
     var esAreas = caja.id === 'elegirAreas';
 
+    var SEL = '.ops:not(.cols) input[type=checkbox]';
+    var COL = '.ops.cols input[type=checkbox]';
+
     function refrescar() {
       var marcadas = Array.prototype.filter
-        .call(caja.querySelectorAll('input[type=checkbox]'), function (c) { return c.checked; })
+        .call(caja.querySelectorAll(SEL), function (c) { return c.checked; })
         .map(function (c) { return c.value; });
-      var total = caja.querySelectorAll('input[type=checkbox]').length;
+      var total = caja.querySelectorAll(SEL).length;
 
-      if (!marcadas.length) {
+      var cols = Array.prototype.filter
+        .call(caja.querySelectorAll(COL), function (c) { return c.checked; })
+        .map(function (c) { return c.value; });
+      var totCols = caja.querySelectorAll(COL).length;
+
+      if (!marcadas.length || (totCols && !cols.length)) {
         ir.classList.add('apagado');
         ir.removeAttribute('href');
-        ir.textContent = 'Elige al menos una';
+        ir.textContent = !marcadas.length ? 'Elige al menos una' : 'Elige al menos una columna';
         return;
       }
       ir.classList.remove('apagado');
@@ -581,6 +616,9 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
       } else if (!esAreas) {
         url += '&todos=1';
       }
+      if (totCols && cols.length < totCols) {
+        url += '&cols=' + cols.map(encodeURIComponent).join('|');
+      }
       ir.href = url;
       ir.textContent = marcadas.length === total
         ? ('Imprimir ' + (esAreas ? 'las ' : 'los ') + total)
@@ -591,7 +629,14 @@ $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
     caja.querySelectorAll('[data-todas]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.dataset.todas === '1';
-        caja.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = v; });
+        caja.querySelectorAll(SEL).forEach(function (c) { c.checked = v; });
+        refrescar();
+      });
+    });
+    caja.querySelectorAll('[data-cols]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = b.dataset.cols === '1';
+        caja.querySelectorAll(COL).forEach(function (c) { c.checked = v; });
         refrescar();
       });
     });

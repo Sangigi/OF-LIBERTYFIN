@@ -293,6 +293,10 @@ if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
 
   document.addEventListener('click', function (ev) {
     if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.button !== 0) return;
+    /* Si el módulo de pestañas ya lo atendió, no se vuelve a pedir la
+       página: se repintaba el contenido y el scroll saltaba a la primera
+       tarjeta ("De dónde a dónde") en vez de quedarse en el reporte. */
+    if (ev.defaultPrevented) return;
     var a = ev.target.closest('a');
     if (!esNuestro(a)) return;
     ev.preventDefault();

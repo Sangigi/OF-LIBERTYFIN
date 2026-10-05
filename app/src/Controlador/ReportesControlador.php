@@ -207,6 +207,30 @@ final class ReportesControlador
             $reps[] = $srv->armar($tipo, $desde, $hasta);
         }
 
+        // `cols` llega como lista de rótulos separada por |. Se filtra por
+        // rótulo porque cada reporte tiene sus propias columnas; un reporte
+        // que no comparte ninguna se deja completo en vez de salir vacío.
+        $cols = array_filter(array_map('trim', explode('|', Peticion::texto('cols', ''))));
+        if ($cols) {
+            foreach ($reps as &$rep) {
+                $quedan = [];
+                foreach ($rep['columnas'] as $j => $c) {
+                    if (in_array($c[0], $cols, true)) $quedan[] = $j;
+                }
+                if (!$quedan) continue;
+                $rep['columnas'] = array_values(array_intersect_key($rep['columnas'], array_flip($quedan)));
+                $rep['filas'] = array_map(function ($f) use ($quedan) {
+                    $n = [];
+                    foreach ($quedan as $j) $n[] = $f[$j] ?? null;
+                    return $n;
+                }, $rep['filas']);
+                $tot = [];
+                foreach ($quedan as $j) $tot[] = $rep['totales'][$j] ?? '';
+                $rep['totales'] = $tot;
+            }
+            unset($rep);
+        }
+
         Plantilla::pagina('reportes/imprimir', [
             'titulo'    => 'Reportes',
             'reportes'  => $reps,

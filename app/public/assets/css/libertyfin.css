@@ -2532,3 +2532,6 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-win-libre .lf-win-cuerpo .card{box-shadow:none}
 .lf-win-libre .lf-win-cuerpo > div{margin:0}
 .lf-win-busca[hidden]{display:none}
+
+.lf-elegir .cols-cab{margin-top:14px}
+.lf-elegir .ops.cols{margin-bottom:12px}
