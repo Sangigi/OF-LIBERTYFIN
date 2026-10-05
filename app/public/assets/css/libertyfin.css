@@ -2609,3 +2609,28 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 @media(max-width:560px){
   .lf-serv .e[style*="background-image"]{height:76px}
 }
+
+/* ══════════════════════════════════════════════════════
+   CAJA · TARJETAS DE PRODUCTO PAREJAS
+   Todas miden lo mismo: la zona de imagen o ícono tiene la misma
+   altura, el nombre ocupa siempre tres renglones como máximo (con
+   puntos suspensivos) y el código y el precio quedan abajo. Así un
+   producto con nombre largo o con foto no descuadra a los demás.
+   ══════════════════════════════════════════════════════ */
+.lf-grid-serv{grid-auto-rows:minmax(0,auto)}
+.lf-serv{display:flex;flex-direction:column;align-items:stretch;
+  height:212px;padding:0 11px 12px;overflow:hidden}
+.lf-serv .e,
+.lf-serv .e[style*="background-image"]{
+  flex:0 0 84px;width:calc(100% + 22px);height:84px;margin:0 -11px 10px;
+  border-radius:0;background-position:center;background-repeat:no-repeat;background-size:cover}
+.lf-serv .e svg{width:26px;height:26px}
+.lf-serv b{display:block;flex:0 0 auto;min-height:0;height:calc(1.3em * 3);
+  margin-bottom:4px;overflow:hidden;text-align:center;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3}
+.lf-serv small{flex:0 0 auto;margin-bottom:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-serv .p{margin-top:auto;padding-top:6px}
+@media(max-width:560px){
+  .lf-serv{height:192px}
+  .lf-serv .e,.lf-serv .e[style*="background-image"]{flex-basis:68px;height:68px}
+}

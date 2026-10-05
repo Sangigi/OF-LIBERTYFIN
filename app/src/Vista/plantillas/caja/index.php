@@ -84,6 +84,7 @@ $token = $_SESSION['lf_token'];
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
+                title="<?= P::e($s['nombre']) ?>"
                 data-precio="<?= (float)$s['precio'] ?>">
           <span class="e"<?= !empty($s['imagen'])
               ? ' style="background-image:url(\''.P::e($s['imagen']).'\');background-size:cover"' : '' ?>>
