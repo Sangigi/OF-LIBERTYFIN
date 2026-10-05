@@ -151,6 +151,20 @@ final class ReportesControlador
             return $r;
         };
 
+        $detalleComisiones = function () use ($srv, $desde, $hasta) {
+            $r = [];
+            foreach ($srv->desgloseComisiones($desde, $hasta)['tablas'] as $t) {
+                $r[] = [
+                    'tipo' => 'comisiones', 'titulo' => 'Comisiones de ' . $t['titulo'],
+                    'nota' => 'Cada renglón es un pago. La comisión sale del porcentaje '
+                            . 'aplicado sobre lo cobrado en ese pago, no sobre la venta completa.',
+                    'periodo' => date('d/m/Y', strtotime($desde)) . ' al ' . date('d/m/Y', strtotime($hasta)),
+                    'columnas' => $t['columnas'], 'filas' => $t['filas'], 'totales' => $t['totales'],
+                ];
+            }
+            return $r;
+        };
+
         if ($tipo === 'desglose') {
             $d = $srv->desglose($desde, $hasta, $por);
 
@@ -202,6 +216,11 @@ final class ReportesControlador
                     continue;
                 }
                 $reps[] = $srv->armar($t, $desde, $hasta);
+                // "Incluir el detalle" del colaborador: debajo del resumen,
+                // una tabla por colaborador con el porque de cada comision.
+                if ($t === 'colaborador' && Peticion::texto('detalle', '') === '1') {
+                    foreach ($detalleComisiones() as $x) $reps[] = $x;
+                }
             }
         } else {
             $reps[] = $srv->armar($tipo, $desde, $hasta);

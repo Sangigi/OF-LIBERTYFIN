@@ -285,6 +285,12 @@ $columnasDe = function (array $cols) {
           <?php $columnasDe($k === 'desglose'
                 ? ($desglose['tablas'] ? $desglose['tablas'][0]['columnas'] : [])
                 : $reportes[$k]['columnas']); ?>
+          <?php if ($k === 'colaborador' && $comisiones['tablas']): ?>
+            <div class="detalle-it">
+              <label><input type="checkbox" data-detalle="1">
+                <span>Con el detalle de cada comisión</span></label>
+            </div>
+          <?php endif; ?>
         </div>
       <?php endforeach; ?>
     </div>
@@ -620,6 +626,8 @@ $columnasDe = function (array $cols) {
       } else if (!esAreas) {
         url += '&todos=1';
       }
+      var det = caja.querySelector('[data-detalle]');
+      if (det && det.checked && marcadas.indexOf('colaborador') !== -1) url += '&detalle=1';
       ocultas.forEach(function (o) {
         url += '&' + encodeURIComponent('ocultar[' + o[0] + ']') + '='
              + o[1].map(encodeURIComponent).join('|');
