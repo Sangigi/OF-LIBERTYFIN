@@ -2535,3 +2535,15 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 
 .lf-elegir .cols-cab{margin-top:14px}
 .lf-elegir .ops.cols{margin-bottom:12px}
+
+/* Columnas por tabla dentro de "Qué imprimir" */
+.lf-elegir .ops > .it{min-width:0}
+.lf-elegir .cols-it{margin:0 0 4px 24px}
+.lf-elegir .cols-it summary{cursor:pointer;font-size:11px;color:var(--lf-tinta-4);list-style:none;padding:1px 0}
+.lf-elegir .cols-it summary::-webkit-details-marker{display:none}
+.lf-elegir .cols-it summary:hover{color:var(--lf-brand-2)}
+.lf-elegir .cols-it summary::before{content:'▸ '}
+.lf-elegir .cols-it[open] summary::before{content:'▾ '}
+.lf-elegir .cols-it .cn{font-family:var(--lf-mono);font-size:10px}
+.lf-elegir .cols-l{display:grid;grid-template-columns:1fr;gap:0;margin-top:2px}
+.lf-elegir .cols-l label{padding:3px 6px;font-size:12px}

@@ -236,28 +236,17 @@ $celda = function ($v, $t) {
 };
 $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
 
-/* Casillas de columnas para imprimir: los rótulos sin repetir, en el orden
-   en que aparecen. */
-$casillasColumnas = function (array $grupos) {
-    $vistos = [];
-    foreach ($grupos as $cols) foreach ($cols as $c) $vistos[$c[0]] = true;
-    if (!$vistos) return;
-    echo '<div class="cab cols-cab"><b>Columnas</b><span class="todas">'
-       . '<button type="button" data-cols="1">Todas</button>'
-       . '<button type="button" data-cols="0">Ninguna</button></span></div>'
-       . '<div class="ops cols">';
-    foreach (array_keys($vistos) as $r) {
-        echo '<label><input type="checkbox" value="' . P::e($r) . '" checked>'
-           . '<span>' . P::e($r) . '</span></label>';
+/* Columnas de UNA tabla, para elegir cuáles imprimir. Cada reporte o área
+   tiene las suyas: lo que se desmarca aquí no toca a las demás. */
+$columnasDe = function (array $cols) {
+    if (count($cols) < 2) return;
+    echo '<details class="cols-it"><summary>Columnas <small class="cn"></small></summary><div class="cols-l">';
+    foreach ($cols as $c) {
+        echo '<label><input type="checkbox" value="' . P::e($c[0]) . '" checked>'
+           . '<span>' . P::e($c[0]) . '</span></label>';
     }
-    echo '</div>';
+    echo '</div></details>';
 };
-$colsDesglose = $desglose['tablas'] ? [$desglose['tablas'][0]['columnas']] : [];
-$colsTipos = [];
-foreach ($reportes as $k => $rp) {
-    $colsTipos[] = ($k === 'desglose' && $desglose['tablas'])
-        ? $desglose['tablas'][0]['columnas'] : ($rp['columnas'] ?? []);
-}
 ?>
 <section class="card lf-tabs" data-tabs="reportes">
   <header class="card-header">
@@ -285,21 +274,25 @@ foreach ($reportes as $k => $rp) {
     </div>
     <div class="ops">
       <?php foreach ($tipos as $k => $t): ?>
-        <label>
-          <input type="checkbox" value="<?= $k ?>" <?= $tipo===$k?'checked':'' ?>>
-          <span><?= P::e($t['rotulo']) ?>
-            <small><?= $k === 'desglose'
-                       ? $desglose['cuantas'] . ' tablas'
-                       : count($reportes[$k]['filas']) ?></small></span>
-        </label>
+        <div class="it">
+          <label>
+            <input type="checkbox" value="<?= P::e($k) ?>" <?= $tipo===$k?'checked':'' ?>>
+            <span><?= P::e($t['rotulo']) ?>
+              <small><?= $k === 'desglose'
+                         ? $desglose['cuantas'] . ' tablas'
+                         : count($reportes[$k]['filas']) ?></small></span>
+          </label>
+          <?php $columnasDe($k === 'desglose'
+                ? ($desglose['tablas'] ? $desglose['tablas'][0]['columnas'] : [])
+                : $reportes[$k]['columnas']); ?>
+        </div>
       <?php endforeach; ?>
     </div>
-    <?php $casillasColumnas($colsTipos); ?>
     <a class="btn btn-primary btn-sm ir" href="#" target="_blank">Imprimir</a>
     <p class="nota">El desglose sale con una tabla por área. Para elegir
-      <b>cuáles</b> áreas, hazlo desde su propia pestaña. Las columnas se
-      eligen por nombre; un reporte que no tenga ninguna de las marcadas
-      sale completo.</p>
+      <b>cuáles</b> áreas, hazlo desde su propia pestaña. Abre
+      <b>Columnas</b> en cada reporte para ocultar las que no quieras; solo
+      afecta a ese reporte.</p>
   </div>
 
   <div class="lf-pills" style="padding:4px 20px 14px" role="tablist">
@@ -362,14 +355,16 @@ foreach ($reportes as $k => $rp) {
         </div>
         <div class="ops">
           <?php foreach ($desglose['tablas'] as $tb): ?>
-            <label>
-              <input type="checkbox" value="<?= P::e($tb['titulo']) ?>" checked>
-              <span><?= P::e($tb['titulo']) ?>
-                <small><?= count($tb['filas']) ?></small></span>
-            </label>
+            <div class="it">
+              <label>
+                <input type="checkbox" value="<?= P::e($tb['titulo']) ?>" checked>
+                <span><?= P::e($tb['titulo']) ?>
+                  <small><?= count($tb['filas']) ?></small></span>
+              </label>
+              <?php $columnasDe($tb['columnas']); ?>
+            </div>
           <?php endforeach; ?>
         </div>
-        <?php $casillasColumnas($colsDesglose); ?>
         <a class="btn btn-primary btn-sm ir" href="#" target="_blank">
           Imprimir las <?= count($desglose['tablas']) ?></a>
       </div>
@@ -585,24 +580,33 @@ foreach ($reportes as $k => $rp) {
     var base  = caja.dataset.base;
     var esAreas = caja.id === 'elegirAreas';
 
-    var SEL = '.ops:not(.cols) input[type=checkbox]';
-    var COL = '.ops.cols input[type=checkbox]';
-
+    /* Cada elemento (reporte o área) lleva sus propias columnas. Se manda
+       solo lo OCULTO, por elemento: ocultar[clave]=Col|Col. Así lo que se
+       quita en uno no se arrastra a los demás. */
     function refrescar() {
-      var marcadas = Array.prototype.filter
-        .call(caja.querySelectorAll(SEL), function (c) { return c.checked; })
-        .map(function (c) { return c.value; });
-      var total = caja.querySelectorAll(SEL).length;
+      var items = Array.prototype.slice.call(caja.querySelectorAll('.ops > .it'));
+      var marcadas = [], ocultas = [], sinCols = false;
 
-      var cols = Array.prototype.filter
-        .call(caja.querySelectorAll(COL), function (c) { return c.checked; })
-        .map(function (c) { return c.value; });
-      var totCols = caja.querySelectorAll(COL).length;
+      items.forEach(function (it) {
+        var chk  = it.querySelector('label input');
+        var cols = it.querySelectorAll('.cols-l input');
+        var off  = [];
+        cols.forEach(function (c) { if (!c.checked) off.push(c.value); });
+        var cn = it.querySelector('.cn');
+        if (cn) cn.textContent = off.length
+          ? '(' + (cols.length - off.length) + ' de ' + cols.length + ')' : '';
+        if (!chk.checked) return;
+        marcadas.push(chk.value);
+        if (cols.length && off.length === cols.length) sinCols = true;
+        if (off.length) ocultas.push([chk.value, off]);
+      });
+      var total = items.length;
 
-      if (!marcadas.length || (totCols && !cols.length)) {
+      if (!marcadas.length || sinCols) {
         ir.classList.add('apagado');
         ir.removeAttribute('href');
-        ir.textContent = !marcadas.length ? 'Elige al menos una' : 'Elige al menos una columna';
+        ir.textContent = !marcadas.length ? 'Elige al menos una'
+                                          : 'Hay una con todas las columnas ocultas';
         return;
       }
       ir.classList.remove('apagado');
@@ -616,9 +620,10 @@ foreach ($reportes as $k => $rp) {
       } else if (!esAreas) {
         url += '&todos=1';
       }
-      if (totCols && cols.length < totCols) {
-        url += '&cols=' + cols.map(encodeURIComponent).join('|');
-      }
+      ocultas.forEach(function (o) {
+        url += '&' + encodeURIComponent('ocultar[' + o[0] + ']') + '='
+             + o[1].map(encodeURIComponent).join('|');
+      });
       ir.href = url;
       ir.textContent = marcadas.length === total
         ? ('Imprimir ' + (esAreas ? 'las ' : 'los ') + total)
@@ -629,14 +634,7 @@ foreach ($reportes as $k => $rp) {
     caja.querySelectorAll('[data-todas]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.dataset.todas === '1';
-        caja.querySelectorAll(SEL).forEach(function (c) { c.checked = v; });
-        refrescar();
-      });
-    });
-    caja.querySelectorAll('[data-cols]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var v = b.dataset.cols === '1';
-        caja.querySelectorAll(COL).forEach(function (c) { c.checked = v; });
+        caja.querySelectorAll('.ops > .it > label input').forEach(function (c) { c.checked = v; });
         refrescar();
       });
     });

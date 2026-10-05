@@ -207,15 +207,21 @@ final class ReportesControlador
             $reps[] = $srv->armar($tipo, $desde, $hasta);
         }
 
-        // `cols` llega como lista de rótulos separada por |. Se filtra por
-        // rótulo porque cada reporte tiene sus propias columnas; un reporte
-        // que no comparte ninguna se deja completo en vez de salir vacío.
-        $cols = array_filter(array_map('trim', explode('|', Peticion::texto('cols', ''))));
-        if ($cols) {
+        // `ocultar[clave]=Col|Col` llega por elemento: la clave es el tipo
+        // de reporte, o el titulo del area en el desglose. Lo que se oculta
+        // en uno no toca a los demas. Un elemento sin entrada sale completo.
+        $ocultar = isset($_GET['ocultar']) && is_array($_GET['ocultar']) ? $_GET['ocultar'] : [];
+        if ($ocultar) {
             foreach ($reps as &$rep) {
+                $clave = $rep['tipo'] === 'desglose' ? $rep['titulo'] : $rep['tipo'];
+                // Desde "Qué imprimir" la clave 'desglose' vale para todas
+                // las areas; una clave por area, si existe, manda.
+                $lista = $ocultar[$clave] ?? ($rep['tipo'] === 'desglose' ? ($ocultar['desglose'] ?? '') : '');
+                $fuera = array_filter(array_map('trim', explode('|', (string)$lista)));
+                if (!$fuera) continue;
                 $quedan = [];
                 foreach ($rep['columnas'] as $j => $c) {
-                    if (in_array($c[0], $cols, true)) $quedan[] = $j;
+                    if (!in_array($c[0], $fuera, true)) $quedan[] = $j;
                 }
                 if (!$quedan) continue;
                 $rep['columnas'] = array_values(array_intersect_key($rep['columnas'], array_flip($quedan)));
