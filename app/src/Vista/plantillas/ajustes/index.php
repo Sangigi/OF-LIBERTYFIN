@@ -38,25 +38,25 @@ $em = $empresa; ?>
     <header class="card-header">Datos de la empresa</header>
     <div class="card-body">
       <form method="post" action="/ajustes/guardar" enctype="multipart/form-data"
-            style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end">
+            class="lf-form-g">
         <input type="hidden" name="token" value="<?= P::e($token) ?>">
         <input type="hidden" name="que" value="empresa">
-        <div style="flex:2;min-width:220px"><label class="form-label">Razón social</label>
+        <div class="todo"><label class="form-label">Razón social</label>
           <input class="form-control" name="nombre_empresa" value="<?= P::e($em['nombre_empresa']) ?>" required></div>
-        <div style="width:170px"><label class="form-label">RFC</label>
+        <div><label class="form-label">RFC</label>
           <input class="form-control" name="rfc" value="<?= P::e($em['rfc'] ?? '') ?>"
                  style="text-transform:uppercase" placeholder="Opcional"></div>
-        <div style="flex:1;min-width:170px"><label class="form-label">Giro</label>
+        <div><label class="form-label">Giro</label>
           <input class="form-control" name="giro_comercial" value="<?= P::e($em['giro_comercial'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="width:170px"><label class="form-label">Teléfono</label>
+        <div><label class="form-label">Teléfono</label>
           <input class="form-control" name="telefono" value="<?= P::e($em['telefono'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="flex:2;min-width:260px"><label class="form-label">Dirección</label>
+        <div class="todo"><label class="form-label">Dirección</label>
           <input class="form-control" name="direccion" value="<?= P::e($em['direccion'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="flex:1;min-width:180px"><label class="form-label">Contacto</label>
+        <div><label class="form-label">Contacto</label>
           <input class="form-control" name="nombre_contacto" value="<?= P::e($em['nombre_contacto'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="flex:1;min-width:190px"><label class="form-label">Correo</label>
+        <div><label class="form-label">Correo</label>
           <input class="form-control" type="email" name="email_admin" value="<?= P::e($em['email_admin'] ?? '') ?>" placeholder="Opcional"></div>
-        <div style="width:100%;border-top:1px solid var(--lf-linea);padding-top:18px;
+        <div class="todo" style="border-top:1px solid var(--lf-linea);padding-top:18px;
                     display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start">
 
           <div style="flex:1;min-width:250px">
@@ -104,8 +104,8 @@ $em = $empresa; ?>
           </div>
         </div>
 
-        <button class="btn btn-primary" type="submit">Guardar</button>
-        <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
+        <div class="todo"><button class="btn btn-primary" type="submit">Guardar</button></div>
+        <p class="todo" style="font-size:11.5px;color:var(--lf-tinta-4);margin:0">
           El nombre, el RFC y la dirección salen en los tickets y en las facturas.
         </p>
       </form>
