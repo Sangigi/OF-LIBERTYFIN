@@ -31,7 +31,9 @@ final class CajaControlador
             'titulo'    => 'Caja',
             'icono'     => 'caja',
             'subtitulo' => 'Venta nueva · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
-            'servicios' => $cat->servicios($suc, $area, $buscar),
+            // Se cargan TODOS: la categoría y la búsqueda filtran en el navegador,
+            // sin recargar, para no perder el ticket que se va armando.
+            'servicios' => $cat->servicios($suc, '', '', 1500),
             'areas'     => $cat->areas(),
             'metodos'   => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
             // Quien va a HACER el trabajo: los COLABORADORES, agrupados

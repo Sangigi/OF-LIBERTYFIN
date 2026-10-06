@@ -59,30 +59,37 @@ $token = $_SESSION['lf_token'];
         <span><b id="servPag">1</b> de <b id="servTot">1</b></span>
         <button type="button" id="servSig" aria-label="Siguiente">&rsaquo;</button>
       </div>
-      <form class="lf-search" method="get" style="max-width:240px">
+      <form class="lf-search" method="get" style="max-width:240px" id="formBuscaCat">
         <?= W::icono('buscar','15px') ?>
-        <input type="search" name="q" value="<?= P::e($buscar) ?>" placeholder="Nombre o código">
+        <input type="search" name="q" id="buscaCat" value="<?= P::e($buscar) ?>" placeholder="Nombre o código"
+               autocomplete="off">
         <?php if ($area): ?><input type="hidden" name="area" value="<?= P::e($area) ?>"><?php endif; ?>
       </form>
     </header>
 
     <div class="lf-cat-fila">
-      <a class="lf-pill <?= $area === '' ? 'active' : '' ?>" href="/caja<?= $buscar ? '?q='.urlencode($buscar) : '' ?>">Todos</a>
+      <?php /* Los enlaces siguen siendo enlaces (sin JavaScript funcionan), pero
+               con JavaScript solo filtran la rejilla: no recargan y el ticket
+               se queda como está. */ ?>
+      <a class="lf-pill <?= $area === '' ? 'active' : '' ?>" data-area=""
+         href="/caja<?= $buscar ? '?q='.urlencode($buscar) : '' ?>">Todos</a>
       <?php foreach ($areas as $a): ?>
         <a class="lf-pill <?= (string)$area === (string)$a['id'] ? 'active' : '' ?>"
+           data-area="<?= (int)$a['id'] ?>"
            href="/caja?area=<?= (int)$a['id'] ?><?= $buscar ? '&q='.urlencode($buscar) : '' ?>">
           <?= P::e($a['nombre']) ?></a>
       <?php endforeach; ?>
     </div>
 
     <div class="lf-grid-serv">
-      <?php if (!$servicios): ?>
-        <p style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
-          No hay productos que coincidan.</p>
-      <?php endif; ?>
+      <p id="catVacio" <?= $servicios ? 'hidden' : '' ?>
+         style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
+        No hay productos que coincidan.</p>
       <?php foreach ($servicios as $s): ?>
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
+                data-area="<?= (int)($s['categoria_id'] ?? 0) ?>"
+                data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
                 title="<?= P::e($s['nombre']) ?>"
                 data-precio="<?= (float)$s['precio'] ?>">
@@ -466,29 +473,80 @@ $token = $_SESSION['lf_token'];
     $('btnCobrar').disabled = lineas.length === 0;
   }
 
-  // Paginación de la rejilla: 21 por página, sin recargar. Con el catálogo
-  // completo a la vista la columna crece tanto que el ticket queda perdido
-  // al fondo de la pantalla.
+  /* ══════════════════════════════════════════════════════
+     CATÁLOGO: CATEGORÍA, BÚSQUEDA Y PÁGINAS, SIN RECARGAR
+     Antes cada categoría era una página nueva y el ticket que se iba
+     armando se perdía. Ahora todas las tarjetas ya están en la página y
+     aquí solo se muestran u ocultan; el ticket ni se entera.
+     Las 21 por página se conservan: con el catálogo completo a la vista
+     el ticket quedaría perdido al fondo de la pantalla.
+     ══════════════════════════════════════════════════════ */
   (function(){
     var POR_PAG = 21;
-    var tarjetas = Array.prototype.slice.call(document.querySelectorAll('.lf-serv'));
-    var totalPag = Math.ceil(tarjetas.length / POR_PAG) || 1;
-    var actual = 1;
-    var caja = $('pagServ');
-    if (totalPag <= 1) { if (caja) caja.hidden = true; return; }
-    caja.hidden = false;
-    $('servTot').textContent = totalPag;
-    function pinta(){
-      tarjetas.forEach(function(t, i){
-        t.style.display = (i >= (actual-1)*POR_PAG && i < actual*POR_PAG) ? '' : 'none';
+    var todas = Array.prototype.slice.call(document.querySelectorAll('.lf-serv'));
+    var area = <?= json_encode((string)$area) ?>;
+    var q = <?= json_encode(mb_strtolower(trim((string)$buscar))) ?>;
+    var actual = 1, visibles = [];
+    var caja = $('pagServ'), vacio = $('catVacio'), campoQ = $('buscaCat');
+
+    function filtrar(){
+      visibles = todas.filter(function(t){
+        return (area === '' || t.dataset.area === area)
+            && (q === '' || (t.dataset.b || '').indexOf(q) !== -1);
       });
-      $('servPag').textContent = actual;
-      $('servAnt').disabled = actual === 1;
-      $('servSig').disabled = actual === totalPag;
+      actual = 1;
+      pinta();
     }
+    function pinta(){
+      var total = Math.max(1, Math.ceil(visibles.length / POR_PAG));
+      if (actual > total) actual = total;
+      todas.forEach(function(t){ t.style.display = 'none'; });
+      visibles.slice((actual-1)*POR_PAG, actual*POR_PAG)
+              .forEach(function(t){ t.style.display = ''; });
+      if (vacio) vacio.hidden = visibles.length > 0;
+      if (caja) caja.hidden = total <= 1;
+      $('servPag').textContent = actual;
+      $('servTot').textContent = total;
+      $('servAnt').disabled = actual === 1;
+      $('servSig').disabled = actual === total;
+    }
+    /* La dirección se mantiene al día para poder recargar o compartir,
+       pero sin recargar ahora. */
+    function direccion(){
+      var p = [];
+      if (area !== '') p.push('area=' + encodeURIComponent(area));
+      if (q !== '') p.push('q=' + encodeURIComponent(campoQ ? campoQ.value.trim() : q));
+      try { history.replaceState(history.state, '', '/caja' + (p.length ? '?' + p.join('&') : '')); }
+      catch (e) {}
+    }
+
     $('servAnt').addEventListener('click', function(){ if (actual>1){ actual--; pinta(); } });
-    $('servSig').addEventListener('click', function(){ if (actual<totalPag){ actual++; pinta(); } });
-    pinta();
+    $('servSig').addEventListener('click', function(){
+      if (actual < Math.ceil(visibles.length / POR_PAG)){ actual++; pinta(); } });
+
+    /* Categorías. preventDefault ANTES de que el navegador de secciones
+       del armazón vea el clic: si no, pediría la página entera. */
+    var fila = document.querySelector('.lf-cat-fila');
+    if (fila) fila.addEventListener('click', function(ev){
+      var p = ev.target.closest('.lf-pill');
+      if (!p || !fila.contains(p)) return;
+      ev.preventDefault();
+      area = p.dataset.area || '';
+      fila.querySelectorAll('.lf-pill').forEach(function(x){ x.classList.toggle('active', x === p); });
+      filtrar(); direccion();
+    });
+
+    /* Búsqueda: filtra al escribir; Enter ya no recarga. */
+    if (campoQ) {
+      campoQ.addEventListener('input', function(){
+        q = campoQ.value.trim().toLowerCase();
+        filtrar(); direccion();
+      });
+      var fq = $('formBuscaCat');
+      if (fq) fq.addEventListener('submit', function(ev){ ev.preventDefault(); });
+    }
+
+    filtrar();
   })();
 
   /* Los botones de método. El texto del botón de cobrar cambia según
