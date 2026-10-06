@@ -2794,17 +2794,17 @@ tr[data-modal],a[data-modal]{cursor:pointer}
    movimiento; el recorrido se mantiene corto para que no sea brusco. */
 @keyframes lf-vibra{
   0%,100%{transform:translateX(0)}
-  8%{transform:translateX(-2.5px)}
-  16%{transform:translateX(2.5px)}
-  24%{transform:translateX(-2.5px)}
-  32%{transform:translateX(2.5px)}
-  40%{transform:translateX(-2px)}
-  48%{transform:translateX(2px)}
-  56%{transform:translateX(-2px)}
-  64%{transform:translateX(1.5px)}
-  72%{transform:translateX(-1px)}
-  82%{transform:translateX(1px)}
-  92%{transform:translateX(-.5px)}
+  8%{transform:translateX(-1.5px)}
+  16%{transform:translateX(1.5px)}
+  24%{transform:translateX(-1.5px)}
+  32%{transform:translateX(1.5px)}
+  40%{transform:translateX(-1.2px)}
+  48%{transform:translateX(1.2px)}
+  56%{transform:translateX(-1px)}
+  64%{transform:translateX(.8px)}
+  72%{transform:translateX(-.6px)}
+  82%{transform:translateX(.5px)}
+  92%{transform:translateX(-.3px)}
 }
 .lf-boton.lf-error{animation:lf-vibra .34s linear both}
 @media (prefers-reduced-motion:reduce){ .lf-boton.lf-error{animation:none} }
