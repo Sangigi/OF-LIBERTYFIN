@@ -2808,3 +2808,22 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 }
 .lf-boton.lf-error{animation:lf-vibra .34s linear both}
 @media (prefers-reduced-motion:reduce){ .lf-boton.lf-error{animation:none} }
+
+/* Caja · resumen de confirmación antes de registrar */
+.lf-conf-av{margin-bottom:14px;padding:11px 14px;border-radius:var(--lf-r);
+  background:var(--lf-amb-soft);color:var(--lf-amb)}
+.lf-conf-av p{margin:0;font-size:12.5px;line-height:1.5}
+.lf-conf-av p + p{margin-top:5px}
+.lf-conf-items{list-style:none;margin:0 0 4px;padding:0;font-size:13px}
+.lf-conf-items li{display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+  border-bottom:1px solid var(--lf-linea)}
+.lf-conf-items li span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-conf-items li.mas{color:var(--lf-tinta-4);justify-content:flex-start;border-bottom:0}
+.lf-conf-total{display:flex;justify-content:space-between;align-items:baseline;
+  padding:12px 0 10px;font-size:13px;color:var(--lf-tinta-3)}
+.lf-conf-total b{font-size:24px;letter-spacing:-.6px;color:var(--lf-tinta)}
+.lf-conf-datos{margin:0;padding:12px 14px;border-radius:var(--lf-r);background:var(--lf-vidrio);font-size:12.5px}
+.lf-conf-datos div{display:flex;justify-content:space-between;gap:14px;padding:4px 0}
+.lf-conf-datos dt{font-weight:400;color:var(--lf-tinta-3)}
+.lf-conf-datos dd{margin:0;text-align:right;font-weight:600;color:var(--lf-tinta)}
+.lf-conf-datos i{font-style:normal;font-weight:400;color:var(--lf-tinta-4)}

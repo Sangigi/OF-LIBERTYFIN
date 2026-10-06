@@ -721,6 +721,28 @@ $token = $_SESSION['lf_token'];
     } catch (e) { /* sin sessionStorage se opera igual, solo que sin guardar */ }
   };
 
+  /* Lo que se va a registrar, leído de la pantalla, para el resumen de
+     confirmación. */
+  window.lfResumenTicket = function(){
+    var cap = lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0);
+    var ant = parseFloat($('anticipo').value) || 0;
+    if (ant > cap) ant = cap;
+    var act = document.querySelector('.lf-metodos .m.on');
+    var esLinea = !!(act && act.dataset.linea);
+    var sl = $('sinLiga');
+    var se = $('selEspecialista');
+    var v = window.lfVentaElegida && window.lfVentaElegida();
+    return {
+      lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio}; }),
+      total: cap, anticipo: ant, saldo: cap - ant,
+      liga: esLinea && !(sl && sl.checked),
+      metodo: act ? act.textContent.trim() : 'Efectivo',
+      cliente: ($('buscaCliente').value || '').trim(),
+      esp: (se && se.value) ? se.options[se.selectedIndex].text : '',
+      ampliar: v ? v.folio : ''
+    };
+  };
+
   /* Venta cobrada: se olvida el ticket y no se vuelve a guardar. */
   window.lfTicketCobrado = function(){
     ticketCerrado = true;
@@ -777,6 +799,24 @@ $token = $_SESSION['lf_token'];
   pintar();
 })();
 </script>
+
+<?php /* ═══════════ CONFIRMAR ANTES DE REGISTRAR ═══════════ */ ?>
+<div class="lf-modal" id="modalConfirma" hidden>
+  <div class="caja" role="dialog" aria-modal="true" aria-labelledby="cTitulo">
+    <header>
+      <div>
+        <h2 id="cTitulo">Revisa antes de registrar</h2>
+        <p>Una vez registrada, deshacerla es trabajo aparte.</p>
+      </div>
+      <button type="button" class="cerrar" id="cCerrar" aria-label="Cerrar">&times;</button>
+    </header>
+    <div class="cuerpo" id="cCuerpo"></div>
+    <footer>
+      <button type="button" class="btn btn-secondary" id="cVolver">Revisar</button>
+      <button type="button" class="btn btn-primary" id="cOk">Confirmar y registrar</button>
+    </footer>
+  </div>
+</div>
 
 <?php /* ═══════════ EL MODAL DE COBRO ═══════════ */ ?>
 <div class="lf-modal" id="modalCobro" hidden>
@@ -990,10 +1030,10 @@ $token = $_SESSION['lf_token'];
     }
   });
 
-  /* El envío ya no recarga: se manda, se recibe y se abre el modal. */
-  if (form) form.addEventListener('submit', function(ev){
-    ev.preventDefault();
-
+  /* El envío ya no recarga: se manda, se recibe y se abre el modal.
+     Esta función es el envío de verdad; solo se llega aquí DESPUÉS de la
+     confirmación (ver más abajo). */
+  function enviar(){
     var btn = document.getElementById('btnCobrar');
     if (btn) { btn.disabled = true; btn.classList.add('cargando'); }
 
@@ -1045,6 +1085,101 @@ $token = $_SESSION['lf_token'];
         }
         form.submit();
       });
-  });
+  }
+
+  /* ══════════════════════════════════════════════════════
+     CONFIRMAR ANTES DE REGISTRAR
+     Un Enter de más, o un toque sin querer, registraba una venta a medias
+     —sin cliente, sin especialista, con saldo— y deshacerla es trabajo
+     aparte. Ahora:
+       · Enter dentro de un campo ya NO envía el formulario;
+       · enviar abre un resumen y avisa de lo que falta;
+       · el foco cae en "Revisar", no en "Confirmar": un segundo Enter
+         seguido tampoco la registra.
+     ══════════════════════════════════════════════════════ */
+  var conf = document.getElementById('modalConfirma');
+  var confCuerpo = document.getElementById('cCuerpo');
+  var pendiente = null;
+
+  function cerrarConf(){
+    conf.hidden = true;
+    document.body.classList.remove('lf-modal-abierto');
+    pendiente = null;
+  }
+
+  function abrirConf(r){
+    var av = [];
+    if (!r.ampliar) {
+      if (!r.cliente) av.push('No elegiste cliente: la venta saldrá como <b>Público general</b>.');
+      if (!r.esp)     av.push('Sin <b>especialista</b>: la comisión quedará por asignar.');
+      if (!r.liga && r.saldo > 0.009)
+        av.push('Quedará un <b>saldo de ' + money(r.saldo) + '</b> por cobrar.');
+      if (!r.liga && r.anticipo <= 0)
+        av.push('<b>No se cobra nada hoy</b>: se registra solo la venta.');
+    }
+    var items = r.lineas.slice(0, 5).map(function(l){
+      return '<li><span>' + (l.cantidad > 1 ? l.cantidad + ' × ' : '') + esc(l.nombre) + '</span>'
+           + '<b class="lf-mono">' + money(l.precio * l.cantidad) + '</b></li>';
+    }).join('');
+    if (r.lineas.length > 5) items += '<li class="mas">y ' + (r.lineas.length - 5) + ' más…</li>';
+
+    var filas = [];
+    if (r.ampliar) {
+      filas.push(['Se agrega a la venta', esc(r.ampliar)]);
+    } else {
+      filas.push(['Cliente', r.cliente ? esc(r.cliente) : '<i>Público general</i>']);
+      filas.push(['Especialista', r.esp ? esc(r.esp) : '<i>Sin asignar</i>']);
+      filas.push(['Paga con', esc(r.metodo)]);
+      filas.push(r.liga ? ['Se genera una liga por', '<b class="lf-mono">' + money(r.total) + '</b>']
+                        : ['Se cobra hoy', '<b class="lf-mono">' + money(r.anticipo) + '</b>']);
+      if (!r.liga && r.saldo > 0.009) filas.push(['Saldo', '<b class="lf-mono">' + money(r.saldo) + '</b>']);
+    }
+
+    confCuerpo.innerHTML =
+        (av.length ? '<div class="lf-conf-av">' + av.map(function(a){ return '<p>' + a + '</p>'; }).join('') + '</div>' : '')
+      + '<ul class="lf-conf-items">' + items + '</ul>'
+      + '<div class="lf-conf-total"><span>Total</span><b class="lf-mono">' + money(r.total) + '</b></div>'
+      + '<dl class="lf-conf-datos">' + filas.map(function(f){
+          return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>'; }).join('') + '</dl>';
+
+    document.getElementById('cOk').textContent = r.liga ? 'Confirmar y generar liga' : 'Confirmar y registrar';
+    conf.hidden = false;
+    document.body.classList.add('lf-modal-abierto');
+    /* El foco va a "Revisar" a propósito: ver nota arriba. */
+    document.getElementById('cVolver').focus();
+  }
+
+  if (conf) {
+    document.getElementById('cVolver').addEventListener('click', cerrarConf);
+    document.getElementById('cCerrar').addEventListener('click', cerrarConf);
+    conf.addEventListener('click', function(e){ if (e.target === conf) cerrarConf(); });
+    document.getElementById('cOk').addEventListener('click', function(){
+      cerrarConf();
+      enviar();
+    });
+    document.addEventListener('keydown', function(e){
+      if (e.key === 'Escape' && !conf.hidden) cerrarConf();
+    });
+  }
+
+  if (form) {
+    /* Enter dentro de un campo (precio, IVA, anticipo, referencia…) ya no
+       manda el formulario. En un área de texto y en botones sí hace lo
+       suyo: salto de línea, o el clic del botón enfocado. */
+    form.addEventListener('keydown', function(e){
+      if (e.key !== 'Enter') return;
+      var t = e.target;
+      if (t.tagName === 'TEXTAREA' || t.tagName === 'BUTTON') return;
+      e.preventDefault();
+    });
+
+    form.addEventListener('submit', function(ev){
+      ev.preventDefault();
+      if (!conf || !window.lfResumenTicket) { enviar(); return; }   // sin resumen, como antes
+      var r = window.lfResumenTicket();
+      if (!r.lineas.length) return;
+      abrirConf(r);
+    });
+  }
 })();
 </script>
