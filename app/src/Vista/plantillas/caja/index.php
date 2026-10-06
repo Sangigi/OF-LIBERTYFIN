@@ -806,7 +806,7 @@ $token = $_SESSION['lf_token'];
     <header>
       <div>
         <h2 id="cTitulo">Revisa antes de registrar</h2>
-        <p>Una vez registrada, deshacerla es trabajo aparte.</p>
+        <p>Una vez registrada, la venta no puede eliminarse. Cualquier cancelación requiere un proceso adicional.</p>
       </div>
       <button type="button" class="cerrar" id="cCerrar" aria-label="Cerrar">&times;</button>
     </header>
