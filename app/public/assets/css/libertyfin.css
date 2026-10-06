@@ -2774,3 +2774,16 @@ tr[data-modal],a[data-modal]{cursor:pointer}
    transición mantienen el centro fijo, así que se cierra y se abre
    desde el mismo punto. */
 .lf-boton{margin-left:auto;margin-right:auto}
+
+/* LAS LETRAS VUELVEN CUANDO EL BOTÓN YA CASI ESTÁ ABIERTO.
+   Al regresar, las letras empezaban a aparecer a la vez que el botón
+   se ensanchaba: con el botón todavía más angosto que el texto, el
+   texto se apretaba y las letras se veían deformadas. Es el mismo
+   problema que ya se resolvió al cerrar (las letras se van antes de que
+   el botón se encoja), pero a la inversa: ahora esperan a que el ancho
+   esté casi completo y entonces vuelan a su sitio. */
+.lf-boton .txt{flex-shrink:0;white-space:nowrap}   /* nunca se encoge, solo se recorta */
+.lf-boton.lf-vuelve .txt i{
+  transition:transform .34s cubic-bezier(.3,.9,.4,1.15) .26s,
+             opacity .22s ease .26s}
+.lf-boton.lf-vuelve .fl{transition:opacity .2s ease .3s,transform .28s ease .3s}

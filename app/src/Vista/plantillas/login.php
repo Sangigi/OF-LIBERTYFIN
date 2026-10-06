@@ -181,7 +181,7 @@ $token = $_SESSION['lf_token'];
         b.classList.remove('lf-error');
         soltar();
         if (alTerminar) alTerminar();
-        setTimeout(function () { b.classList.remove('lf-vuelve'); }, 520);
+        setTimeout(function () { b.classList.remove('lf-vuelve'); }, 750);
       }, 950);
     }, falta);
   }
