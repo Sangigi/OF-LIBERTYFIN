@@ -2787,3 +2787,16 @@ tr[data-modal],a[data-modal]{cursor:pointer}
   transition:transform .34s cubic-bezier(.3,.9,.4,1.15) .26s,
              opacity .22s ease .26s}
 .lf-boton.lf-vuelve .fl{transition:opacity .2s ease .3s,transform .28s ease .3s}
+
+/* Al aparecer la X, el círculo rojo vibra de lado a lado y se calma. */
+@keyframes lf-vibra{
+  0%,100%{transform:translateX(0)}
+  12%{transform:translateX(-8px)}
+  27%{transform:translateX(7px)}
+  42%{transform:translateX(-6px)}
+  57%{transform:translateX(5px)}
+  72%{transform:translateX(-3px)}
+  87%{transform:translateX(2px)}
+}
+.lf-boton.lf-error{animation:lf-vibra .55s cubic-bezier(.36,.07,.19,.97) both}
+@media (prefers-reduced-motion:reduce){ .lf-boton.lf-error{animation:none} }
