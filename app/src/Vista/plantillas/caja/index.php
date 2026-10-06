@@ -207,7 +207,6 @@ $token = $_SESSION['lf_token'];
       <p id="msgSaldo">Deja el total para liquidar de una vez.</p>
     </div>
 
-    <div style="padding:0 20px 14px;display:flex;gap:8px;flex-wrap:wrap">
       <?php
       // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a quien
       // la tiene apagada hace que el cajero la elija y la venta falle al
@@ -635,6 +634,88 @@ $token = $_SESSION['lf_token'];
     }, 220);
   });
 
+  /* ══════════════════════════════════════════════════════
+     EL TICKET SOBREVIVE AL CAMBIO DE CATEGORÍA
+     Las categorías de arriba son enlaces: cambiar de una a otra carga
+     la pantalla otra vez y el ticket —productos, precios, IVA, cliente,
+     método— se borraba. Se guarda en la pestaña (sessionStorage) cada vez
+     que algo cambia y se restaura al cargar. Se borra al cobrar con
+     éxito, para que la siguiente venta empiece limpia.
+     ══════════════════════════════════════════════════════ */
+  var CLAVE_TICKET = 'lf-caja-ticket';
+  var ticketListo = false;     // no se guarda nada antes de restaurar
+  var ticketCerrado = false;   // ya se cobró: no se vuelve a guardar
+
+  window.lfGuardarTicket = function(){
+    if (!ticketListo || ticketCerrado) return;
+    try {
+      sessionStorage.setItem(CLAVE_TICKET, JSON.stringify({
+        lineas: lineas,
+        iva: $('ivaPct').value, gastos: $('gastos').value,
+        anticipo: $('anticipo').value, manual: $('anticipo').dataset.manual || '',
+        clienteId: $('cliente_id').value, cliente: $('buscaCliente').value,
+        esp: $('selEspecialista') ? $('selEspecialista').value : '',
+        desc: $('descVenta') ? $('descVenta').value : '',
+        metodo: $('comoPaga').value,
+        sinLiga: $('sinLiga') ? $('sinLiga').checked : null,
+        ref: $('refTransf') ? $('refTransf').value : ''
+      }));
+    } catch (e) { /* sin sessionStorage se opera igual, solo que sin guardar */ }
+  };
+
+  /* Venta cobrada: se olvida el ticket y no se vuelve a guardar. */
+  window.lfTicketCobrado = function(){
+    ticketCerrado = true;
+    try { sessionStorage.removeItem(CLAVE_TICKET); } catch (e) {}
+  };
+
+  function restaurarTicket(){
+    var g = null;
+    try {
+      /* Si se acaba de cobrar (?ok=…), el ticket de antes ya no vale. */
+      if (/[?&]ok=/.test(location.search)) { sessionStorage.removeItem(CLAVE_TICKET); }
+      else g = JSON.parse(sessionStorage.getItem(CLAVE_TICKET) || 'null');
+    } catch (e) { g = null; }
+
+    if (g && g.lineas && g.lineas.length) {
+      lineas = g.lineas.map(function(l){
+        return {id:l.id, nombre:l.nombre, precio:+l.precio, cantidad:+l.cantidad || 1};
+      });
+      $('ivaPct').value = g.iva;
+      $('gastos').value = g.gastos;
+      $('cliente_id').value = g.clienteId || '';
+      $('buscaCliente').value = g.cliente || '';
+      if ($('selEspecialista')) $('selEspecialista').value = g.esp || '';
+      if ($('descVenta')) $('descVenta').value = g.desc || '';
+
+      /* El método: se "toca" su botón para que todo lo que depende de él
+         (anticipo, casilla de "Ya me pagaron", referencia) se acomode. */
+      var bm = document.querySelector('.lf-metodos .m[data-metodo="' + (g.metodo || '') + '"]');
+      if (bm) bm.click();
+      if ($('sinLiga') && g.sinLiga !== null) $('sinLiga').checked = !!g.sinLiga;
+      if ($('refTransf')) $('refTransf').value = g.ref || '';
+      $('anticipo').value = g.anticipo;
+      $('anticipo').dataset.manual = g.manual || '';
+      if ($('sinLiga')) $('sinLiga').dispatchEvent(new Event('change'));
+      /* `change` en la casilla reinicia el anticipo; se vuelve a poner. */
+      $('anticipo').value = g.anticipo;
+      $('anticipo').dataset.manual = g.manual || '';
+    }
+    ticketListo = true;
+  }
+
+  /* Cualquier cambio en el formulario guarda el ticket. */
+  ['ticket'].forEach(function(id){
+    var fm = $(id);
+    if (!fm) return;
+    fm.addEventListener('input',  function(){ window.lfGuardarTicket(); });
+    fm.addEventListener('change', function(){ window.lfGuardarTicket(); });
+    fm.addEventListener('click',  function(){ setTimeout(window.lfGuardarTicket, 0); });
+  });
+  /* Y siempre que se recalcula (agregar, quitar, cambiar un precio). */
+  document.addEventListener('lf-recalcular', function(){ window.lfGuardarTicket(); });
+
+  restaurarTicket();
   pintar();
 })();
 </script>
@@ -662,7 +743,11 @@ $token = $_SESSION['lf_token'];
       titulo = document.getElementById('mTitulo'),
       sub    = document.getElementById('mSub'),
       pie    = document.getElementById('mPie'),
-      form   = document.getElementById('formCobro') || document.querySelector('form.lf-pos, form'),
+      /* El formulario del TICKET, por su id. Antes se tomaba el primer
+         <form> de la página, que en Caja es el buscador del catálogo: el
+         cobro nunca se enviaba por detrás, el modal no abría y la liga
+         salía como un bloque arriba de la página. */
+      form   = document.getElementById('ticket'),
       reloj  = null;
 
   function abrir(){ modal.hidden = false; document.body.classList.add('lf-modal-abierto'); }
@@ -856,12 +941,18 @@ $token = $_SESSION['lf_token'];
 
     var datos = new FormData(form);
     datos.append('json', '1');
+    var recibido = false;   // ¿ya contestó el servidor? Si sí, la venta YA existe.
     fetch(form.action, { method:'POST', body:datos,
                          headers:{'Accept':'application/json'}, credentials:'same-origin' })
       .then(function(r){ return r.json(); })
       .then(function(d){
+        recibido = true;
         if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
         if (!d.ok) { alert(d.error || 'No se pudo cobrar.'); return; }
+
+        /* La venta ya existe: el ticket guardado en la pestaña ya no vale,
+           o la siguiente venta arrancaría con los mismos productos. */
+        if (window.lfTicketCobrado) window.lfTicketCobrado();
 
         /* SE AGREGO A UNA VENTA QUE YA EXISTIA.
            No hay nada que cobrar aqui —se abrio saldo— asi que no hay
@@ -885,8 +976,15 @@ $token = $_SESSION['lf_token'];
       })
       .catch(function(){
         if (btn) { btn.disabled = false; btn.classList.remove('cargando'); }
-        /* Si algo falla se manda como siempre, para no dejar al cajero
-           sin poder cobrar porque el JavaScript tuvo un mal día. */
+        /* Si falló la CONEXIÓN, se manda como siempre para no dejar al
+           cajero sin poder cobrar. Pero si el servidor ya contestó, la
+           venta YA se registró y el error fue al mostrarla: reenviar el
+           formulario crearía una segunda venta. */
+        if (recibido) {
+          alert('La venta se registró, pero hubo un problema al mostrar el cobro. '
+              + 'Revísala en Ventas y no la cobres otra vez.');
+          return;
+        }
         form.submit();
       });
   });
