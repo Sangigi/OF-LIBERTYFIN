@@ -132,7 +132,17 @@ $token = $_SESSION['lf_token'];
     anillo.className = 'lf-anillo';
     anillo.setAttribute('aria-hidden', 'true');
     b.appendChild(anillo);
+
+    /* La X blanca de cuando no entra. Se crea al cargar, como el anillo,
+       para que al fallar solo haya que mostrarla. */
+    var equis = document.createElement('span');
+    equis.className = 'lf-equis';
+    equis.setAttribute('aria-hidden', 'true');
+    equis.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" '
+                    + 'stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+    b.appendChild(equis);
   }
+  var t0 = 0;   // cuándo empezó a cerrarse el botón
 
   /* Hacia dónde viaja cada letra: al centro del botón. Se mide ANTES de
      encoger, porque después el botón ya no mide lo mismo. */
@@ -149,6 +159,31 @@ $token = $_SESSION['lf_token'];
     }
     b.classList.add('lf-cerrando');
     b.setAttribute('aria-busy', 'true');
+    t0 = Date.now();
+  }
+
+  /* NO ENTRÓ. El círculo se pone rojo con una X blanca, se queda un
+     momento y el botón vuelve a su tamaño normal.
+     Antes se llamaba directo a soltar(): quitaba el círculo de golpe y
+     las letras reaparecían mientras el botón todavía se estaba
+     encogiendo. Aquí primero se espera a que el círculo esté completo
+     (si el servidor contestó rápido, el botón aún iba a la mitad),
+     después se muestra la X, y solo entonces se abre de vuelta.
+     `alMostrar` pinta el motivo justo cuando aparece la X. */
+  function fallar(alMostrar, alTerminar) {
+    if (lento || !letras.length) { soltar(); alMostrar(); if (alTerminar) alTerminar(); return; }
+    var falta = Math.max(0, 760 - (Date.now() - t0));
+    setTimeout(function () {
+      b.classList.add('lf-error');
+      alMostrar();
+      setTimeout(function () {
+        b.classList.add('lf-vuelve');
+        b.classList.remove('lf-error');
+        soltar();
+        if (alTerminar) alTerminar();
+        setTimeout(function () { b.classList.remove('lf-vuelve'); }, 520);
+      }, 950);
+    }, falta);
   }
 
   function abrir(cuando) {
@@ -241,30 +276,39 @@ $token = $_SESSION['lf_token'];
            intentos, que trae su propio texto—. */
         var doc = new DOMParser().parseFromString(res.html, 'text/html'),
             msg = doc.querySelector('.lf-msg');
-        soltar();
-        if (msg) {
-          var vieja = f.parentNode.querySelector('.lf-msg');
-          if (vieja) vieja.replaceWith(msg.cloneNode(true));
-          else f.parentNode.insertBefore(msg.cloneNode(true), f);
-        } else {
-          decir('No se pudo entrar. Revisa tu correo y tu contraseña.');
-        }
+
         /* El token puede haber rotado: reenviar el viejo daría un error
            de formulario en vez del de contraseña, y nadie entendería
-           por qué el segundo intento falla distinto. */
+           por qué el segundo intento falla distinto. Se actualiza YA, no
+           al terminar la animación: no depende de ella. */
         var tk = doc.querySelector('input[name=token]');
         var mio = f.querySelector('input[name=token]');
         if (tk && mio && tk.value) mio.value = tk.value;
-        /* Si el servidor deshabilitó los campos por bloqueo, se respeta. */
-        if (doc.querySelector('#usuario[disabled]')) {
-          f.querySelectorAll('input,button').forEach(function (e2) { e2.disabled = true; });
-        }
-        var cl = document.getElementById('clave');
-        if (cl && !cl.disabled) { cl.value = ''; cl.focus(); }
+        var bloqueado = !!doc.querySelector('#usuario[disabled]');
+
+        fallar(function () {
+          /* Sale junto con la X: el motivo y el círculo rojo llegan a la vez. */
+          if (msg) {
+            var vieja = f.parentNode.querySelector('.lf-msg');
+            if (vieja) vieja.replaceWith(msg.cloneNode(true));
+            else f.parentNode.insertBefore(msg.cloneNode(true), f);
+          } else {
+            decir('No se pudo entrar. Revisa tu correo y tu contraseña.');
+          }
+        }, function () {
+          /* Si el servidor deshabilitó los campos por bloqueo, se respeta. */
+          if (bloqueado) {
+            f.querySelectorAll('input,button').forEach(function (e2) { e2.disabled = true; });
+            return;
+          }
+          var cl = document.getElementById('clave');
+          if (cl && !cl.disabled) { cl.value = ''; cl.focus(); }
+        });
       })
       .catch(function () {
-        soltar();
-        decir('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
+        fallar(function () {
+          decir('No se pudo conectar. Revisa tu conexión e inténtalo de nuevo.');
+        });
       });
   });
 })();
