@@ -151,8 +151,7 @@ $comoVa = [
       'enlace'=>function($n){ return '?p=' . $n; }]); ?>
   </div>
   <div class="card-footer" style="border-top:none;padding-top:0">
-    Te avisamos por correo en cuanto te contestemos. No hace falta que estés
-    revisando aquí.
+    Te avisaremos por correo electrónico en cuanto tengamos una respuesta. No es necesario que revises esta sección constantemente.
   </div>
 </section>
 <?php endif; ?>
