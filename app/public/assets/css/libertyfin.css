@@ -351,7 +351,7 @@ small,.small{font-size:12px}
 .lf-tile.a{background:var(--lf-amb-soft);color:var(--lf-amb)}
 .lf-tile.l{background:var(--lf-lima-soft);color:#5d9330}
 .lf-tile.r{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
-:root[data-theme="dark"] .lf-tile{color:color-mix(in srgb,var(--lf-brand) 72%,#fff)}
+:root[data-theme="dark"] .lf-tile{color:color-mix(in srgb,var(--lf-brand) 22%,#fff)}
 
 /* Tarjeta destacada con degradado */
 .stat-card.lf-hero,.card.lf-hero{
