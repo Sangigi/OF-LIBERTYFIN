@@ -2788,15 +2788,15 @@ tr[data-modal],a[data-modal]{cursor:pointer}
              opacity .22s ease .26s}
 .lf-boton.lf-vuelve .fl{transition:opacity .2s ease .3s,transform .28s ease .3s}
 
-/* Al aparecer la X, el círculo rojo vibra de lado a lado y se calma. */
+/* Al aparecer la X, el círculo rojo da un temblor corto y discreto:
+   pocos píxeles, pocas oscilaciones y una curva suave, para que se sienta
+   como un "no" firme y no como una sacudida. */
 @keyframes lf-vibra{
   0%,100%{transform:translateX(0)}
-  12%{transform:translateX(-8px)}
-  27%{transform:translateX(7px)}
-  42%{transform:translateX(-6px)}
-  57%{transform:translateX(5px)}
-  72%{transform:translateX(-3px)}
-  87%{transform:translateX(2px)}
+  20%{transform:translateX(-3px)}
+  40%{transform:translateX(3px)}
+  60%{transform:translateX(-2px)}
+  80%{transform:translateX(1px)}
 }
-.lf-boton.lf-error{animation:lf-vibra .55s cubic-bezier(.36,.07,.19,.97) both}
+.lf-boton.lf-error{animation:lf-vibra .36s cubic-bezier(.4,0,.2,1) both}
 @media (prefers-reduced-motion:reduce){ .lf-boton.lf-error{animation:none} }
