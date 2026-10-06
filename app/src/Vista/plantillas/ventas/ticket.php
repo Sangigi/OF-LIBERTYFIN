@@ -9,13 +9,16 @@ $v = $venta;
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%2327ae60'/><text x='50' y='50' font-family='DM Sans,system-ui,sans-serif' font-size='62' font-weight='800' fill='white' text-anchor='middle' dominant-baseline='central'>L</text></svg>">
 <meta name="theme-color" content="#27ae60">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&display=swap" rel="stylesheet">
 <title>Ticket <?= P::e($v['codigo_venta']) ?></title>
 <style>
 /* El ticket trae su propio CSS: es la única pantalla que se imprime,
    y cargar la hoja completa solo para tacharla al imprimir no tiene
    sentido. Ancho de 80 mm, el de las impresoras térmicas. */
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'DM Sans',system-ui,sans-serif;background:#f1f4f2;
+body{font-family:'Google Sans',system-ui,sans-serif;background:#f1f4f2;
      color:#1b2420;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
 .t{width:80mm;max-width:100%;background:#fff;padding:16px 18px;
    border-radius:10px;box-shadow:0 2px 10px rgba(0,0,0,.08);font-size:12px;line-height:1.45}
