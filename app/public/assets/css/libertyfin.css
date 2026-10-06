@@ -2765,3 +2765,12 @@ tr[data-modal],a[data-modal]{cursor:pointer}
              gap .3s ease,
              background-color .3s ease}
 @media (prefers-reduced-motion:reduce){ .lf-equis{transition:none} }
+
+/* El botón se centra con márgenes automáticos SIEMPRE, no solo cerrado.
+   Antes `margin: auto` existía solo en `.lf-cerrando`: al volver a su
+   tamaño los márgenes pasaban a 0 de golpe (los márgenes no se animan),
+   el círculo saltaba a la izquierda y desde ahí crecía. Con el botón al
+   100% de ancho los márgenes automáticos no cambian nada; durante la
+   transición mantienen el centro fijo, así que se cierra y se abre
+   desde el mismo punto. */
+.lf-boton{margin-left:auto;margin-right:auto}
