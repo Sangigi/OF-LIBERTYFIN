@@ -84,6 +84,19 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
       <?php if ($r['iva'] > 0): ?><br>
       De lo facturado, <b><?= D::pesos($r['iva']) ?></b> son IVA: no es ingreso, es del SAT.
       <?php endif; ?>
+      <?php /* Lo que entró por ventas de meses anteriores. Ya está dentro de
+               "Cobrado"; se dice aparte porque las tablas por fecha de venta
+               no lo enseñan y parecía que no cuadraba. */
+      if (!empty($r['de_anteriores']) && $r['de_anteriores'] > 0): ?>
+      <p class="lf-otros">
+        De lo que entró, <b><?= D::pesos($r['de_anteriores']) ?></b> son
+        <?= (int)$r['de_anteriores_cobros'] ?> cobro<?= $r['de_anteriores_cobros'] == 1 ? '' : 's' ?>
+        de <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
+        de meses anteriores: anticipos y abonos que llegaron en este periodo.
+        <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
+           data-ir-pestana="pagos">Ver cuáles</a>
+      </p>
+      <?php endif; ?>
     </div>
   </div>
 </section>
@@ -214,10 +227,10 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
 </section>
 <?php endif; ?>
 
-<?php /* ═══ LOS OCHO REPORTES ═══ */ ?>
+<?php /* ═══ LOS REPORTES DEL PERIODO ═══ */ ?>
 <?php
 /**
- * Los ocho van en la página, y la pestaña solo muestra uno.
+ * Todos van en la página, y la pestaña solo muestra uno.
  *
  * Antes cada pestaña era un enlace y recargaba: se perdía el lugar en la
  * página y había que esperar. Comparar "por área" con "por colaborador"
@@ -236,6 +249,33 @@ $celda = function ($v, $t) {
 };
 $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
 
+/* El contenido de una celda, YA ESCAPADO, listo para pintar.
+ *
+ * El folio de la venta —o la columna "Venta" en el detalle de pagos— se
+ * vuelve un enlace que abre esa venta en el panel de al lado (data-modal),
+ * sin salir del reporte. Lo hace con el id que trae la fila en '_venta',
+ * que no es columna: el Excel y la impresión no lo ven.
+ *
+ * Solo si quien mira puede ver ventas: a alguien con permiso de reportes
+ * pero no de ventas, el enlace le abriría un "sin permiso".
+ *
+ * En el detalle de pagos, la fecha de una venta de otro periodo lleva una
+ * marca: es justo lo que esa tabla vino a enseñar. */
+$puedeVerVentas = \LibertyFin\Dominio\Permisos::puede('ver.ventas');
+$valor = function (array $f, $j, array $c) use ($celda, $puedeVerVentas) {
+    $txt = P::e($celda($f[$j] ?? null, $c[1])) ?: '–';
+    if ($txt === '–') return $txt;
+    if ($puedeVerVentas && !empty($f['_venta']) && in_array($c[0], ['Folio', 'Venta'], true)) {
+        return '<a class="lf-folio" href="/ventas/' . (int)$f['_venta'] . '" data-modal'
+             . ' title="Ver la venta ' . $txt . '">' . $txt . '</a>';
+    }
+    if ($c[0] === 'Fecha de venta' && !empty($f['_origen'])) {
+        $txt .= ' <span class="lf-origen">'
+              . ($f['_origen'] === 'anterior' ? 'anterior' : 'posterior') . '</span>';
+    }
+    return $txt;
+};
+
 /* Columnas de UNA tabla, para elegir cuáles imprimir. Cada reporte o área
    tiene las suyas: lo que se desmarca aquí no toca a las demás. */
 $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $extra = '') {
@@ -249,7 +289,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
     echo '</div></details>';
 };
 ?>
-<section class="card lf-tabs" data-tabs="reportes">
+<section class="card lf-tabs" data-tabs="reportes" id="lfReportes">
   <header class="card-header">
     <div><span>Reportes del periodo</span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
@@ -346,6 +386,18 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
           equipo salió la venta.
         <?php endif; ?>
       </p>
+      <?php /* Igual que en el detalle de ventas: estas tablas van por la fecha
+               de la venta y no enseñan lo que entró por ventas de otro mes. */
+      if (!empty($r['de_anteriores']) && $r['de_anteriores'] > 0): ?>
+        <p class="lf-otros en-tabla" style="margin:10px 0 0">
+          Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
+          <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
+          de meses anteriores (anticipos y abonos). No salen en estas tablas porque van por
+          la fecha de la venta.
+          <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
+             data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
+        </p>
+      <?php endif; ?>
     </div>
 
     <?php if (!$desglose['tablas']): ?>
@@ -406,7 +458,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
                 <?php foreach ($tb['columnas'] as $j => $c): ?>
                   <td data-label="<?= P::e($c[0]) ?>"
                       <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
-                    <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+                    <?= $valor($f, $j, $c) ?></td>
                 <?php endforeach; ?>
               </tr>
             <?php endforeach; ?>
@@ -428,7 +480,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
 
     <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <span><?= $desglose['cuantas'] ?> tabla<?= $desglose['cuantas']==1?'':'s' ?> ·
-        total cobrado <b class="lf-mono" style="color:var(--lf-tinta)">
+        cobrado de estas ventas <b class="lf-mono" style="color:var(--lf-tinta)">
           <?= D::pesos($desglose['total']) ?></b></span>
       <a class="btn btn-secondary btn-sm" target="_blank"
          href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose']) ?>">
@@ -504,7 +556,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
                   <?php foreach ($tb['columnas'] as $j => $c): ?>
                     <td data-label="<?= P::e($c[0]) ?>"
                         <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
-                      <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+                      <?= $valor($f, $j, $c) ?></td>
                   <?php endforeach; ?>
                 </tr>
               <?php endforeach; ?>
@@ -529,8 +581,48 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
     </div>
   </div>
 
-  <?php foreach ($reportes as $k => $rep): if ($k === 'desglose' || $k === 'colaborador') continue; ?>
+  <?php foreach ($reportes as $k => $rep): if ($k === 'desglose' || $k === 'colaborador') continue;
+    /* El detalle de pagos se lee entero para cuadrar contra "Entraron": se
+       enseñan más renglones que en las demás tablas. */
+    $tope = $k === 'pagos' ? 300 : 50; ?>
   <div data-panel="<?= $k ?>" <?= $tipo===$k ? '' : 'hidden' ?>>
+    <?php if (!empty($rep['partes']) && $rep['filas']): $pt = $rep['partes']; ?>
+      <?php /* De dónde vino lo que entró: ventas de este periodo o de otro. */ ?>
+      <div class="lf-partes">
+        <div>
+          <small>De ventas de este periodo</small>
+          <b class="lf-mono"><?= D::pesos($pt['periodo']['monto']) ?></b>
+          <span><?= (int)$pt['periodo']['cobros'] ?> cobro<?= $pt['periodo']['cobros'] == 1 ? '' : 's' ?></span>
+        </div>
+        <div class="otro">
+          <small>De ventas de meses anteriores</small>
+          <b class="lf-mono"><?= D::pesos($pt['anterior']['monto']) ?></b>
+          <span><?= (int)$pt['anterior']['cobros'] ?> cobro<?= $pt['anterior']['cobros'] == 1 ? '' : 's' ?>
+            · marcados con <i class="lf-origen">anterior</i></span>
+        </div>
+        <?php if ($pt['posterior']['cobros'] > 0): ?>
+        <div class="otro">
+          <small>De ventas con fecha posterior</small>
+          <b class="lf-mono"><?= D::pesos($pt['posterior']['monto']) ?></b>
+          <span><?= (int)$pt['posterior']['cobros'] ?> cobro<?= $pt['posterior']['cobros'] == 1 ? '' : 's' ?>
+            · su fecha se movió a mano</span>
+        </div>
+        <?php endif; ?>
+      </div>
+    <?php endif; ?>
+
+    <?php /* Las tablas por fecha de venta no enseñan lo que entró por ventas de
+             otros meses. Se avisa aquí, donde se nota la falta. */
+    if ($k === 'detalle' && !empty($r['de_anteriores']) && $r['de_anteriores'] > 0): ?>
+      <p class="lf-otros en-tabla">
+        Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
+        <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
+        de meses anteriores. No salen aquí porque esta tabla va por la fecha de la venta.
+        <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
+           data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
+      </p>
+    <?php endif; ?>
+
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table">
         <thead><tr>
@@ -544,12 +636,12 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
               style="text-align:center;color:var(--lf-tinta-4);padding:32px">
             No hay datos en este periodo. Cambia las fechas de arriba.</td></tr>
         <?php endif; ?>
-        <?php foreach (array_slice($rep['filas'], 0, 50) as $f): ?>
-          <tr>
+        <?php foreach (array_slice($rep['filas'], 0, $tope) as $f): ?>
+          <tr<?= !empty($f['_origen']) ? ' class="lf-fila-otro"' : '' ?>>
             <?php foreach ($rep['columnas'] as $j => $c): ?>
               <td data-label="<?= P::e($c[0]) ?>"
                   <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
-                <?= P::e($celda($f[$j] ?? null, $c[1])) ?: '–' ?></td>
+                <?= $valor($f, $j, $c) ?></td>
             <?php endforeach; ?>
           </tr>
         <?php endforeach; ?>
@@ -567,8 +659,8 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
 
     <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <span style="flex:1;min-width:220px"><?= P::e($rep['nota']) ?>
-        <?php if (count($rep['filas']) > 50): ?>
-          <b>Se muestran 50 de <?= count($rep['filas']) ?>; el Excel los trae todos.</b>
+        <?php if (count($rep['filas']) > $tope): ?>
+          <b>Se muestran <?= $tope ?> de <?= count($rep['filas']) ?>; el Excel los trae todos.</b>
         <?php endif; ?></span>
       <a class="btn btn-secondary btn-sm" target="_blank"
          href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>$k]) ?>">
@@ -577,6 +669,34 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
   </div>
   <?php endforeach; ?>
 </section>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   "VER CUÁLES": IR A UNA PESTAÑA DESDE OTRO LADO
+   Los avisos de cobros de meses anteriores llevan a la
+   pestaña "Detalle de pagos". Se "toca" su píldora para que
+   cambie igual que siempre (sin recargar y con la dirección
+   al día) y se baja hasta los reportes. Sin JavaScript el
+   enlace navega a ?tipo=pagos#lfReportes, que da lo mismo.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  /* La navegación sin recarga vuelve a correr este script cada vez
+     que se entra a Reportes; el escucha se pone una sola vez. */
+  if (window.lfIrPestana) return;
+  window.lfIrPestana = true;
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('[data-ir-pestana]');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    var pill = document.querySelector('[data-tabs="reportes"] .lf-pill[data-tab="'
+                                      + a.getAttribute('data-ir-pestana') + '"]');
+    if (!pill) return;               // sin la pestaña, que navegue el enlace
+    e.preventDefault();
+    pill.click();
+    var sec = document.getElementById('lfReportes');
+    if (sec) sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+})();
+</script>
 
 <script>
 /* ══════════════════════════════════════════════════════

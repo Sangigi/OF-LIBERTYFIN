@@ -26,8 +26,14 @@ final class ReporteRepo extends Repo
                 date('Y-m-d', strtotime($hasta . ' +1 day')) . ' 00:00:00'];
     }
 
-    /** El resultado del periodo, línea por línea. */
-    public function resultado($desde, $hasta)
+    /**
+     * El resultado del periodo, línea por línea.
+     *
+     * @param bool $conAnteriores  separar lo cobrado de ventas de antes del
+     *                             periodo. La gráfica de meses no lo usa y
+     *                             se ahorra la consulta.
+     */
+    public function resultado($desde, $hasta, $conAnteriores = true)
     {
         list($a, $b) = $this->rango($desde, $hasta);
 
@@ -61,7 +67,30 @@ final class ReporteRepo extends Repo
             SELECT COALESCE(SUM(iva),0) FROM ventas
             WHERE estado <> 'cancelada' AND fecha >= ? AND fecha < ?", [$a, $b]);
 
+        // LO QUE ENTRÓ POR VENTAS DE ANTES DEL PERIODO.
+        //
+        // Ya está dentro de `cobrado`: un abono de octubre sobre una venta de
+        // septiembre es dinero de octubre. Se separa para poder DECIRLO,
+        // porque las tablas que van por fecha de venta (por área, por
+        // cliente, el desglose…) no lo enseñan, y sin esta cifra "Entraron"
+        // parecía no cuadrar con nada.
+        $anteriores = ['monto' => 0, 'cobros' => 0, 'ventas' => 0];
+        if ($conAnteriores) {
+            $anteriores = $this->uno("
+                SELECT COALESCE(SUM(p.monto),0)   AS monto,
+                       COUNT(*)                   AS cobros,
+                       COUNT(DISTINCT p.venta_id) AS ventas
+                FROM venta_pagos p
+                INNER JOIN ventas v ON v.id = p.venta_id
+                WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+                  AND p.fecha_pago >= ? AND p.fecha_pago < ?
+                  AND v.fecha < ?", [$a, $b, $a]) ?: $anteriores;
+        }
+
         return [
+            'de_anteriores'        => round((float)$anteriores['monto'], 2),
+            'de_anteriores_cobros' => (int)$anteriores['cobros'],
+            'de_anteriores_ventas' => (int)$anteriores['ventas'],
             'cobrado'    => $cobrado,
             'vendido'    => $vendido,
             'por_cobrar' => max(0, $vendido - $cobrado),
@@ -80,7 +109,7 @@ final class ReporteRepo extends Repo
         $salida = [];
         for ($i = 0; $i < $meses; $i++) {
             $m  = date('Y-m', strtotime("+{$i} month", strtotime($desde)));
-            $r  = $this->resultado($m . '-01', date('Y-m-t', strtotime($m . '-01')));
+            $r  = $this->resultado($m . '-01', date('Y-m-t', strtotime($m . '-01')), false);
             $r['mes'] = $m;
             $salida[] = $r;
         }
@@ -205,12 +234,21 @@ final class ReporteRepo extends Repo
             ORDER BY (pc.colaborador_nombre = 'POR ASIGNAR'), devengado DESC", [$a, $b]);
     }
 
-    /** El detalle en crudo, para exportar. */
+    /**
+     * Una VENTA por renglón: las ventas hechas en el periodo.
+     *
+     * Su "cobrado" es todo lo que se le ha cobrado a cada venta, sin
+     * importar cuándo. Lo que ENTRÓ en el periodo —con los abonos de ventas
+     * de meses anteriores— está en pagosDelPeriodo().
+     *
+     * Las canceladas no entran: antes sí, y su total se sumaba al de la
+     * pestaña aunque ninguna otra tabla las contara.
+     */
     public function detalle($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT v.codigo_venta AS folio, DATE(v.fecha) AS fecha,
+            SELECT v.id AS venta_id, v.codigo_venta AS folio, DATE(v.fecha) AS fecha,
                    COALESCE(c.nombre,'Público general') AS cliente,
                    -- Mismo criterio que el resumen: el área del producto
                    -- de la línea, no la de la venta.
@@ -236,8 +274,53 @@ final class ReporteRepo extends Repo
                         GROUP BY venta_id ) g ON g.venta_id = v.id
             LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
                         GROUP BY venta_id ) cm ON cm.venta_id = v.id
-            WHERE v.fecha >= ? AND v.fecha < ?
+            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             ORDER BY v.fecha", [$a, $b]);
+    }
+
+    /**
+     * UN RENGLÓN POR COBRO: lo que entró en el periodo, venga de la venta
+     * que venga.
+     *
+     * Va por `venta_pagos.fecha_pago`, con los mismos filtros que el
+     * "Entraron" de resultado(), así que la suma de `monto` es exactamente
+     * esa cifra. Es la tabla que enseña lo que las tablas por fecha de
+     * venta no pueden: el anticipo o abono que llegó este mes sobre una
+     * venta del mes pasado, y a qué venta pertenece.
+     *
+     * `posicion` sirve para armar el subfolio de los cobros guardados antes
+     * de que existiera (ver Folio::deRespaldo); se cuenta igual que en el
+     * detalle de la venta: por fecha y luego por id, con cancelados.
+     */
+    public function pagosDelPeriodo($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT p.id, p.folio, p.tipo, p.monto, p.fecha_pago, p.metodo_pago,
+                   v.id AS venta_id, v.codigo_venta, v.fecha AS fecha_venta, v.total,
+                   COALESCE(c.nombre,'Público general') AS cliente,
+                   COALESCE(NULLIF((
+                       SELECT cat.nombre FROM venta_detalles d2
+                       LEFT JOIN productos p2  ON p2.id = d2.producto_id
+                       LEFT JOIN categorias cat ON cat.id = p2.categoria_id
+                       WHERE d2.venta_id = v.id AND cat.nombre IS NOT NULL
+                       GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1
+                   ),''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                   ROUND(v.total - COALESCE(pg.cobrado,0), 2) AS debe,
+                   CASE WHEN p.folio IS NULL OR p.folio = '' THEN (
+                       SELECT COUNT(*) FROM venta_pagos p3
+                       WHERE p3.venta_id = p.venta_id
+                         AND (p3.fecha_pago < p.fecha_pago
+                              OR (p3.fecha_pago = p.fecha_pago AND p3.id <= p.id))
+                   ) END AS posicion
+            FROM venta_pagos p
+            INNER JOIN ventas v  ON v.id = p.venta_id
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+              AND p.fecha_pago >= ? AND p.fecha_pago < ?
+            ORDER BY p.fecha_pago, p.id", [$a, $b]);
     }
 
     /**
@@ -283,7 +366,7 @@ final class ReporteRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT v.codigo_venta, v.fecha,
+            SELECT v.id AS venta_id, v.codigo_venta, v.fecha,
                    COALESCE(c.nombre,'Público general') AS cliente,
                    v.total,
                    COALESCE(pg.cobrado,0) AS cobrado,
@@ -358,7 +441,8 @@ final class ReporteRepo extends Repo
              : "'Sin asignar'";
 
         return $this->todos("
-            SELECT v.codigo_venta                          AS folio,
+            SELECT v.id                                    AS venta_id,
+                   v.codigo_venta                          AS folio,
                    v.fecha,
                    COALESCE(cl.nombre, 'Publico general')  AS cliente,
                    COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin area')
@@ -454,6 +538,7 @@ final class ReporteRepo extends Repo
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
             SELECT pc.colaborador_nombre              AS colaborador,
+                   v.id                               AS venta_id,
                    v.codigo_venta                     AS folio,
                    COALESCE(cl.nombre,'Publico general') AS cliente,
                    v.fecha                            AS fecha_venta,

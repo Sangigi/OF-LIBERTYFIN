@@ -2827,3 +2827,31 @@ tr[data-modal],a[data-modal]{cursor:pointer}
 .lf-conf-datos dt{font-weight:400;color:var(--lf-tinta-3)}
 .lf-conf-datos dd{margin:0;text-align:right;font-weight:600;color:var(--lf-tinta)}
 .lf-conf-datos i{font-style:normal;font-weight:400;color:var(--lf-tinta-4)}
+
+/* ══════════════════════════════════════════════════════
+   REPORTES · COBROS DE VENTAS DE OTROS MESES
+   El folio abre la venta en el panel de al lado; los cobros
+   de ventas de otro periodo se marcan; y donde una tabla va
+   por fecha de venta se avisa de lo que no enseña.
+   ══════════════════════════════════════════════════════ */
+.lf-folio{font-weight:600;color:var(--lf-brand-2);text-decoration:none;
+  border-bottom:1px dashed color-mix(in srgb,var(--lf-brand) 45%,transparent)}
+.lf-folio:hover{color:var(--lf-brand);border-bottom-style:solid}
+.lf-origen{display:inline-block;margin-left:5px;padding:1px 7px;border-radius:99px;
+  font-family:var(--lf-font);font-style:normal;font-size:10px;font-weight:700;
+  letter-spacing:.2px;vertical-align:1px;background:var(--lf-amb-soft);color:var(--lf-amb)}
+tr.lf-fila-otro > td{background:color-mix(in srgb,var(--lf-amb) 6%,transparent)}
+.lf-otros{margin:10px 0 0;padding:10px 13px;border-radius:var(--lf-r);font-size:12.5px;
+  line-height:1.55;color:var(--lf-tinta-2);background:var(--lf-amb-soft);
+  border-left:3px solid var(--lf-amb)}
+.lf-otros.en-tabla{margin:0 20px 14px}
+.lf-otros a{font-weight:600;white-space:nowrap}
+.lf-partes{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;
+  padding:0 20px 14px}
+.lf-partes > div{padding:11px 14px;border-radius:var(--lf-r);background:var(--lf-vidrio);
+  border:1px solid var(--lf-linea)}
+.lf-partes > div.otro{background:color-mix(in srgb,var(--lf-amb) 7%,var(--lf-sup));
+  border-color:color-mix(in srgb,var(--lf-amb) 30%,transparent)}
+.lf-partes small{display:block;font-size:11px;color:var(--lf-tinta-4);margin-bottom:3px}
+.lf-partes b{display:block;font-size:18px;letter-spacing:-.4px;color:var(--lf-tinta)}
+.lf-partes span{display:block;font-size:11px;color:var(--lf-tinta-3);margin-top:2px}

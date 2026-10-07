@@ -24,7 +24,9 @@ final class Reportes
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
-            'nota'   => 'Comisiones generadas por los pagos recibidos en el periodo.',
+            // Decía "por los pagos recibidos en el periodo", pero la consulta
+            // va por la fecha de la VENTA (igual que la comisión de arriba).
+            'nota'   => 'Comisiones de las ventas del periodo, por colaborador.',
         ],
         'servicio' => [
             'rotulo' => 'Por producto',
@@ -46,9 +48,20 @@ final class Reportes
             'rotulo' => 'Día por día',
             'nota'   => 'Lo cobrado cada día del periodo.',
         ],
-        'detalle' => [
+        // "Detalle de pagos" se llamaba al que hoy es "Detalle de ventas", y
+        // no cumplía lo que decía: era una VENTA por renglón, filtrada por la
+        // fecha de la venta, así que el abono que entraba este mes sobre una
+        // venta del mes pasado no salía en ninguna tabla. Ahora el nombre es
+        // de quien de verdad lista los cobros.
+        'pagos' => [
             'rotulo' => 'Detalle de pagos',
-            'nota'   => 'Cada abono, uno por renglón. Es el que se audita.',
+            'nota'   => 'Cada cobro que entró en el periodo, uno por renglón, aunque la venta '
+                      . 'sea de un mes anterior. Suma lo mismo que «Entraron». Es el que se audita.',
+        ],
+        'detalle' => [
+            'rotulo' => 'Detalle de ventas',
+            'nota'   => 'Una venta por renglón: las hechas en el periodo, con todo lo que se les '
+                      . 'ha cobrado. Los cobros que entraron en el periodo están en «Detalle de pagos».',
         ],
         'desglose' => [
             'rotulo' => 'Desglose por área',
@@ -133,7 +146,8 @@ final class Reportes
                      ['Debe', Libro::MONEDA, 14]],
                     array_map(function ($x) {
                         return [$x['codigo_venta'], $x['cliente'], $x['fecha'], (int)$x['dias'],
-                                $x['total'], $x['cobrado'], $x['saldo']];
+                                $x['total'], $x['cobrado'], $x['saldo'],
+                                '_venta' => (int)$x['venta_id']];
                     }, $f),
                     $this->sumar($f, ['total','cobrado','saldo'],
                         function ($t) { return ['TOTAL', '', '', '', $t['total'],
@@ -163,6 +177,9 @@ final class Reportes
                     $this->sumar($f, ['pagos','cobrado'],
                         function ($t) { return ['TOTAL', (int)$t['pagos'], $t['cobrado']]; }));
 
+            case 'pagos':
+                return $this->pagos($r->pagosDelPeriodo($desde, $hasta), $desde, $hasta);
+
             case 'desglose':
                 // Para el Excel y la impresion se aplanan las tablas en
                 // una sola, con un renglon de titulo entre cada area:
@@ -191,7 +208,8 @@ final class Reportes
                         return [$x['folio'], $x['cliente'], $x['area'], $x['fecha'],
                                 $x['subtotal'], $x['iva'], $x['total'], $x['cobrado'],
                                 $x['saldo'], $x['gastos'], $x['comision'],
-                                $x['cobrado'] - $x['gastos'] - $x['comision']];
+                                $x['cobrado'] - $x['gastos'] - $x['comision'],
+                                '_venta' => (int)$x['venta_id']];
                     }, $f),
                     $this->sumar($f, ['subtotal','iva','total','cobrado','saldo','gastos','comision'],
                         function ($t) { return ['TOTAL', '', '', '',
@@ -199,6 +217,82 @@ final class Reportes
                             $t['saldo'], $t['gastos'], $t['comision'],
                             $t['cobrado'] - $t['gastos'] - $t['comision']]; }));
         }
+    }
+
+    /**
+     * El "Detalle de pagos": un COBRO por renglón, por la fecha en que entró.
+     *
+     * Cada renglón dice de qué venta es —su folio y su fecha— y además trae
+     * dos claves que no son columnas:
+     *
+     *   '_venta'   el id de la venta, para que la pantalla pueda abrirla.
+     *   '_origen'  'anterior' si la venta es de antes del periodo,
+     *              'posterior' si es de después (fecha movida a mano),
+     *              '' si es del periodo.
+     *
+     * El Excel, la impresión y el filtro de columnas recorren las filas por
+     * número de columna, así que esas claves no salen en ninguno.
+     *
+     * 'partes' dice cuánto entró por ventas del periodo y cuánto por ventas
+     * de otros: es la respuesta corta a "¿y de dónde salió esto?".
+     *
+     * Los cobros guardados antes de que existieran los subfolios no tienen
+     * uno: se arma con su posición y se marca con ~, igual que en el detalle
+     * de la venta, para no hacer pasar por folio un número calculado.
+     */
+    private function pagos(array $f, $desde, $hasta)
+    {
+        $tipos  = ['anticipo' => 'Anticipo', 'abono' => 'Abono', 'liquidacion' => 'Liquidación'];
+        $partes = [
+            'periodo'   => ['monto' => 0.0, 'cobros' => 0],
+            'anterior'  => ['monto' => 0.0, 'cobros' => 0],
+            'posterior' => ['monto' => 0.0, 'cobros' => 0],
+        ];
+        $filas = [];
+        foreach ($f as $x) {
+            $cobro = trim((string)($x['folio'] ?? ''));
+            if ($cobro === '') {
+                $cobro = Folio::deRespaldo($x['codigo_venta'], (int)$x['posicion']) . '~';
+            }
+            // Se compara como texto Y-m-d: así lo traen $desde y $hasta.
+            $fv     = substr((string)$x['fecha_venta'], 0, 10);
+            $origen = $fv < $desde ? 'anterior' : ($fv > $hasta ? 'posterior' : '');
+            $parte  = $origen ?: 'periodo';
+            $partes[$parte]['monto']  += (float)$x['monto'];
+            $partes[$parte]['cobros'] += 1;
+
+            $filas[] = [
+                $x['fecha_pago'], $cobro, $x['codigo_venta'], $fv,
+                $x['cliente'], $x['area'],
+                $tipos[$x['tipo']] ?? ucfirst((string)$x['tipo']),
+                ucfirst((string)($x['metodo_pago'] ?: 'sin método')),
+                $x['monto'],
+                max(0, (float)$x['debe']),
+                '_venta'  => (int)$x['venta_id'],
+                '_origen' => $origen,
+            ];
+        }
+        foreach ($partes as $k => $p) $partes[$k]['monto'] = round($p['monto'], 2);
+
+        $n   = count($filas);
+        $rep = $this->envolver('pagos', $desde, $hasta,
+            [['Fecha',          Libro::FECHA,  12],
+             ['Cobro',          Libro::TEXTO,  21],
+             ['Venta',          Libro::TEXTO,  17],
+             ['Fecha de venta', Libro::FECHA,  14],
+             ['Cliente',        Libro::TEXTO,  30],
+             ['Área',           Libro::TEXTO,  22],
+             ['Tipo',           Libro::TEXTO,  12],
+             ['Forma',          Libro::TEXTO,  14],
+             ['Monto',          Libro::MONEDA, 14],
+             // Lo que la venta debe HOY, no al cierre del periodo. Por eso no
+             // se suma abajo: dos cobros de la misma venta lo contarían doble.
+             ['Debe hoy',       Libro::MONEDA, 13]],
+            $filas,
+            ['TOTAL', $n . ' cobro' . ($n === 1 ? '' : 's'), '', '', '', '', '', '',
+             round(array_sum(array_column($f, 'monto')), 2), '']);
+        $rep['partes'] = $partes;
+        return $rep;
     }
 
     private function envolver($tipo, $desde, $hasta, $columnas, $filas, $totales)
@@ -223,7 +317,7 @@ final class Reportes
         return $armar($t);
     }
 
-    /** Los ocho reportes del periodo, para pintarlos todos de una vez. */
+    /** Todos los reportes del periodo, para pintarlos de una vez. */
     public function todos($desde, $hasta)
     {
         $r = [];
@@ -335,6 +429,8 @@ final class Reportes
                         $f['gastos'], $f['comision'],
                         $f['cobrado'] - $f['gastos'] - $f['comision'],
                         ucfirst((string)$f['metodo']),
+                        // No es columna: la pantalla lo usa para abrir la venta.
+                        '_venta' => (int)$f['venta_id'],
                     ];
                 }, $gf),
                 'totales'  => ['TOTAL ' . mb_strtoupper($nombre), '', '', '', '', '', '', '',
@@ -405,7 +501,8 @@ final class Reportes
                             $f['total_venta'], $f['cobrado'],
                             (float)$f['porcentaje'] / 100,
                             (float)$f['proporcion'],
-                            $f['comision']];
+                            $f['comision'],
+                            '_venta' => (int)$f['venta_id']];
                 }, $gf),
                 'totales'  => ['TOTAL ' . mb_strtoupper($quien), '', '', '', '', '',
                     '', array_sum(array_column($gf, 'cobrado')), '', '',
