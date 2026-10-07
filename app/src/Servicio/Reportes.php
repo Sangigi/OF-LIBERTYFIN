@@ -220,27 +220,6 @@ final class Reportes
     }
 
     /**
-     * El "Detalle de pagos": un COBRO por renglón, por la fecha en que entró.
-     *
-     * Cada renglón dice de qué venta es —su folio y su fecha— y además trae
-     * dos claves que no son columnas:
-     *
-     *   '_venta'   el id de la venta, para que la pantalla pueda abrirla.
-     *   '_origen'  'anterior' si la venta es de antes del periodo,
-     *              'posterior' si es de después (fecha movida a mano),
-     *              '' si es del periodo.
-     *
-     * El Excel, la impresión y el filtro de columnas recorren las filas por
-     * número de columna, así que esas claves no salen en ninguno.
-     *
-     * 'partes' dice cuánto entró por ventas del periodo y cuánto por ventas
-     * de otros: es la respuesta corta a "¿y de dónde salió esto?".
-     *
-     * Los cobros guardados antes de que existieran los subfolios no tienen
-     * uno: se arma con su posición y se marca con ~, igual que en el detalle
-     * de la venta, para no hacer pasar por folio un número calculado.
-     */
-    /**
      * Cómo llamar a las ventas de ANTES del periodo, en pantalla, en la hoja
      * impresa y en el Excel. Una sola regla para las tres salidas.
      *
@@ -259,9 +238,34 @@ final class Reportes
              : 'anteriores al ' . date('d/m/Y', strtotime((string)$desde));
     }
 
+    /**
+     * El "Detalle de pagos": un COBRO por renglón, por la fecha en que entró.
+     *
+     * Cada renglón se lee como "pago de tal venta": la venta (folio, fecha,
+     * de qué periodo es), su total, lo que se pagó en ese cobro, su estado
+     * (anticipo, abono o liquidación) y lo que le faltaba DESPUÉS de ese pago.
+     *
+     * Además trae dos claves que no son columnas:
+     *
+     *   '_venta'   el id de la venta, para que la pantalla pueda abrirla.
+     *   '_origen'  'anterior' si la venta es de antes del periodo,
+     *              'posterior' si es de después (fecha movida a mano),
+     *              '' si es del periodo.
+     *
+     * El Excel, la impresión y el filtro de columnas recorren las filas por
+     * número de columna, así que esas claves no salen como columnas; la hoja
+     * impresa usa '_origen' para resaltar el renglón.
+     *
+     * 'partes' dice cuánto entró por ventas del periodo y cuánto por ventas
+     * de otros: es la respuesta corta a "¿y de dónde salió esto?".
+     *
+     * Los cobros guardados antes de que existieran los subfolios no tienen
+     * uno: se arma con su posición y se marca con ~, igual que en el detalle
+     * de la venta, para no hacer pasar por folio un número calculado.
+     */
     private function pagos(array $f, $desde, $hasta)
     {
-        $tipos  = ['anticipo' => 'Anticipo', 'abono' => 'Abono', 'liquidacion' => 'Liquidación'];
+        $estados = ['anticipo' => 'Anticipo', 'abono' => 'Abono', 'liquidacion' => 'Liquidación'];
         // Lo que dice la columna "Origen". Es texto de verdad, no una marca de
         // pantalla: así sale igual en la hoja impresa y se puede filtrar en el
         // Excel, que era justo donde no se distinguía.
@@ -286,13 +290,28 @@ final class Reportes
             $partes[$parte]['monto']  += (float)$x['monto'];
             $partes[$parte]['cobros'] += 1;
 
+            // EL ESTADO SALE DEL MISMO SALDO QUE "LE FALTA".
+            //
+            // El tipo guardado se decide una sola vez, al capturar el pago, con
+            // los pagos que había en ese momento. Si después se captura un pago
+            // con fecha anterior, o se cancela otro, ya no corresponde: salía
+            // "Liquidación" con $3,000 por cobrar, o "Abono" dejando la venta
+            // en cero. Aquí manda el saldo: si este pago la deja en cero es
+            // liquidación; si no, lo que se guardó (anticipo o abono), y una
+            // "liquidación" que ya no liquida pasa a abono.
+            $falta = max(0, (float)$x['le_falta']);
+            $tipo  = (string)$x['tipo'];
+            if ($falta <= 0.005)             $tipo = 'liquidacion';
+            elseif ($tipo === 'liquidacion') $tipo = 'abono';
+
             $filas[] = [
                 $x['fecha_pago'], $cobro, $x['codigo_venta'], $fv, $origenes[$origen],
                 $x['cliente'], $x['area'],
-                $tipos[$x['tipo']] ?? ucfirst((string)$x['tipo']),
                 ucfirst((string)($x['metodo_pago'] ?: 'sin método')),
+                $x['total'],
                 $x['monto'],
-                max(0, (float)$x['debe']),
+                $estados[$tipo] ?? ucfirst($tipo),
+                $falta,
                 '_venta'  => (int)$x['venta_id'],
                 '_origen' => $origen,
             ];
@@ -308,15 +327,20 @@ final class Reportes
              ['Origen',         Libro::TEXTO,  17],
              ['Cliente',        Libro::TEXTO,  30],
              ['Área',           Libro::TEXTO,  22],
-             ['Tipo',           Libro::TEXTO,  12],
              ['Forma',          Libro::TEXTO,  14],
+             // De la venta, no del cobro: no se suma abajo, porque dos cobros
+             // de la misma venta la contarían dos veces.
+             ['Total venta',    Libro::MONEDA, 14],
              ['Monto',          Libro::MONEDA, 14],
-             // Lo que la venta debe HOY, no al cierre del periodo. Por eso no
-             // se suma abajo: dos cobros de la misma venta lo contarían doble.
-             ['Debe hoy',       Libro::MONEDA, 13]],
+             // Anticipo, abono o liquidación: qué fue este pago para su venta.
+             // Se deriva del saldo de "Le falta" para que nunca se contradigan.
+             ['Estado',         Libro::TEXTO,  13],
+             // Lo que la venta quedó debiendo después de este pago. Tampoco
+             // se suma: es un saldo de la venta en ese momento, no dinero.
+             ['Le falta',       Libro::MONEDA, 13]],
             $filas,
             ['TOTAL', $n . ' cobro' . ($n === 1 ? '' : 's'), '', '', '', '', '', '', '',
-             round(array_sum(array_column($f, 'monto')), 2), '']);
+             round(array_sum(array_column($f, 'monto')), 2), '', '']);
         $rep['partes'] = $partes;
         return $rep;
     }

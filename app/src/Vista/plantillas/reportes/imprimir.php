@@ -48,8 +48,15 @@ $alineado = function ($tipo) {
   <?php
   // Con muchas columnas se baja el tamaño al imprimir. Con pocas no
   // hace falta y achicarlas sería perder legibilidad sin motivo.
-  $n = count($rep['columnas']);
-  $clase = $n >= 12 ? ' ancha' : ($n >= 8 ? ' media' : '');
+  //
+  // Se mide por el ANCHO de las columnas (el tercer dato de cada una), no
+  // solo por cuántas son: doce columnas cortas caben en letra media, y
+  // contarlas mandaba el Detalle de pagos o el de ventas a la letra más
+  // chica sin necesidad. La más chica queda para lo de verdad ancho, como
+  // el desglose.
+  $n     = count($rep['columnas']);
+  $ancho = array_sum(array_map(function ($c) { return (int)($c[2] ?? 12); }, $rep['columnas']));
+  $clase = $ancho >= 230 ? ' ancha' : ($n >= 8 ? ' media' : '');
   ?>
   <section class="rep<?= $clase ?>">
     <header>
@@ -76,9 +83,18 @@ $alineado = function ($tipo) {
           </div>
         <?php endforeach; ?>
       </div>
-      <?php if ($hayOtros): ?>
+      <?php if ($hayOtros):
+        /* Solo se nombran las columnas que SÍ salen en la hoja: al imprimir se
+           pueden ocultar, y una leyenda que manda a ver una columna que no
+           está deja el papel sin forma de saber de qué venta es cada uno. */
+        $dicen = array_values(array_intersect(['Origen', 'Fecha de venta'],
+                                              array_column($rep['columnas'], 0))); ?>
         <p class="leyenda">Los renglones resaltados son cobros que entraron en el periodo
-          por ventas de otro periodo; la columna «Origen» y la «Fecha de venta» dicen de cuál.</p>
+          por ventas de otro periodo<?= $dicen
+            ? '; ' . (count($dicen) > 1
+                ? 'las columnas «' . P::e(implode('» y «', $dicen)) . '» dicen'
+                : 'la columna «' . P::e($dicen[0]) . '» dice') . ' de cuál.'
+            : '. Las tarjetas de arriba dan el total de cada origen.' ?></p>
       <?php endif; ?>
     <?php endif; ?>
 

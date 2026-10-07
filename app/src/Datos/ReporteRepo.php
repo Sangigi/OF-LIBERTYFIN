@@ -291,6 +291,13 @@ final class ReporteRepo extends Repo
      * `posicion` sirve para armar el subfolio de los cobros guardados antes
      * de que existiera (ver Folio::deRespaldo); se cuenta igual que en el
      * detalle de la venta: por fecha y luego por id, con cancelados.
+     *
+     * `le_falta` es lo que la venta quedó debiendo DESPUÉS DE ESE PAGO, no
+     * lo que debe hoy. En un renglón de pago eso es lo que se lee: "pagó
+     * tanto y le faltan tanto". El saldo de hoy confundía: en un abono de
+     * hace tres semanas enseñaba lo que faltaba después de abonos que
+     * todavía no existían cuando se hizo. Se suman los pagos vivos de la
+     * misma venta hasta este, en el mismo orden (fecha y luego id).
      */
     public function pagosDelPeriodo($desde, $hasta)
     {
@@ -306,7 +313,12 @@ final class ReporteRepo extends Repo
                        WHERE d2.venta_id = v.id AND cat.nombre IS NOT NULL
                        GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1
                    ),''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
-                   ROUND(v.total - COALESCE(pg.cobrado,0), 2) AS debe,
+                   ROUND(v.total - (
+                       SELECT COALESCE(SUM(p4.monto),0) FROM venta_pagos p4
+                       WHERE p4.venta_id = p.venta_id AND p4.cancelado = 0
+                         AND (p4.fecha_pago < p.fecha_pago
+                              OR (p4.fecha_pago = p.fecha_pago AND p4.id <= p.id))
+                   ), 2) AS le_falta,
                    CASE WHEN p.folio IS NULL OR p.folio = '' THEN (
                        SELECT COUNT(*) FROM venta_pagos p3
                        WHERE p3.venta_id = p.venta_id
@@ -316,8 +328,6 @@ final class ReporteRepo extends Repo
             FROM venta_pagos p
             INNER JOIN ventas v  ON v.id = p.venta_id
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
-                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
             WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
               AND p.fecha_pago >= ? AND p.fecha_pago < ?
             ORDER BY p.fecha_pago, p.id", [$a, $b]);
