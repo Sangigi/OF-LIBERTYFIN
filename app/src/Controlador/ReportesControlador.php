@@ -247,6 +247,11 @@ final class ReportesControlador
                 $rep['filas'] = array_map(function ($f) use ($quedan) {
                     $n = [];
                     foreach ($quedan as $j) $n[] = $f[$j] ?? null;
+                    // Las claves de texto ('_origen', '_venta') no son
+                    // columnas: se conservan, para que la hoja siga
+                    // resaltando los cobros de ventas de otro periodo
+                    // aunque se haya ocultado la columna "Origen".
+                    foreach ($f as $k => $v) if (is_string($k)) $n[$k] = $v;
                     return $n;
                 }, $rep['filas']);
                 $tot = [];

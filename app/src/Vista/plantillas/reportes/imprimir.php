@@ -14,7 +14,13 @@ $fmt = function ($v, $tipo) {
         case L::MONEDA:  return D::pesos($v);
         case L::NUMERO:  return number_format((float)$v);
         case L::PORCENT: return number_format((float)$v * (abs($v) <= 1.5 ? 100 : 1), 1) . '%';
-        case L::FECHA:   return $v ? date('d/m/Y', is_numeric($v) ? $v : strtotime($v)) : '–';
+        // Lo que no es fecha se deja como viene. El renglón de totales pone
+        // "TOTAL" en la primera columna, y si esa columna es de fecha
+        // strtotime('TOTAL') da false y salía "31/12/1969".
+        case L::FECHA:
+            if (!$v) return '–';
+            $ts = is_numeric($v) ? (int)$v : strtotime((string)$v);
+            return $ts === false ? $v : date('d/m/Y', $ts);
         default:         return $v;
     }
 };
@@ -54,6 +60,28 @@ $alineado = function ($tipo) {
       <div class="marca"><span>L</span>LibertyFin</div>
     </header>
 
+    <?php /* Detalle de pagos: de dónde vino lo que entró. En papel no hay
+             insignias ni colores de pantalla que lo digan, así que va escrito
+             arriba de la tabla, y los renglones de ventas de otro periodo se
+             resaltan. "Posterior" solo sale si hay. */
+    if (!empty($rep['partes'])): $hayOtros = false; ?>
+      <div class="partes">
+        <?php foreach ($rep['partes'] as $k => $p):
+          if ($k === 'posterior' && empty($p['cobros'])) continue;
+          if ($k !== 'periodo' && !empty($p['cobros'])) $hayOtros = true; ?>
+          <div<?= $k === 'periodo' ? '' : ' class="otro"' ?>>
+            <small><?= P::e($p['rotulo']) ?></small>
+            <b><?= D::pesos($p['monto']) ?></b>
+            <span><?= (int)$p['cobros'] ?> cobro<?= (int)$p['cobros'] === 1 ? '' : 's' ?></span>
+          </div>
+        <?php endforeach; ?>
+      </div>
+      <?php if ($hayOtros): ?>
+        <p class="leyenda">Los renglones resaltados son cobros que entraron en el periodo
+          por ventas de otro periodo; la columna «Origen» y la «Fecha de venta» dicen de cuál.</p>
+      <?php endif; ?>
+    <?php endif; ?>
+
     <table>
       <thead>
         <tr>
@@ -68,7 +96,7 @@ $alineado = function ($tipo) {
             No hay datos en este periodo.</td></tr>
         <?php endif; ?>
         <?php foreach ($rep['filas'] as $f): ?>
-          <tr>
+          <tr<?= !empty($f['_origen']) ? ' class="otro"' : '' ?>>
             <?php foreach ($rep['columnas'] as $k => $c): ?>
               <td<?= $alineado($c[1]) ?>><?= P::e($fmt($f[$k] ?? null, $c[1])) ?></td>
             <?php endforeach; ?>
@@ -131,6 +159,18 @@ th.n,td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tbody tr:nth-child(even){background:#f8faf9}
 tfoot td{background:#eff5f1;font-weight:700;border-top:2px solid #27ae60;border-bottom:none}
 .vacio{text-align:center;color:#6d7a74;padding:26px}
+
+/* Detalle de pagos: resumen por origen y cobros de ventas de otro periodo */
+.partes{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px}
+.partes > div{flex:1;min-width:160px;padding:9px 12px;border:1px solid #e6ebe8;
+  border-radius:8px;background:#f8faf9}
+.partes > div.otro{background:#fdf3dc;border-color:#ecd39a}
+.partes small{display:block;font-size:10.5px;color:#6d7a74}
+.partes b{display:block;font-size:16px;margin-top:2px;font-variant-numeric:tabular-nums}
+.partes span{display:block;font-size:10.5px;color:#43504a}
+.leyenda{font-size:10.5px;color:#8a6410;margin:0 0 12px}
+tbody tr.otro, tbody tr.otro:nth-child(even){background:#fdf3dc}
+tbody tr.otro td:first-child{box-shadow:inset 3px 0 0 #c58a14}
 .nota{font-size:11px;color:#6d7a74;line-height:1.55;margin:14px 0 0;
   padding-top:12px;border-top:1px solid #e6ebe8}
 .pie{font-size:10.5px;color:#9aa8a2;margin:8px 0 0}
@@ -169,6 +209,13 @@ tfoot td{background:#eff5f1;font-weight:700;border-top:2px solid #27ae60;border-
   tfoot td{background:#eff5f1 !important;
      -webkit-print-color-adjust:exact;print-color-adjust:exact}
   .marca span{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  /* Sin esto el navegador no imprime fondos y el resaltado se pierde. Va
+     DESPUÉS de la regla de los renglones pares para ganarle. */
+  tbody tr.otro, tbody tr.otro:nth-child(even){background:#fdf3dc !important;
+     -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  tbody tr.otro td:first-child, .partes > div{
+     -webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .partes{break-inside:avoid;page-break-inside:avoid}
 }
 </style>
 

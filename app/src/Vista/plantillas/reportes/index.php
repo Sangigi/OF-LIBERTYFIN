@@ -8,6 +8,12 @@ $salidas = $r['operacion'] + $r['generales'] + $r['comisiones'];
 $qs = http_build_query(['desde'=>$desde,'hasta'=>$hasta]);
 $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
     return mb_strtoupper(mb_substr($p[0],0,1) . (isset($p[1]) ? mb_substr($p[1],0,1) : '')); };
+
+/* Cómo llamar a las ventas de antes del periodo: "de meses anteriores" con
+   meses completos, o "anteriores al 15/10/2026" con un rango a mitad de mes.
+   La regla vive en Reportes::rotuloAntes para que la pantalla, la hoja
+   impresa y el Excel digan lo mismo. */
+$deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
 ?>
 
 <form class="lf-filtros" method="get">
@@ -92,7 +98,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
         De lo que entró, <b><?= D::pesos($r['de_anteriores']) ?></b> son
         <?= (int)$r['de_anteriores_cobros'] ?> cobro<?= $r['de_anteriores_cobros'] == 1 ? '' : 's' ?>
         de <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-        de meses anteriores: anticipos y abonos que llegaron en este periodo.
+        <?= P::e($deAntes) ?>: anticipos y abonos que llegaron en este periodo.
         <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
            data-ir-pestana="pagos">Ver cuáles</a>
       </p>
@@ -244,7 +250,13 @@ $celda = function ($v, $t) {
     if ($t === '$') return D::pesos($v);
     if ($t === 'n') return number_format((float)$v);
     if ($t === '%') return number_format((float)$v * (abs($v) <= 1.5 ? 100 : 1), 1) . '%';
-    if ($t === 'f') return date('d/m/Y', is_numeric($v) ? (int)$v : strtotime((string)$v));
+    if ($t === 'f') {
+        // Lo que no es fecha se deja como viene: el pie pone "TOTAL" en la
+        // primera columna, y en las tablas que empiezan por fecha
+        // strtotime('TOTAL') da false y salía "31/12/1969".
+        $ts = is_numeric($v) ? (int)$v : strtotime((string)$v);
+        return $ts === false ? $v : date('d/m/Y', $ts);
+    }
     return $v;
 };
 $derecha = function ($t) { return in_array($t, ['$','n','%'], true); };
@@ -269,9 +281,11 @@ $valor = function (array $f, $j, array $c) use ($celda, $puedeVerVentas) {
         return '<a class="lf-folio" href="/ventas/' . (int)$f['_venta'] . '" data-modal'
              . ' title="Ver la venta ' . $txt . '">' . $txt . '</a>';
     }
-    if ($c[0] === 'Fecha de venta' && !empty($f['_origen'])) {
-        $txt .= ' <span class="lf-origen">'
-              . ($f['_origen'] === 'anterior' ? 'anterior' : 'posterior') . '</span>';
+    // En el detalle de pagos, la columna "Origen" de un cobro de una venta de
+    // otro periodo se pinta como insignia: es justo lo que esa tabla vino a
+    // enseñar. Es un solo elemento, así que en el celular no se separa.
+    if ($c[0] === 'Origen' && !empty($f['_origen'])) {
+        return '<span class="lf-origen">' . $txt . '</span>';
     }
     return $txt;
 };
@@ -392,7 +406,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
         <p class="lf-otros en-tabla" style="margin:10px 0 0">
           Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
           <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-          de meses anteriores (anticipos y abonos). No salen en estas tablas porque van por
+          <?= P::e($deAntes) ?> (anticipos y abonos). No salen en estas tablas porque van por
           la fecha de la venta.
           <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
              data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
@@ -590,19 +604,19 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
       <?php /* De dónde vino lo que entró: ventas de este periodo o de otro. */ ?>
       <div class="lf-partes">
         <div>
-          <small>De ventas de este periodo</small>
+          <small><?= P::e($pt['periodo']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['periodo']['monto']) ?></b>
           <span><?= (int)$pt['periodo']['cobros'] ?> cobro<?= $pt['periodo']['cobros'] == 1 ? '' : 's' ?></span>
         </div>
         <div class="otro">
-          <small>De ventas de meses anteriores</small>
+          <small><?= P::e($pt['anterior']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['anterior']['monto']) ?></b>
           <span><?= (int)$pt['anterior']['cobros'] ?> cobro<?= $pt['anterior']['cobros'] == 1 ? '' : 's' ?>
-            · marcados con <i class="lf-origen">anterior</i></span>
+            · marcados <i class="lf-origen">Venta anterior</i></span>
         </div>
         <?php if ($pt['posterior']['cobros'] > 0): ?>
         <div class="otro">
-          <small>De ventas con fecha posterior</small>
+          <small><?= P::e($pt['posterior']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['posterior']['monto']) ?></b>
           <span><?= (int)$pt['posterior']['cobros'] ?> cobro<?= $pt['posterior']['cobros'] == 1 ? '' : 's' ?>
             · su fecha se movió a mano</span>
@@ -617,7 +631,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
       <p class="lf-otros en-tabla">
         Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
         <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-        de meses anteriores. No salen aquí porque esta tabla va por la fecha de la venta.
+        <?= P::e($deAntes) ?>. No salen aquí porque esta tabla va por la fecha de la venta.
         <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
            data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
       </p>

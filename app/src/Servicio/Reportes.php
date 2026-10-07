@@ -240,13 +240,38 @@ final class Reportes
      * uno: se arma con su posición y se marca con ~, igual que en el detalle
      * de la venta, para no hacer pasar por folio un número calculado.
      */
+    /**
+     * Cómo llamar a las ventas de ANTES del periodo, en pantalla, en la hoja
+     * impresa y en el Excel. Una sola regla para las tres salidas.
+     *
+     * El corte es "antes del primer día del periodo". Con un mes completo (o
+     * varios) eso es "de meses anteriores", que es como se dice en la
+     * oficina; con un rango a mitad de mes —del 15 al 31— una venta del día
+     * 3 también cuenta, y llamarla "de meses anteriores" sería falso.
+     * Entonces se dice la fecha de corte.
+     */
+    public static function rotuloAntes($desde, $hasta)
+    {
+        $mesesCompletos = substr((string)$desde, 8, 2) === '01'
+                       && (string)$hasta === date('Y-m-t', strtotime((string)$hasta));
+        return $mesesCompletos
+             ? 'de meses anteriores'
+             : 'anteriores al ' . date('d/m/Y', strtotime((string)$desde));
+    }
+
     private function pagos(array $f, $desde, $hasta)
     {
         $tipos  = ['anticipo' => 'Anticipo', 'abono' => 'Abono', 'liquidacion' => 'Liquidación'];
+        // Lo que dice la columna "Origen". Es texto de verdad, no una marca de
+        // pantalla: así sale igual en la hoja impresa y se puede filtrar en el
+        // Excel, que era justo donde no se distinguía.
+        $origenes = ['' => 'Venta del periodo', 'anterior' => 'Venta anterior',
+                     'posterior' => 'Venta posterior'];
         $partes = [
-            'periodo'   => ['monto' => 0.0, 'cobros' => 0],
-            'anterior'  => ['monto' => 0.0, 'cobros' => 0],
-            'posterior' => ['monto' => 0.0, 'cobros' => 0],
+            'periodo'   => ['monto' => 0.0, 'cobros' => 0, 'rotulo' => 'De ventas del periodo'],
+            'anterior'  => ['monto' => 0.0, 'cobros' => 0,
+                            'rotulo' => 'De ventas ' . self::rotuloAntes($desde, $hasta)],
+            'posterior' => ['monto' => 0.0, 'cobros' => 0, 'rotulo' => 'De ventas con fecha posterior'],
         ];
         $filas = [];
         foreach ($f as $x) {
@@ -262,7 +287,7 @@ final class Reportes
             $partes[$parte]['cobros'] += 1;
 
             $filas[] = [
-                $x['fecha_pago'], $cobro, $x['codigo_venta'], $fv,
+                $x['fecha_pago'], $cobro, $x['codigo_venta'], $fv, $origenes[$origen],
                 $x['cliente'], $x['area'],
                 $tipos[$x['tipo']] ?? ucfirst((string)$x['tipo']),
                 ucfirst((string)($x['metodo_pago'] ?: 'sin método')),
@@ -280,6 +305,7 @@ final class Reportes
              ['Cobro',          Libro::TEXTO,  21],
              ['Venta',          Libro::TEXTO,  17],
              ['Fecha de venta', Libro::FECHA,  14],
+             ['Origen',         Libro::TEXTO,  17],
              ['Cliente',        Libro::TEXTO,  30],
              ['Área',           Libro::TEXTO,  22],
              ['Tipo',           Libro::TEXTO,  12],
@@ -289,7 +315,7 @@ final class Reportes
              // se suma abajo: dos cobros de la misma venta lo contarían doble.
              ['Debe hoy',       Libro::MONEDA, 13]],
             $filas,
-            ['TOTAL', $n . ' cobro' . ($n === 1 ? '' : 's'), '', '', '', '', '', '',
+            ['TOTAL', $n . ' cobro' . ($n === 1 ? '' : 's'), '', '', '', '', '', '', '',
              round(array_sum(array_column($f, 'monto')), 2), '']);
         $rep['partes'] = $partes;
         return $rep;
@@ -332,11 +358,30 @@ final class Reportes
         foreach ($this->todos($desde, $hasta) as $rep) {
             $l->hoja($rep['titulo'], $rep['columnas'], $rep['filas'], [
                 'titulo'    => $rep['titulo'],
-                'subtitulo' => $rep['periodo'] . ' · ' . $rep['nota'],
+                'subtitulo' => $rep['periodo'] . ' · ' . $rep['nota'] . self::resumenPartes($rep),
                 'totales'   => $rep['totales'],
             ]);
         }
         return $l;
+    }
+
+    /**
+     * El resumen "de dónde vino" en una línea, para el Excel: cuánto entró
+     * por ventas del periodo y cuánto por ventas de otro. En pantalla y en la
+     * hoja impresa se pinta como tarjetas; aquí va en el subtítulo de la hoja.
+     */
+    public static function resumenPartes(array $rep)
+    {
+        if (empty($rep['partes'])) return '';
+        $t = [];
+        foreach ($rep['partes'] as $k => $p) {
+            // "Posterior" solo si hay: es raro (fecha movida a mano). "Anterior"
+            // se dice aunque sea cero: es justo la pregunta.
+            if ($k === 'posterior' && empty($p['cobros'])) continue;
+            $t[] = $p['rotulo'] . ': ' . Dinero::pesos($p['monto'])
+                 . ' (' . (int)$p['cobros'] . ' cobro' . ((int)$p['cobros'] === 1 ? '' : 's') . ')';
+        }
+        return $t ? ' · ' . implode(' · ', $t) : '';
     }
 
     /**
