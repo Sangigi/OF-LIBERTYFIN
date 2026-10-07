@@ -145,13 +145,28 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
     <table class="table table-hover">
       <thead><tr><th>Área</th><th class="text-end">Ventas</th><th class="text-end">Cobrado</th>
         <th class="text-end">Gastos</th><th class="text-end">Comisiones</th>
-        <th class="text-end">Queda</th><th class="text-end">Margen</th></tr></thead>
+        <th class="text-end">Queda</th><th class="text-end">Margen</th>
+        <th class="text-end lf-col-ant">De ventas anteriores</th></tr></thead>
       <tbody>
-      <?php foreach ($areas as $a):
+      <?php
+      $hayAnt = false;
+      foreach ($areas as $a):
         $q = (float)$a['cobrado'] - (float)$a['gastos'] - (float)$a['comisiones'];
-        $mg = $a['cobrado'] > 0 ? round($q / $a['cobrado'] * 100) : 0; ?>
+        $mg = $a['cobrado'] > 0 ? round($q / $a['cobrado'] * 100) : 0;
+        /* Un área que solo recibió abonos de ventas viejas no tiene ventas del
+           periodo: sin ventas no hay "queda" ni margen que decir, y un 0% en
+           rojo haría creer que perdió dinero. */
+        $sinVentas = (int)$a['ventas'] === 0;
+        $mAnt = (float)($a['de_anteriores'] ?? 0);
+        $nAnt = (int)($a['cobros_ant'] ?? 0);
+        if ($mAnt > 0) $hayAnt = true; ?>
         <tr>
           <td data-label="Área"><b style="font-weight:600"><?= P::e($a['area']) ?></b></td>
+          <?php if ($sinVentas): ?>
+            <td data-label="Ventas" class="text-end lf-mono" colspan="6"
+                style="color:var(--lf-tinta-4);font-size:12px">
+              Sin ventas en el periodo; solo abonos de ventas anteriores</td>
+          <?php else: ?>
           <td data-label="Ventas" class="text-end lf-mono"><?= (int)$a['ventas'] ?></td>
           <td data-label="Cobrado" class="text-end lf-mono"><?= D::pesos($a['cobrado']) ?></td>
           <td data-label="Gastos" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
@@ -163,6 +178,12 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
           <td data-label="Margen" class="text-end">
             <span class="badge <?= $mg>=40?'bg-success':($mg>=15?'bg-warning':'bg-danger') ?>">
               <?= $mg ?>%</span></td>
+          <?php endif; ?>
+          <td data-label="De ventas anteriores" class="text-end lf-mono lf-col-ant">
+            <?php if ($mAnt > 0): ?>
+              <b><?= D::pesos($mAnt) ?></b>
+              <small><?= $nAnt ?> cobro<?= $nAnt === 1 ? '' : 's' ?></small>
+            <?php else: ?>–<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
@@ -171,6 +192,13 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
   <div class="card-footer">
     El margen es lo que queda después de gastos y comisiones. Un área con mucho
     cobrado y margen bajo está trabajando para pagar comisiones.
+    <?php if ($hayAnt): ?>
+      <br>«De ventas anteriores» es lo que entró en el periodo por anticipos y abonos de
+      ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta. No suma al
+      margen, que es de las ventas del periodo.
+      <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
+         data-ir-pestana="pagos">Ver cada cobro</a>
+    <?php endif; ?>
   </div>
 </section>
 <?php endif; ?>

@@ -20,7 +20,9 @@ final class Reportes
         'area' => [
             'rotulo' => 'Por área',
             'nota'   => 'El área sale del producto contratado, no del cliente. Una venta con '
-                      . 'productos de dos áreas reparte su dinero entre las dos.',
+                      . 'productos de dos áreas reparte su dinero entre las dos. «De ventas '
+                      . 'anteriores» es lo que entró en el periodo por anticipos y abonos de ventas '
+                      . 'de meses anteriores; no suma a la utilidad, que es de las ventas del periodo.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
@@ -84,21 +86,44 @@ final class Reportes
 
         switch ($tipo) {
             case 'area':
-                $f = $r->porArea($desde, $hasta);
+                // Al final, aparte de la utilidad: lo que entró en el periodo
+                // por ventas de meses anteriores, de cada área. Son columnas y
+                // no subrenglones: así el Excel se puede sumar, filtrar y
+                // ordenar, y la hoja impresa sigue siendo una fila por área.
+                $f   = $r->porArea($desde, $hasta);
+                $ant = $r->deAnteriores($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Área', Libro::TEXTO, 30], ['Ventas', Libro::NUMERO, 10],
                      ['Vendido', Libro::MONEDA, 15], ['Cobrado', Libro::MONEDA, 15],
                      ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
-                     ['Utilidad', Libro::MONEDA, 15]],
+                     ['Utilidad', Libro::MONEDA, 15],
+                     ['Cobros anteriores',    Libro::NUMERO, 11],
+                     ['De ventas anteriores', Libro::MONEDA, 15]],
                     array_map(function ($x) {
-                        return [$x['area'], (int)$x['ventas'], $x['vendido'], $x['cobrado'],
-                                $x['gastos'], $x['comisiones'],
-                                $x['cobrado'] - $x['gastos'] - $x['comisiones']];
+                        // Un área que solo recibió abonos de ventas viejas no
+                        // tiene ventas del periodo: sus cifras de venta van
+                        // vacías en vez de una fila de $0.00 que parece dato.
+                        $sinVentas = (int)$x['ventas'] === 0;
+                        $nAnt      = (int)($x['cobros_ant'] ?? 0);
+                        $mAnt      = (float)($x['de_anteriores'] ?? 0);
+                        return [$x['area'],
+                                $sinVentas ? '' : (int)$x['ventas'],
+                                $sinVentas ? '' : $x['vendido'],
+                                $sinVentas ? '' : $x['cobrado'],
+                                $sinVentas ? '' : $x['gastos'],
+                                $sinVentas ? '' : $x['comisiones'],
+                                $sinVentas ? '' : $x['cobrado'] - $x['gastos'] - $x['comisiones'],
+                                $nAnt > 0 ? $nAnt : '',
+                                $mAnt > 0 ? $mAnt : ''];
                     }, $f),
-                    $this->sumar($f, ['ventas','vendido','cobrado','gastos','comisiones'],
-                        function ($t) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
+                    // Los cobros del total salen de deAnteriores(): un pago de
+                    // una venta con dos áreas cuenta en las dos filas, y sumar
+                    // la columna lo contaría dos veces.
+                    $this->sumar($f, ['ventas','vendido','cobrado','gastos','comisiones','de_anteriores'],
+                        function ($t) use ($ant) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
                             $t['cobrado'], $t['gastos'], $t['comisiones'],
-                            $t['cobrado'] - $t['gastos'] - $t['comisiones']]; }));
+                            $t['cobrado'] - $t['gastos'] - $t['comisiones'],
+                            (int)$ant['cobros'], $t['de_anteriores']]; }));
 
             case 'colaborador':
                 $f = $r->porColaborador($desde, $hasta);

@@ -2855,3 +2855,10 @@ tr.lf-fila-otro > td{background:color-mix(in srgb,var(--lf-amb) 6%,transparent)}
 .lf-partes small{display:block;font-size:11px;color:var(--lf-tinta-4);margin-bottom:3px}
 .lf-partes b{display:block;font-size:18px;letter-spacing:-.4px;color:var(--lf-tinta)}
 .lf-partes span{display:block;font-size:11px;color:var(--lf-tinta-3);margin-top:2px}
+
+/* Reportes · columna "De ventas anteriores" de la tarjeta por área:
+   separada de la utilidad con una línea, porque no suma a ella. */
+th.lf-col-ant, td.lf-col-ant{border-left:1px dashed var(--lf-linea-f)}
+td.lf-col-ant b{display:block;font-weight:700;color:var(--lf-amb)}
+td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-family:var(--lf-font)}
+@media(max-width:760px){ th.lf-col-ant, td.lf-col-ant{border-left:0} }

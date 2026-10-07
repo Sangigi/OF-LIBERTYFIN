@@ -74,18 +74,8 @@ final class ReporteRepo extends Repo
         // porque las tablas que van por fecha de venta (por área, por
         // cliente, el desglose…) no lo enseñan, y sin esta cifra "Entraron"
         // parecía no cuadrar con nada.
-        $anteriores = ['monto' => 0, 'cobros' => 0, 'ventas' => 0];
-        if ($conAnteriores) {
-            $anteriores = $this->uno("
-                SELECT COALESCE(SUM(p.monto),0)   AS monto,
-                       COUNT(*)                   AS cobros,
-                       COUNT(DISTINCT p.venta_id) AS ventas
-                FROM venta_pagos p
-                INNER JOIN ventas v ON v.id = p.venta_id
-                WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
-                  AND p.fecha_pago >= ? AND p.fecha_pago < ?
-                  AND v.fecha < ?", [$a, $b, $a]) ?: $anteriores;
-        }
+        $anteriores = $conAnteriores ? $this->deAnteriores($desde, $hasta)
+                                     : ['monto' => 0, 'cobros' => 0, 'ventas' => 0];
 
         return [
             'de_anteriores'        => round((float)$anteriores['monto'], 2),
@@ -116,7 +106,109 @@ final class ReporteRepo extends Repo
         return $salida;
     }
 
-    public function porArea($desde, $hasta)
+    /**
+     * Lo que entró en el periodo por ventas de ANTES del periodo: anticipos
+     * y abonos que llegaron ahora sobre ventas de otro mes.
+     *
+     * Mismos filtros que el "cobrado" de resultado() más la fecha de la
+     * venta, así que es la parte de "Entraron" que las tablas por fecha de
+     * venta no enseñan.
+     *
+     * @return array ['monto' => float, 'cobros' => int, 'ventas' => int]
+     */
+    public function deAnteriores($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $r = $this->uno("
+            SELECT COALESCE(SUM(p.monto),0)   AS monto,
+                   COUNT(*)                   AS cobros,
+                   COUNT(DISTINCT p.venta_id) AS ventas
+            FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+              AND p.fecha_pago >= ? AND p.fecha_pago < ?
+              AND v.fecha < ?", [$a, $b, $a]);
+        return ['monto'  => round((float)($r['monto'] ?? 0), 2),
+                'cobros' => (int)($r['cobros'] ?? 0),
+                'ventas' => (int)($r['ventas'] ?? 0)];
+    }
+
+    /**
+     * Lo mismo que deAnteriores(), pero POR ÁREA.
+     *
+     * Con el mismo criterio que porArea(): el área sale del producto de cada
+     * renglón de la venta, y el pago se reparte entre sus renglones según lo
+     * que pesa cada uno. Un abono de $3,000 a una venta que fue mitad legal
+     * y mitad contable pone $1,500 en cada área.
+     *
+     * `cobros` cuenta los pagos que tocan el área. Un pago repartido entre
+     * dos áreas cuenta en las dos, así que la suma por área puede pasar del
+     * total de cobros; el total real es el de deAnteriores().
+     */
+    public function anterioresPorArea($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        return $this->todos("
+            SELECT area,
+                   COUNT(DISTINCT pago_id) AS cobros,
+                   ROUND(SUM(monto), 2)    AS monto
+            FROM (
+                SELECT p.id AS pago_id,
+                       COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                       p.monto * (d.subtotal / NULLIF(tot.suma,0)) AS monto
+                FROM venta_pagos p
+                INNER JOIN ventas v          ON v.id = p.venta_id
+                INNER JOIN venta_detalles d  ON d.venta_id = v.id
+                LEFT  JOIN productos pr      ON pr.id = d.producto_id
+                LEFT  JOIN categorias cat    ON cat.id = pr.categoria_id
+                INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
+                             FROM venta_detalles GROUP BY venta_id ) tot
+                       ON tot.venta_id = v.id
+                WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+                  AND p.fecha_pago >= ? AND p.fecha_pago < ?
+                  AND v.fecha < ?
+            ) x
+            GROUP BY area
+            ORDER BY monto DESC", [$a, $b, $a]);
+    }
+
+    /**
+     * Por área: las ventas del periodo y, además, lo que entró por ventas de
+     * meses anteriores.
+     *
+     * Cada renglón trae `cobros_ant` y `de_anteriores`: los anticipos y
+     * abonos que llegaron en el periodo sobre ventas de antes, de esa área.
+     * Un área que en el periodo SOLO recibió eso —ninguna venta nueva— se
+     * agrega al final con lo demás en cero: si no, ese dinero no salía en
+     * ningún lado de la tabla.
+     *
+     * @param bool $conAnteriores  false = solo las ventas del periodo.
+     */
+    public function porArea($desde, $hasta, $conAnteriores = true)
+    {
+        $filas = $this->porAreaVentas($desde, $hasta);
+        if (!$conAnteriores) return $filas;
+
+        $ant = [];
+        foreach ($this->anterioresPorArea($desde, $hasta) as $x) $ant[$x['area']] = $x;
+
+        foreach ($filas as $i => $f) {
+            $x = $ant[$f['area']] ?? null;
+            $filas[$i]['cobros_ant']    = $x ? (int)$x['cobros'] : 0;
+            $filas[$i]['de_anteriores'] = $x ? round((float)$x['monto'], 2) : 0.0;
+            unset($ant[$f['area']]);
+        }
+        foreach ($ant as $area => $x) {
+            $filas[] = ['area' => $area, 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
+                        'gastos' => 0, 'comisiones' => 0,
+                        'cobros_ant'    => (int)$x['cobros'],
+                        'de_anteriores' => round((float)$x['monto'], 2)];
+        }
+        return $filas;
+    }
+
+    /** Las ventas del periodo por área (sin lo de ventas anteriores). */
+    private function porAreaVentas($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
 
