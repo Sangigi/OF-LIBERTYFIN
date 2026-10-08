@@ -118,13 +118,13 @@ final class SesionUnica
 
     /**
      * ¿La cuenta está abierta AHORA en otro navegador? La fila (con
-     * `dispositivo`, `ip` y `hace` en segundos) o null.
+     * `dispositivo` y `hace` en segundos) o null.
      */
     public static function otraActiva($cuenta)
     {
         try {
             $st = self::db()->prepare("
-                SELECT dispositivo, ip, disp, TIMESTAMPDIFF(SECOND, ultimo, NOW()) AS hace
+                SELECT dispositivo, disp, TIMESTAMPDIFF(SECOND, ultimo, NOW()) AS hace
                 FROM lf_sesiones WHERE cuenta = ?");
             $st->execute([$cuenta]);
             $f = $st->fetch();
@@ -234,13 +234,5 @@ final class SesionUnica
         if ($seg < 60) return 'hace un momento';
         $m = intdiv($seg, 60);
         return $m === 1 ? 'hace 1 minuto' : 'hace ' . $m . ' minutos';
-    }
-
-    /** La IP a medias: para reconocerla, no para exponerla entera. */
-    public static function ipCorta($ip)
-    {
-        $ip = (string)$ip;
-        if (preg_match('/^(\d+\.\d+)\.\d+\.\d+$/', $ip, $m)) return $m[1] . '.x.x';
-        return $ip !== '' ? substr($ip, 0, 9) . '…' : '';
     }
 }

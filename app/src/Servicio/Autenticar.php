@@ -127,8 +127,8 @@ final class Autenticar
             'identificador' => (string)$identificador,
             'recordar'      => !empty($_POST['recordar']),
             'hasta'         => time() + SesionUnica::ESPERA,
-            'otra'          => ['dispositivo' => (string)$otra['dispositivo'],
-                                'hace' => (int)$otra['hace'], 'ip' => (string)$otra['ip']],
+            // Sin la IP: no se le enseña a nadie.
+            'otra'          => ['dispositivo' => (string)$otra['dispositivo'], 'hace' => (int)$otra['hace']],
         ];
         return true;
     }

@@ -44,9 +44,7 @@ $token = $_SESSION['lf_token'];
         </span>
         <span class="txt">
           <b><?= P::e($otra['dispositivo'] ?? 'Otro dispositivo') ?></b>
-          <small>Activa <?= P::e(\LibertyFin\Servicio\SesionUnica::hace($otra['hace'] ?? 0)) ?>
-            <?php $ip = \LibertyFin\Servicio\SesionUnica::ipCorta($otra['ip'] ?? ''); ?>
-            <?= $ip !== '' ? ' · desde ' . P::e($ip) : '' ?></small>
+          <small>Activa <?= P::e(\LibertyFin\Servicio\SesionUnica::hace($otra['hace'] ?? 0)) ?></small>
         </span>
       </div>
 
