@@ -94,6 +94,8 @@ final class VentasControlador
             'pagos'      => $repo->pagos($id),
             'gastos'     => $repo->gastos($id),
             'comisiones' => $repo->comisiones($id),
+            // La base comisionable de cada producto, con su parte del gasto.
+            'bases'      => ((new AsignarComision($db))->lineas($id) ?: ['lineas' => []])['lineas'],
             'catalogo'   => (new ComisionRepo($db))->catalogo(),
             'sugeridos'  => (new ComisionRepo($db))->porcentajesUsados(),
             'nueva'      => Peticion::entero('nueva') === 1,
@@ -181,13 +183,16 @@ final class VentasControlador
 
         try {
             $r = (new AsignarComision($db))->asignar(
-                $id, (int)($_POST['colaborador'] ?? 0), $_POST['pct'] ?? 0);
+                $id, (int)($_POST['colaborador'] ?? 0), $_POST['pct'] ?? 0,
+                (int)($_POST['detalle'] ?? 0) ?: null);
             Auditoria::anota('comision.asignar',
-                'venta ' . $id . ' · ' . $r['colaborador'],
+                'venta ' . $id . ' · ' . $r['colaborador']
+                . ($r['varios'] ? ' · ' . $r['producto'] : ''),
                 null, $_POST['pct'] . '% sobre ' . $r['base']);
             $this->volver($id, $r['colaborador'] . ': '
                 . \LibertyFin\Dominio\Dinero::pesos($r['asignada'])
-                . ' sobre una base de ' . \LibertyFin\Dominio\Dinero::pesos($r['base']) . '.', 'ok');
+                . ' sobre una base de ' . \LibertyFin\Dominio\Dinero::pesos($r['base'])
+                . ($r['varios'] ? ' (' . $r['producto'] . ')' : '') . '.', 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($id, $e->getMessage(), 'error');
         } catch (\Throwable $e) {

@@ -194,7 +194,13 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
                 <span style="display:flex;align-items:center;gap:9px">
                   <span class="lf-av <?= $sd ? 'gris' : '' ?>" style="width:28px;height:28px;font-size:10px">
                     <?= $sd ? '?' : P::e($ini($c['colaborador_nombre'])) ?></span>
-                  <b style="font-weight:600"><?= P::e($c['colaborador_nombre']) ?></b>
+                  <span style="min-width:0">
+                    <b style="font-weight:600"><?= P::e($c['colaborador_nombre']) ?></b>
+                    <?php if (count($bases) > 1): ?>
+                      <small style="display:block;font-size:11px;color:var(--lf-tinta-4)">
+                        <?= $c['producto'] ? 'en ' . P::e($c['producto']) : 'toda la venta' ?></small>
+                    <?php endif; ?>
+                  </span>
                 </span>
               </td>
               <td data-label="Área"><span class="badge bg-secondary"><?= P::e($c['area_nombre']) ?></span></td>
@@ -222,21 +228,47 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     </section>
     <?php endif; ?>
 
-    <?php if ($esAdmin && $v['estado'] !== 'cancelada'): ?>
+    <?php if ($esAdmin && $v['estado'] !== 'cancelada'):
+      // La base de cada producto: sin IVA, sin su costo y con su parte de
+      // los gastos. Es la misma cuenta que hace AsignarComision al guardar.
+      $varios  = count($bases) > 1;
+      $conBase = array_filter($bases, function ($b) { return $b['base'] > 0; });
+      $unaBase = $bases ? reset($bases)['base'] : 0; ?>
     <section class="card">
       <header class="card-header">
         <span><?= $comisiones ? 'Agregar otra comisión' : 'Asignar comisión' ?></span>
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-          Se calcula sobre el neto de <?= D::pesos($neto) ?>, sin IVA y ya con los gastos restados</p>
+          <?php if ($varios): ?>
+            La venta tiene <?= count($bases) ?> productos: la comisión va a uno y se calcula sobre su propia base,
+            sin IVA, sin costo y con su parte de los gastos
+          <?php else: ?>
+            Se calcula sobre una base de <?= D::pesos($unaBase) ?>: sin IVA, sin costo y ya con los gastos restados
+          <?php endif; ?></p>
       </header>
       <div class="card-body">
-        <?php if ($neto <= 0): ?>
+        <?php if (!$bases): ?>
+          <p style="font-size:13px;color:var(--lf-amb);margin:0">
+            Esta venta no tiene productos, así que no hay sobre qué comisionar.</p>
+        <?php elseif (!$conBase): ?>
           <p style="font-size:13px;color:var(--lf-amb);margin:0">
             Esta venta no deja base comisionable: los gastos se comen la utilidad.</p>
         <?php else: ?>
         <form method="post" action="/ventas/<?= (int)$v['id'] ?>/comision"
               style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
+          <?php if ($varios): ?>
+          <div style="flex:1 1 100%">
+            <label class="form-label">Producto</label>
+            <select class="form-select" name="detalle" id="selDet" required>
+              <option value="">Elegir…</option>
+              <?php foreach ($bases as $b): ?>
+                <option value="<?= (int)$b['id'] ?>" data-base="<?= P::e(number_format($b['base'], 2, '.', '')) ?>"
+                        <?= $b['base'] > 0 ? '' : 'disabled' ?>>
+                  <?= P::e($b['producto']) ?> · <?= $b['base'] > 0 ? 'base ' . D::pesos($b['base']) : 'sin base comisionable' ?></option>
+              <?php endforeach; ?>
+            </select>
+          </div>
+          <?php endif; ?>
           <div style="flex:2;min-width:220px">
             <label class="form-label">Colaborador</label>
             <select class="form-select" name="colaborador" id="selColab" required>
@@ -266,7 +298,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         </form>
         <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px">
           El porcentaje se sugiere solo con el que ese colaborador suele cobrar.
-          Nadie puede tener dos comisiones en la misma venta.
+          Nadie puede tener dos comisiones <?= $varios ? 'en el mismo producto' : 'en la misma venta' ?>.
         </p>
         <?php endif; ?>
       </div>
@@ -362,17 +394,25 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 <script>
 // Vista previa de cuánto le tocaría, mientras se escribe.
 (function(){
-  var neto = <?= json_encode((float)$neto) ?>;
+  // La base del único producto; con varios, la del que se elija.
+  var unaBase = <?= json_encode($bases ? (float)reset($bases)['base'] : 0) ?>;
   var sel = document.getElementById('selColab'),
       pct = document.getElementById('inpPct'),
-      pre = document.getElementById('prevCom');
+      pre = document.getElementById('prevCom'),
+      det = document.getElementById('selDet');
   if (!sel || !pct || !pre) return;
+  function base(){
+    if (!det) return unaBase;
+    var o = det.options[det.selectedIndex];
+    return o && o.dataset.base ? parseFloat(o.dataset.base) : NaN;
+  }
   function pintar(){
-    var p = parseFloat(pct.value);
-    pre.value = isNaN(p) || p <= 0 ? '—'
-      : '$' + (Math.round(neto * p) / 100).toLocaleString('es-MX',
+    var p = parseFloat(pct.value), b = base();
+    pre.value = isNaN(p) || p <= 0 || isNaN(b) ? '—'
+      : '$' + (Math.round(b * p) / 100).toLocaleString('es-MX',
               {minimumFractionDigits:2, maximumFractionDigits:2});
   }
+  if (det) det.addEventListener('change', pintar);
   sel.addEventListener('change', function(){
     var o = sel.options[sel.selectedIndex];
     if (o && o.dataset.pct) pct.value = o.dataset.pct;

@@ -44,6 +44,48 @@ final class ReporteRepo extends Repo
      * pagos —pagos vivos de la venta hasta este, por fecha y luego id—, así
      * que "venta liquidada" y el estado "Liquidación" nunca se contradicen.
      */
+    /**
+     * Las comisiones devengadas, por PRODUCTO. Se une con `d` y `v` y deja
+     * dos columnas:
+     *
+     *   cp.comision  la de este producto: la comisión dice a cuál va.
+     *   cs.comision  la de la venta que no dice de qué producto es —las
+     *                viejas, o la de un producto que ya no está—. Esa sí
+     *                se reparte con PESO, como lo cobrado.
+     *
+     * Antes toda la comisión de la venta se repartía con el peso: en una
+     * venta de contabilidad y un trámite legal, la comisión del abogado
+     * le restaba utilidad también a contabilidad.
+     */
+    const COMISION_POR_PRODUCTO = "
+                LEFT JOIN ( SELECT vc.venta_detalle_id AS detalle_id, SUM(pc.monto) comision
+                            FROM pago_comisiones pc
+                            INNER JOIN venta_comisiones vc ON vc.id = pc.venta_comision_id
+                            INNER JOIN venta_detalles dd   ON dd.id = vc.venta_detalle_id
+                                                          AND dd.venta_id = pc.venta_id
+                            GROUP BY vc.venta_detalle_id ) cp ON cp.detalle_id = d.id
+                LEFT JOIN ( SELECT pc.venta_id, SUM(pc.monto) comision
+                            FROM pago_comisiones pc
+                            LEFT JOIN venta_comisiones vc ON vc.id = pc.venta_comision_id
+                            LEFT JOIN venta_detalles dd   ON dd.id = vc.venta_detalle_id
+                                                         AND dd.venta_id = pc.venta_id
+                            WHERE dd.id IS NULL
+                            GROUP BY pc.venta_id ) cs ON cs.venta_id = v.id";
+
+    /**
+     * El área del producto sobre el que va una comisión devengada (`pc`).
+     * NULL si la comisión no dice de qué producto es o el producto no tiene
+     * categoría: ahí se cae al área de la venta, como antes.
+     */
+    const AREA_DE_LA_COMISION = "(
+                       SELECT NULLIF(catx.nombre,'')
+                       FROM venta_comisiones vcx
+                       INNER JOIN venta_detalles dx ON dx.id = vcx.venta_detalle_id
+                                                   AND dx.venta_id = vcx.venta_id
+                       LEFT JOIN productos px    ON px.id = dx.producto_id
+                       LEFT JOIN categorias catx ON catx.id = px.categoria_id
+                       WHERE vcx.id = pc.venta_comision_id)";
+
     const LIQUIDA = "(v.total - (SELECT COALESCE(SUM(pl.monto),0) FROM venta_pagos pl
                         WHERE pl.venta_id = p.venta_id AND pl.cancelado = 0
                           AND (pl.fecha_pago < p.fecha_pago
@@ -293,6 +335,7 @@ final class ReporteRepo extends Repo
         // sin renglones (muchas vienen del sistema anterior) o con renglones
         // en $0 desaparecía de esta tabla con todo y lo cobrado. Ver PESO.
         $peso = self::PESO;
+        $cpro = self::COMISION_POR_PRODUCTO;
         return $this->todos("
             SELECT area,
                    COUNT(DISTINCT venta_id)  AS ventas,
@@ -317,7 +360,11 @@ final class ReporteRepo extends Repo
                        v.total                 * ({$peso}) AS vendido,
                        COALESCE(pg.cobrado,0)  * ({$peso}) AS cobrado,
                        COALESCE(g.gastos,0)    * ({$peso}) AS gastos,
-                       COALESCE(cm.comision,0) * ({$peso}) AS comisiones
+                       -- La comisión de un producto es de SU área; solo
+                       -- la que no dice de qué producto es (las viejas) se
+                       -- reparte con el peso, como lo demás.
+                       COALESCE(cp.comision,0)
+                         + COALESCE(cs.comision,0) * ({$peso}) AS comisiones
                 FROM ventas v
                 LEFT JOIN venta_detalles d ON d.venta_id = v.id
                 LEFT JOIN productos p      ON p.id = d.producto_id
@@ -330,8 +377,7 @@ final class ReporteRepo extends Repo
                 LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
                             WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                             GROUP BY venta_id ) g ON g.venta_id = v.id
-                LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
-                            GROUP BY venta_id ) cm ON cm.venta_id = v.id
+                {$cpro}
                 WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             ) x
             GROUP BY area ORDER BY cobrado DESC", [$a, $b]);
@@ -367,12 +413,14 @@ final class ReporteRepo extends Repo
     public function porColaborador($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+        $areaCom = self::AREA_DE_LA_COMISION;
         return $this->todos("
             -- El area es la del SERVICIO vendido, no el equipo de quien
             -- comisiono: una venta de contabilidad cerrada por alguien
-            -- de Administracion es de contabilidad.
+            -- de Administracion es de contabilidad. Si la comision dice
+            -- de que producto es, el area de ese producto.
             SELECT pc.colaborador_nombre AS nombre,
-                   GROUP_CONCAT(DISTINCT COALESCE((
+                   GROUP_CONCAT(DISTINCT COALESCE({$areaCom}, (
                        SELECT cat.nombre
                        FROM venta_detalles d
                        LEFT JOIN productos pr   ON pr.id = d.producto_id
@@ -612,6 +660,7 @@ final class ReporteRepo extends Repo
         $esp = $hayEsp
              ? "COALESCE(NULLIF(TRIM(v.especialista_nombre),''), 'Sin asignar')"
              : "'Sin asignar'";
+        $cpro = self::COMISION_POR_PRODUCTO;
 
         return $this->todos("
             SELECT v.id                                    AS venta_id,
@@ -649,7 +698,10 @@ final class ReporteRepo extends Repo
                    ROUND((v.total - COALESCE(pg.cobrado,0))
                          * (d.subtotal / NULLIF(tot.suma,0)), 2) AS saldo,
                    ROUND(COALESCE(g.gastos,0)   * (d.subtotal / NULLIF(tot.suma,0)), 2) AS gastos,
-                   ROUND(COALESCE(cm.comision,0)* (d.subtotal / NULLIF(tot.suma,0)), 2) AS comision,
+                   -- La del producto, completa; la que no dice de qué
+                   -- producto es, por su peso. Ver COMISION_POR_PRODUCTO.
+                   ROUND(COALESCE(cp.comision,0)
+                         + COALESCE(cs.comision * (d.subtotal / NULLIF(tot.suma,0)), 0), 2) AS comision,
                    v.metodo_pago                           AS metodo,
                    suc.nombre                              AS sucursal
             FROM venta_detalles d
@@ -665,8 +717,7 @@ final class ReporteRepo extends Repo
             LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
                         WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                         GROUP BY venta_id ) g ON g.venta_id = v.id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
-                        GROUP BY venta_id ) cm ON cm.venta_id = v.id
+            {$cpro}
             WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             ORDER BY area_servicio, tipo_persona, v.fecha DESC, v.codigo_venta",
             [$a, $b]);
@@ -709,6 +760,7 @@ final class ReporteRepo extends Repo
     public function comisionesDetalle($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+        $areaCom = self::AREA_DE_LA_COMISION;
         return $this->todos("
             SELECT pc.colaborador_nombre              AS colaborador,
                    v.id                               AS venta_id,
@@ -718,8 +770,9 @@ final class ReporteRepo extends Repo
                    p.fecha_pago,
                    p.tipo                             AS tipo_pago,
                    p.metodo_pago                      AS metodo,
-                   -- El area del SERVICIO, igual que en el resto
-                   COALESCE((
+                   -- El area del SERVICIO, igual que en el resto: la del
+                   -- producto comisionado, o la que mas pesa en la venta
+                   COALESCE({$areaCom}, (
                        SELECT cat.nombre
                        FROM venta_detalles d
                        LEFT JOIN productos pr   ON pr.id = d.producto_id

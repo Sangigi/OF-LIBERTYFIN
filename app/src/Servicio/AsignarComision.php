@@ -22,8 +22,84 @@ final class AsignarComision
     private $db;
     public function __construct(PDO $db) { $this->db = $db; }
 
-    /** @throws \InvalidArgumentException con un mensaje apto para mostrar */
-    public function asignar($ventaId, $colaboradorId, $porcentaje)
+    /**
+     * Los productos de una venta, cada uno con su base comisionable.
+     *
+     * La comisión se asigna POR PRODUCTO: en una venta de contabilidad y
+     * un trámite legal, el contador comisiona sobre la contabilidad y el
+     * abogado sobre el trámite, no los dos sobre todo.
+     *
+     * El gasto de operación es de la VENTA, no de un producto. Con un solo
+     * producto se le resta completo, como siempre. Con varios se reparte
+     * según lo que vale cada uno: restárselo entero a cada producto lo
+     * cobraría dos o tres veces.
+     *
+     * @return array|null ['venta' => fila, 'lineas' => [id => [id, producto,
+     *               valor, gasto, base, fila]]] o null si no existe.
+     */
+    public function lineas($ventaId)
+    {
+        $st = $this->db->prepare("
+            SELECT v.id, v.subtotal, v.descuento, v.iva, v.total,
+                   COALESCE(v.iva_modo,'incluido') AS iva_modo, v.estado
+            FROM ventas v WHERE v.id = ?");
+        $st->execute([(int)$ventaId]);
+        $venta = $st->fetch();
+        if (!$venta) return null;
+
+        $st = $this->db->prepare("
+            SELECT vd.id, vd.cantidad, vd.precio_unitario, vd.descuento,
+                   COALESCE(p.costo,0) AS costo, COALESCE(p.nombre,'Producto') AS producto
+            FROM venta_detalles vd
+            LEFT JOIN productos p ON p.id = vd.producto_id
+            WHERE vd.venta_id = ? ORDER BY vd.id");
+        $st->execute([(int)$ventaId]);
+        $filas = $st->fetchAll();
+
+        $st = $this->db->prepare("
+            SELECT COALESCE(SUM(monto),0) FROM gastos
+            WHERE venta_id = ? AND tipo = 'manual' AND categoria <> 'Costo de venta'");
+        $st->execute([(int)$ventaId]);
+        $gasto = Dinero::centavos($st->fetchColumn());
+
+        // Lo que vale cada producto decide su parte del gasto.
+        $valores = [];
+        foreach ($filas as $f) {
+            $valores[$f['id']] = max(0, Comision::desdeLinea($venta, $f, 0)->valorLinea());
+        }
+        $suma = array_sum($valores);
+        $n    = count($filas);
+
+        $lineas = []; $repartido = 0.0; $i = 0;
+        foreach ($filas as $f) {
+            $i++;
+            // El último se lleva los centavos del redondeo, así los
+            // pedazos suman exactamente el gasto.
+            if ($i === $n) {
+                $g = Dinero::centavos($gasto - $repartido);
+            } else {
+                $g = Dinero::centavos($gasto * ($suma > 0 ? $valores[$f['id']] / $suma : 1 / $n));
+                $repartido += $g;
+            }
+            $com = Comision::desdeLinea($venta, $f, $g);
+            $lineas[(int)$f['id']] = [
+                'id'       => (int)$f['id'],
+                'producto' => $f['producto'],
+                'valor'    => $com->valorLinea(),
+                'gasto'    => $g,
+                'base'     => $com->baseAsignada(),
+                'fila'     => $f,
+            ];
+        }
+        return ['venta' => $venta, 'lineas' => $lineas];
+    }
+
+    /**
+     * @param int|null $detalleId  el producto (venta_detalles.id). Puede
+     *                             omitirse solo si la venta tiene uno.
+     * @throws \InvalidArgumentException con un mensaje apto para mostrar
+     */
+    public function asignar($ventaId, $colaboradorId, $porcentaje, $detalleId = null)
     {
         $ventaId = (int)$ventaId;
         $pct     = (float)$porcentaje;
@@ -31,13 +107,9 @@ final class AsignarComision
             throw new \InvalidArgumentException('El porcentaje debe estar entre 0 y 100');
         }
 
-        $st = $this->db->prepare("
-            SELECT v.id, v.subtotal, v.descuento, v.iva, v.total,
-                   COALESCE(v.iva_modo,'incluido') AS iva_modo, v.estado
-            FROM ventas v WHERE v.id = ?");
-        $st->execute([$ventaId]);
-        $venta = $st->fetch();
-        if (!$venta) throw new \InvalidArgumentException('La venta no existe');
+        $datos = $this->lineas($ventaId);
+        if (!$datos) throw new \InvalidArgumentException('La venta no existe');
+        $venta = $datos['venta'];
         if ($venta['estado'] === 'cancelada') {
             throw new \InvalidArgumentException('No se puede comisionar una venta cancelada');
         }
@@ -51,46 +123,48 @@ final class AsignarComision
         $col = $st->fetch();
         if (!$col) throw new \InvalidArgumentException('Ese colaborador no existe o está inactivo');
 
-        // Una sola vez por colaborador y venta: dos renglones del mismo
-        // nombre en la misma venta es siempre un error de captura.
-        $st = $this->db->prepare("
-            SELECT COUNT(*) FROM venta_comisiones
-            WHERE venta_id = ? AND colaborador_id = ? AND cancelada = 0");
-        $st->execute([$ventaId, $col['id']]);
-        if ((int)$st->fetchColumn() > 0) {
-            throw new \InvalidArgumentException($col['nombre'] . ' ya tiene comisión en esta venta');
-        }
-
-        // La línea. Con varios productos habría que elegir; hoy todas las
-        // ventas del sistema tienen uno solo, así que se toma el primero
-        // y se avisa si hubiera más.
-        $st = $this->db->prepare("
-            SELECT vd.id, vd.cantidad, vd.precio_unitario, vd.descuento,
-                   COALESCE(p.costo,0) AS costo
-            FROM venta_detalles vd
-            LEFT JOIN productos p ON p.id = vd.producto_id
-            WHERE vd.venta_id = ? ORDER BY vd.id");
-        $st->execute([$ventaId]);
-        $lineas = $st->fetchAll();
+        // El producto.
+        $lineas = $datos['lineas'];
         if (!$lineas) throw new \InvalidArgumentException('La venta no tiene productos');
-        if (count($lineas) > 1) {
+        $varios = count($lineas) > 1;
+        if ($detalleId) {
+            if (!isset($lineas[(int)$detalleId])) {
+                throw new \InvalidArgumentException('Ese producto no es de esta venta');
+            }
+            $l = $lineas[(int)$detalleId];
+        } elseif ($varios) {
             throw new \InvalidArgumentException(
-                'Esta venta tiene ' . count($lineas) . ' productos. Asigna la comisión por producto.');
+                'Esta venta tiene ' . count($lineas) . ' productos. Elige a cuál va la comisión.');
+        } else {
+            $l = reset($lineas);
         }
-        $linea = $lineas[0];
 
+        // Una sola vez por colaborador y producto: dos renglones del mismo
+        // nombre sobre lo mismo es siempre un error de captura. Una comisión
+        // vieja sin producto (o con uno que ya no está en la venta) cuenta
+        // como de toda la venta.
         $st = $this->db->prepare("
-            SELECT COALESCE(SUM(monto),0) FROM gastos
-            WHERE venta_id = ? AND tipo = 'manual' AND categoria <> 'Costo de venta'");
-        $st->execute([$ventaId]);
-        $gasto = Dinero::centavos($st->fetchColumn());
+            SELECT COUNT(*) FROM venta_comisiones vc
+            WHERE vc.venta_id = ? AND vc.colaborador_id = ? AND vc.cancelada = 0
+              AND ( vc.venta_detalle_id = ? OR vc.venta_detalle_id IS NULL
+                    OR NOT EXISTS ( SELECT 1 FROM venta_detalles dx
+                                    WHERE dx.id = vc.venta_detalle_id AND dx.venta_id = vc.venta_id ) )");
+        $st->execute([$ventaId, $col['id'], $l['id']]);
+        if ((int)$st->fetchColumn() > 0) {
+            throw new \InvalidArgumentException($col['nombre'] . ' ya tiene comisión en '
+                . ($varios ? $l['producto'] : 'esta venta'));
+        }
+
+        $linea = $l['fila'];
+        $gasto = $l['gasto'];
 
         // Aquí está todo el asunto: el dominio quita el IVA.
         $com  = Comision::desdeLinea($venta, $linea, $gasto);
         $base = $com->baseAsignada();
         if ($base <= 0) {
-            throw new \InvalidArgumentException(
-                'Esta venta no deja base comisionable: los gastos se comen la utilidad');
+            throw new \InvalidArgumentException($varios
+                ? $l['producto'] . ' no deja base comisionable: su costo y su parte de los gastos se comen la utilidad'
+                : 'Esta venta no deja base comisionable: los gastos se comen la utilidad');
         }
 
         $iva    = \LibertyFin\Dominio\Iva::desdeVenta($venta);
@@ -119,7 +193,7 @@ final class AsignarComision
         (new SincronizarComisiones($this->db))->paraVenta($ventaId);
 
         return ['colaborador' => $col['nombre'], 'asignada' => $com->asignada($pct),
-                'base' => $base];
+                'base' => $base, 'producto' => $l['producto'], 'varios' => $varios];
     }
 
     /** Cancelación lógica: deja rastro y resincroniza. */

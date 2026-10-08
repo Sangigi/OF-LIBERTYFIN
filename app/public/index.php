@@ -108,6 +108,8 @@ $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
 $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador', 'index']);
 $r->get('/comisiones/colaborador/{id}', ['LibertyFin\Controlador\ComisionesControlador', 'colaborador']);
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
+$r->get('/comisiones/lote',      ['LibertyFin\Controlador\ComisionesControlador', 'lote']);
+$r->post('/comisiones/lote',     ['LibertyFin\Controlador\ComisionesControlador', 'asignarLote']);
 $r->get('/clientes',  ['LibertyFin\Controlador\ClientesControlador',  'index']);
 $r->get('/cobranza',  ['LibertyFin\Controlador\CobranzaControlador',  'index']);
 $r->get('/gastos',          ['LibertyFin\Controlador\GastosControlador', 'index']);
@@ -228,6 +230,7 @@ $permisos = [
   '/comisiones'             => 'ver.comisiones',
   '/comisiones/colaborador/{id}' => 'ver.comisiones',
   '/comisiones/reasignar'   => 'asignar.comision',
+  '/comisiones/lote'        => 'asignar.comision',
   '/gastos'                 => 'ver.gastos',
   '/gastos/guardar'         => 'editar.gastos',
   '/gastos/borrar'          => 'borrar.gastos',

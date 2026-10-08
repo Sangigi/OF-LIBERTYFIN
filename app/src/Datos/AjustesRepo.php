@@ -98,7 +98,9 @@ final class AjustesRepo extends Repo
     {
         return $this->todos("
             SELECT c.id, c.nombre, c.activo, c.area_id, a.nombre AS area,
-                   (SELECT COUNT(*) FROM venta_comisiones vc
+                   -- Ventas, no comisiones: con varios productos una
+                   -- misma venta puede darle dos.
+                   (SELECT COUNT(DISTINCT vc.venta_id) FROM venta_comisiones vc
                       WHERE vc.colaborador_id = c.id AND vc.cancelada = 0) AS ventas,
                    (SELECT COALESCE(SUM(pc.monto),0) FROM pago_comisiones pc
                       WHERE pc.colaborador_id = c.id) AS devengado,

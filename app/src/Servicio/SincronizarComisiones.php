@@ -66,6 +66,26 @@ final class SincronizarComisiones
         $st->execute([$ventaId]);
         $pagos = $st->fetchAll();
 
+        // Con varios productos, lo cobrado se reparte entre ellos según lo
+        // que vale cada uno: si el cliente pagó un tercio de la venta, la
+        // comisión de cada producto va en un tercio. Sin esto, un abono
+        // igual al precio de UN producto liberaba completa la comisión de
+        // cada uno de ellos.
+        // Con un solo producto la parte es 1 y nada cambia. Una comisión
+        // vieja sin producto se queda con toda la venta, como antes.
+        $st = $this->db->prepare("
+            SELECT id, GREATEST(precio_unitario * cantidad - COALESCE(descuento,0), 0) AS valor
+            FROM venta_detalles WHERE venta_id = ?");
+        $st->execute([$ventaId]);
+        $valores = [];
+        foreach ($st->fetchAll() as $d) $valores[(int)$d['id']] = (float)$d['valor'];
+        $sumaValores = array_sum($valores);
+        $parte = function ($a) use ($valores, $sumaValores) {
+            $d = (int)($a['venta_detalle_id'] ?? 0);
+            if (count($valores) < 2 || $sumaValores <= 0 || !isset($valores[$d])) return 1.0;
+            return $valores[$d] / $sumaValores;
+        };
+
         $this->db->beginTransaction();
         try {
             $this->db->prepare("DELETE FROM pago_comisiones WHERE venta_id = ?")->execute([$ventaId]);
@@ -94,8 +114,9 @@ final class SincronizarComisiones
                     // Lo devengado al cierre de este pago, menos lo que ya
                     // se había devengado con los anteriores. La diferencia
                     // es lo que ESTE pago liberó.
-                    $hasta = $com->devengada($a['porcentaje_regla'], $acumulado);
-                    $desde = $com->devengada($a['porcentaje_regla'], $antes);
+                    $p     = $parte($a);
+                    $hasta = $com->devengada($a['porcentaje_regla'], $acumulado * $p);
+                    $desde = $com->devengada($a['porcentaje_regla'], $antes * $p);
                     $delta = Dinero::centavos($hasta - $desde);
                     if (abs($delta) < 0.005) continue;
 

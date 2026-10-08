@@ -2863,3 +2863,63 @@ td.lf-col-ant b{display:block;font-weight:700;color:var(--lf-amb)}
 td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-family:var(--lf-font)}
 @media(max-width:760px){ th.lf-col-ant, td.lf-col-ant{border-left:0} }
 .lf-ant-val{display:inline-block;text-align:right}
+
+/* ══════════════════════════════════════════════════════
+   COMISIONES EN LOTE
+   ══════════════════════════════════════════════════════ */
+.lf-lote-atras{display:inline-block;margin:0 0 14px;font-size:12.5px;font-weight:600;
+  color:var(--lf-tinta-3);text-decoration:none}
+.lf-lote-atras:hover{color:var(--lf-brand)}
+.lf-lote-paso{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;
+  margin-right:9px;border-radius:50%;font-size:11.5px;font-weight:700;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2);vertical-align:1px}
+.lf-lote-filtros,.lf-lote-quien{display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:4px 20px 18px}
+.lf-lote-filtros label,.lf-lote-quien label{display:flex;flex-direction:column;gap:5px;
+  font-size:11.5px;font-weight:600;color:var(--lf-tinta-3);min-width:150px}
+.lf-lote-filtros .form-control,.lf-lote-filtros .form-select{height:36px;min-width:150px}
+.lf-lote-filtros .lf-lote-chk{flex-direction:row;align-items:center;gap:7px;height:36px;
+  font-weight:500;color:var(--lf-tinta-2);font-size:12.5px;min-width:0}
+.lf-lote-quien label{flex:1;max-width:340px}
+.lf-lote-quien label:last-child{flex:0 0 150px}
+.lf-lote-pct{position:relative;display:block}
+.lf-lote-pct input{padding-right:30px}
+.lf-lote-pct i{position:absolute;right:12px;top:50%;transform:translateY(-50%);
+  font-style:normal;font-weight:600;color:var(--lf-tinta-4);pointer-events:none}
+.lf-lote-sub{display:block;color:var(--lf-tinta-4);font-size:11.5px;font-weight:400}
+.lf-lote-tabla input[type=checkbox]{width:16px;height:16px;cursor:pointer;accent-color:var(--lf-brand)}
+.lf-lote-tabla input[type=checkbox]:disabled{cursor:not-allowed}
+.lf-lote-tabla tr.no td{color:var(--lf-tinta-4)}
+.lf-lote-tabla tr.no td a{color:var(--lf-tinta-3)!important}
+.lf-lote-motivo{font-size:12px;font-weight:600;color:var(--lf-brand-2);white-space:nowrap}
+.lf-lote-tabla tr.no .lf-lote-motivo{color:var(--lf-amb);font-weight:500;white-space:normal}
+.lf-lote-pie{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:14px 20px;border-top:1px solid var(--lf-linea)}
+.lf-lote-pie p{margin:0;font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-lote-tope,.lf-lote-vacio{margin:0 20px 14px;padding:10px 14px;border-radius:var(--lf-r);
+  font-size:12.5px;background:var(--lf-vidrio);color:var(--lf-tinta-3)}
+.lf-lote-vacio{text-align:center;padding:28px 14px}
+.lf-lote-res .card-header p{font-size:12.5px;color:var(--lf-tinta-3);margin:3px 0 0;font-weight:400}
+.lf-lote-omit{list-style:none;margin:0;padding:4px 20px 14px;font-size:12.5px;max-height:260px;overflow-y:auto}
+.lf-lote-omit li{display:flex;gap:12px;padding:6px 0;border-bottom:1px solid var(--lf-vidrio)}
+.lf-lote-omit li:last-child{border-bottom:0}
+.lf-lote-omit li b{flex:0 0 auto;min-width:96px;font-size:12px}
+.lf-lote-omit li span{color:var(--lf-tinta-3)}
+.lf-lote-omit li.mas{color:var(--lf-tinta-4)}
+@media(max-width:760px){
+  .lf-lote-filtros,.lf-lote-quien{padding:4px 14px 16px}
+  .lf-lote-filtros label,.lf-lote-quien label,.lf-lote-quien label:last-child{flex:1 1 100%;max-width:none;min-width:0}
+  .lf-lote-filtros .btn{width:100%}
+  .lf-lote-pie{padding:14px}
+  .lf-lote-pie .btn{width:100%}
+  .lf-lote-motivo{white-space:normal}
+}
+/* Ventas con varios productos: cada uno con su área y sus comisiones. */
+.lf-lote-prods{list-style:none;margin:6px 0 0;padding:0 0 0 10px;border-left:2px solid var(--lf-linea)}
+.lf-lote-prods li{padding:2px 0;font-size:12px;line-height:1.35}
+.lf-lote-prods li span{display:block;font-weight:500;color:var(--lf-tinta-2)}
+.lf-lote-prods li small{display:block;font-size:10.5px;color:var(--lf-tinta-4)}
+.lf-lote-prods li.fuera{opacity:.55}
+@media(max-width:760px){
+  .lf-lote-tabla td[data-label="Venta"]{flex-wrap:wrap}
+  .lf-lote-prods{flex:1 1 100%;text-align:left}
+}

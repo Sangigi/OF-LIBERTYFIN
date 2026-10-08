@@ -199,6 +199,7 @@ final class VentaRepo extends Repo
     {
         return $this->todos("
             SELECT vc.id, vc.colaborador_nombre, vc.area_nombre, vc.porcentaje_regla AS pct,
+                   vc.venta_detalle_id, pr.nombre AS producto,
                    vc.monto_comision AS asignada,
                    COALESCE(pc.devengada,0) AS devengada,
                    vc.monto_comision - COALESCE(pc.devengada,0) AS pendiente
@@ -206,6 +207,8 @@ final class VentaRepo extends Repo
             LEFT JOIN ( SELECT venta_comision_id, SUM(monto) devengada
                         FROM pago_comisiones GROUP BY venta_comision_id ) pc
                    ON pc.venta_comision_id = vc.id
+            LEFT JOIN venta_detalles vd ON vd.id = vc.venta_detalle_id AND vd.venta_id = vc.venta_id
+            LEFT JOIN productos pr      ON pr.id = vd.producto_id
             WHERE vc.venta_id = ? AND vc.cancelada = 0
             ORDER BY vc.porcentaje_regla DESC", [(int)$id]);
     }

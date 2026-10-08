@@ -33,6 +33,10 @@ $qs = function ($x = []) use ($desde, $hasta) {
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
+  <?php if ($esAdmin): ?>
+    <a class="btn btn-primary btn-sm" style="margin-left:auto"
+       href="/comisiones/lote?<?= P::e(http_build_query(['desde' => $desde, 'hasta' => $hasta])) ?>">Asignar en lote</a>
+  <?php endif; ?>
 </form>
 
 <div class="lf-stats">

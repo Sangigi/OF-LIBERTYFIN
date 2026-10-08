@@ -317,6 +317,103 @@ final class ComisionRepo extends Repo
     }
 
     /**
+     * Las ventas de un periodo para asignar comisiones EN LOTE, cada una
+     * con sus productos (ver `lineasDe`).
+     *
+     * La comisión va POR PRODUCTO, así que de cada venta se trae cada
+     * producto con su área y con quién ya comisiona sobre él: con eso se
+     * sabe de antemano qué se puede asignar y qué no, sin asignarle dos
+     * veces lo mismo a la misma persona.
+     *
+     * @param string|int|null $especialista  null = cualquiera, 'sin' = sin
+     *                                       especialista, id = ese colaborador.
+     */
+    public function paraLote($desde, $hasta, $especialista = null, $tope = 300)
+    {
+        $w = "v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?";
+        $p = [$desde . ' 00:00:00', date('Y-m-d', strtotime($hasta . ' +1 day')) . ' 00:00:00'];
+        if ($especialista === 'sin') {
+            $w .= " AND v.especialista_id IS NULL";
+        } elseif ((int)$especialista > 0) {
+            $w .= " AND v.especialista_id = ?";
+            $p[] = (int)$especialista;
+        }
+        $ventas = $this->todos("
+            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.especialista_id,
+                   COALESCE(NULLIF(TRIM(v.especialista_nombre),''), '') AS especialista,
+                   COALESCE(c.nombre, 'Público general') AS cliente,
+                   COALESCE(NULLIF((
+                       SELECT cat.nombre FROM venta_detalles d2
+                       LEFT JOIN productos p2  ON p2.id = d2.producto_id
+                       LEFT JOIN categorias cat ON cat.id = p2.categoria_id
+                       WHERE d2.venta_id = v.id AND cat.nombre IS NOT NULL
+                       GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1
+                   ),''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                   (SELECT GROUP_CONCAT(CONCAT(vc.colaborador_nombre, ' ',
+                                               TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM vc.porcentaje_regla)), '%')
+                                        ORDER BY vc.id SEPARATOR ', ')
+                    FROM venta_comisiones vc
+                    WHERE vc.venta_id = v.id AND vc.cancelada = 0) AS comisiones
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            WHERE {$w}
+            ORDER BY v.fecha, v.id
+            LIMIT " . (int)$tope, $p);
+
+        $lineas = $this->lineasDe(array_column($ventas, 'id'));
+        foreach ($ventas as &$v) $v['lineas'] = $lineas[(int)$v['id']] ?? [];
+        unset($v);
+        return $ventas;
+    }
+
+    /**
+     * Los productos de varias ventas, agrupados por venta.
+     *
+     * Cada uno con su área (la categoría del producto, o la de la venta si
+     * no tiene) y `con`: los ids de quienes ya comisionan sobre él. Una
+     * comisión vieja sin producto, o con uno que ya no está en la venta,
+     * cuenta como de toda la venta: igual que en AsignarComision.
+     *
+     * @return array [venta_id => [ [id, producto, area, con, comisiones], ... ]]
+     */
+    public function lineasDe(array $ventaIds)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ventaIds))));
+        if (!$ids) return [];
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        $filas = $this->todos("
+            SELECT d.id, d.venta_id, COALESCE(p.nombre, 'Producto') AS producto,
+                   COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                   ( SELECT GROUP_CONCAT(vc.colaborador_id)
+                     FROM venta_comisiones vc
+                     WHERE vc.venta_id = d.venta_id AND vc.cancelada = 0
+                       AND ( vc.venta_detalle_id = d.id OR vc.venta_detalle_id IS NULL
+                             OR NOT EXISTS ( SELECT 1 FROM venta_detalles dx
+                                             WHERE dx.id = vc.venta_detalle_id
+                                               AND dx.venta_id = vc.venta_id ) ) ) AS con,
+                   ( SELECT GROUP_CONCAT(CONCAT(vc2.colaborador_nombre, ' ',
+                                                TRIM(TRAILING '.' FROM TRIM(TRAILING '0' FROM vc2.porcentaje_regla)), '%')
+                                         ORDER BY vc2.id SEPARATOR ', ')
+                     FROM venta_comisiones vc2
+                     WHERE vc2.venta_detalle_id = d.id AND vc2.cancelada = 0 ) AS comisiones
+            FROM venta_detalles d
+            INNER JOIN ventas v     ON v.id = d.venta_id
+            LEFT JOIN productos p    ON p.id = d.producto_id
+            LEFT JOIN categorias cat ON cat.id = p.categoria_id
+            WHERE d.venta_id IN ({$marcas})
+            ORDER BY d.venta_id, d.id", $ids);
+
+        $r = [];
+        foreach ($filas as $f) {
+            $f['id'] = (int)$f['id'];
+            $f['con'] = (string)$f['con'];
+            $f['comisiones'] = (string)$f['comisiones'];
+            $r[(int)$f['venta_id']][] = $f;
+        }
+        return $r;
+    }
+
+    /**
      * Condición de búsqueda sobre las columnas de `detalleColaborador`.
      *
      * Cada palabra tiene que aparecer en ALGUNA columna (cliente, folio,
