@@ -228,6 +228,7 @@ final class ComisionesControlador
         }
         $pcts  = (array)($_POST['porcentaje'] ?? []);
         $ens   = (array)($_POST['en'] ?? []);
+        $filas = (array)($_POST['fila'] ?? []);       // clave de cada fila, para `para`
         $pares = []; $vistos = [];
         foreach ((array)($_POST['colaborador'] ?? []) as $i => $q) {
             $q   = trim((string)$q);
@@ -255,7 +256,8 @@ final class ComisionesControlador
                 $falla('Hay una persona dos veces con lo mismo: deja una sola fila.');
             }
             $vistos[$clave . '|' . $en] = true;
-            $pares[] = ['q' => $clave, 'pct' => $pct, 'en' => $en,
+            $k = substr(preg_replace('/[^0-9a-z]/i', '', (string)($filas[$i] ?? '')), 0, 10);
+            $pares[] = ['q' => $clave, 'pct' => $pct, 'en' => $en, 'k' => $k !== '' ? $k : 'f' . $i,
                         'nombre' => $clave === 'esp' ? 'Especialista' : $nombres[(int)$clave]];
         }
         if (!$pares)            $falla('Elige a quién se le asigna la comisión.');
@@ -275,6 +277,9 @@ final class ComisionesControlador
         $area    = trim((string)($_POST['area'] ?? ''));
         $lineas  = $repo->lineasDe($ids);
         $elegido = (array)($_POST['lineas'] ?? []);
+        // Por venta, a quiénes de las filas lleva (los chips). Si no llegó,
+        // lleva a todos a los que les toca.
+        $paraPost = (array)($_POST['para'] ?? []);
 
         // Para los mensajes y la bitácora: "Ana 10% en Legal + Juan 5%".
         $nombreProd = [];
@@ -309,10 +314,16 @@ final class ComisionesControlador
 
             // Por producto: quién ya quedó (nadie dos veces en lo mismo; la
             // primera fila gana) y cuánto porcentaje lleva (no más de 100).
-            $alguna = false; $aplico = false; $usados = []; $sumaPct = [];
+            $para = isset($paraPost[$id]) ? array_map('strval', (array)$paraPost[$id]) : null;
+
+            $alguna = false; $aplico = false; $quitados = false; $usados = []; $sumaPct = [];
             foreach ($pares as $par) {
                 $mios = array_filter($obj, function ($l) use ($par) { return self::enAlcance($l, $par['en']); });
                 if (!$mios) continue;                    // en esta venta no hay nada para esta fila
+                if ($para !== null && !in_array($par['k'], $para, true)) {
+                    $quitados = true;                    // se quitó de esta venta a propósito
+                    continue;
+                }
                 $aplico = true;
 
                 $esp = $par['q'] === 'esp';
@@ -355,7 +366,10 @@ final class ComisionesControlador
                     }
                 }
             }
-            if (!$aplico) $omitidas[] = [$folio, 'Sus productos no son para nadie de la lista'];
+            if (!$aplico) {
+                $omitidas[] = [$folio, $quitados ? 'Se quitó a todos de esta venta'
+                                                 : 'Sus productos no son para nadie de la lista'];
+            }
             if ($alguna) $enVentas++;
         }
 

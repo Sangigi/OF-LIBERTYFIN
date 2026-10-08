@@ -169,6 +169,8 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
           </select>
         </label>
         <button type="button" class="lf-lote-quitar" data-quitar aria-label="Quitar este colaborador" hidden>&times;</button>
+        <?php /* Clave de la fila: con ella cada venta dice a quiénes de aquí lleva. */ ?>
+        <input type="hidden" name="fila[]" value="1">
       </div>
     </div>
     <div class="lf-lote-mas">
@@ -253,7 +255,13 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
             <td data-label="Total" class="text-end lf-mono"><?= D::pesos($v['total']) ?></td>
             <td data-label="Comisiones"><?= $v['comisiones'] ? P::e($v['comisiones'])
                 : '<span class="lf-lote-sub" style="display:inline">Ninguna</span>' ?></td>
-            <td data-label="Estado" class="lf-lote-motivo"><?= $fijo ? P::e($fijo) : 'Lista' ?></td>
+            <td data-label="Estado">
+              <div class="lf-lote-estado">
+                <span class="lf-lote-motivo"><?= $fijo ? P::e($fijo) : 'Lista' ?></span>
+                <?php /* Con dos o más personas, a quiénes lleva esta venta (lo pinta el script). */ ?>
+                <div class="lf-lote-para" hidden></div>
+              </div>
+            </td>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -310,6 +318,14 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
   var filas  = [].slice.call(form.querySelectorAll('tbody tr'));
   var MAX    = 10;
   var confirmado = false;
+  // venta:clave -> true cuando a esa persona se le quitó esa venta.
+  var apagado = {};
+  // Clave de la siguiente fila de "quiénes". No se reutiliza al quitar una
+  // fila, para que un chip apagado no pase a otra persona.
+  var sig = 1;
+  [].forEach.call(document.querySelectorAll('#loteQuienes input[name="fila[]"]'), function (i) {
+    sig = Math.max(sig, +i.value || 0);
+  });
 
   /* ── Quiénes ── */
   function renglones() { return [].slice.call(caja.querySelectorAll('[data-fila]')); }
@@ -321,6 +337,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
       var s = r.querySelector('select[name="colaborador[]"]'), p = r.querySelector('input'),
           e = r.querySelector('select[name="en[]"]');
       return { q: s.value, pct: parseFloat(p.value),
+               k: r.querySelector('input[name="fila[]"]').value,
                nombre: s.value ? s.options[s.selectedIndex].text : '',
                en: e.value, enTexto: e.value ? e.options[e.selectedIndex].text : '' };
     }).filter(function (x) { return x.q; });
@@ -355,6 +372,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     var nuevo = rs[0].cloneNode(true);
     [].forEach.call(nuevo.querySelectorAll('select'), function (s) { s.value = ''; s.setCustomValidity(''); });
     nuevo.querySelector('input').value = '';
+    nuevo.querySelector('input[name="fila[]"]').value = String(++sig);
     caja.appendChild(nuevo);
     pintarRenglones();
     revisar();
@@ -408,12 +426,29 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
      Igual que en el servidor: nadie recibe dos comisiones en el mismo
      producto (la primera fila gana), y en un producto los porcentajes
      de todos no pueden pasar de 100. */
+  function ventaId(tr) { return tr.querySelector('input[name="ventas[]"]').value; }
+
+  /* Las filas de "quiénes" que tocan algún producto de esta venta. */
+  function aplicables(tr) {
+    var ps = productos(tr);
+    return quienes().filter(function (x) {
+      return ps.some(function (p) { return enAlcance(p, x.en); });
+    });
+  }
+
+  /* Con dos o más personas para una venta salen los chips, y ahí se puede
+     quitar a alguien solo de esa venta. Con una, basta la casilla de la
+     venta. */
+  function hayPara(tr) { return aplicables(tr).length > 1; }
+
   function reparto(tr) {
     var ps = productos(tr), usados = {}, suma = {};
+    var para = hayPara(tr), vid = ventaId(tr);
     return quienes().map(function (x) {
       var esp = x.q === 'esp';
       var mios = ps.filter(function (p) { return enAlcance(p, x.en); });
       if (!mios.length) return { libres: 0, aplica: false, motivo: '' };
+      if (para && apagado[vid + ':' + x.k]) return { libres: 0, aplica: false, quitado: true, motivo: '' };
       var id = esp ? tr.dataset.esp : x.q;
       if (!id || id === '0') return { libres: 0, aplica: true, motivo: 'No tiene especialista' };
       var pasa = false;
@@ -440,7 +475,10 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     var rs = reparto(tr);
     if (!rs.length || rs.some(function (r) { return r.libres; })) return '';
     var aplican = rs.filter(function (r) { return r.aplica; });
-    if (!aplican.length) return 'Sus productos no son para nadie de la lista';
+    if (!aplican.length) {
+      return rs.some(function (r) { return r.quitado; })
+        ? 'Quitaste a todos de esta venta' : 'Sus productos no son para nadie de la lista';
+    }
     if (aplican.length === 1) return aplican[0].motivo;
     return 'Ya tienen comisión' + (aplican.some(function (r) { return r.motivo === 'No tiene especialista'; })
       ? ' (y no tiene especialista)' : '');
@@ -505,8 +543,36 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
       else if (antes && !tr.dataset.fijo) c.checked = true;   // vuelve a quedar disponible
       tr.classList.toggle('no', !!m);
       tr.querySelector('.lf-lote-motivo').textContent = m || listo(tr);
+      pintarPara(tr);
     });
     contar();
+  }
+
+  /* Los chips de la venta: uno por persona que le toca. Apagado = esa
+     persona no va en esta venta. El "-" oculto le dice al servidor que en
+     esta venta se eligió, aunque se apaguen todos. */
+  function pintarPara(tr) {
+    var box = tr.querySelector('.lf-lote-para');
+    if (!box) return;
+    box.innerHTML = '';
+    if (tr.dataset.fijo || !hayPara(tr)) { box.hidden = true; return; }
+    box.hidden = false;
+    var vid = ventaId(tr);
+    var marca = document.createElement('input');
+    marca.type = 'hidden'; marca.name = 'para[' + vid + '][]'; marca.value = '-';
+    box.appendChild(marca);
+    aplicables(tr).forEach(function (x) {
+      var l = document.createElement('label');
+      var c = document.createElement('input');
+      c.type = 'checkbox'; c.name = 'para[' + vid + '][]'; c.value = x.k;
+      c.setAttribute('data-para', '');
+      c.checked = !apagado[vid + ':' + x.k];
+      l.title = c.checked ? 'Quitar de esta venta' : 'Volver a poner en esta venta';
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(
+        (x.q === 'esp' ? 'Especialista' : x.nombre) + (x.en ? ' · ' + x.enTexto : '')));
+      box.appendChild(l);
+    });
   }
 
   form.addEventListener('change', function (e) {
@@ -516,8 +582,12 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
         if (!c.disabled) c.checked = todas.checked;
       });
     }
-    // Cambiar los productos de una venta puede cambiar si se puede o no.
-    if (e.target.matches('input[data-prod]')) revisar();
+    // Quitar o poner a alguien en una venta, o cambiar sus productos,
+    // puede cambiar si la venta se puede o no.
+    if (e.target.matches('input[data-para]')) {
+      apagado[ventaId(e.target.closest('tr')) + ':' + e.target.value] = !e.target.checked;
+      revisar();
+    } else if (e.target.matches('input[data-prod]')) revisar();
     else if (e.target.matches('tbody input[type=checkbox], #loteTodas')) contar();
   });
 

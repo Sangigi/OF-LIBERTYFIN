@@ -2880,7 +2880,7 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-filtros .lf-lote-chk{flex-direction:row;align-items:center;gap:7px;height:36px;
   font-weight:500;color:var(--lf-tinta-2);font-size:12.5px;min-width:0}
 .lf-lote-quien label.quien,.lf-lote-quien label.en{flex:1 1 220px;max-width:340px}
-.lf-lote-quien label.pct{flex:0 0 120px;min-width:0}
+.lf-lote-quien label.pct{flex:0 0 130px;min-width:0}
 .lf-lote-pct{position:relative;display:block}
 .lf-lote-pct input{padding-right:30px}
 .lf-lote-pct i{position:absolute;right:12px;top:50%;transform:translateY(-50%);
@@ -2925,9 +2925,10 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 }
 /* Varias personas: una fila por cada una, con su porcentaje y en qué. */
 .lf-lote-quienes{padding:4px 20px 2px}
-.lf-lote-quienes .lf-lote-quien{padding:0 0 12px;flex-wrap:nowrap}
+.lf-lote-quienes .lf-lote-quien{padding:0 0 14px;flex-wrap:nowrap;gap:12px 22px}
+.lf-lote-quien .form-control,.lf-lote-quien .form-select{height:38px}
 .lf-lote-quienes .lf-lote-quien + .lf-lote-quien{padding-top:12px;border-top:1px dashed var(--lf-linea)}
-.lf-lote-quitar{flex:0 0 auto;width:36px;height:36px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+.lf-lote-quitar{flex:0 0 auto;width:38px;height:38px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
   background:none;color:var(--lf-tinta-4);font-size:18px;line-height:1;cursor:pointer}
 .lf-lote-quitar:hover{color:var(--lf-rojo);border-color:currentColor}
 .lf-lote-mas{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:0 20px 18px}
@@ -2943,3 +2944,13 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   .lf-lote-quien label.pct{flex:1 1 auto}
   .lf-lote-mas{padding:0 14px 16px}
 }
+/* A quiénes lleva cada venta: chips que se apagan para quitar a alguien solo de esa venta. */
+.lf-lote-estado{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.lf-lote-para{display:flex;flex-wrap:wrap;gap:5px}
+.lf-lote-para label{display:inline-flex;align-items:center;gap:5px;margin:0;padding:3px 9px 3px 7px;
+  border:1px solid var(--lf-linea);border-radius:999px;font-size:11.5px;font-weight:500;
+  color:var(--lf-tinta-2);background:var(--lf-sup);cursor:pointer;white-space:nowrap;user-select:none}
+.lf-lote-para label:has(input:checked){border-color:var(--lf-brand);background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-lote-para label:has(input:not(:checked)){text-decoration:line-through;opacity:.6}
+.lf-lote-para input{width:13px;height:13px;margin:0;accent-color:var(--lf-brand)}
+@media(max-width:760px){ .lf-lote-estado{align-items:flex-end} .lf-lote-para{justify-content:flex-end} }
