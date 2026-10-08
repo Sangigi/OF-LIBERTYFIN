@@ -87,13 +87,20 @@ final class TicketsControlador
     public function crear()
     {
         if (!$this->token()) $this->a('/tickets', 'No se pudo verificar el formulario.', 'error');
+        $adjunto = null;
         try {
+            // La evidencia va con el ticket desde que se abre.
+            if (!empty($_FILES['adjunto']['name'])) {
+                $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
+            }
             $r = (new TicketRepo($this->principal()))->crear(
-                $_POST, $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
+                $_POST, $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '', $adjunto);
             $this->a('/tickets/' . $r['id'], 'Ticket ' . $r['folio'] . ' creado.', 'ok');
         } catch (\InvalidArgumentException $e) {
+            if ($adjunto) \LibertyFin\Servicio\Archivos::borrar($adjunto);
             $this->a('/tickets', $e->getMessage(), 'error');
         } catch (\Throwable $e) {
+            if ($adjunto) \LibertyFin\Servicio\Archivos::borrar($adjunto);
             error_log('[LibertyFin] ticket crear: ' . $e->getMessage());
             $this->a('/tickets', 'No se pudo crear el ticket.', 'error');
         }

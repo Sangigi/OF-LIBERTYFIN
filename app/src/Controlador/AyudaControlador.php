@@ -84,6 +84,7 @@ final class AyudaControlador
     public function crear()
     {
         if (!$this->token()) $this->a('No se pudo verificar el formulario.', 'error');
+        $adjunto = null;
         try {
             $datos = $_POST;
             // La empresa se toma de la sesión, nunca del formulario.
@@ -91,13 +92,22 @@ final class AyudaControlador
             // Y la prioridad la pone soporte al leerlo, no quien reporta.
             $datos['prioridad'] = 'normal';
 
+            // La evidencia va con el reporte, no después: una captura junto
+            // a la descripción ahorra la primera pregunta de soporte.
+            if (!empty($_FILES['adjunto']['name'])) {
+                $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
+            }
+
             $r = (new TicketRepo($this->principal()))->crear(
-                $datos, $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
+                $datos, $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '', $adjunto);
             $this->a('Listo, tu reporte quedó con el folio ' . $r['folio']
                 . '. Te avisamos por correo en cuanto lo veamos.', 'ok');
         } catch (\InvalidArgumentException $e) {
+            // Si el reporte no se creó, el archivo subido sobra.
+            if ($adjunto) \LibertyFin\Servicio\Archivos::borrar($adjunto);
             $this->a($e->getMessage(), 'error');
         } catch (\Throwable $e) {
+            if ($adjunto) \LibertyFin\Servicio\Archivos::borrar($adjunto);
             error_log('[LibertyFin] ayuda/crear: ' . $e->getMessage());
             $this->a('No se pudo enviar el reporte.', 'error');
         }

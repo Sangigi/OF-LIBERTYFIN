@@ -53,7 +53,7 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
 
 <details class="lf-alta">
   <summary><?= W::icono('mas','16px') ?>Nuevo ticket</summary>
-  <form method="post" action="/tickets/crear" class="lf-form">
+  <form method="post" action="/tickets/crear" class="lf-form" enctype="multipart/form-data">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <div style="flex:2;min-width:240px"><label class="form-label">Asunto</label>
       <input class="form-control" name="asunto" required
@@ -79,6 +79,13 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
     <div style="width:100%"><label class="form-label">Qué pasó y qué esperaba</label>
       <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
                 placeholder="Pasos para reproducirlo, qué vio y qué esperaba ver"></textarea></div>
+    <div style="width:100%"><label class="form-label">Evidencia <span style="font-weight:400;color:var(--lf-tinta-4)">(opcional)</span></label>
+      <span class="lf-file">
+        <input type="file" name="adjunto" id="adjTicket"
+               accept="image/png,image/jpeg,image/webp,application/pdf">
+        <label class="bt" for="adjTicket">Adjuntar captura o archivo</label>
+        <span class="n" data-vacio="Ningún archivo elegido">Ningún archivo elegido</span>
+      </span></div>
     <button class="btn btn-primary" type="submit">Crear ticket</button>
     <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.5">
       El tiempo comprometido se mide contra la <b>primera respuesta</b>, no contra la

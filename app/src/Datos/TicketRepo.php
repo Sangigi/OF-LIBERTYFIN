@@ -195,7 +195,12 @@ final class TicketRepo
 
     // ── Crear y responder ───────────────────────────────────────
 
-    public function crear(array $d, $usuarioId, $usuarioNombre)
+    /**
+     * @param string|null $adjunto  la evidencia (captura o PDF), ya subida.
+     *                              Va en el primer mensaje: es lo que se ve
+     *                              junto a la descripción del problema.
+     */
+    public function crear(array $d, $usuarioId, $usuarioNombre, $adjunto = null)
     {
         $this->asegurar();
         $asunto = trim($d['asunto'] ?? '');
@@ -222,9 +227,9 @@ final class TicketRepo
         $id = (int)$this->db->lastInsertId();
 
         $this->db->prepare("
-            INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, autor_id, autor_nombre, autor_tipo, creado_en)
-            VALUES (?,?,0,?,?,?,NOW())
-        ")->execute([$id, $cuerpo, $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
+            INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, adjunto, autor_id, autor_nombre, autor_tipo, creado_en)
+            VALUES (?,?,0,?,?,?,?,NOW())
+        ")->execute([$id, $cuerpo, $adjunto ?: null, $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
 
         $this->evento($id, 'creado', null, $folio, $usuarioId, $usuarioNombre);
         return ['id' => $id, 'folio' => $folio];
