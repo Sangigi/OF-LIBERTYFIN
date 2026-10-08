@@ -16,7 +16,16 @@ namespace LibertyFin\Datos;
  *   cobrado             -> venta_pagos.fecha_pago  (cuándo entró el dinero)
  *   gastos de operación -> ventas.fecha            (cuelgan de su venta)
  *   gastos generales    -> gastos.fecha            (cuándo se pagó)
- *   comisiones          -> ventas.fecha            (a qué venta pertenecen)
+ *   comisiones          -> pago_comisiones.fecha_pago (cuándo entró el pago
+ *                          que la generó, igual que el cobrado)
+ *
+ * Las comisiones iban por ventas.fecha: un abono de octubre a una venta de
+ * septiembre entraba en octubre, pero su comisión caía en septiembre. Ahora
+ * van con el dinero que las generó.
+ *
+ * Excepción: las tablas que van POR VENTA (por área, detalle de ventas, por
+ * línea) siguen sumando a cada venta del periodo todo lo suyo —cobrado y
+ * comisiones—, y aparte enseñan lo que entró de ventas anteriores.
  */
 final class ReporteRepo extends Repo
 {
@@ -129,10 +138,14 @@ final class ReporteRepo extends Repo
             SELECT COALESCE(SUM(monto),0) FROM gastos
             WHERE venta_id IS NULL AND fecha >= ? AND fecha < ?", [$a, $b]);
 
+        // POR LA FECHA DEL PAGO QUE LA GENERÓ, como `cobrado`: la comisión
+        // de un abono de octubre a una venta de septiembre es de octubre,
+        // igual que el abono. Antes iba por fecha de venta y el dinero caía
+        // en un mes y su comisión en otro.
         $comisiones = (float)$this->valor("
             SELECT COALESCE(SUM(pc.monto),0)
             FROM pago_comisiones pc INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?", [$a, $b]);
+            WHERE v.estado <> 'cancelada' AND pc.fecha_pago >= ? AND pc.fecha_pago < ?", [$a, $b]);
 
         $iva = (float)$this->valor("
             SELECT COALESCE(SUM(iva),0) FROM ventas
@@ -168,6 +181,8 @@ final class ReporteRepo extends Repo
             'de_anteriores_cobros' => (int)$anteriores['cobros'],
             'de_anteriores_ventas' => (int)$anteriores['ventas'],
             'de_anteriores_liquidadas' => (int)($anteriores['liquidadas'] ?? 0),
+            // La parte de `comisiones` que generaron esos cobros.
+            'de_anteriores_comisiones' => round((float)($anteriores['comisiones'] ?? 0), 2),
             'cobrado'    => $cobrado,
             'vendido'    => $vendido,
             'por_cobrar' => round($porCobrar, 2),
@@ -217,11 +232,56 @@ final class ReporteRepo extends Repo
             WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
               AND p.fecha_pago >= ? AND p.fecha_pago < ?
               AND v.fecha < ?", [$a, $b, $a]);
+        // Las comisiones que generaron esos cobros: cuentan en este periodo,
+        // como el cobro. Ver resultado().
+        $com = (float)$this->valor("
+            SELECT COALESCE(SUM(pc.monto),0)
+            FROM pago_comisiones pc INNER JOIN ventas v ON v.id = pc.venta_id
+            WHERE v.estado <> 'cancelada'
+              AND pc.fecha_pago >= ? AND pc.fecha_pago < ?
+              AND v.fecha < ?", [$a, $b, $a]);
         return ['monto'      => round((float)($r['monto'] ?? 0), 2),
                 'cobros'     => (int)($r['cobros'] ?? 0),
                 'ventas'     => (int)($r['ventas'] ?? 0),
                 // Ventas de antes que quedaron pagadas en el periodo.
-                'liquidadas' => (int)($r['liquidadas'] ?? 0)];
+                'liquidadas' => (int)($r['liquidadas'] ?? 0),
+                'comisiones' => round($com, 2)];
+    }
+
+    /**
+     * Las comisiones que generaron en el periodo los cobros a ventas de
+     * ANTES del periodo, por área. Acompaña a anterioresPorArea().
+     *
+     * La comisión que dice de qué producto es va completa al área de ese
+     * producto; la que no (las viejas) se reparte con PESO, como el cobro.
+     */
+    public function comisionesAnterioresPorArea($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $peso = self::PESO;
+        return $this->todos("
+            SELECT area, ROUND(SUM(monto), 2) AS monto
+            FROM (
+                SELECT COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                       CASE WHEN dl.id IS NOT NULL
+                            THEN CASE WHEN d.id = dl.id THEN pc.monto ELSE 0 END
+                            ELSE pc.monto * ({$peso}) END AS monto
+                FROM pago_comisiones pc
+                INNER JOIN ventas v           ON v.id = pc.venta_id
+                LEFT JOIN venta_comisiones vc ON vc.id = pc.venta_comision_id
+                LEFT JOIN venta_detalles dl   ON dl.id = vc.venta_detalle_id AND dl.venta_id = pc.venta_id
+                LEFT JOIN venta_detalles d    ON d.venta_id = v.id
+                LEFT JOIN productos pr        ON pr.id = d.producto_id
+                LEFT JOIN categorias cat      ON cat.id = pr.categoria_id
+                LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                            FROM venta_detalles GROUP BY venta_id ) tot
+                       ON tot.venta_id = v.id
+                WHERE v.estado <> 'cancelada'
+                  AND pc.fecha_pago >= ? AND pc.fecha_pago < ?
+                  AND v.fecha < ?
+            ) x
+            GROUP BY area
+            HAVING ABS(SUM(monto)) > 0.004", [$a, $b, $a]);
     }
 
     /**
@@ -290,21 +350,37 @@ final class ReporteRepo extends Repo
         $clave = function ($s) { return mb_strtolower(trim((string)$s)); };
         $ant = [];
         foreach ($this->anterioresPorArea($desde, $hasta) as $x) $ant[$clave($x['area'])] = $x;
+        // Las comisiones que generaron esos cobros, también de este periodo.
+        $comAnt = [];
+        foreach ($this->comisionesAnterioresPorArea($desde, $hasta) as $x) {
+            $comAnt[$clave($x['area'])] = ['area' => $x['area'], 'monto' => (float)$x['monto']];
+        }
 
         foreach ($filas as $i => $f) {
             $k = $clave($f['area']);
             $x = $ant[$k] ?? null;
-            $filas[$i]['cobros_ant']    = $x ? (int)$x['cobros'] : 0;
+            $filas[$i]['cobros_ant']     = $x ? (int)$x['cobros'] : 0;
             $filas[$i]['liquidadas_ant'] = $x ? (int)$x['liquidadas'] : 0;
-            $filas[$i]['de_anteriores'] = $x ? round((float)$x['monto'], 2) : 0.0;
-            unset($ant[$k]);
+            $filas[$i]['de_anteriores']  = $x ? round((float)$x['monto'], 2) : 0.0;
+            $filas[$i]['comisiones_ant'] = isset($comAnt[$k]) ? round($comAnt[$k]['monto'], 2) : 0.0;
+            unset($ant[$k], $comAnt[$k]);
         }
-        foreach ($ant as $x) {
+        foreach ($ant as $k => $x) {
             $filas[] = ['area' => $x['area'], 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
                         'gastos' => 0, 'comisiones' => 0,
-                        'cobros_ant'    => (int)$x['cobros'],
+                        'cobros_ant'     => (int)$x['cobros'],
                         'liquidadas_ant' => (int)$x['liquidadas'],
-                        'de_anteriores' => round((float)$x['monto'], 2)];
+                        'de_anteriores'  => round((float)$x['monto'], 2),
+                        'comisiones_ant' => isset($comAnt[$k]) ? round($comAnt[$k]['monto'], 2) : 0.0];
+            unset($comAnt[$k]);
+        }
+        // Comisión de un cobro anterior en un área sin cobros anteriores: no
+        // debería pasar (la comisión sale del cobro), pero si el área del
+        // producto comisionado no coincide con el reparto, que no se pierda.
+        foreach ($comAnt as $x) {
+            $filas[] = ['area' => $x['area'], 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
+                        'gastos' => 0, 'comisiones' => 0, 'cobros_ant' => 0, 'liquidadas_ant' => 0,
+                        'de_anteriores' => 0.0, 'comisiones_ant' => round($x['monto'], 2)];
         }
         return $filas;
     }
@@ -432,7 +508,7 @@ final class ReporteRepo extends Repo
                    ROUND(SUM(pc.monto),2) AS devengado,
                    COUNT(*) AS ventas
             FROM pago_comisiones pc INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            WHERE v.estado <> 'cancelada' AND pc.fecha_pago >= ? AND pc.fecha_pago < ?
             GROUP BY pc.colaborador_nombre
             ORDER BY (pc.colaborador_nombre = 'POR ASIGNAR'), devengado DESC", [$a, $b]);
     }

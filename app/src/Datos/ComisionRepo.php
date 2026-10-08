@@ -14,10 +14,34 @@ namespace LibertyFin\Datos;
  *
  * La diferencia son los renglones a nombre de POR ASIGNAR: el Excel los
  * cuenta porque la venta sí los generó, pero nadie confirmó quién vendió.
+ *
+ * EN QUÉ MES CUENTA UNA COMISIÓN: en el del PAGO que la generó
+ * (`pago_comisiones.fecha_pago`), igual que el dinero en "Entraron". La
+ * comisión de una venta de septiembre que se cobró en septiembre se queda
+ * en septiembre; la de un abono de octubre a esa misma venta, en octubre.
+ * Antes iba por la fecha de la venta y el abono de octubre caía en
+ * octubre pero su comisión en septiembre: cada mes cuadraba con otro.
+ *
+ * Lo que mide cuánto falta por liberar (liberacion, atadas, por_liberar)
+ * sigue yendo por VENTA: es lo que quedó atado a las ventas del periodo.
  */
 final class ComisionRepo extends Repo
 {
     const SIN_DUENO = 'POR ASIGNAR';
+
+    /**
+     * El área del producto sobre el que va una comisión devengada (`pc`),
+     * o NULL si la comisión no dice de qué producto es. Igual que en
+     * ReporteRepo: así Comisiones y Reportes ponen cada peso en la misma área.
+     */
+    const AREA_DE_LA_COMISION = "(
+                       SELECT NULLIF(catx.nombre,'')
+                       FROM venta_comisiones vcx
+                       INNER JOIN venta_detalles dx ON dx.id = vcx.venta_detalle_id
+                                                   AND dx.venta_id = vcx.venta_id
+                       LEFT JOIN productos px    ON px.id = dx.producto_id
+                       LEFT JOIN categorias catx ON catx.id = px.categoria_id
+                       WHERE vcx.id = pc.venta_comision_id)";
 
     private function rango($desde, $hasta)
     {
@@ -37,7 +61,7 @@ final class ComisionRepo extends Repo
                 COUNT(DISTINCT CASE WHEN pc.colaborador_nombre <> ? THEN pc.colaborador_id END) AS colaboradores
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+            WHERE pc.fecha_pago >= ? AND pc.fecha_pago < ? AND v.estado <> 'cancelada'
         ", [self::SIN_DUENO, self::SIN_DUENO, self::SIN_DUENO, self::SIN_DUENO, $a, $b]) ?: [];
 
         // Lo que falta liberar: asignado si liquidan, menos lo ya devengado.
@@ -66,9 +90,10 @@ final class ComisionRepo extends Repo
                    -- es alguien, pero ya no se llama area a secas.
                    GROUP_CONCAT(DISTINCT pc.area_nombre
                        ORDER BY pc.area_nombre SEPARATOR ', ') AS equipo,
-                   -- El ÁREA es la del servicio que se vendió. Un
-                   -- colaborador puede comisionar en varias.
-                   GROUP_CONCAT(DISTINCT COALESCE((
+                   -- El ÁREA es la del servicio que se vendió: la del
+                   -- producto comisionado, o la que más pesa en la venta.
+                   -- Un colaborador puede comisionar en varias.
+                   GROUP_CONCAT(DISTINCT COALESCE(" . self::AREA_DE_LA_COMISION . ", (
                        SELECT cat.nombre
                        FROM venta_detalles d
                        LEFT JOIN productos pr    ON pr.id = d.producto_id
@@ -88,7 +113,7 @@ final class ComisionRepo extends Repo
                    (pc.colaborador_nombre = ?) AS sin_dueno
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+            WHERE pc.fecha_pago >= ? AND pc.fecha_pago < ? AND v.estado <> 'cancelada'
             -- SE AGRUPA POR PERSONA, NO POR PERSONA Y EQUIPO.
             --
             -- Incluir el equipo partia en dos a quien comisiona en
@@ -109,8 +134,9 @@ final class ComisionRepo extends Repo
             -- comisionó. Agrupar por ahí hacía que una venta de
             -- contabilidad apareciera bajo Administración solo porque
             -- la cerró alguien de ese equipo, y no coincidía con el
-            -- control que lleva la oficina.
-            SELECT COALESCE((
+            -- control que lleva la oficina. Si la comisión dice de qué
+            -- producto es, el área de ese producto.
+            SELECT COALESCE(" . self::AREA_DE_LA_COMISION . ", (
                        SELECT cat.nombre
                        FROM venta_detalles d
                        LEFT JOIN productos pr    ON pr.id = d.producto_id
@@ -121,7 +147,7 @@ final class ComisionRepo extends Repo
                    ROUND(SUM(pc.monto),2) AS monto
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+            WHERE pc.fecha_pago >= ? AND pc.fecha_pago < ? AND v.estado <> 'cancelada'
             GROUP BY area
             ORDER BY monto DESC
         ", [$a, $b]);
@@ -556,7 +582,7 @@ final class ComisionRepo extends Repo
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
             WHERE pc.colaborador_id <=> ? AND pc.colaborador_nombre = ? AND {$condEqPc}
-              AND v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+              AND pc.fecha_pago >= ? AND pc.fecha_pago < ? AND v.estado <> 'cancelada'
         ", array_merge([$id, $nombre], $parEq, [$a, $b])) ?: ['ventas' => 0, 'devengado' => 0];
 
         // Una fila por venta; sobre esto se busca, se cuenta y se pagina.
@@ -574,13 +600,21 @@ final class ComisionRepo extends Repo
                    ), NULLIF(v.area_nombre,''), 'Sin área') AS area_servicio,
                    x.pct AS porcentaje,
                    ROUND(x.dev,2) AS devengado,
-                   ROUND(GREATEST(COALESCE(asg.asignada,0) - x.dev, 0),2) AS pendiente
+                   ROUND(GREATEST(COALESCE(asg.asignada,0) - x.dev_total, 0),2) AS pendiente
             FROM ventas v
+            -- Las ventas con comisión generada EN EL PERIODO (por fecha del
+            -- pago), aunque la venta sea de antes. `dev` es lo de este
+            -- periodo; lo pendiente se mide contra todo lo ya liberado.
             INNER JOIN (
-                SELECT venta_id, SUM(monto) AS dev, MAX(porcentaje) AS pct
+                SELECT venta_id,
+                       SUM(CASE WHEN fecha_pago >= ? AND fecha_pago < ? THEN monto ELSE 0 END) AS dev,
+                       SUM(monto) AS dev_total,
+                       MAX(porcentaje) AS pct,
+                       SUM(CASE WHEN fecha_pago >= ? AND fecha_pago < ? THEN 1 ELSE 0 END) AS en_periodo
                 FROM pago_comisiones
                 WHERE colaborador_id <=> ? AND colaborador_nombre = ? AND {$condEq}
                 GROUP BY venta_id
+                HAVING en_periodo > 0
             ) x ON x.venta_id = v.id
             LEFT JOIN (
                 SELECT venta_id, SUM(monto_comision) AS asignada
@@ -590,8 +624,8 @@ final class ComisionRepo extends Repo
                 GROUP BY venta_id
             ) asg ON asg.venta_id = v.id
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'";
-        $pBase = array_merge([$id, $nombre], $parEq, [$id, $nombre], $parEq, [$a, $b]);
+            WHERE v.estado <> 'cancelada'";
+        $pBase = array_merge([$a, $b, $a, $b, $id, $nombre], $parEq, [$id, $nombre], $parEq);
 
         list($cond, $pCond) = $this->condicionBusqueda($q);
 

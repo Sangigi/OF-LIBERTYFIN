@@ -127,7 +127,8 @@ final class PanelRepo extends Repo
                 COUNT(DISTINCT CASE WHEN pc.colaborador_nombre = 'POR ASIGNAR' THEN pc.venta_id END) AS ventas_pendientes
             FROM pago_comisiones pc
             INNER JOIN ventas v ON v.id = pc.venta_id
-            WHERE v.fecha >= ? AND v.fecha < ? AND v.estado <> 'cancelada'
+            -- Por la fecha del pago que la generó, como en Comisiones y Reportes.
+            WHERE pc.fecha_pago >= ? AND pc.fecha_pago < ? AND v.estado <> 'cancelada'
         ", [$desde . ' 00:00:00', date('Y-m-d', strtotime($hasta . ' +1 day')) . ' 00:00:00'])
         ?: ['total'=>0,'por_pagar'=>0,'sin_asignar'=>0,'ventas_pendientes'=>0];
     }

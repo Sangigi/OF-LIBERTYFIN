@@ -103,6 +103,10 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         con ellos <?= $liq1 ? 'quedó pagada' : 'quedaron pagadas' ?>
         <b><?= (int)$r['de_anteriores_liquidadas'] ?></b>
         venta<?= $liq1 ? '' : 's' ?><?php endif; ?>.
+        <?php if (!empty($r['de_anteriores_comisiones']) && $r['de_anteriores_comisiones'] > 0): ?>
+          Esos cobros generaron <b><?= D::pesos($r['de_anteriores_comisiones']) ?></b> de comisiones,
+          que cuentan en este periodo igual que el dinero.
+        <?php endif; ?>
         <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
            data-ir-pestana="pagos">Ver cuáles</a>
       </p>
@@ -164,7 +168,8 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         $mAnt = (float)($a['de_anteriores'] ?? 0);
         $nAnt = (int)($a['cobros_ant'] ?? 0);
         $lAnt = (int)($a['liquidadas_ant'] ?? 0);
-        if ($mAnt > 0) $hayAnt = true; ?>
+        $cAnt = (float)($a['comisiones_ant'] ?? 0);
+        if ($mAnt > 0 || $cAnt > 0) $hayAnt = true; ?>
         <tr>
           <td data-label="Área"><b style="font-weight:600"><?= P::e($a['area']) ?></b></td>
           <?php if ($sinVentas): ?>
@@ -185,12 +190,13 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
               <?= $mg ?>%</span></td>
           <?php endif; ?>
           <td data-label="De ventas anteriores" class="text-end lf-mono lf-col-ant">
-            <?php if ($mAnt > 0): ?>
+            <?php if ($mAnt > 0 || $cAnt > 0): ?>
               <?php /* Un solo elemento: en el celular la celda es flex y, sueltos,
                        el monto y "N cobros" se iban a extremos opuestos. */ ?>
               <span class="lf-ant-val"><b><?= D::pesos($mAnt) ?></b>
                 <small><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes(
-                         ['cobros' => $nAnt, 'liquidadas' => $lAnt], 'anterior')) ?></small></span>
+                         ['cobros' => $nAnt, 'liquidadas' => $lAnt], 'anterior')) ?></small>
+                <?php if ($cAnt > 0): ?><small>comisiones <?= D::pesos($cAnt) ?></small><?php endif; ?></span>
             <?php else: ?>–<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
@@ -202,7 +208,8 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
     cobrado y margen bajo está trabajando para pagar comisiones.
     <?php if ($hayAnt): ?>
       <br>«De ventas anteriores» es lo que entró en el periodo por anticipos, abonos y
-      liquidaciones de ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta.
+      liquidaciones de ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta,
+      con las comisiones que generaron (cuentan en este periodo, como el dinero).
       No suma al margen, que es de las ventas del periodo.
       <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
          data-ir-pestana="pagos">Ver cada cobro</a>

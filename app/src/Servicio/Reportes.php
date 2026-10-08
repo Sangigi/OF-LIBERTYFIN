@@ -25,13 +25,16 @@ final class Reportes
                       . 'por ventas de antes del periodo; no suma a la utilidad, que es de las ventas '
                       . 'del periodo. «Ventas liquidadas» cuenta las ventas de antes que quedaron '
                       . 'pagadas en el periodo: no son ventas nuevas. Un cobro repartido entre dos '
-                      . 'áreas cuenta en las dos.',
+                      . 'áreas cuenta en las dos. «Comisiones de anteriores» es lo que generaron '
+                      . 'esos cobros: cuenta en este periodo, como el dinero.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
-            // Decía "por los pagos recibidos en el periodo", pero la consulta
-            // va por la fecha de la VENTA (igual que la comisión de arriba).
-            'nota'   => 'Comisiones de las ventas del periodo, por colaborador.',
+            // Va por la fecha del PAGO que generó cada comisión, igual que
+            // "Entraron": un abono de este mes a una venta de antes, con su
+            // comisión, cuenta aquí.
+            'nota'   => 'Comisiones generadas por los cobros del periodo, por colaborador, '
+                      . 'aunque la venta sea de un mes anterior.',
         ],
         'servicio' => [
             'rotulo' => 'Por producto',
@@ -102,7 +105,10 @@ final class Reportes
                      ['Utilidad', Libro::MONEDA, 15],
                      ['Cobros anteriores',    Libro::NUMERO, 11],
                      ['Ventas liquidadas',    Libro::NUMERO, 11],
-                     ['De ventas anteriores', Libro::MONEDA, 15]],
+                     ['De ventas anteriores', Libro::MONEDA, 15],
+                     // Las comisiones que generaron esos cobros: cuentan en
+                     // este periodo, como el dinero.
+                     ['Comisiones de anteriores', Libro::MONEDA, 15]],
                     array_map(function ($x) {
                         // Un área que solo recibió abonos de ventas viejas no
                         // tiene ventas del periodo: sus cifras de venta van
@@ -111,6 +117,7 @@ final class Reportes
                         $nAnt      = (int)($x['cobros_ant'] ?? 0);
                         $lAnt      = (int)($x['liquidadas_ant'] ?? 0);
                         $mAnt      = (float)($x['de_anteriores'] ?? 0);
+                        $cAnt      = (float)($x['comisiones_ant'] ?? 0);
                         return [$x['area'],
                                 $sinVentas ? '' : (int)$x['ventas'],
                                 $sinVentas ? '' : $x['vendido'],
@@ -120,7 +127,8 @@ final class Reportes
                                 $sinVentas ? '' : $x['cobrado'] - $x['gastos'] - $x['comisiones'],
                                 $nAnt > 0 ? $nAnt : '',
                                 $lAnt > 0 ? $lAnt : '',
-                                $mAnt > 0 ? $mAnt : ''];
+                                $mAnt > 0 ? $mAnt : '',
+                                $cAnt > 0 ? $cAnt : ''];
                     }, $f),
                     // El total de las dos columnas sale de deAnteriores(), la
                     // misma cifra de "De lo que entró…" y del Detalle de pagos:
@@ -132,7 +140,8 @@ final class Reportes
                         function ($t) use ($ant) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
                             $t['cobrado'], $t['gastos'], $t['comisiones'],
                             $t['cobrado'] - $t['gastos'] - $t['comisiones'],
-                            (int)$ant['cobros'], (int)$ant['liquidadas'], (float)$ant['monto']]; }));
+                            (int)$ant['cobros'], (int)$ant['liquidadas'], (float)$ant['monto'],
+                            (float)($ant['comisiones'] ?? 0)]; }));
 
             case 'colaborador':
                 $f = $r->porColaborador($desde, $hasta);
