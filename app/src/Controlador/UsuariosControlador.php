@@ -240,7 +240,7 @@ final class UsuariosControlador
     }
 
     /** La empresa elige un plan para pagar. */
-    public function solicitarPlan()
+public function solicitarPlan()
     {
         if (empty($_SESSION['empresa_id'])) {
             $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
@@ -248,18 +248,197 @@ final class UsuariosControlador
         $this->token('/cuenta?t=plan');
         try {
             $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
-            $clave = (string)($_POST['plan'] ?? '');
+            $clave   = (string)($_POST['plan'] ?? '');
             $periodo = ($_POST['periodo'] ?? '') === 'anual' ? 'anual' : 'mensual';
-            (new PlanRepo($principal))->solicitar((int)$_SESSION['empresa_id'], $clave, $periodo);
-            Auditoria::anota('plan.solicitar', $clave . ' · ' . $periodo, null, 'por pagar');
-            $this->volver('/cuenta?t=plan',
-                'Listo. Haz la transferencia con la referencia que aparece abajo y sube tu comprobante.', 'ok');
+            $repo    = new PlanRepo($principal);
+
+            $repo->solicitar((int)$_SESSION['empresa_id'], $clave, $periodo);
+
+            // ─────────────────────────────────────────────────────
+            // POR QUÉ SE LEE DE LA BASE Y NO DEL RETORNO
+            //
+            // `solicitar` crea el pago pero no lo devuelve: en el
+            // código original se llamaba sin asignar, así que
+            // devuelve void. Antes se intentaba usar su retorno y,
+            // como era null, el bloque de la liga nunca corría y el
+            // usuario acababa viendo el aviso manual aunque hubiera
+            // pedido pagar con tarjeta.
+            //
+            // Se lee el pago más reciente que siga en `por_pagar`:
+            // es el que se acaba de crear.
+            // ─────────────────────────────────────────────────────
+            $pago = null;
+            foreach ($repo->deEmpresa((int)$_SESSION['empresa_id']) as $p) {
+                if (($p['estado'] ?? '') !== 'por_pagar') continue;
+                if ($pago === null || (int)$p['id'] > (int)$pago['id']) $pago = $p;
+            }
+
+            // ¿Pidió una forma de pago en línea?
+            $forma = self::formaEnLinea($_POST['como_paga'] ?? '');
+            $aviso = 'Listo. Haz la transferencia con la referencia que aparece abajo y sube tu comprobante.';
+            $tipo  = 'ok';
+
+            if ($forma !== '' && $pago && !empty($pago['id'])) {
+                $g = $this->generarLigaPlan($principal, $repo, $pago, $forma);
+                if ($g) {
+                    // Se deja la liga en la sesión: la pestaña Plan la
+                    // enseña al volver. Mismo patrón que usa Caja con
+                    // `$_SESSION['lf_liga']`.
+                    $_SESSION['lf_liga'] = [
+                        'pago_id'    => (int)$pago['id'],
+                        'metodo'     => $forma,
+                        'monto'      => (float)$pago['monto'],
+                        'descripcion'=> $pago['nombre_plan'] ?? '',
+                        'referencia' => $g['referencia'] ?? '',
+                        'liga'       => $g['liga']     ?? null,
+                        'clabe'      => $g['clabe']    ?? null,
+                        'barras'     => $g['barras']   ?? null,
+                        'imagen'     => $g['imagen']   ?? null,
+                        'vence'      => $g['vence']    ?? null,
+                        'pruebas'    => $g['pruebas']  ?? false,
+                        'empresa'    => $_SESSION['empresa_nombre'] ?? '',
+                    ];
+                    $aviso = 'Listo. ' . self::textoDePago($forma);
+                } else {
+                    // La solicitud SÍ quedó. Decir "no se pudo" dejaría
+                    // creer que no hay nada y volvería a intentarlo.
+                    $aviso = 'Registramos tu solicitud, pero no se pudo generar el cobro automático. '
+                           . 'Usa la referencia de abajo para transferir, o inténtalo de nuevo.';
+                    $tipo  = 'error';
+                }
+            }
+
+            Auditoria::anota('plan.solicitar', $clave . ' · ' . $periodo, null, $forma ?: 'por pagar');
+            $this->volver('/cuenta?t=plan', $aviso, $tipo);
         } catch (\InvalidArgumentException $e) {
             $this->volver('/cuenta?t=plan', $e->getMessage(), 'error');
         } catch (\Throwable $e) {
             error_log('[LibertyFin] solicitar plan: ' . $e->getMessage());
             $this->volver('/cuenta?t=plan', 'No se pudo registrar la solicitud.', 'error');
         }
+    }
+
+    private function generarLigaPlan($principal, PlanRepo $repo, array $pago, $forma)
+    {
+        $monto = round((float)($pago['monto'] ?? 0), 2);
+        if ($monto <= 0.01) return null;
+
+        $api = new \LibertyFin\Servicio\LigaPago(\LibertyFin\Servicio\Integraciones::de('spei'));
+
+        // LA SEMILLA SALE DE LigaPago::semilla(), CON PREFIJO "8".
+        //
+        // Antes se armaba aquí a mano:
+        //
+        //     '8' . str_pad((string)$pago['id'], 7, '0', STR_PAD_LEFT) . date('ymdHi')
+        //
+        // Son 18 caracteres. `generar()` recorta el Id a los últimos 10
+        // —el proveedor pide Numérico(10)— y esos últimos diez eran SOLO
+        // la fecha: el id del pago se perdía en el recorte. Dos pagos en
+        // el mismo minuto compartían Id, y la Reference, recortada a 15
+        // de esos mismos 18, arrastraba la cola del id.
+        //
+        // El proveedor contestaba el código 15 —"El formato del ID es
+        // incorrecto"— y el mapa de mensajes lo traducía como "este
+        // comercio no está vinculado", que mandaba a revisar el
+        // `BusinessID`, que estaba bien.
+        $semilla = \LibertyFin\Servicio\LigaPago::semilla((int)$pago['id'], '8');
+
+        $descripcion = 'Plan ' . ($pago['nombre_plan'] ?? '')
+                     . ' · ' . (int)($pago['meses'] ?? 1) . ' mes'
+                     . ((int)($pago['meses'] ?? 1) === 1 ? '' : 'es');
+
+        $g = $api->generar([
+            'monto'       => $monto,
+            'metodo'      => $forma,
+            'descripcion' => $descripcion,
+            'referencia'  => $semilla,
+            'id'          => $semilla,
+            'cliente'     => $_SESSION['empresa_nombre'] ?? 'Empresa',
+            'correo'      => $_SESSION['usuario_correo'] ?? '',
+        ]);
+        if (!$g) {
+            error_log('[LibertyFin] plan liga: ' . $api->error());
+            return null;
+        }
+
+        try {
+            // PlanRepo guarda los datos de la liga en el pago: así la
+            // pestaña Plan los enseña sin volver a llamar al proveedor.
+            // Si el repo no soporta el método, el apunte del directorio
+            // de cobros (abajo) ya deja la referencia rastreable.
+            if (method_exists($repo, 'guardarLiga')) {
+                $repo->guardarLiga((int)$pago['id'], [
+                    'referencia' => $g['referencia'] ?? $semilla,
+                    'liga'       => $g['liga']     ?? null,
+                    'clabe'      => $g['clabe']    ?? null,
+                    'barras'     => $g['barras']   ?? null,
+                    'imagen'     => $g['imagen']   ?? null,
+                    'formato'    => $g['formato']  ?? null,
+                    'vence'      => $g['vence']    ?? null,
+                    'metodo'     => $forma,
+                    'pruebas'    => $g['pruebas']  ?? false,
+                ]);
+            }
+
+            // ─────────────────────────────────────────────────────
+            // REGISTRO EN EL DIRECTORIO DE LIGAS
+            //
+            // Mismo patrón que CajaControlador::conLiga: el cobro del
+            // plan entra a `ligas` para que aparezca junto a los de la
+            // Caja, con la misma trazabilidad (estado, avisos del
+            // proveedor, reintentos, documento descargable).
+            //
+            // `venta_id` va en null: este cobro no cuelga de una venta,
+            // cuelga de un pago de plan. Quien quiera el detalle lo
+            // tiene en PlanRepo::deEmpresa(), referenciado por el
+            // mismo `referencia` que aquí se guarda.
+            //
+            // Si tu esquema exige `venta_id` NOT NULL, usa 0 como
+            // centinela y filtra en las vistas de ligas de venta.
+            // ─────────────────────────────────────────────────────
+            (new \LibertyFin\Datos\LigaRepo($principal))->crear([
+                'referencia'     => $g['referencia'] ?? $semilla,
+                'venta_id'       => null,
+                'cliente'        => $_SESSION['empresa_nombre'] ?? 'Empresa',
+                'monto'          => $monto,
+                'metodo'         => $forma,
+                'descripcion'    => $descripcion,
+                'liga'           => $g['liga']     ?? null,
+                'clabe'          => $g['clabe']    ?? null,
+                'barras'         => $g['barras']   ?? null,
+                'imagen'         => $g['imagen']   ?? null,
+                'formato'        => $g['formato']  ?? null,
+                'vence'          => $g['vence']    ?? null,
+                'pruebas'        => $g['pruebas']  ?? false,
+                'usuario_id'     => $_SESSION['usuario_id']     ?? null,
+                'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
+            ]);
+
+            // Sin esto, el aviso del proveedor ("ya pagó") llega sin
+            // sesión y sin empresa: no sabría en qué base buscar la
+            // referencia para marcar el plan como pagado.
+            \LibertyFin\Servicio\Cobros::apuntar($g['referencia'] ?? $semilla, $forma);
+            return $g;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] guardar liga plan: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** Mismo mapa que usa la Caja: '' = no eligió pagar en línea. */
+    private static function formaEnLinea($como)
+    {
+        $mapa = ['_tarjeta' => 'tarjeta', '_spei' => 'spei', '_tienda' => 'efectivo'];
+        return $mapa[$como] ?? '';
+    }
+
+    private static function textoDePago($forma)
+    {
+        return [
+            'tarjeta'  => 'Pasa la tarjeta o comparte la liga: el cargo se procesa al momento.',
+            'spei'     => 'Transfiere con la CLABE que aparece abajo. El plan se activa al validar el pago.',
+            'efectivo' => 'Muestra la referencia en tienda. El plan se activa al validar el pago.',
+        ][$forma] ?? 'Puedes pagar con la referencia de abajo.';
     }
 
     /** Sube el comprobante de la transferencia de un plan. */
