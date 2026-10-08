@@ -520,16 +520,36 @@ final class UsuariosControlador
                     try {
                         $aprobado = (new PlanRepo($principal))
                             ->aprobarPorPago($l['referencia'], $_SESSION['usuario_id'] ?? null);
-                        if ($aprobado) {
-                            \LibertyFin\Servicio\Auditoria::anota(
+                    } catch (\Throwable $e) {
+                        error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
+                    }
+
+                    // ─────────────────────────────────────────────
+                    // LA AUDITORÍA VA EN LA BASE DE LA EMPRESA
+                    //
+                    // El pago y el plan viven en la principal, pero
+                    // quien lee esta bitácora —el dueño, el contador—
+                    // está en la base de la empresa. Por eso se abre
+                    // una conexión nueva a propósito, con la sesión
+                    // de la empresa, en vez de reusar `$principal`.
+                    //
+                    // Va en try/catch porque un fallo al anotar no
+                    // puede tumbar una aprobación que ya ocurrió: el
+                    // dinero entró, el plan ya se movió. Se pierde el
+                    // apunte, no el cobro.
+                    // ─────────────────────────────────────────────
+                    if ($aprobado) {
+                        try {
+                            $dbEmpresa = \LibertyFin\Datos\Conexion::de($_SESSION['empresa_db'] ?? '');
+                            (new \LibertyFin\Datos\AuditoriaRepo($dbEmpresa))->anota(
                                 'plan.aprobar',
                                 'cobro en linea ' . $l['referencia'],
                                 null,
                                 \LibertyFin\Dominio\Dinero::pesos($l['monto'])
                             );
+                        } catch (\Throwable $e) {
+                            error_log('[LibertyFin] auditoría plan.aprobar: ' . $e->getMessage());
                         }
-                    } catch (\Throwable $e) {
-                        error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
                     }
 
                     $ligaRepo->marcarPagada($l['id']);
