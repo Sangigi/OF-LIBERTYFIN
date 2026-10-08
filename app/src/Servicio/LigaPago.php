@@ -146,9 +146,42 @@ final class LigaPago
      * si toca esperar el aviso del proveedor. Sin esto el modal giraba
      * para siempre en SPEI y en tienda.
      */
+
+
+    
+    /**
+     * Deja el método con su nombre canónico.
+     *
+     * `todos` es un alias de `tarjeta` que quedó en registros viejos y
+     * en el formulario de Ligas. Guardarlo así en la base hacía que
+     * hubiera dos valores para la MISMA forma de pago —`tarjeta` desde
+     * Caja y `todos` desde Ligas— y luego las consultas por método se
+     * volvían incómodas: había que acordarse de incluir los dos.
+     */
+    public static function normalizar($metodo)
+    {
+        $m = trim((string)$metodo);
+        if ($m === 'todos') return 'tarjeta';
+        return isset(self::METODOS[$m]) ? $m : 'tarjeta';
+    }
     public static function consultable($metodo)
     {
         return isset(self::CONSULTA[self::servicioDe($metodo)]);
+    }
+
+        public static function semilla($ventaId = 0)
+    {
+        $ventaId = (int)$ventaId;
+        if ($ventaId > 0) {
+            // El 9 va delante para que la referencia empiece con un
+            // dígito distinto al de las que se generan por tiempo:
+            // facilita reconocerlas en el panel del proveedor.
+            return substr(
+                '9' . str_pad((string)$ventaId, 6, '0', STR_PAD_LEFT) . date('ymdHi'),
+                0, 9
+            );
+        }
+        return substr(date('ymdHis') . random_int(100000, 999999), 0, 9);
     }
 
     /**
@@ -187,6 +220,12 @@ final class LigaPago
         // `escuela_id` queda como respaldo para quien venía de Paga la
         // Escuela y todavía no mueve su configuración.
         return $b !== '' ? $b : trim((string)($this->cfg['escuela_id'] ?? ''));
+    }
+
+        private function integracion($servicio)
+    {
+        $propio = trim((string)($this->cfg['integracion_id_' . $servicio] ?? ''));
+        return $propio !== '' ? $propio : (string)($this->cfg['integracion_id'] ?? '');
     }
 
     /**
@@ -323,7 +362,7 @@ final class LigaPago
         $monto = round((float)($d['monto'] ?? 0), 2);
         if ($monto <= 0) { $this->ultimoError = 'El monto tiene que ser mayor a cero'; return null; }
 
-        $metodo   = isset(self::METODOS[$d['metodo'] ?? '']) ? $d['metodo'] : 'tarjeta';
+        $metodo   = self::normalizar($d['metodo'] ?? 'tarjeta');
         $servicio = self::servicioDe($metodo);
         list($ruta, $campos, $devuelve) = self::SERVICIOS[$servicio];
 
@@ -351,7 +390,7 @@ final class LigaPago
         $cuerpo = [
             'User'          => $this->usuario(),
             'Password'      => $this->clave(),
-            'IntegrationID' => $this->cfg['integracion_id'],
+            'IntegrationID' => $this->integracion($servicio),
         ];
 
         $posibles = [
@@ -451,10 +490,10 @@ final class LigaPago
         }
         if (!$this->listo()) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
 
-        $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
+            $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
             'User'          => $this->usuario(),
             'Password'      => $this->clave(),
-            'IntegrationID' => $this->cfg['integracion_id'],
+            'IntegrationID' => $this->integracion($servicio),
             'BusinessID'    => $this->negocio(),
             'Reference'     => (string)$referencia,
         ]);
