@@ -20,6 +20,24 @@ namespace LibertyFin\Datos;
  */
 final class ReporteRepo extends Repo
 {
+    /**
+     * Cuánto le toca a un renglón del dinero de su venta, para repartirlo
+     * entre áreas. Se usa con `d` (venta_detalles) y `tot` (suma y número
+     * de renglones de la venta) unidos con LEFT JOIN:
+     *
+     *   renglones que suman algo  ->  lo que pesa cada uno
+     *   renglones que suman $0    ->  partes iguales
+     *   venta SIN renglones       ->  la venta completa, a su área escrita
+     *
+     * Antes era `d.subtotal / NULLIF(tot.suma,0)` con INNER JOIN: las ventas
+     * sin renglones —muchas vienen del sistema anterior— o con renglones en
+     * $0 desaparecían de la tabla por área, con todo y sus abonos y
+     * liquidaciones.
+     */
+    const PESO = "CASE WHEN tot.venta_id IS NULL THEN 1
+                       WHEN tot.suma = 0 THEN 1.0 / tot.n
+                       ELSE d.subtotal / tot.suma END";
+
     private function rango($desde, $hasta)
     {
         return [$desde . ' 00:00:00',
@@ -148,6 +166,7 @@ final class ReporteRepo extends Repo
     public function anterioresPorArea($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+        $peso = self::PESO;
         return $this->todos("
             SELECT area,
                    COUNT(DISTINCT pago_id) AS cobros,
@@ -155,14 +174,14 @@ final class ReporteRepo extends Repo
             FROM (
                 SELECT p.id AS pago_id,
                        COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
-                       p.monto * (d.subtotal / NULLIF(tot.suma,0)) AS monto
+                       p.monto * ({$peso}) AS monto
                 FROM venta_pagos p
-                INNER JOIN ventas v          ON v.id = p.venta_id
-                INNER JOIN venta_detalles d  ON d.venta_id = v.id
-                LEFT  JOIN productos pr      ON pr.id = d.producto_id
-                LEFT  JOIN categorias cat    ON cat.id = pr.categoria_id
-                INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
-                             FROM venta_detalles GROUP BY venta_id ) tot
+                INNER JOIN ventas v        ON v.id = p.venta_id
+                LEFT JOIN venta_detalles d ON d.venta_id = v.id
+                LEFT JOIN productos pr     ON pr.id = d.producto_id
+                LEFT JOIN categorias cat   ON cat.id = pr.categoria_id
+                LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                            FROM venta_detalles GROUP BY venta_id ) tot
                        ON tot.venta_id = v.id
                 WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
                   AND p.fecha_pago >= ? AND p.fecha_pago < ?
@@ -189,17 +208,22 @@ final class ReporteRepo extends Repo
         $filas = $this->porAreaVentas($desde, $hasta);
         if (!$conAnteriores) return $filas;
 
+        // Se cruzan por nombre SIN distinguir mayúsculas ni espacios, como
+        // agrupa MySQL: "Legales" y "LEGALES" son la misma área, y cruzarlas
+        // al pie de la letra daba dos filas, una de ellas "sin ventas".
+        $clave = function ($s) { return mb_strtolower(trim((string)$s)); };
         $ant = [];
-        foreach ($this->anterioresPorArea($desde, $hasta) as $x) $ant[$x['area']] = $x;
+        foreach ($this->anterioresPorArea($desde, $hasta) as $x) $ant[$clave($x['area'])] = $x;
 
         foreach ($filas as $i => $f) {
-            $x = $ant[$f['area']] ?? null;
+            $k = $clave($f['area']);
+            $x = $ant[$k] ?? null;
             $filas[$i]['cobros_ant']    = $x ? (int)$x['cobros'] : 0;
             $filas[$i]['de_anteriores'] = $x ? round((float)$x['monto'], 2) : 0.0;
-            unset($ant[$f['area']]);
+            unset($ant[$k]);
         }
-        foreach ($ant as $area => $x) {
-            $filas[] = ['area' => $area, 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
+        foreach ($ant as $x) {
+            $filas[] = ['area' => $x['area'], 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
                         'gastos' => 0, 'comisiones' => 0,
                         'cobros_ant'    => (int)$x['cobros'],
                         'de_anteriores' => round((float)$x['monto'], 2)];
@@ -228,6 +252,11 @@ final class ReporteRepo extends Repo
         // Si un producto no tiene categoría se cae al área de la venta, y
         // si tampoco, a "Sin área": es preferible un renglón honesto que
         // perder la venta del reporte.
+        //
+        // Por lo mismo, se parte de la VENTA y no de sus renglones: una venta
+        // sin renglones (muchas vienen del sistema anterior) o con renglones
+        // en $0 desaparecía de esta tabla con todo y lo cobrado. Ver PESO.
+        $peso = self::PESO;
         return $this->todos("
             SELECT area,
                    COUNT(DISTINCT venta_id)  AS ventas,
@@ -238,8 +267,6 @@ final class ReporteRepo extends Repo
             FROM (
                 SELECT v.id AS venta_id,
                        COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
-                       -- El peso del renglón dentro de su venta
-                       (d.subtotal * 1.0 / NULLIF(tot.suma,0))                   AS peso,
                        -- SE REPARTE `v.total`, NO SE SUMA `d.subtotal`.
                        --
                        -- No siempre son lo mismo: el IVA, los descuentos
@@ -251,16 +278,16 @@ final class ReporteRepo extends Repo
                        -- El renglón solo decide la PROPORCIÓN. Lo que se
                        -- reparte es el total de la venta, así el reporte
                        -- siempre suma lo mismo que las ventas.
-                       v.total * (d.subtotal / NULLIF(tot.suma,0))              AS vendido,
-                       COALESCE(pg.cobrado,0) * (d.subtotal / NULLIF(tot.suma,0)) AS cobrado,
-                       COALESCE(g.gastos,0)   * (d.subtotal / NULLIF(tot.suma,0)) AS gastos,
-                       COALESCE(cm.comision,0)* (d.subtotal / NULLIF(tot.suma,0)) AS comisiones
-                FROM venta_detalles d
-                INNER JOIN ventas v   ON v.id = d.venta_id
-                LEFT  JOIN productos p ON p.id = d.producto_id
-                LEFT  JOIN categorias cat ON cat.id = p.categoria_id
-                INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
-                             FROM venta_detalles GROUP BY venta_id ) tot
+                       v.total                 * ({$peso}) AS vendido,
+                       COALESCE(pg.cobrado,0)  * ({$peso}) AS cobrado,
+                       COALESCE(g.gastos,0)    * ({$peso}) AS gastos,
+                       COALESCE(cm.comision,0) * ({$peso}) AS comisiones
+                FROM ventas v
+                LEFT JOIN venta_detalles d ON d.venta_id = v.id
+                LEFT JOIN productos p      ON p.id = d.producto_id
+                LEFT JOIN categorias cat   ON cat.id = p.categoria_id
+                LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                            FROM venta_detalles GROUP BY venta_id ) tot
                        ON tot.venta_id = v.id
                 LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
                             WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id

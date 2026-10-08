@@ -21,8 +21,9 @@ final class Reportes
             'rotulo' => 'Por área',
             'nota'   => 'El área sale del producto contratado, no del cliente. Una venta con '
                       . 'productos de dos áreas reparte su dinero entre las dos. «De ventas '
-                      . 'anteriores» es lo que entró en el periodo por anticipos y abonos de ventas '
-                      . 'de meses anteriores; no suma a la utilidad, que es de las ventas del periodo.',
+                      . 'anteriores» es lo que entró en el periodo (anticipos, abonos y liquidaciones) '
+                      . 'por ventas de antes del periodo; no suma a la utilidad, que es de las ventas '
+                      . 'del periodo. Un cobro repartido entre dos áreas cuenta en las dos.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
@@ -116,14 +117,17 @@ final class Reportes
                                 $nAnt > 0 ? $nAnt : '',
                                 $mAnt > 0 ? $mAnt : ''];
                     }, $f),
-                    // Los cobros del total salen de deAnteriores(): un pago de
-                    // una venta con dos áreas cuenta en las dos filas, y sumar
-                    // la columna lo contaría dos veces.
-                    $this->sumar($f, ['ventas','vendido','cobrado','gastos','comisiones','de_anteriores'],
+                    // El total de las dos columnas sale de deAnteriores(), la
+                    // misma cifra de "De lo que entró…" y del Detalle de pagos:
+                    // un pago de una venta con dos áreas cuenta en las dos
+                    // filas, y el monto repartido se redondea por área, así que
+                    // sumar la columna podía dar un cobro de más o un centavo
+                    // de diferencia.
+                    $this->sumar($f, ['ventas','vendido','cobrado','gastos','comisiones'],
                         function ($t) use ($ant) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
                             $t['cobrado'], $t['gastos'], $t['comisiones'],
                             $t['cobrado'] - $t['gastos'] - $t['comisiones'],
-                            (int)$ant['cobros'], $t['de_anteriores']]; }));
+                            (int)$ant['cobros'], (float)$ant['monto']]; }));
 
             case 'colaborador':
                 $f = $r->porColaborador($desde, $hasta);

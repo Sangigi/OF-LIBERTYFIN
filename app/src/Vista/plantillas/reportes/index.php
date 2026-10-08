@@ -181,8 +181,10 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
           <?php endif; ?>
           <td data-label="De ventas anteriores" class="text-end lf-mono lf-col-ant">
             <?php if ($mAnt > 0): ?>
-              <b><?= D::pesos($mAnt) ?></b>
-              <small><?= $nAnt ?> cobro<?= $nAnt === 1 ? '' : 's' ?></small>
+              <?php /* Un solo elemento: en el celular la celda es flex y, sueltos,
+                       el monto y "N cobros" se iban a extremos opuestos. */ ?>
+              <span class="lf-ant-val"><b><?= D::pesos($mAnt) ?></b>
+                <small><?= $nAnt ?> cobro<?= $nAnt === 1 ? '' : 's' ?></small></span>
             <?php else: ?>–<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
