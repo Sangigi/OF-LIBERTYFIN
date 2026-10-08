@@ -395,7 +395,7 @@ final class CajaControlador
         }
 
         $api = new \LibertyFin\Servicio\LigaPago(\LibertyFin\Servicio\Integraciones::de('spei'));
-        $semilla = '9' . str_pad((string)$r['id'], 7, '0', STR_PAD_LEFT) . date('ymdHi');
+        $semilla = \LibertyFin\Servicio\LigaPago::semilla((int)$r['id']);
 
         $g = $api->generar([
             'monto' => $saldo, 'metodo' => $forma,
