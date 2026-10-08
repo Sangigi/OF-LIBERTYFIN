@@ -122,8 +122,21 @@ final class TicketRepo
                     SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME) FROM information_schema.COLUMNS
                     WHERE TABLE_SCHEMA = DATABASE()
                       AND ((TABLE_NAME = 'ticket_mensajes' AND COLUMN_NAME = 'autor_tipo')
-                        OR (TABLE_NAME = 'tickets' AND COLUMN_NAME IN ('creado_tipo','visto_cliente')))");
+                        OR (TABLE_NAME = 'tickets' AND COLUMN_NAME IN
+                            ('creado_tipo','visto_cliente','escribe_cliente','escribe_soporte')))");
                 $hay = $st->fetchAll(PDO::FETCH_COLUMN);
+                // "Está escribiendo…": cuándo tecleó cada lado por última vez
+                // y quién. Se apaga solo a los pocos segundos y al enviar.
+                if (!in_array('tickets.escribe_cliente', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets
+                                     ADD COLUMN escribe_cliente DATETIME NULL,
+                                     ADD COLUMN escribe_cliente_nombre VARCHAR(160) NULL");
+                }
+                if (!in_array('tickets.escribe_soporte', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets
+                                     ADD COLUMN escribe_soporte DATETIME NULL,
+                                     ADD COLUMN escribe_soporte_nombre VARCHAR(160) NULL");
+                }
                 if (!in_array('ticket_mensajes.autor_tipo', $hay, true)) {
                     $this->db->exec("ALTER TABLE ticket_mensajes
                                      ADD COLUMN autor_tipo VARCHAR(12) NULL AFTER autor_nombre");
@@ -152,6 +165,63 @@ final class TicketRepo
             ORDER BY id");
         $st->execute([(int)$ticketId, (int)$desdeId]);
         return $st->fetchAll();
+    }
+
+    /**
+     * "Está escribiendo…": este lado ('cliente' o 'soporte') está tecleando.
+     * El chat lo avisa cada pocos segundos mientras se escribe.
+     */
+    public function escribiendo($ticketId, $lado, $nombre)
+    {
+        if (!in_array($lado, ['cliente', 'soporte'], true)) return;
+        try {
+            $this->db->prepare("UPDATE tickets SET escribe_{$lado} = NOW(), escribe_{$lado}_nombre = ? WHERE id = ?")
+                     ->execute([mb_substr((string)$nombre, 0, 160), (int)$ticketId]);
+        } catch (\Throwable $e) { /* sin la columna todavía: sin indicador */ }
+    }
+
+    /**
+     * Quién de cada lado tecleó en los últimos segundos: ['cliente' =>
+     * nombre|null, 'soporte' => nombre|null]. Se mide con el reloj de la
+     * base, el mismo que lo anotó.
+     */
+    public function escribiendoAhora($ticketId)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT CASE WHEN escribe_cliente IS NOT NULL
+                             AND TIMESTAMPDIFF(SECOND, escribe_cliente, NOW()) <= 7
+                            THEN COALESCE(escribe_cliente_nombre, '') END AS cliente,
+                       CASE WHEN escribe_soporte IS NOT NULL
+                             AND TIMESTAMPDIFF(SECOND, escribe_soporte, NOW()) <= 7
+                            THEN COALESCE(escribe_soporte_nombre, '') END AS soporte
+                FROM tickets WHERE id = ?");
+            $st->execute([(int)$ticketId]);
+            $f = $st->fetch() ?: [];
+            return ['cliente' => $f['cliente'] ?? null, 'soporte' => $f['soporte'] ?? null];
+        } catch (\Throwable $e) {
+            return ['cliente' => null, 'soporte' => null];
+        }
+    }
+
+    /**
+     * El reporte más reciente de esta persona que sigue vivo (no cerrado):
+     * el que abre la burbuja del chat cuando se cerró.
+     */
+    public function activoCliente($empresaId, $usuarioId)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT t.id, t.folio, t.asunto
+                FROM tickets t
+                WHERE t.empresa_id = ? AND t.creado_por = ?
+                  AND (t.creado_tipo = 'empresa' OR t.creado_tipo IS NULL)
+                  AND t.estado <> 'cerrado'
+                ORDER BY (SELECT MAX(m.id) FROM ticket_mensajes m WHERE m.ticket_id = t.id) DESC, t.id DESC
+                LIMIT 1");
+            $st->execute([(int)$empresaId, (int)$usuarioId]);
+            return $st->fetch() ?: null;
+        } catch (\Throwable $e) { return null; }
     }
 
     /** El cliente ya vio hasta este mensaje. Nunca retrocede. */
@@ -352,6 +422,12 @@ final class TicketRepo
         // escribe el CLIENTE tampoco: antes contaba, y un ticket al que solo
         // él le había agregado algo salía como "respondido" y "en curso".
         $deSoporte = self::tipoAutor() === 'plataforma';
+        // Ya envió: deja de "estar escribiendo".
+        try {
+            $lado = $deSoporte ? 'soporte' : 'cliente';
+            $this->db->prepare("UPDATE tickets SET escribe_{$lado} = NULL WHERE id = ?")
+                     ->execute([(int)$ticketId]);
+        } catch (\Throwable $e) { /* sin la columna todavía */ }
         if (!$interno && $deSoporte && empty($t['primera_respuesta_en'])) {
             $this->db->prepare("UPDATE tickets SET primera_respuesta_en = NOW() WHERE id = ?")
                      ->execute([(int)$ticketId]);

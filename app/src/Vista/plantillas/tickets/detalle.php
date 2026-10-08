@@ -60,6 +60,7 @@ document.addEventListener('click', function(ev){
     <?php /* Chat en vivo: lo que escriba el cliente aparece solo, y la
              respuesta se envía sin recargar (ver assets/js/lf-chat.js). */ ?>
     <section class="card" data-lf-chat="/tickets/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="soporte"
+             data-lf-escribe="/tickets/<?= (int)$t['id'] ?>/escribiendo"
              data-lf-form="#formResp"
              data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
       <header class="card-header">

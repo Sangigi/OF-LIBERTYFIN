@@ -23,13 +23,20 @@ $comoVa = [
 <?php endif; ?>
 
 <?php if ($abierto): $t = $abierto; ?>
-<div style="margin-bottom:18px">
+<div style="margin-bottom:18px;display:flex;gap:8px;flex-wrap:wrap">
   <a class="btn btn-secondary btn-sm" href="/ayuda">Volver a mis reportes</a>
+  <?php if ($t['estado'] !== 'cerrado'): ?>
+    <?php /* Para seguir la conversación en la esquina mientras se trabaja en otra pantalla. */ ?>
+    <button type="button" class="btn btn-secondary btn-sm"
+            data-lf-abrir-chat="<?= P::e(json_encode(['id' => (int)$t['id'], 'folio' => $t['folio'], 'asunto' => $t['asunto']], JSON_UNESCAPED_UNICODE)) ?>">
+      Abrir en chat flotante</button>
+  <?php endif; ?>
 </div>
 
 <?php /* La conversación es un chat en vivo: lo nuevo aparece solo y se
          contesta sin recargar (ver assets/js/lf-chat.js). */ ?>
 <section class="card" data-lf-chat="/ayuda/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="cliente"
+         data-lf-escribe="/ayuda/<?= (int)$t['id'] ?>/escribiendo"
          data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
   <header class="card-header">
     <div><span><?= P::e($t['asunto']) ?></span>

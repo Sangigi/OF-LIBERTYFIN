@@ -181,14 +181,28 @@ final class TicketsControlador
         if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no existe.'], 404);
         $nuevos = $repo->mensajesDesde($id, Peticion::entero('desde'), true);
         $fotos  = $nuevos ? $repo->fotos($nuevos, $t['nombre_base_datos'] ?? null, false) : [];
+        $esc    = $repo->escribiendoAhora($id);
         $this->json([
             'ok'       => true,
             'estado'   => $t['estado'],
             'cerrado'  => $t['estado'] === 'cerrado',
+            // El cliente está tecleando.
+            'escribiendo' => $esc['cliente'] !== null ? ($esc['cliente'] ?: 'El cliente') : null,
             'mensajes' => array_map(function ($m) use ($fotos) {
                 return TicketRepo::aJson($m, $fotos, 'soporte');
             }, $nuevos),
         ]);
+    }
+
+    /**
+     * Soporte está tecleando en este ticket. Las notas internas no se
+     * avisan: el chat no llama aquí si está marcada "Nota interna".
+     */
+    public function escribiendo($id)
+    {
+        if (!$this->token()) $this->json(['ok' => false], 403);
+        (new TicketRepo($this->principal()))->escribiendo($id, 'soporte', $_SESSION['usuario_nombre'] ?? '');
+        $this->json(['ok' => true]);
     }
 
     private function json(array $datos, $codigo = 200)

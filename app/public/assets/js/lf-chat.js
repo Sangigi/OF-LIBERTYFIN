@@ -26,8 +26,9 @@
 (function () {
   if (window.LFChat) return;
 
-  var CADA_CHAT = 4000;        // conversación abierta
+  var CADA_CHAT = 3000;        // conversación abierta
   var CADA_NOVEDADES = 20000;  // aviso de respuestas
+  var CADA_ESCRIBE = 3000;     // "estoy escribiendo", como mucho cada 3 s
 
   function token() { return document.body.getAttribute('data-lf-token') || ''; }
 
@@ -92,19 +93,55 @@
     p.hidden = false;
   }
 
+  /* "Ana está escribiendo…" con los tres puntos. Va siempre al final de
+     la lista; lo nuevo se inserta antes que él. */
+  function indicador(lista, nombre) {
+    var ind = lista.querySelector('[data-lf-escribe-ind]');
+    if (!nombre) { if (ind) ind.remove(); return; }
+    if (!ind) {
+      ind = crear('div', 'lf-escribe');
+      ind.setAttribute('data-lf-escribe-ind', '');
+      ind.setAttribute('aria-live', 'polite');
+      var pts = crear('span', 'puntos');
+      pts.appendChild(crear('i')); pts.appendChild(crear('i')); pts.appendChild(crear('i'));
+      ind.appendChild(pts);
+      ind.appendChild(crear('small'));
+      lista.appendChild(ind);
+    }
+    ind.querySelector('small').textContent = nombre + ' está escribiendo…';
+  }
+
   /* ══ 1 · Una conversación en vivo ══ */
   function conversacion(raiz) {
     if (raiz._lfChat) return raiz._lfChat;
     var url   = raiz.getAttribute('data-lf-chat');
+    var urlEscribe = raiz.getAttribute('data-lf-escribe');
     var lado  = raiz.getAttribute('data-lf-lado') || 'cliente';
     var flota = raiz.hasAttribute('data-lf-flota');
     var lista = raiz.querySelector('[data-lf-lista]') || raiz;
     var sel   = raiz.getAttribute('data-lf-form');
     var form  = sel ? document.querySelector(sel) : raiz.querySelector('form[data-lf-enviar]');
     var ultimo = +raiz.getAttribute('data-lf-ultimo') || 0;
-    var reloj = null, ocupado = false;
+    var reloj = null, ocupado = false, avisado = 0;
 
     function viva() { return document.body.contains(raiz); }
+
+    /* Mientras se teclea, se le avisa al otro lado (como mucho cada 3 s).
+       Una nota interna no: el cliente no debe saber que se escribe algo
+       que no va a ver. */
+    function tecleando() {
+      if (!urlEscribe || !form) return;
+      var ta = form.querySelector('textarea');
+      if (!ta || !ta.value.trim()) return;
+      var interno = form.querySelector('input[name=interno]');
+      if (interno && interno.checked) return;
+      var ahora = Date.now();
+      if (ahora - avisado < CADA_ESCRIBE) return;
+      avisado = ahora;
+      var fd = new FormData();
+      fd.append('token', (form.querySelector('input[name=token]') || {}).value || token());
+      pedir(urlEscribe, { method: 'POST', body: fd }).catch(function () {});
+    }
 
     function traer() {
       if (!viva()) { parar(); return; }
@@ -115,13 +152,16 @@
         if (!j) { parar(); return; }          // la sesión venció: no insistir
         if (!j.ok) return;
         var nuevos = (j.mensajes || []).filter(function (m) { return m.id > ultimo; });
+        var abajo = flota || lista.scrollHeight - lista.scrollTop - lista.clientHeight < 80;
         if (nuevos.length) {
           var vacio = raiz.querySelector('[data-lf-vacio]');
           if (vacio) vacio.hidden = true;
-          var abajo = flota || lista.scrollHeight - lista.scrollTop - lista.clientHeight < 80;
-          nuevos.forEach(function (m) { lista.appendChild(pintar(m, lado)); ultimo = m.id; });
-          if (abajo) lista.scrollTop = lista.scrollHeight;
+          var ind = lista.querySelector('[data-lf-escribe-ind]');
+          nuevos.forEach(function (m) { lista.insertBefore(pintar(m, lado), ind); ultimo = m.id; });
         }
+        // El otro lado está tecleando: los tres puntos.
+        indicador(lista, j.escribiendo || null);
+        if (abajo && (nuevos.length || j.escribiendo)) lista.scrollTop = lista.scrollHeight;
         if (j.cerrado && form) {
           form.hidden = true;
           if (!raiz.querySelector('[data-lf-cerrado]')) {
@@ -137,6 +177,9 @@
 
     if (form && !form._lfChat) {
       form._lfChat = true;
+      form.addEventListener('input', function (e) {
+        if (e.target.tagName === 'TEXTAREA') tecleando();
+      });
       form.addEventListener('submit', function (e) {
         e.preventDefault();
         var ta  = form.querySelector('textarea');
@@ -149,6 +192,7 @@
           if (btn) { btn.disabled = false; btn.textContent = btn.getAttribute('data-antes') || 'Enviar'; }
           if (j && j.ok) {
             ta.value = '';
+            avisado = 0;
             var f = form.querySelector('input[type=file]');
             if (f) { f.value = ''; f.dispatchEvent(new Event('change', { bubbles: true })); }
             var interno = form.querySelector('input[name=interno]');
@@ -233,9 +277,37 @@
     setTimeout(function () { if (caja.parentNode) caja.remove(); }, 9600);
   }
 
+  /* ── La burbuja: vuelve a abrir el chat después de cerrarlo ──
+     Se ve mientras el chat está cerrado y hay un reporte vivo. Lleva la
+     cuenta de lo que soporte escribió y no se ha leído. */
+  var burbuja = null, ultimoActivo = null, pendiente = null;
+
+  function pintarBurbuja(sinLeer) {
+    var hay = !!(pendiente || ultimoActivo);
+    if (!hay || panel) { if (burbuja) burbuja.hidden = true; return; }
+    if (!burbuja) {
+      burbuja = crear('button', 'lf-chat-burbuja');
+      burbuja.type = 'button';
+      burbuja.setAttribute('aria-label', 'Abrir el chat con soporte');
+      burbuja.title = 'Chat con soporte';
+      burbuja.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.4c-.6.5-1.3 0-1.3-.6V16A2.5 2.5 0 0 1 4 13.5z"/></svg>';
+      burbuja.appendChild(crear('span', 'lf-noti-num'));
+      burbuja.addEventListener('click', function () {
+        var t = pendiente || ultimoActivo;
+        if (t) abrirChat(t);
+      });
+      document.body.appendChild(burbuja);
+    }
+    burbuja.hidden = false;
+    var num = burbuja.querySelector('.lf-noti-num');
+    num.hidden = !sinLeer;
+    num.textContent = sinLeer > 9 ? '9+' : (sinLeer || '');
+  }
+
   function cerrarChat() {
     if (panel) { if (panel._lfChat) panel._lfChat.parar(); panel.remove(); panel = null; }
     sesionGuardar('lf_chat_abierto', null);
+    pintarBurbuja(0);
   }
 
   function abrirChat(t) {
@@ -244,7 +316,8 @@
       var ta0 = panel.querySelector('textarea'); if (ta0) ta0.focus();
       return;
     }
-    cerrarChat();
+    if (panel) { if (panel._lfChat) panel._lfChat.parar(); panel.remove(); panel = null; }
+    if (burbuja) burbuja.hidden = true;
     sesionGuardar('lf_chat_abierto', JSON.stringify({ id: t.id, folio: t.folio || '', asunto: t.asunto || '' }));
 
     panel = crear('div', 'lf-chatf');
@@ -252,6 +325,7 @@
     panel.setAttribute('aria-label', 'Chat con soporte');
     panel.setAttribute('data-ticket', t.id);
     panel.setAttribute('data-lf-chat', '/ayuda/' + (+t.id) + '/mensajes');
+    panel.setAttribute('data-lf-escribe', '/ayuda/' + (+t.id) + '/escribiendo');
     panel.setAttribute('data-lf-lado', 'cliente');
     panel.setAttribute('data-lf-flota', '');
 
@@ -313,6 +387,9 @@
       pedir('/ayuda/novedades').then(function (j) {
         if (!j || !j.ok) return;
         marcarMenu(j.sin_leer);
+        ultimoActivo = j.activo || null;
+        pendiente = (j.tickets && j.tickets[0]) || null;
+        pintarBurbuja(j.sin_leer);
         if (!j.tickets || !j.tickets.length) return;
         var t = j.tickets[0];
         // En la página de ese ticket la conversación ya se actualiza sola.
@@ -334,6 +411,15 @@
     setInterval(revisar, CADA_NOVEDADES);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) revisar(); });
   }
+
+  /* Cualquier botón [data-lf-abrir-chat='{"id":…}'] abre ese reporte en el
+     chat flotante (por ejemplo, desde la página del reporte). */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-lf-abrir-chat]');
+    if (!b) return;
+    e.preventDefault();
+    try { abrirChat(JSON.parse(b.getAttribute('data-lf-abrir-chat'))); } catch (err) {}
+  });
 
   window.LFChat = { enlazar: enlazar, abrir: abrirChat };
 

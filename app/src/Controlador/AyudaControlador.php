@@ -160,14 +160,29 @@ final class AyudaControlador
         if ($nuevos && $this->esCreador($t)) {
             $repo->marcarVistoCliente($id, max(array_column($nuevos, 'id')));
         }
+        $esc = $repo->escribiendoAhora($id);
         $this->json([
             'ok'       => true,
             'estado'   => $t['estado'],
             'cerrado'  => $t['estado'] === 'cerrado',
+            // Soporte está tecleando: "Ana está escribiendo…".
+            'escribiendo' => $esc['soporte'] !== null ? ($esc['soporte'] ?: 'Soporte') : null,
             'mensajes' => array_map(function ($m) use ($fotos) {
                 return TicketRepo::aJson($m, $fotos, 'cliente');
             }, $nuevos),
         ]);
+    }
+
+    /** El cliente está tecleando en este ticket (lo avisa el chat). */
+    public function escribiendo($id)
+    {
+        if (!$this->token()) $this->json(['ok' => false], 403);
+        $repo = new TicketRepo($this->principal());
+        if (!$this->miTicket($repo, (int)$id, (int)($_SESSION['empresa_id'] ?? 0))) {
+            $this->json(['ok' => false], 404);
+        }
+        $repo->escribiendo($id, 'cliente', $_SESSION['usuario_nombre'] ?? '');
+        $this->json(['ok' => true]);
     }
 
     /**
@@ -178,11 +193,16 @@ final class AyudaControlador
     public function novedades()
     {
         $emp = (int)($_SESSION['empresa_id'] ?? 0);
-        if (!$emp) $this->json(['ok' => true, 'sin_leer' => 0, 'tickets' => []]);
-        $n = (new TicketRepo($this->principal()))
-            ->novedadesCliente($emp, (int)($_SESSION['usuario_id'] ?? 0));
+        if (!$emp) $this->json(['ok' => true, 'sin_leer' => 0, 'tickets' => [], 'activo' => null]);
+        $repo = new TicketRepo($this->principal());
+        $yo   = (int)($_SESSION['usuario_id'] ?? 0);
+        $n    = $repo->novedadesCliente($emp, $yo);
+        // El reporte vivo más reciente: con él, la burbuja vuelve a abrir
+        // el chat después de cerrarlo.
+        $act  = $repo->activoCliente($emp, $yo);
         $this->json([
             'ok'       => true,
+            'activo'   => $act ? ['id' => (int)$act['id'], 'folio' => $act['folio'], 'asunto' => $act['asunto']] : null,
             'sin_leer' => $n['sin_leer'],
             'tickets'  => array_map(function ($t) {
                 $txt = trim(preg_replace('/\s+/u', ' ', (string)$t['cuerpo']));
