@@ -212,6 +212,7 @@ $r->post('/cuenta/comercio',     ['LibertyFin\Controlador\UsuariosControlador', 
 $r->post('/cuenta/documento',    ['LibertyFin\Controlador\UsuariosControlador', 'subirDocumento']);
 $r->post('/cuenta/plan',         ['LibertyFin\Controlador\UsuariosControlador', 'solicitarPlan']);
 $r->post('/cuenta/plan/comprobante', ['LibertyFin\Controlador\UsuariosControlador', 'comprobantePlan']);
+$r->get('/cuenta/plan/estado/{id}', ['LibertyFin\Controlador\UsuariosControlador', 'estadoPlan']);
 $r->post('/guia/vista',          ['LibertyFin\Controlador\UsuariosControlador', 'guiaVista']);
 $r->get('/guia',                 ['LibertyFin\Controlador\UsuariosControlador', 'verGuia']);
 $r->get('/corte',        ['LibertyFin\Controlador\CorteControlador', 'index']);

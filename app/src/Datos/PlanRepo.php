@@ -98,7 +98,8 @@ final class PlanRepo
                 resuelto_en DATETIME NULL,
                 resuelto_por INT NULL,
                 KEY ix_pp_empresa (empresa_id),
-                KEY ix_pp_estado (estado)
+                KEY ix_pp_estado (estado),
+                KEY ix_pp_referencia (referencia)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
@@ -181,7 +182,7 @@ final class PlanRepo
         return $pago;
     }
 
-     /**
+    /**
      * Guarda en el pago la referencia que devolvió el proveedor de cobro.
      *
      * Solo se persiste el VALOR de `referencia`; el resto de datos de la
@@ -267,6 +268,93 @@ final class PlanRepo
                 ->execute([$decision, $decision === 'rechazado' ? $motivo : null,
                            (int)$porUsuario, (int)$id]);
             $this->principal->commit();
+            return $pago;
+        } catch (\Throwable $e) {
+            $this->principal->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
+     * Aprueba un pago de plan cuando el cobro en línea ya se confirmó.
+     *
+     * A diferencia de `resolver()`, que espera un pago en `en_revision`
+     * (transferencia + comprobante revisado por una persona), aquí el
+     * pago sigue en `por_pagar`: el usuario nunca subió nada porque el
+     * proveedor avisó que el cargo ya entró. Por eso se busca por
+     * `referencia` y se acepta el estado actual tal como esté.
+     *
+     * Hace exactamente lo mismo que `resolver()` al aprobar:
+     *   · cambia el plan y extiende el vencimiento desde el que sea MÁS
+     *     TARDE entre hoy y el actual;
+     *   · marca el pago como `aprobado` y sella `resuelto_en`;
+     *   · TODO dentro de una transacción, para que no se pueda aprobar
+     *     dos veces ni sumar meses de más si el proveedor avisa varias
+     *     veces del mismo cobro.
+     *
+     * @param string   $referencia  la referencia del cobro (la que viaja en los avisos)
+     * @param int|null $porUsuario  quién disparó la aprobación; null = automático
+     * @return array|null  el pago aprobado, o null si no había nada que aprobar
+     */
+    public function aprobarPorPago($referencia, $porUsuario = null)
+    {
+        $referencia = trim((string)$referencia);
+        if ($referencia === '') return null;
+
+        $this->asegurar();
+        $this->principal->beginTransaction();
+        try {
+            // `por_pagar` cubre el caso normal (nadie subió comprobante);
+            // `en_revision` cubre el raro en que alguien subió uno y
+            // además entró el cargo por línea: gana la confirmación del
+            // proveedor y se aprueba igual.
+            $st = $this->principal->prepare(
+                "SELECT * FROM pagos_plan
+                  WHERE referencia = ?
+                    AND estado IN ('por_pagar', 'en_revision')
+                  ORDER BY id DESC
+                  LIMIT 1
+                  FOR UPDATE");
+            $st->execute([$referencia]);
+            $pago = $st->fetch();
+            if (!$pago) {
+                $this->principal->rollBack();
+                return null;
+            }
+
+            // Mismo enriquecimiento que hace `resolver()`: a quién avisar.
+            $st = $this->principal->prepare(
+                "SELECT nombre_empresa, nombre_contacto, email_admin FROM empresas WHERE id = ?");
+            $st->execute([(int)$pago['empresa_id']]);
+            $pago += (array)($st->fetch() ?: []);
+
+            // Mismo cálculo de vencimiento que `resolver()`: desde el que
+            // sea más tarde entre hoy y el actual.
+            $st = $this->principal->prepare("SELECT fecha_vencimiento FROM empresas WHERE id = ?");
+            $st->execute([(int)$pago['empresa_id']]);
+            $actual = $st->fetchColumn();
+            $hoy  = new \DateTimeImmutable('today');
+            $base = ($actual && strtotime($actual) > $hoy->getTimestamp())
+                  ? new \DateTimeImmutable($actual) : $hoy;
+            $nuevo = $base->modify('+' . (int)$pago['meses'] . ' months')->format('Y-m-d');
+
+            $this->principal->prepare(
+                "UPDATE empresas SET plan = ?, fecha_vencimiento = ? WHERE id = ?")
+                ->execute([$pago['plan'], $nuevo, (int)$pago['empresa_id']]);
+
+            $this->principal->prepare("
+                UPDATE pagos_plan
+                   SET estado = 'aprobado',
+                       motivo_rechazo = NULL,
+                       resuelto_en = NOW(),
+                       resuelto_por = ?
+                 WHERE id = ?")
+                ->execute([$porUsuario !== null ? (int)$porUsuario : null, (int)$pago['id']]);
+
+            $this->principal->commit();
+
+            $pago['estado']      = 'aprobado';
+            $pago['vence_nuevo'] = $nuevo;
             return $pago;
         } catch (\Throwable $e) {
             $this->principal->rollBack();

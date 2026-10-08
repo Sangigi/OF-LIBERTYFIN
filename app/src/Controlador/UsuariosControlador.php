@@ -440,6 +440,127 @@ final class UsuariosControlador
         }
     }
 
+    /**
+     * ¿Ya se pagó un cobro de plan? Lo consulta el modal de la pestaña
+     * Plan igual que el de Caja, pero las dos patas —liga y pago— viven
+     * en la base PRINCIPAL.
+     *
+     * Cuando el proveedor confirma el cargo:
+     *   · aprueba el pago del plan (PlanRepo::aprobarPorPago), que mueve
+     *     el plan y el vencimiento dentro de una transacción;
+     *   · marca la liga como pagada en el directorio de cobros.
+     *
+     * Con SPEI y tienda no hay nada que consultar: el proveedor avisa
+     * llamando a /pagadetodo/pago-clabe y /pagadetodo/pago-referencia,
+     * que ya dejan la liga marcada. Aquí se relee la fila y ya.
+     */
+    public function estadoPlan($id)
+    {
+        if (empty($_SESSION['empresa_id'])) {
+            $this->json(['ok' => false, 'error' => 'Sin empresa'], 403);
+        }
+
+        $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+        $ligaRepo  = new \LibertyFin\Datos\LigaRepo($principal);
+
+        $l = $ligaRepo->porId((int)$id);
+        if (!$l) $this->json(['ok' => false, 'error' => 'No existe'], 404);
+
+        // ─────────────────────────────────────────────────────
+        // LA LIGA ES DE LA EMPRESA QUE LA MIRÓ
+        //
+        // El id de la liga viaja en la URL; sin esta comprobación,
+        // cualquier sesión podría consultar (y con eso aprobar) el
+        // cobro de otra empresa con solo cambiar el número. Se
+        // compara contra el nombre de la empresa en sesión, que es
+        // lo que se guardó al crear la liga desde la pestaña Plan.
+        // ─────────────────────────────────────────────────────
+        $mia = (string)($_SESSION['empresa_nombre'] ?? '');
+        if ($mia !== '' && ($l['cliente'] ?? '') !== $mia) {
+            $this->json(['ok' => false, 'error' => 'No es tuya'], 403);
+        }
+
+        // Ya resuelto en una vuelta anterior del modal.
+        if ($l['estado'] === 'pagada') {
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'pagada']);
+        }
+        if ($l['estado'] === 'por_aprobar') {
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'por_aprobar']);
+        }
+
+        // Solo la tarjeta se consulta. SPEI y tienda avisan por webhook.
+        $consultable = \LibertyFin\Servicio\LigaPago::consultable($l['metodo']);
+
+        // No le pegamos al proveedor en cada vuelta: cada diez segundos
+        // basta y evita castigar su servicio.
+        $hace = $l['revisado_en'] ? (time() - strtotime($l['revisado_en'])) : 999;
+        if ($consultable && $hace >= 10) {
+            $cfg = \LibertyFin\Servicio\Integraciones::de('spei');
+            if ($cfg) {
+                $api = new \LibertyFin\Servicio\LigaPago($cfg);
+                $r = $api->estado($l['referencia'], $l['metodo']);
+
+                if ($r && !empty($r['pagado'])) {
+                    // ─────────────────────────────────────────────
+                    // AQUÍ ESTÁ LA DIFERENCIA CON CAJA
+                    //
+                    // En Caja el pago se abona a una venta
+                    // (RegistrarPago::abonar). Aquí no hay venta: hay
+                    // un pago de plan en `pagos_plan` que debe pasar a
+                    // `aprobado` y mover el plan y el vencimiento de la
+                    // empresa. Todo en la base principal, que es donde
+                    // viven los planes y los pagos de plan.
+                    //
+                    // Si `aprobarPorPago` no encuentra la fila, no es
+                    // un error: probablemente alguien ya la aprobó a
+                    // mano, o la liga se generó pero el pago se canceló
+                    // al elegir otro plan. Se registra y se sigue.
+                    // ─────────────────────────────────────────────
+                    $aprobado = null;
+                    try {
+                        $aprobado = (new PlanRepo($principal))
+                            ->aprobarPorPago($l['referencia'], $_SESSION['usuario_id'] ?? null);
+                        if ($aprobado) {
+                            \LibertyFin\Servicio\Auditoria::anota(
+                                'plan.aprobar',
+                                'cobro en linea ' . $l['referencia'],
+                                null,
+                                \LibertyFin\Dominio\Dinero::pesos($l['monto'])
+                            );
+                        }
+                    } catch (\Throwable $e) {
+                        error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
+                    }
+
+                    $ligaRepo->marcarPagada($l['id']);
+                    $this->json([
+                        'ok'      => true,
+                        'pagado'  => true,
+                        'estado'  => 'pagada',
+                        'plan'    => $aprobado ? [
+                            'nombre' => $aprobado['nombre_plan'] ?? '',
+                            'vence'  => $aprobado['vence_nuevo'] ?? null,
+                        ] : null,
+                    ]);
+                }
+
+                // No pagó todavía: se sella la consulta para no repetirla
+                // antes de diez segundos.
+                $ligaRepo->marcarRevisada($l['id']);
+            }
+        }
+
+        // `consulta` le dice al modal de qué va la espera: si estamos
+        // preguntando, o si toca esperar a que el proveedor avise. Con
+        // eso el usuario sabe si vale la pena quedarse mirando.
+        $this->json([
+            'ok'       => true,
+            'pagado'   => false,
+            'estado'   => 'pendiente',
+            'consulta' => $consultable,
+        ]);
+    }
+
     /** Mismo mapa que usa la Caja: '' = no eligió pagar en línea. */
     private static function formaEnLinea($como)
     {
@@ -569,6 +690,22 @@ final class UsuariosControlador
         }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: ' . $destino); exit;
+    }
+
+    /**
+     * Contesta JSON y termina.
+     *
+     * Vive aquí porque las respuestas del modal de plan (estadoPlan)
+     * las lee JavaScript, no un navegador que recarga. Si el mismo
+     * método tiene que poder contestar HTML y JSON según quién
+     * pregunte, esta es la puerta JSON; para HTML está volver().
+     */
+    private function json(array $cuerpo, $codigo = 200)
+    {
+        http_response_code((int)$codigo);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode($cuerpo, JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
     /** Foto de perfil. Cada quien la suya, sin pedir permiso a nadie. */
