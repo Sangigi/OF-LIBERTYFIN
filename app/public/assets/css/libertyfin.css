@@ -2924,10 +2924,10 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   .lf-lote-prods{flex:1 1 100%;text-align:left}
 }
 /* Varias personas: una fila por cada una, con su porcentaje y en qué. */
-.lf-lote-quienes{padding:4px 20px 2px}
-.lf-lote-quienes .lf-lote-quien{padding:0 0 14px;flex-wrap:nowrap;gap:12px 22px}
+.lf-lote-quienes{padding:4px 20px 4px;display:flex;flex-direction:column;gap:10px}
+.lf-lote-quienes .lf-lote-quien{display:block;padding:12px 14px 10px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);background:var(--lf-sup);cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
 .lf-lote-quien .form-control,.lf-lote-quien .form-select{height:38px}
-.lf-lote-quienes .lf-lote-quien + .lf-lote-quien{padding-top:12px;border-top:1px dashed var(--lf-linea)}
+.lf-lote-quien .campos{display:flex;flex-wrap:nowrap;gap:12px 22px;align-items:flex-end}
 .lf-lote-quitar{flex:0 0 auto;width:38px;height:38px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
   background:none;color:var(--lf-tinta-4);font-size:18px;line-height:1;cursor:pointer}
 .lf-lote-quitar:hover{color:var(--lf-rojo);border-color:currentColor}
@@ -2939,7 +2939,7 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-prods label input{margin-top:2px;flex-shrink:0}
 @media(max-width:760px){
   .lf-lote-quienes{padding:4px 14px 2px}
-  .lf-lote-quienes .lf-lote-quien{flex-wrap:wrap}
+  .lf-lote-quien .campos{flex-wrap:wrap}
   .lf-lote-quien label.quien,.lf-lote-quien label.en{flex:1 1 100%;max-width:none}
   .lf-lote-quien label.pct{flex:1 1 auto}
   .lf-lote-mas{padding:0 14px 16px}
@@ -2954,3 +2954,27 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-para label:has(input:not(:checked)){text-decoration:line-through;opacity:.6}
 .lf-lote-para input{width:13px;height:13px;margin:0;accent-color:var(--lf-brand)}
 @media(max-width:760px){ .lf-lote-estado{align-items:flex-end} .lf-lote-para{justify-content:flex-end} }
+/* La tarjeta de cada persona: tocarla la selecciona para elegir sus ventas. */
+.lf-lote-quienes .lf-lote-quien:hover{border-color:color-mix(in srgb,var(--lf-brand) 45%,var(--lf-linea))}
+.lf-lote-quienes .lf-lote-quien.activa{border-color:var(--lf-brand);background:var(--lf-brand-soft);
+  box-shadow:0 0 0 3px color-mix(in srgb,var(--lf-brand) 18%,transparent)}
+.lf-lote-quien .pie{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:10px;padding-top:9px;border-top:1px dashed var(--lf-linea);font-size:12px;color:var(--lf-tinta-3)}
+.lf-lote-quien.activa .pie{border-top-color:color-mix(in srgb,var(--lf-brand) 35%,transparent);color:var(--lf-brand-2);font-weight:600}
+.lf-lote-elegir{border:1px solid var(--lf-linea);background:var(--lf-sup);color:var(--lf-tinta-2);
+  border-radius:999px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer}
+.lf-lote-elegir:hover:not(:disabled){border-color:var(--lf-brand);color:var(--lf-brand-2)}
+.lf-lote-elegir:disabled{opacity:.5;cursor:not-allowed}
+.lf-lote-quien.activa .lf-lote-elegir{background:var(--lf-brand);border-color:var(--lf-brand);color:#fff}
+/* Mientras se eligen las ventas de alguien: aviso fijo arriba de la lista. */
+.lf-lote-modo{position:sticky;top:8px;z-index:5;display:flex;justify-content:space-between;align-items:center;
+  gap:12px;flex-wrap:wrap;margin:0 20px 12px;padding:10px 14px;border-radius:var(--lf-r);
+  background:var(--lf-brand-soft);border:1px solid var(--lf-brand);color:var(--lf-brand-2);font-size:12.5px;
+  box-shadow:var(--lf-s2)}
+.lf-lote-modo b{font-weight:700}
+.lf-lote-tabla.modo-persona thead th:first-child,
+.lf-lote-tabla.modo-persona tbody td:first-child{background:color-mix(in srgb,var(--lf-brand) 7%,transparent)}
+.lf-lote-tabla.modo-persona tr.mia td{background:color-mix(in srgb,var(--lf-brand) 5%,transparent)}
+.lf-lote-tabla.modo-persona tr.ajena{opacity:.45}
+.lf-lote-para label.yo{box-shadow:0 0 0 2px var(--lf-brand)}
+@media(max-width:760px){ .lf-lote-modo{margin:0 14px 12px;top:4px} }

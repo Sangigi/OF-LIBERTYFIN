@@ -127,7 +127,11 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
           Cada quien con su porcentaje y en qué productos, sobre la base comisionable de cada uno (sin IVA, sin costo y sin gastos), igual que al asignar desde la venta</p></div>
     </header>
     <div class="lf-lote-quienes" id="loteQuienes">
+      <?php /* Una tarjeta por persona. Tocarla la selecciona y la lista de
+               abajo pasa a ser la de SUS ventas: ahí se marcan o desmarcan
+               las que le tocan, cuando sea, aunque ya haya más personas. */ ?>
       <div class="lf-lote-quien" data-fila>
+       <div class="campos">
         <label class="quien">Colaborador
           <select class="form-select" name="colaborador[]" required>
             <option value="">Elegir…</option>
@@ -169,6 +173,11 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
           </select>
         </label>
         <button type="button" class="lf-lote-quitar" data-quitar aria-label="Quitar este colaborador" hidden>&times;</button>
+       </div>
+       <div class="pie">
+         <span data-cuenta>Elige a alguien para ver en cuántas ventas va</span>
+         <button type="button" class="lf-lote-elegir" data-elegir>Elegir sus ventas</button>
+       </div>
         <?php /* Clave de la fila: con ella cada venta dice a quiénes de aquí lleva. */ ?>
         <input type="hidden" name="fila[]" value="1">
       </div>
@@ -186,6 +195,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
           <?= count($ventas) ?> venta<?= count($ventas) === 1 ? '' : 's' ?> en la búsqueda
           · las que no se pueden salen sin marcar y con el motivo
+          · toca la tarjeta de una persona (arriba) para elegir solo sus ventas
           <?php if ($hayVarios): ?>
             · con varios productos, marca a cuáles va la comisión (vienen marcados <?= $area !== '' ? 'los de ' . P::e($area) : 'todos' ?>); cada uno sobre su propia base
           <?php endif; ?></p></div>
@@ -199,6 +209,11 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     <?php if (!$ventas): ?>
       <p class="lf-lote-vacio">No hay ventas con esos filtros<?= $solo ? ' que no tengan comisión' : '' ?>.</p>
     <?php else: ?>
+    <?php /* Se ve mientras hay una persona seleccionada: la lista es la suya. */ ?>
+    <div class="lf-lote-modo" id="lotePersona" hidden>
+      <span id="lotePersonaT"></span>
+      <button type="button" class="btn btn-primary btn-sm" id="lotePersonaOk">Listo</button>
+    </div>
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table table-hover lf-lote-tabla">
         <thead><tr>
@@ -217,9 +232,13 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
                 data-pid="<?= (int)$l1['producto_id'] ?>"<?php endif; ?>
               data-fijo="<?= P::e($fijo) ?>" class="<?= $fijo ? 'no' : '' ?>">
             <td data-label="Incluir">
-              <input type="checkbox" name="ventas[]" value="<?= (int)$v['id'] ?>"
+              <?php /* La casilla que se ve: la venta para todos, o para la persona
+                       seleccionada. Lo que se envía lo calcula el script: la
+                       venta va (`ventas[]`) si alguien quedó en ella. */ ?>
+              <input type="checkbox" class="lf-lote-sel"
                      aria-label="Incluir <?= P::e($v['codigo_venta']) ?>"
                      <?= $fijo ? 'disabled' : 'checked' ?>>
+              <input type="hidden" name="ventas[]" value="<?= (int)$v['id'] ?>" <?= $fijo ? 'disabled' : '' ?>>
             </td>
             <td data-label="Venta">
               <a href="/ventas/<?= (int)$v['id'] ?>" data-modal style="font-weight:600;color:var(--lf-tinta)">
@@ -260,6 +279,8 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
                 <span class="lf-lote-motivo"><?= $fijo ? P::e($fijo) : 'Lista' ?></span>
                 <?php /* Con dos o más personas, a quiénes lleva esta venta (lo pinta el script). */ ?>
                 <div class="lf-lote-para" hidden></div>
+                <?php /* Lo que se envía de "a quiénes": lo llena el script. */ ?>
+                <div class="lf-lote-datos" hidden></div>
               </div>
             </td>
           </tr>
@@ -296,12 +317,21 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
 
 <script>
 /* Asignar en lote.
-   Varias personas a la vez, cada una con su porcentaje. Al elegirlas,
-   cada fila se revisa contra esa elección: lo que una persona ya
-   comisiona no se le vuelve a dar, y "al especialista" no aplica en las
-   ventas que no tienen. Si a nadie le queda nada en una venta, se
-   desmarca y dice por qué. Así lo que se ve marcado es lo que de verdad
-   se va a asignar.
+
+   Varias personas a la vez, cada una con su porcentaje y su alcance (En).
+   Cada venta lleva a algunas de ellas; eso se guarda por venta y por
+   persona, y se edita de dos formas:
+
+   · Sin nadie seleccionado, la casilla de cada venta la pone o la quita
+     para TODOS.
+   · Al tocar la tarjeta de una persona, la lista pasa a ser la SUYA: la
+     casilla dice si esa venta le toca a ella, y se marca o desmarca sin
+     tocar a los demás. Se puede volver a cualquier persona cuando sea.
+
+   Lo que una persona ya comisiona no se le vuelve a dar, "al especialista"
+   no aplica donde no hay, nadie va dos veces en el mismo producto y en un
+   producto no se pasa de 100%. Lo que se ve marcado es lo que se asigna.
+
    La página se reemplaza al navegar sin recargar y este script vuelve a
    correr: todo se engancha a los elementos de esta página, que son
    nuevos cada vez. */
@@ -315,39 +345,59 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
   var cuenta = document.getElementById('loteCuenta');
   var resum  = document.getElementById('loteResumen');
   var conf   = document.getElementById('loteConf');
+  var modo   = document.getElementById('lotePersona');
+  var modoT  = document.getElementById('lotePersonaT');
+  var tabla  = form.querySelector('.lf-lote-tabla');
   var filas  = [].slice.call(form.querySelectorAll('tbody tr'));
   var MAX    = 10;
   var confirmado = false;
-  // venta:clave -> true cuando a esa persona se le quitó esa venta.
-  var apagado = {};
-  // Clave de la siguiente fila de "quiénes". No se reutiliza al quitar una
-  // fila, para que un chip apagado no pase a otra persona.
+
+  /* Quién va en qué venta.
+       'venta:clave' -> true  la persona NO va en esa venta
+                        false la persona SÍ va, aunque la venta se haya quitado
+       'venta:*'     -> true  la venta se quitó para todos (y para quien se agregue)
+     Sin nada anotado, todos van. */
+  var fuera = {};
+  // La persona cuyas ventas se están eligiendo (su clave), o null.
+  var activa = null;
+  // Clave de la siguiente fila. No se reutiliza al quitar una fila, para
+  // que lo anotado de una persona no pase a otra.
   var sig = 1;
-  [].forEach.call(document.querySelectorAll('#loteQuienes input[name="fila[]"]'), function (i) {
+  [].forEach.call(caja.querySelectorAll('input[name="fila[]"]'), function (i) {
     sig = Math.max(sig, +i.value || 0);
   });
 
-  /* ── Quiénes ── */
+  /* ══ Las personas ══ */
   function renglones() { return [].slice.call(caja.querySelectorAll('[data-fila]')); }
+  function claveDe(r)  { return r.querySelector('input[name="fila[]"]').value; }
 
-  /* [{q: 'esp' | id, pct, nombre, en, enTexto}] de las filas con alguien
-     elegido. `en` es '' (todos), 'a:Área' o 'p:id de producto'. */
-  function quienes() {
+  /* [{q: 'esp' | id, pct, k, nombre, en, enTexto}] de las filas con alguien
+     elegido. `en` es '' (todos), 'a:Área' o 'p:id de producto'. Durante
+     `revisar` se lee una vez y se reutiliza. */
+  var QS = null;
+  function leerQuienes() {
     return renglones().map(function (r) {
-      var s = r.querySelector('select[name="colaborador[]"]'), p = r.querySelector('input'),
+      var s = r.querySelector('select[name="colaborador[]"]'),
+          p = r.querySelector('input[name="porcentaje[]"]'),
           e = r.querySelector('select[name="en[]"]');
-      return { q: s.value, pct: parseFloat(p.value),
-               k: r.querySelector('input[name="fila[]"]').value,
+      return { q: s.value, pct: parseFloat(p.value), k: claveDe(r),
                nombre: s.value ? s.options[s.selectedIndex].text : '',
+               corto: s.value === 'esp' ? 'Especialista' : (s.value ? s.options[s.selectedIndex].text : ''),
                en: e.value, enTexto: e.value ? e.options[e.selectedIndex].text : '' };
     }).filter(function (x) { return x.q; });
+  }
+  function quienes() { return QS || leerQuienes(); }
+  function persona(k) {
+    var qs = quienes();
+    for (var i = 0; i < qs.length; i++) if (qs[i].k === k) return qs[i];
+    return null;
   }
 
   function pintarRenglones() {
     var rs = renglones(), vistos = {}, total = 0, todosEnTodo = true;
     rs.forEach(function (r) {
       var s = r.querySelector('select[name="colaborador[]"]'), e = r.querySelector('select[name="en[]"]');
-      var p = parseFloat(r.querySelector('input').value);
+      var p = parseFloat(r.querySelector('input[name="porcentaje[]"]').value);
       r.querySelector('[data-quitar]').hidden = rs.length < 2;
       // La misma persona en lo mismo dos veces es un error de captura. En
       // cosas distintas sí se vale: Juan 10% en Legal y 5% en Contabilidad.
@@ -356,6 +406,10 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
       if (s.value) vistos[k] = true;
       if (e.value) todosEnTodo = false;
       if (p > 0) total += p;
+      var sel = activa === claveDe(r);
+      r.classList.toggle('activa', sel);
+      r.querySelector('[data-elegir]').textContent = sel ? 'Listo' : 'Elegir sus ventas';
+      r.querySelector('[data-elegir]').disabled = !s.value;
     });
     mas.disabled = rs.length >= MAX;
     total = Math.round(total * 100) / 100;
@@ -366,13 +420,20 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     suma.className = todosEnTodo && total > 100 ? 'mal' : '';
   }
 
+  function seleccionar(k) {
+    activa = k && persona(k) ? k : null;
+    pintarRenglones();
+    revisar();
+  }
+
   mas.addEventListener('click', function () {
     var rs = renglones();
     if (rs.length >= MAX) return;
     var nuevo = rs[0].cloneNode(true);
     [].forEach.call(nuevo.querySelectorAll('select'), function (s) { s.value = ''; s.setCustomValidity(''); });
-    nuevo.querySelector('input').value = '';
+    nuevo.querySelector('input[name="porcentaje[]"]').value = '';
     nuevo.querySelector('input[name="fila[]"]').value = String(++sig);
+    nuevo.classList.remove('activa');
     caja.appendChild(nuevo);
     pintarRenglones();
     revisar();
@@ -380,26 +441,48 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
   });
 
   caja.addEventListener('click', function (e) {
-    var b = e.target.closest('[data-quitar]');
-    if (!b || renglones().length < 2) return;
-    b.closest('[data-fila]').remove();
-    pintarRenglones();
-    revisar();
+    var r = e.target.closest('[data-fila]');
+    if (!r) return;
+    if (e.target.closest('[data-quitar]')) {
+      if (renglones().length < 2) return;
+      if (activa === claveDe(r)) activa = null;
+      r.remove();
+      pintarRenglones();
+      revisar();
+      return;
+    }
+    if (e.target.closest('[data-elegir]')) {
+      seleccionar(activa === claveDe(r) ? null : claveDe(r));
+      return;
+    }
+    // Tocar la tarjeta (fuera de sus campos) también la selecciona.
+    if (e.target.closest('select, input, label, button')) return;
+    if (!r.querySelector('select[name="colaborador[]"]').value) return;
+    seleccionar(activa === claveDe(r) ? null : claveDe(r));
   });
 
   caja.addEventListener('change', function (e) {
     if (e.target.name === 'colaborador[]') {
       // El porcentaje que esa persona suele cobrar, si no hay uno escrito.
       var o = e.target.options[e.target.selectedIndex];
-      var p = e.target.closest('[data-fila]').querySelector('input');
+      var p = e.target.closest('[data-fila]').querySelector('input[name="porcentaje[]"]');
       if (o && o.dataset.pct && !p.value) p.value = o.dataset.pct;
+      if (!e.target.value && activa === claveDe(e.target.closest('[data-fila]'))) activa = null;
     }
     pintarRenglones();
     revisar();
   });
-  caja.addEventListener('input', function () { pintarRenglones(); contar(); });
+  // El porcentaje cuenta para el tope de 100% por producto: se revisa todo.
+  caja.addEventListener('input', function () { pintarRenglones(); revisar(); });
 
-  /* ── Cada venta contra esa elección ── */
+  if (modo) modo.querySelector('#lotePersonaOk').addEventListener('click', function () { seleccionar(null); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && activa && conf.hidden && document.body.contains(form)) seleccionar(null);
+  });
+
+  /* ══ Cada venta ══ */
+  function ventaId(tr) { return tr.querySelector('input[name="ventas[]"]').value; }
+
   /* Los productos de la venta que se van a comisionar: el único que
      tiene, o los que estén marcados. Cada uno con quién ya comisiona. */
   function productos(tr) {
@@ -421,36 +504,37 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     return false;
   }
 
-  /* Por persona: su id real en esta venta ("esp" se vuelve el
-     especialista), sus productos y cuántos de ellos le quedan libres.
-     Igual que en el servidor: nadie recibe dos comisiones en el mismo
-     producto (la primera fila gana), y en un producto los porcentajes
-     de todos no pueden pasar de 100. */
-  function ventaId(tr) { return tr.querySelector('input[name="ventas[]"]').value; }
-
-  /* Las filas de "quiénes" que tocan algún producto de esta venta. */
-  function aplicables(tr) {
-    var ps = productos(tr);
-    return quienes().filter(function (x) {
-      return ps.some(function (p) { return enAlcance(p, x.en); });
+  function quitado(vid, k) {
+    var v = fuera[vid + ':' + k];
+    return v === true || (v !== false && fuera[vid + ':*'] === true);
+  }
+  function soloVenta(vid) {
+    Object.keys(fuera).forEach(function (c) {
+      if (c.indexOf(vid + ':') === 0) delete fuera[c];
     });
   }
+  /* Pone o quita la venta para todos. */
+  function ponerVenta(vid, si) {
+    soloVenta(vid);
+    if (!si) fuera[vid + ':*'] = true;
+  }
 
-  /* Con dos o más personas para una venta salen los chips, y ahí se puede
-     quitar a alguien solo de esa venta. Con una, basta la casilla de la
-     venta. */
-  function hayPara(tr) { return aplicables(tr).length > 1; }
-
-  function reparto(tr) {
-    var ps = productos(tr), usados = {}, suma = {};
-    var para = hayPara(tr), vid = ventaId(tr);
+  /* Por persona: si le toca algo de esta venta, si se quitó de ella, y
+     cuántas comisiones le salen. Igual que en el servidor: nadie va dos
+     veces en el mismo producto (la primera fila gana) y en un producto
+     los porcentajes no pasan de 100. Con `todos`, como si nadie se
+     hubiera quitado: sirve para saber qué es posible. */
+  function reparto(tr, todos) {
+    var ps = productos(tr), usados = {}, suma = {}, vid = ventaId(tr);
     return quienes().map(function (x) {
+      var r = { x: x, libres: 0, aplica: false, quitado: false, motivo: '' };
       var esp = x.q === 'esp';
       var mios = ps.filter(function (p) { return enAlcance(p, x.en); });
-      if (!mios.length) return { libres: 0, aplica: false, motivo: '' };
-      if (para && apagado[vid + ':' + x.k]) return { libres: 0, aplica: false, quitado: true, motivo: '' };
+      if (!mios.length) { r.motivo = 'No es de su alcance (' + (x.enTexto || 'sus productos') + ')'; return r; }
+      r.aplica = true;
+      if (!todos && quitado(vid, x.k)) { r.quitado = true; return r; }
       var id = esp ? tr.dataset.esp : x.q;
-      if (!id || id === '0') return { libres: 0, aplica: true, motivo: 'No tiene especialista' };
+      if (!id || id === '0') { r.motivo = 'No tiene especialista'; return r; }
       var pasa = false;
       var l = mios.filter(function (p) {
         if ((',' + p.c + ',').indexOf(',' + id + ',') !== -1 || usados[id + ':' + p.k]) return false;
@@ -458,30 +542,41 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
         return true;
       });
       l.forEach(function (p) { usados[id + ':' + p.k] = true; suma[p.k] = (suma[p.k] || 0) + (x.pct || 0); });
-      return { libres: l.length, aplica: true,
-               motivo: l.length ? '' : pasa ? 'Los porcentajes pasan de 100% en un producto'
-                     : esp ? 'Su especialista ya tiene comisión' : 'Ya tiene comisión de esta persona' };
+      r.libres = l.length;
+      r.motivo = l.length ? '' : pasa ? 'Los porcentajes pasan de 100% en un producto'
+               : esp ? 'Su especialista ya tiene comisión' : 'Ya tiene comisión';
+      return r;
     });
+  }
+  function de(rs, k) {
+    for (var i = 0; i < rs.length; i++) if (rs[i].x.k === k) return rs[i];
+    return null;
+  }
+
+  /* Por qué esta venta no se puede, aunque se quisiera. '' si sí se puede. */
+  function imposible(tr) {
+    if (tr.dataset.fijo) return tr.dataset.fijo;
+    if (!productos(tr).length) return 'Marca al menos un producto';
+    if (!quienes().length) return '';
+    var rs = reparto(tr, true);
+    if (rs.some(function (r) { return r.libres; })) return '';
+    var ap = rs.filter(function (r) { return r.aplica; });
+    if (!ap.length) return 'Sus productos no son para nadie de la lista';
+    if (ap.length === 1) return ap[0].motivo;
+    return 'Ya tienen comisión' + (ap.some(function (r) { return r.motivo === 'No tiene especialista'; })
+      ? ' (y no tiene especialista)' : '');
   }
 
   function libres(tr) {
-    if (!quienes().length) return productos(tr).length;
     return reparto(tr).reduce(function (s, r) { return s + r.libres; }, 0);
   }
 
-  function motivo(tr) {
-    if (tr.dataset.fijo) return tr.dataset.fijo;
-    if (!productos(tr).length) return 'Marca al menos un producto';
-    var rs = reparto(tr);
-    if (!rs.length || rs.some(function (r) { return r.libres; })) return '';
-    var aplican = rs.filter(function (r) { return r.aplica; });
-    if (!aplican.length) {
-      return rs.some(function (r) { return r.quitado; })
-        ? 'Quitaste a todos de esta venta' : 'Sus productos no son para nadie de la lista';
-    }
-    if (aplican.length === 1) return aplican[0].motivo;
-    return 'Ya tienen comisión' + (aplican.some(function (r) { return r.motivo === 'No tiene especialista'; })
-      ? ' (y no tiene especialista)' : '');
+  /* ¿La venta va? Antes de elegir a nadie, si no se quitó; después, si a
+     alguien le sale al menos una comisión. */
+  function incluida(tr) {
+    if (imposible(tr)) return false;
+    if (!quienes().length) return !fuera[ventaId(tr) + ':*'];
+    return libres(tr) > 0;
   }
 
   /* "Lista", o cuántas comisiones salen de esta venta. */
@@ -493,13 +588,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
                                    : l + ' de ' + sel + ' productos');
   }
 
-  function marcadas() {
-    return filas.filter(function (tr) {
-      var c = tr.querySelector('input[type=checkbox]');
-      return c && c.checked && !c.disabled;
-    });
-  }
-
+  function marcadas() { return filas.filter(incluida); }
   function comisiones() {
     return marcadas().reduce(function (s, tr) { return s + libres(tr); }, 0);
   }
@@ -510,20 +599,123 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     }).join(' + ');
   }
 
+  /* ══ Pintar ══ */
+  function revisar() {
+    QS = leerQuienes();
+    if (activa && !persona(activa)) activa = null;
+    var yo = activa ? persona(activa) : null;
+    var porPersona = {};
+
+    filas.forEach(function (tr) {
+      var c   = tr.querySelector('.lf-lote-sel');
+      var vid = ventaId(tr);
+      var no  = imposible(tr);
+      var rs  = no ? [] : reparto(tr);
+      var va  = !no && (QS.length ? rs.some(function (r) { return r.libres; }) : !fuera[vid + ':*']);
+
+      rs.forEach(function (r) { if (r.libres) porPersona[r.x.k] = (porPersona[r.x.k] || 0) + 1; });
+
+      // La casilla: la venta para todos, o para la persona seleccionada.
+      if (yo) {
+        var mio = no ? null : de(reparto(tr, true), activa);
+        var puede = !!(mio && mio.libres);
+        c.disabled = !puede;
+        c.checked = puede && !quitado(vid, activa);
+        c.indeterminate = false;
+        c.title = puede ? '' : (no || (mio && mio.motivo) || '');
+        tr.classList.toggle('ajena', !puede);
+        tr.classList.toggle('mia', c.checked);
+      } else {
+        var aplican = rs.filter(function (r) { return r.aplica; });
+        var dentro  = aplican.filter(function (r) { return !r.quitado; });
+        c.disabled = !!no;
+        c.checked = va;
+        c.indeterminate = va && dentro.length > 0 && dentro.length < aplican.length;
+        c.title = '';
+        tr.classList.remove('ajena', 'mia');
+      }
+
+      tr.classList.toggle('no', !!no || !va);
+      tr.querySelector('.lf-lote-motivo').textContent = no || (va ? listo(tr) : 'No va');
+
+      // Lo que se envía: la venta si va, y a quiénes lleva.
+      tr.querySelector('input[name="ventas[]"]').disabled = !va;
+      var datos = tr.querySelector('.lf-lote-datos');
+      datos.innerHTML = '';
+      if (va && QS.length) {
+        datos.appendChild(oculto('para[' + vid + '][]', '-'));
+        rs.forEach(function (r) { if (r.aplica && !r.quitado) datos.appendChild(oculto('para[' + vid + '][]', r.x.k)); });
+      }
+      pintarPara(tr, no ? [] : rs);
+    });
+
+    // En cada tarjeta, en cuántas ventas va esa persona.
+    renglones().forEach(function (r) {
+      var k = claveDe(r), x = persona(k), n = porPersona[k] || 0;
+      r.querySelector('[data-cuenta]').textContent = !x ? 'Elige a alguien para ver en cuántas ventas va'
+        : n ? 'Va en ' + n + (n === 1 ? ' venta' : ' ventas') : 'No va en ninguna venta de la lista';
+    });
+
+    // El aviso de arriba de la lista mientras se eligen las ventas de alguien.
+    if (modo) modo.hidden = !yo;
+    if (tabla) tabla.classList.toggle('modo-persona', !!yo);
+    if (yo && modoT) {
+      modoT.innerHTML = '';
+      modoT.appendChild(document.createTextNode('Eligiendo las ventas de '));
+      var b = document.createElement('b'); b.textContent = yo.nombre; modoT.appendChild(b);
+      modoT.appendChild(document.createTextNode(
+        (yo.pct > 0 ? ' · ' + yo.pct + '%' : '') + (yo.en ? ' en ' + yo.enTexto : '')
+        + '. Marca o desmarca sus ventas; a los demás no les cambia nada.'));
+    }
+
+    contar();
+    QS = null;
+  }
+
+  function oculto(nombre, valor) {
+    var i = document.createElement('input');
+    i.type = 'hidden'; i.name = nombre; i.value = valor;
+    return i;
+  }
+
+  /* Los chips de la venta: quiénes van en ella. Tocar uno quita o pone a
+     esa persona solo en esta venta. Salen con dos o más personas. */
+  function pintarPara(tr, rs) {
+    var box = tr.querySelector('.lf-lote-para');
+    box.innerHTML = '';
+    var aplican = rs.filter(function (r) { return r.aplica; });
+    if (quienes().length < 2 || !aplican.length) { box.hidden = true; return; }
+    box.hidden = false;
+    aplican.forEach(function (r) {
+      var l = document.createElement('label');
+      var c = document.createElement('input');
+      c.type = 'checkbox'; c.value = r.x.k;
+      c.setAttribute('data-para', '');
+      c.checked = !r.quitado;
+      l.title = c.checked ? 'Quitar de esta venta' : 'Poner en esta venta';
+      if (r.x.k === activa) l.className = 'yo';
+      l.appendChild(c);
+      l.appendChild(document.createTextNode(r.x.corto + (r.x.en ? ' · ' + r.x.enTexto : '')));
+      box.appendChild(l);
+    });
+  }
+
   function contar() {
-    var n = marcadas().length;
-    if (cuenta) cuenta.textContent = n + (n === 1 ? ' marcada' : ' marcadas');
-    var abiertas = filas.filter(function (tr) { return !tr.querySelector('input').disabled; });
+    var propio = !QS;
+    if (propio) QS = leerQuienes();
+    var vs = marcadas(), n = vs.length;
+    if (cuenta) cuenta.textContent = n + (n === 1 ? ' venta va' : ' ventas van');
     if (todas) {
-      todas.checked = abiertas.length > 0 && n === abiertas.length;
-      todas.indeterminate = n > 0 && n < abiertas.length;
+      var abiertas = filas.filter(function (tr) { return !tr.querySelector('.lf-lote-sel').disabled; });
+      var on = abiertas.filter(function (tr) { return tr.querySelector('.lf-lote-sel').checked; }).length;
+      todas.checked = abiertas.length > 0 && on === abiertas.length;
+      todas.indeterminate = on > 0 && on < abiertas.length;
       todas.disabled = !abiertas.length;
+      todas.setAttribute('aria-label', activa ? 'Marcar todas sus ventas' : 'Marcar todas');
     }
     if (resum) {
-      var qs = quienes(), c = comisiones();
-      var faltaPct = renglones().some(function (r) {
-        return r.querySelector('select').value && !(parseFloat(r.querySelector('input').value) > 0);
-      });
+      var qs = quienes(), c = vs.reduce(function (s, tr) { return s + libres(tr); }, 0);
+      var faltaPct = qs.some(function (x) { return !(x.pct > 0); });
       var ventas = n + (n === 1 ? ' venta' : ' ventas')
         + (qs.length && c !== n ? ' (' + c + (c === 1 ? ' comisión)' : ' comisiones)') : '');
       resum.textContent = !n ? 'No hay ventas marcadas.'
@@ -531,64 +723,33 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
         : faltaPct ? ventas + ' para ' + describir(qs) + '. Falta el porcentaje.'
         : ventas + ' · ' + describir(qs);
     }
+    if (propio) QS = null;
   }
 
-  function revisar() {
-    filas.forEach(function (tr) {
-      var c = tr.querySelector('input[type=checkbox]');
-      var m = motivo(tr);
-      var antes = c.disabled;
-      c.disabled = !!m;
-      if (m) c.checked = false;
-      else if (antes && !tr.dataset.fijo) c.checked = true;   // vuelve a quedar disponible
-      tr.classList.toggle('no', !!m);
-      tr.querySelector('.lf-lote-motivo').textContent = m || listo(tr);
-      pintarPara(tr);
-    });
-    contar();
-  }
-
-  /* Los chips de la venta: uno por persona que le toca. Apagado = esa
-     persona no va en esta venta. El "-" oculto le dice al servidor que en
-     esta venta se eligió, aunque se apaguen todos. */
-  function pintarPara(tr) {
-    var box = tr.querySelector('.lf-lote-para');
-    if (!box) return;
-    box.innerHTML = '';
-    if (tr.dataset.fijo || !hayPara(tr)) { box.hidden = true; return; }
-    box.hidden = false;
+  /* ══ Marcar ══ */
+  function marcarVenta(tr, si) {
     var vid = ventaId(tr);
-    var marca = document.createElement('input');
-    marca.type = 'hidden'; marca.name = 'para[' + vid + '][]'; marca.value = '-';
-    box.appendChild(marca);
-    aplicables(tr).forEach(function (x) {
-      var l = document.createElement('label');
-      var c = document.createElement('input');
-      c.type = 'checkbox'; c.name = 'para[' + vid + '][]'; c.value = x.k;
-      c.setAttribute('data-para', '');
-      c.checked = !apagado[vid + ':' + x.k];
-      l.title = c.checked ? 'Quitar de esta venta' : 'Volver a poner en esta venta';
-      l.appendChild(c);
-      l.appendChild(document.createTextNode(
-        (x.q === 'esp' ? 'Especialista' : x.nombre) + (x.en ? ' · ' + x.enTexto : '')));
-      box.appendChild(l);
-    });
+    if (activa) fuera[vid + ':' + activa] = !si;
+    else ponerVenta(vid, si);
   }
 
   form.addEventListener('change', function (e) {
-    if (e.target === todas) {
+    var t = e.target;
+    if (t === todas) {
       filas.forEach(function (tr) {
-        var c = tr.querySelector('input[type=checkbox]');
-        if (!c.disabled) c.checked = todas.checked;
+        if (!tr.querySelector('.lf-lote-sel').disabled) marcarVenta(tr, todas.checked);
       });
-    }
-    // Quitar o poner a alguien en una venta, o cambiar sus productos,
-    // puede cambiar si la venta se puede o no.
-    if (e.target.matches('input[data-para]')) {
-      apagado[ventaId(e.target.closest('tr')) + ':' + e.target.value] = !e.target.checked;
       revisar();
-    } else if (e.target.matches('input[data-prod]')) revisar();
-    else if (e.target.matches('tbody input[type=checkbox], #loteTodas')) contar();
+    } else if (t.matches('.lf-lote-sel')) {
+      marcarVenta(t.closest('tr'), t.checked);
+      revisar();
+    } else if (t.matches('input[data-para]')) {
+      fuera[ventaId(t.closest('tr')) + ':' + t.value] = !t.checked;
+      revisar();
+    } else if (t.matches('input[data-prod]')) {
+      // Cambiar los productos de una venta puede cambiar si se puede o no.
+      revisar();
+    }
   });
 
   /* Enter en un porcentaje no manda nada: aquí un envío por accidente
@@ -597,7 +758,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') e.preventDefault();
   });
 
-  /* ── Confirmar ── */
+  /* ══ Confirmar ══ */
   function cerrar() { conf.hidden = true; document.body.classList.remove('lf-modal-abierto'); }
   [].forEach.call(conf.querySelectorAll('[data-lote-cerrar]'), function (b) {
     b.addEventListener('click', cerrar);
@@ -608,15 +769,26 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
   form.addEventListener('submit', function (e) {
     if (confirmado) return;                  // ya confirmado: que se envíe
     e.preventDefault();
-    var n = marcadas().length;
+    revisar();                               // lo que se envía, al día
+    var vs = marcadas(), n = vs.length;
     if (!n) { alert('Marca al menos una venta.'); return; }
     if (!form.reportValidity()) return;
     var qs = quienes();
     var c = comisiones();
     if (!c) { alert('Con esa elección no queda ninguna comisión por asignar.'); return; }
+
+    // Por persona, en cuántas de las ventas que van.
+    var cuantas = {};
+    vs.forEach(function (tr) {
+      reparto(tr).forEach(function (r) { if (r.libres) cuantas[r.x.k] = (cuantas[r.x.k] || 0) + 1; });
+    });
     var datos = [['Ventas', n]];
     if (c !== n) datos.push(['Comisiones', c + (qs.length > 1 ? '' : ' (una por producto)')]);
-    qs.forEach(function (x) { datos.push([x.nombre, x.pct + '%' + (x.en ? ' · solo ' + x.enTexto : '')]); });
+    qs.forEach(function (x) {
+      var m = cuantas[x.k] || 0;
+      datos.push([x.nombre, x.pct + '%' + (x.en ? ' · solo ' + x.enTexto : '')
+                  + ' · ' + m + (m === 1 ? ' venta' : ' ventas')]);
+    });
 
     var d = document.getElementById('loteConfD');
     d.innerHTML = '';
