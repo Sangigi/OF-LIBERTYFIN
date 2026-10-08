@@ -85,6 +85,19 @@ final class LoginControlador
         }
     }
 
+    /**
+     * La página pregunta si su sesión sigue abierta. Llegar aquí ya es
+     * la respuesta: si la cuenta se abrió en otro dispositivo, el portero
+     * (public/index.php) contesta antes, con `sesion_cerrada`.
+     */
+    public function pulso()
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo '{"ok":true}';
+        exit;
+    }
+
     public function salir()
     {
         // La cuenta queda libre: entrar desde otro lado ya no pregunta.

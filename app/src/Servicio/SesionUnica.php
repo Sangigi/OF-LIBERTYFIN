@@ -25,8 +25,8 @@ use PDO;
  *
  * EN CADA PETICIÓN el portero (public/index.php) pregunta vigente(): si
  * la ficha de esta sesión ya no es la de la cuenta, otra la reemplazó y
- * esta se cierra. Se confirma como mucho cada REVISAR segundos por
- * sesión: una consulta por llave primaria, no una por clic.
+ * esta se cierra. Es una consulta por llave primaria. Además, cada página
+ * abierta pregunta sola cada 15 s (lf-chat.js), para enterarse sin clic.
  *
  * Si la tabla falla, NO se saca a nadie: mejor una sesión doble un rato
  * que todo el mundo afuera por un problema de la base.
@@ -34,7 +34,6 @@ use PDO;
 final class SesionUnica
 {
     const ACTIVA  = 900;   // 15 min: con movimiento en ese lapso, "está abierta"
-    const REVISAR = 20;    // cada cuánto se confirma que esta sesión sigue siendo la vigente
     const ESPERA  = 180;   // cuánto vale un "¿cerrar la otra y entrar?" sin contestar
 
     /** El dispositivo de la sesión que desplazó a esta (para el aviso). */
@@ -154,7 +153,6 @@ final class SesionUnica
         }
         $_SESSION['lf_sesion_cuenta']   = $cuenta;
         $_SESSION['lf_sesion_token']    = $token;
-        $_SESSION['lf_sesion_revisada'] = time();
     }
 
     /**
@@ -166,10 +164,9 @@ final class SesionUnica
         $cuenta = self::cuentaDeSesion();
         if (!$cuenta) return true;
         $mio = (string)($_SESSION['lf_sesion_token'] ?? '');
-        if ($mio !== '' && ($_SESSION['lf_sesion_cuenta'] ?? '') === $cuenta
-            && time() - (int)($_SESSION['lf_sesion_revisada'] ?? 0) < self::REVISAR) {
-            return true;
-        }
+        // Se revisa en CADA petición. Antes se confiaba en la última
+        // revisión durante 20 s y, en ese lapso, la sesión desplazada
+        // seguía funcionando: parecía que no la había sacado.
         try {
             $db = self::db();
             $st = $db->prepare("SELECT token, dispositivo, TIMESTAMPDIFF(SECOND, ultimo, NOW()) AS hace
@@ -184,7 +181,6 @@ final class SesionUnica
                     $db->prepare("UPDATE lf_sesiones SET ultimo = NOW() WHERE cuenta = ? AND token = ?")
                        ->execute([$cuenta, $mio]);
                 }
-                $_SESSION['lf_sesion_revisada'] = time();
                 return true;
             }
             // Tenía ficha y ya no es la de la cuenta (o la fila se borró

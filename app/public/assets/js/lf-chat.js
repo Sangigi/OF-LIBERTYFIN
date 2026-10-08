@@ -60,7 +60,15 @@
     opciones.credentials = 'same-origin';
     opciones.headers = { 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' };
     return fetch(url, opciones)
-      .then(function (r) { return r.text(); })
+      .then(function (r) {
+        // La sesión ya no existe (venció, o se cerró desde otro lado) y
+        // el servidor mandó a la pantalla de entrar: allá vamos.
+        if (r.redirected && /\/login\/?(\?|$)/.test(String(r.url).replace(location.origin, ''))) {
+          aEntrar();
+          return '';
+        }
+        return r.text();
+      })
       .then(function (t) {
         var j = null;
         try { j = JSON.parse(t); } catch (e) { return null; }
@@ -1470,9 +1478,28 @@
     try { abrirChat(JSON.parse(b.getAttribute('data-lf-abrir-chat'))); } catch (err) {}
   });
 
+  /* ══ 5 · ¿Sigue abierta esta sesión? ══
+     Si la cuenta se abrió en otro dispositivo (ver Servicio\SesionUnica),
+     esta pestaña se entera SOLA: al volver a ella y cada 15 s mientras
+     está a la vista. Sin esto solo se enteraba al dar el siguiente clic,
+     y mientras tanto parecía que no la habían sacado. */
+  function pulsoSesion() {
+    if (!window.fetch) return;
+    var ultimo = 0;
+    function revisar() {
+      if (document.hidden || saliendo) return;
+      if (Date.now() - ultimo < 3000) return;   // volver y enfocar llegan juntos
+      ultimo = Date.now();
+      pedir('/sesion/pulso').then(null, function () {});
+    }
+    setInterval(revisar, 15000);
+    document.addEventListener('visibilitychange', revisar);
+    window.addEventListener('focus', revisar);
+  }
+
   window.LFChat = { enlazar: enlazar, abrir: abrirChat, revisar: function () { revisarCliente(); } };
 
-  function arrancar() { enlazar(document); clienteNovedades(); soporteNovedades(); }
+  function arrancar() { enlazar(document); clienteNovedades(); soporteNovedades(); pulsoSesion(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar);
   else arrancar();
 })();

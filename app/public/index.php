@@ -54,6 +54,8 @@ $r->get('/login',  ['LibertyFin\Controlador\LoginControlador', 'mostrar']);
 $r->post('/login', ['LibertyFin\Controlador\LoginControlador', 'entrar']);
 // "Cerrarla y entrar aquí", cuando la cuenta está abierta en otro dispositivo.
 $r->post('/login/confirmar', ['LibertyFin\Controlador\LoginControlador', 'confirmar']);
+// ¿Sigue abierta esta sesión? Lo pregunta cada página sola (ver SesionUnica).
+$r->get('/sesion/pulso',      ['LibertyFin\Controlador\LoginControlador', 'pulso']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);
 // El registro solo existe si hay credenciales de cPanel: sin ellas no se
