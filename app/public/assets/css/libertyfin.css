@@ -3248,13 +3248,17 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   transition:border-color .2s ease,box-shadow .2s ease,transform .3s var(--lf-rebote)}
 .lf-emoji-bt:hover{border-color:var(--lf-brand);transform:scale(1.06)}
 .lf-emoji.abierto .lf-emoji-bt{border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-glow)}
+/* Cerrada NO ocupa lugar (display:none). Escondida con opacity o
+   visibility seguía contando para el ancho de la página: en el celular,
+   con el botón a media fila, se salía por la derecha y la página entera
+   quedaba más ancha que la pantalla (la barra de abajo se desbordaba).
+   Al abrir entra con una animación, y el chat la recorre si no cabe. */
 .lf-emoji-pop{position:absolute;left:0;bottom:calc(100% + 8px);z-index:30;
-  display:grid;grid-template-columns:repeat(8,32px);gap:2px;padding:8px;
+  display:none;grid-template-columns:repeat(8,32px);gap:2px;padding:8px;
   border-radius:14px;border:1px solid var(--lf-linea);background:var(--lf-sup);
-  box-shadow:var(--lf-s3, 0 12px 32px rgba(0,0,0,.16));
-  opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px) scale(.97);transform-origin:0 100%;
-  transition:opacity .18s ease,transform .26s var(--lf-suave),visibility 0s linear .26s}
-.lf-emoji.abierto .lf-emoji-pop{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}
+  box-shadow:var(--lf-s3, 0 12px 32px rgba(0,0,0,.16));transform-origin:0 100%}
+.lf-emoji.abierto .lf-emoji-pop{display:grid;animation:lf-emoji-abre .24s var(--lf-suave) both}
+@keyframes lf-emoji-abre{from{opacity:0;transform:translateY(6px) scale(.97)}}
 .lf-emoji-pop button{width:32px;height:32px;padding:0;border:0;border-radius:8px;background:none;
   font-size:19px;line-height:1;cursor:pointer;transition:background .15s ease,transform .2s var(--lf-rebote)}
 .lf-emoji-pop button:hover,.lf-emoji-pop button:focus-visible{background:var(--lf-vidrio);transform:scale(1.18);outline:none}
@@ -3302,7 +3306,7 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 @keyframes lf-aparece{from{opacity:0}}
 
 @media (prefers-reduced-motion:reduce){
-  .lf-adj-vista,.lf-chatf > .lista{animation:none!important}
+  .lf-adj-vista,.lf-chatf > .lista,.lf-emoji.abierto .lf-emoji-pop{animation:none!important}
   .lf-emoji-pop,.lf-emoji-bt,.lf-emoji-pop button,.lf-msj .adj-img img{transition:none!important}
 }
 
@@ -3420,3 +3424,5 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 @media (prefers-reduced-motion:reduce){
   .lf-campana.con-nuevos .lf-campana-bt svg,.lf-campana-pop{animation:none!important}
 }
+/* El ticket que se está viendo ahora, en la lista de la campana. */
+.lf-campana-pop .it.aqui{box-shadow:inset 3px 0 0 var(--lf-brand)}

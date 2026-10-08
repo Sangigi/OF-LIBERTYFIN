@@ -311,6 +311,14 @@
       caja.classList.add('abierto');
       bt.setAttribute('aria-expanded', 'true');
       emojiAbierto = caja;
+      // Que no se salga de la pantalla (en el celular el botón puede
+      // quedar a media fila): se recorre lo que haga falta.
+      pop.style.left = '';
+      var r = pop.getBoundingClientRect(), ancho = document.documentElement.clientWidth;
+      var mover = 0;
+      if (r.right > ancho - 8) mover = (ancho - 8) - r.right;
+      if (r.left + mover < 8) mover = 8 - r.left;
+      if (mover) pop.style.left = mover + 'px';
     });
     caja.appendChild(bt);
     caja.appendChild(pop);
@@ -1214,10 +1222,10 @@
       return (+leer('lf_sop_avisado_' + t.id) || 0) < t.mensaje_id;
     });
     nuevos.forEach(function (t) { guardar('lf_sop_avisado_' + t.id, t.mensaje_id); });
-    // Si está viendo ese ticket, ya lo vio.
-    nuevos = nuevos.filter(function (t) {
-      return document.hidden || location.pathname !== '/tickets/' + t.id;
-    });
+    // DENTRO DEL CHAT DE ESE TICKET NO SE AVISA: ni aviso, ni sonido, ni
+    // escritorio. Lo que escribe el cliente ya aparece en la conversación.
+    // Solo si la pestaña está en segundo plano (no lo está mirando).
+    nuevos = nuevos.filter(function (t) { return !viendo(t.id); });
     if (primera || !nuevos.length) return;
 
     var t = nuevos[0], mas = nuevos.length - 1;
@@ -1246,12 +1254,19 @@
      Vive en la barra de arriba (topbar.php la pone solo para soporte).
      El número es cuántos esperan respuesta; el punto que late, que hay
      algo que no se ha visto desde la última vez que se abrió. */
+  /* ¿Está viendo ese ticket ahora mismo? Lo que escriba ahí el cliente ya
+     lo tiene enfrente en el chat: no es "algo sin ver". */
+  function viendo(id) {
+    return !document.hidden && location.pathname === '/tickets/' + id;
+  }
+  function sinVer(t, visto) { return t.mensaje_id > visto && !viendo(t.id); }
+
   function pintarCampana() {
     var j = campana;
     if (!j) return;
     var n = +j.esperando || 0;
     var visto = +leer('lf_sop_campana_vista') || 0;
-    var maximo = (j.tickets || []).reduce(function (a, t) { return Math.max(a, t.mensaje_id); }, 0);
+    var maximo = (j.tickets || []).reduce(function (a, t) { return sinVer(t, visto) ? Math.max(a, t.mensaje_id) : a; }, 0);
     [].forEach.call(document.querySelectorAll('[data-lf-campana]'), function (c) {
       var num = c.querySelector('.lf-noti-num');
       var txt = n > 9 ? '9+' : String(n || '');
@@ -1285,7 +1300,7 @@
       lista.appendChild(nada);
     }
     (j.tickets || []).forEach(function (t) {
-      var a = crear('a', 'it' + (t.mensaje_id > visto ? ' sin-ver' : ''));
+      var a = crear('a', 'it' + (sinVer(t, visto) ? ' sin-ver' : '') + (viendo(t.id) ? ' aqui' : ''));
       a.href = '/tickets/' + (+t.id);
       a.setAttribute('data-parcial', '');
       a.appendChild(crear('span', 'pri pri-' + (t.prioridad || 'normal')));
