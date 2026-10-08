@@ -133,13 +133,16 @@ final class ComisionesControlador
         $area  = Peticion::texto('area');
         $esp   = Peticion::texto('esp');                 // '' | 'sin' | id
         $solo  = Peticion::texto('solo', '1') === '1';   // solo ventas sin comisión
+        // También las ventas de antes que tuvieron cobros en el periodo
+        // (abonos, liquidaciones): las "de ventas anteriores" de Reportes.
+        $ant   = Peticion::texto('ant', '1') === '1';
         $tope  = 300;
 
         // El área y "sin comisión" se miran producto por producto, así que
         // se filtran aquí y no en la consulta. Se traen de sobra para que
         // el tope no se coma ventas que sí cumplen.
         $ventas = $repo->paraLote($desde, $hasta,
-            $esp === 'sin' ? 'sin' : ((int)$esp > 0 ? (int)$esp : null), 2000);
+            $esp === 'sin' ? 'sin' : ((int)$esp > 0 ? (int)$esp : null), 2000, $ant);
 
         $quedan = [];
         foreach ($ventas as $v) {
@@ -172,6 +175,7 @@ final class ComisionesControlador
             'areas'     => (new \LibertyFin\Datos\CatalogoRepo($db))->areas(),
             'desde'     => $desde, 'hasta' => $hasta, 'area' => $area, 'esp' => $esp,
             'solo'      => $solo,
+            'ant'       => $ant,
             'resultado' => $_SESSION['lf_lote'] ?? null,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
         ]);
@@ -199,7 +203,7 @@ final class ComisionesControlador
         $volverA = '/comisiones/lote?' . http_build_query([
             'desde' => (string)($_POST['desde'] ?? ''), 'hasta' => (string)($_POST['hasta'] ?? ''),
             'area'  => (string)($_POST['area'] ?? ''),  'esp'   => (string)($_POST['esp'] ?? ''),
-            'solo'  => (string)($_POST['solo'] ?? '1'),
+            'solo'  => (string)($_POST['solo'] ?? '1'), 'ant' => (string)($_POST['ant'] ?? '1'),
         ]);
         $falla = function ($texto) use ($volverA) {
             $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => 'error'];

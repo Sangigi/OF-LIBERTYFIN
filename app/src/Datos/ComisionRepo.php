@@ -325,13 +325,29 @@ final class ComisionRepo extends Repo
      * sabe de antemano qué se puede asignar y qué no, sin asignarle dos
      * veces lo mismo a la misma persona.
      *
+     * Con `$anteriores` entran también las ventas de ANTES del periodo que
+     * tuvieron cobros dentro de él (abonos, liquidaciones): las que en
+     * Reportes salen como "de ventas anteriores". Van al final, marcadas,
+     * con lo que se les cobró en el periodo y si ahí quedaron pagadas.
+     *
      * @param string|int|null $especialista  null = cualquiera, 'sin' = sin
      *                                       especialista, id = ese colaborador.
      */
-    public function paraLote($desde, $hasta, $especialista = null, $tope = 300)
+    public function paraLote($desde, $hasta, $especialista = null, $tope = 300, $anteriores = true)
     {
-        $w = "v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?";
-        $p = [$desde . ' 00:00:00', date('Y-m-d', strtotime($hasta . ' +1 day')) . ' 00:00:00'];
+        $a = $desde . ' 00:00:00';
+        $b = date('Y-m-d', strtotime($hasta . ' +1 day')) . ' 00:00:00';
+
+        // El orden de los ? es el del texto: primero los cobros del periodo
+        // (en el FROM), luego el WHERE.
+        $p = [$a, $b];
+        $w = "v.estado <> 'cancelada' AND ((v.fecha >= ? AND v.fecha < ?)";
+        $p[] = $a; $p[] = $b;
+        if ($anteriores) {
+            $w .= " OR (v.fecha < ? AND pp.venta_id IS NOT NULL)";
+            $p[] = $a;
+        }
+        $w .= ")";
         if ($especialista === 'sin') {
             $w .= " AND v.especialista_id IS NULL";
         } elseif ((int)$especialista > 0) {
@@ -340,6 +356,11 @@ final class ComisionRepo extends Repo
         }
         $ventas = $this->todos("
             SELECT v.id, v.codigo_venta, v.fecha, v.total, v.especialista_id,
+                   COALESCE(pp.n, 0)      AS cobros_periodo,
+                   COALESCE(pp.monto, 0)  AS cobrado_periodo,
+                   pp.ultimo              AS ultimo_cobro_periodo,
+                   COALESCE(pg.cobrado, 0) AS cobrado,
+                   pg.ultimo              AS ultimo_cobro,
                    COALESCE(NULLIF(TRIM(v.especialista_nombre),''), '') AS especialista,
                    COALESCE(c.nombre, 'Público general') AS cliente,
                    COALESCE(NULLIF((
@@ -356,12 +377,26 @@ final class ComisionRepo extends Repo
                     WHERE vc.venta_id = v.id AND vc.cancelada = 0) AS comisiones
             FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, COUNT(*) AS n, SUM(monto) AS monto, MAX(fecha_pago) AS ultimo
+                        FROM venta_pagos
+                        WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) pp ON pp.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) AS cobrado, MAX(fecha_pago) AS ultimo
+                        FROM venta_pagos WHERE cancelado = 0
+                        GROUP BY venta_id ) pg ON pg.venta_id = v.id
             WHERE {$w}
-            ORDER BY v.fecha, v.id
-            LIMIT " . (int)$tope, $p);
+            ORDER BY (v.fecha < ?), v.fecha, v.id
+            LIMIT " . (int)$tope, array_merge($p, [$a]));
 
         $lineas = $this->lineasDe(array_column($ventas, 'id'));
-        foreach ($ventas as &$v) $v['lineas'] = $lineas[(int)$v['id']] ?? [];
+        foreach ($ventas as &$v) {
+            $v['lineas']   = $lineas[(int)$v['id']] ?? [];
+            $v['anterior'] = $v['fecha'] < $a;
+            // ¿Quedó pagada con un cobro de este periodo?
+            $v['liquido_periodo'] = $v['anterior'] && (float)$v['total'] - (float)$v['cobrado'] <= 0.005
+                && $v['ultimo_cobro'] !== null
+                && $v['ultimo_cobro'] >= substr($a, 0, 10) && $v['ultimo_cobro'] < substr($b, 0, 10);
+        }
         unset($v);
         return $ventas;
     }

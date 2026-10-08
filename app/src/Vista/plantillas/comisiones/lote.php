@@ -28,6 +28,16 @@ foreach ($ventas as $v) {
 }
 asort($alcAreas); asort($alcProds);
 $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
+
+// Ventas de antes del periodo que tuvieron cobros en él (abonos, liquidaciones).
+$mesDe = function ($fecha) {
+    $m = ['','enero','febrero','marzo','abril','mayo','junio','julio',
+          'agosto','septiembre','octubre','noviembre','diciembre'];
+    $t = strtotime($fecha);
+    return $m[(int)date('n', $t)] . (date('Y', $t) !== date('Y') ? ' ' . date('Y', $t) : '');
+};
+$nAnt = count(array_filter($ventas, function ($v) { return !empty($v['anterior']); }));
+$nDel = count($ventas) - $nAnt;
 ?>
 
 <?php if ($aviso): ?>
@@ -101,6 +111,10 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
       <input type="hidden" name="solo" value="0">
       <input type="checkbox" name="solo" value="1" <?= $solo ? 'checked' : '' ?>> Solo las que no tienen comisión
     </label>
+    <label class="lf-lote-chk" title="Abonos y liquidaciones de este periodo a ventas de meses anteriores">
+      <input type="hidden" name="ant" value="0">
+      <input type="checkbox" name="ant" value="1" <?= $ant ? 'checked' : '' ?>> Incluir ventas anteriores con cobros en el periodo
+    </label>
     <button class="btn btn-secondary btn-sm" type="submit">Buscar</button>
   </form>
 </section>
@@ -118,6 +132,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
   <input type="hidden" name="area"  value="<?= P::e($area) ?>">
   <input type="hidden" name="esp"   value="<?= P::e($esp) ?>">
   <input type="hidden" name="solo"  value="<?= $solo ? '1' : '0' ?>">
+  <input type="hidden" name="ant"   value="<?= $ant ? '1' : '0' ?>">
 
   <?php /* ═══════════ 2 · A QUIÉN Y CUÁNTO ═══════════ */ ?>
   <section class="card">
@@ -193,7 +208,8 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <div><span><b class="lf-lote-paso">3</b>Revisa y asigna</span>
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-          <?= count($ventas) ?> venta<?= count($ventas) === 1 ? '' : 's' ?> en la búsqueda
+          <?= $nDel ?> venta<?= $nDel === 1 ? '' : 's' ?> del periodo<?php if ($nAnt): ?>
+          + <?= $nAnt ?> de antes con abonos o liquidaciones en el periodo<?php endif; ?>
           · las que no se pueden salen sin marcar y con el motivo
           · toca la tarjeta de una persona (arriba) para elegir solo sus ventas
           <?php if ($hayVarios): ?>
@@ -245,6 +261,15 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
                 <?= P::e($v['cliente'] ?: 'Público general') ?></a>
               <span class="lf-lote-sub"><?= P::e($v['codigo_venta']) ?> · <?= date('d/m/Y', strtotime($v['fecha'])) ?>
                 <?php if ($nLin === 1): ?> · <?= P::e($v['lineas'][0]['producto']) ?><?php endif; ?></span>
+              <?php if (!empty($v['anterior'])):
+                // Venta de antes del periodo: qué se le cobró en él.
+                $nCob = (int)$v['cobros_periodo']; ?>
+                <span class="lf-lote-ant">
+                  <b>Venta de <?= P::e($mesDe($v['fecha'])) ?></b>
+                  <?= $v['liquido_periodo'] ? 'liquidó' : ($nCob === 1 ? 'abonó' : $nCob . ' abonos:') ?>
+                  <?= D::pesos($v['cobrado_periodo']) ?> el <?= date('d/m', strtotime($v['ultimo_cobro_periodo'])) ?>
+                </span>
+              <?php endif; ?>
               <?php if ($nLin > 1): ?>
                 <?php /* A qué productos va la comisión. Vienen marcados todos, o
                          los del área si se filtró por área; se puede cambiar.
