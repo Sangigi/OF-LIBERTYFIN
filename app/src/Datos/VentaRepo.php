@@ -32,6 +32,32 @@ final class VentaRepo extends Repo
         return [$w, $p];
     }
 
+    /**
+     * EL FILTRO "ESTADO" DICE LO MISMO QUE LA INSIGNIA DE CADA FILA.
+     *
+     * La insignia enseña Liquidada / Debe $X / Cancelada según lo que le
+     * falta pagar a la venta. El filtro, en cambio, comparaba la columna
+     * `ventas.estado` contra "completada" y "pendiente", y esa columna vale
+     * "completada" casi siempre, deba o no: "Pendientes" no traía nada y
+     * "Completadas" traía ventas con saldo. Ahora filtra por lo mismo que
+     * se ve, con TODO lo cobrado a la venta, sin importar cuándo.
+     */
+    const ESTADOS = ['liquidada' => 'Liquidadas', 'debe' => 'Con saldo', 'cancelada' => 'Canceladas'];
+
+    /** Todo lo cobrado a cada venta (alias `pv`), para el filtro de estado. */
+    const JOIN_COBRADO = "LEFT JOIN ( SELECT venta_id, SUM(monto) AS cobrado FROM venta_pagos
+                                      WHERE cancelado = 0 GROUP BY venta_id ) pv ON pv.venta_id = v.id";
+
+    private static function condicionEstado($estado)
+    {
+        switch ($estado) {
+            case 'cancelada': return "v.estado = 'cancelada'";
+            case 'liquidada': return "v.estado <> 'cancelada' AND v.total - COALESCE(pv.cobrado,0) <= 0.01";
+            case 'debe':      return "v.estado <> 'cancelada' AND v.total - COALESCE(pv.cobrado,0) > 0.01";
+        }
+        return '';
+    }
+
     private function rangoPagos($desde, $hasta)
     {
         $w = 'WHERE cancelado = 0'; $p = [];
@@ -46,12 +72,13 @@ final class VentaRepo extends Repo
         list($w, $p)   = $this->rango($desde, $hasta);
         list($pw, $pp) = $this->rangoPagos($desde, $hasta);
 
-        if (!empty($filtros['estado'])) { $w[] = 'v.estado = ?'; $p[] = $filtros['estado']; }
+        if ($c = self::condicionEstado($filtros['estado'] ?? '')) $w[] = $c;
         if (!empty($filtros['buscar'])) {
             $w[] = '(v.codigo_venta LIKE ? OR c.nombre LIKE ? OR v.descripcion LIKE ?)';
             $l = '%' . $filtros['buscar'] . '%'; $p[] = $l; $p[] = $l; $p[] = $l;
         }
         $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
+        $jc = self::JOIN_COBRADO;
 
         return $this->uno("
             SELECT
@@ -67,6 +94,7 @@ final class VentaRepo extends Repo
             LEFT JOIN clientes c ON c.id = v.cliente_id
             LEFT JOIN ( SELECT venta_id, SUM(monto) AS cobrado FROM venta_pagos {$pw} GROUP BY venta_id )
                    pg ON pg.venta_id = v.id
+            {$jc}
             {$where}
         ", array_merge($pp, $p)) ?: [];
     }
@@ -74,30 +102,33 @@ final class VentaRepo extends Repo
     /** El listado, con el avance de cobro de cada venta. */
     public function listado($desde, $hasta, array $filtros = [], $limite = 25, $desfase = 0)
     {
-        list($w, $p)   = $this->rango($desde, $hasta);
-        list($pw, $pp) = $this->rangoPagos($desde, $hasta);
+        list($w, $p) = $this->rango($desde, $hasta);
 
-        if (!empty($filtros['estado'])) { $w[] = 'v.estado = ?'; $p[] = $filtros['estado']; }
+        if ($c = self::condicionEstado($filtros['estado'] ?? '')) $w[] = $c;
         if (!empty($filtros['buscar'])) {
             $w[] = '(v.codigo_venta LIKE ? OR c.nombre LIKE ? OR v.descripcion LIKE ?)';
             $l = '%' . $filtros['buscar'] . '%'; $p[] = $l; $p[] = $l; $p[] = $l;
         }
         $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
+        $jc = self::JOIN_COBRADO;
 
+        // El avance de cada venta es con TODO lo que se le ha cobrado, no
+        // solo lo cobrado dentro de las fechas del filtro: una venta de
+        // octubre que se liquidó en noviembre salía "Debe" al ver octubre, y
+        // no coincidía con su detalle ni con el filtro de estado.
         return $this->todos("
             SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado,
                    COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
-                   COALESCE(pg.cobrado,0) AS cobrado,
-                   v.total - COALESCE(pg.cobrado,0) AS saldo
+                   COALESCE(pv.cobrado,0) AS cobrado,
+                   v.total - COALESCE(pv.cobrado,0) AS saldo
             FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) AS cobrado FROM venta_pagos {$pw} GROUP BY venta_id )
-                   pg ON pg.venta_id = v.id
+            {$jc}
             {$where}
             ORDER BY v.fecha DESC
             LIMIT " . (int)$limite . " OFFSET " . (int)$desfase . "
-        ", array_merge($pp, $p));
+        ", $p);
     }
 
     /** Cobrado por mes, para la gráfica. Va por fecha_pago, no por fecha de venta. */
@@ -216,15 +247,17 @@ final class VentaRepo extends Repo
     public function cuantas($desde, $hasta, array $filtros = [])
     {
         list($w, $p) = $this->rango($desde, $hasta);
-        if (!empty($filtros['estado'])) { $w[] = 'v.estado = ?'; $p[] = $filtros['estado']; }
+        if ($c = self::condicionEstado($filtros['estado'] ?? '')) $w[] = $c;
         if (!empty($filtros['buscar'])) {
             $w[] = '(v.codigo_venta LIKE ? OR c.nombre LIKE ? OR v.descripcion LIKE ?)';
             $l = '%' . $filtros['buscar'] . '%'; $p[] = $l; $p[] = $l; $p[] = $l;
         }
         $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
+        $jc = self::JOIN_COBRADO;
         return (int)$this->valor("
             SELECT COUNT(DISTINCT v.id) FROM ventas v
-            LEFT JOIN clientes c ON c.id = v.cliente_id {$where}", $p);
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            {$jc} {$where}", $p);
     }
 
     /**

@@ -443,16 +443,17 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
           equipo salió la venta.
         <?php endif; ?>
       </p>
-      <?php /* Igual que en el detalle de ventas: estas tablas van por la fecha
-               de la venta y no enseñan lo que entró por ventas de otro mes. */
+      <?php /* Las ventas de antes con cobros en el periodo ya salen en estas
+               tablas, en el área de su producto y marcadas. */
       if (!empty($r['de_anteriores']) && $r['de_anteriores'] > 0): ?>
         <p class="lf-otros en-tabla" style="margin:10px 0 0">
-          Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
+          En este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
           <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-          <?= P::e($deAntes) ?> (anticipos y abonos). No salen en estas tablas porque van por
-          la fecha de la venta.
+          <?= P::e($deAntes) ?> (anticipos, abonos y liquidaciones). Salen en el área de
+          su producto, marcadas <i class="lf-origen">Venta anterior</i>, con lo que entró en
+          «Cobrado en el periodo».
           <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
-             data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
+             data-ir-pestana="pagos">Ver cada cobro</a>
         </p>
       <?php endif; ?>
     </div>
@@ -498,9 +499,14 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
           <span><?= P::e($tb['titulo']) ?></span>
           <span style="font-size:12px;font-weight:600;color:var(--lf-brand-2);
                        font-family:var(--lf-mono)">
-            <?= D::pesos(array_sum(array_column($tb['filas'], 9))) ?>
+            <?php /* Por posición: 10 es "Cobrado" y 11 "Cobrado en el periodo"
+                     (ver Reportes::desglose). */
+            $nAntTb = count(array_filter($tb['filas'], function ($x) { return !empty($x['_origen']); })); ?>
+            <?= D::pesos(array_sum(array_column($tb['filas'], 10))) ?>
             <span style="color:var(--lf-tinta-4);font-weight:400">
-              · <?= count($tb['filas']) ?> renglones</span></span>
+              · <?= count($tb['filas']) ?> renglones<?php if ($nAntTb): ?>
+              (<?= $nAntTb ?> de ventas anteriores)<?php endif; ?>
+              · entró en el periodo <?= D::pesos(array_sum(array_column($tb['filas'], 11))) ?></span></span>
         </h3>
         <div class="table-responsive lf-cards">
           <table class="table">
@@ -511,7 +517,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
             </tr></thead>
             <tbody>
             <?php foreach (array_slice($tb['filas'], 0, 40) as $f): ?>
-              <tr>
+              <tr<?= !empty($f['_origen']) ? ' class="lf-fila-otro"' : '' ?>>
                 <?php foreach ($tb['columnas'] as $j => $c): ?>
                   <td data-label="<?= P::e($c[0]) ?>"
                       <?= $derecha($c[1]) ? 'class="text-end lf-mono"' : '' ?>>
@@ -668,17 +674,6 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
       </div>
     <?php endif; ?>
 
-    <?php /* Las tablas por fecha de venta no enseñan lo que entró por ventas de
-             otros meses. Se avisa aquí, donde se nota la falta. */
-    if ($k === 'detalle' && !empty($r['de_anteriores']) && $r['de_anteriores'] > 0): ?>
-      <p class="lf-otros en-tabla">
-        Además, en este periodo entraron <b><?= D::pesos($r['de_anteriores']) ?></b> de
-        <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-        <?= P::e($deAntes) ?>. No salen aquí porque esta tabla va por la fecha de la venta.
-        <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
-           data-ir-pestana="pagos">Verlos en Detalle de pagos</a>
-      </p>
-    <?php endif; ?>
 
     <div class="table-responsive lf-cards" style="padding:0 12px 6px">
       <table class="table">

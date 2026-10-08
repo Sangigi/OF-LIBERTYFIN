@@ -30,8 +30,14 @@ final class VentasControlador
         $desde = Peticion::fecha('desde', date('Y-m-01'));
         $hasta = Peticion::fecha('hasta', date('Y-m-t'));
 
+        // El estado es el de la insignia de cada fila: liquidada, debe o
+        // cancelada (ver VentaRepo::ESTADOS). Un enlace guardado con los
+        // valores de antes se traduce en vez de ignorarse.
+        $estado = Peticion::opcion('estado',
+            array_merge(array_keys(VentaRepo::ESTADOS), ['completada', 'pendiente']));
+        $estado = ['completada' => 'liquidada', 'pendiente' => 'debe'][$estado] ?? $estado;
         $filtros = [
-            'estado' => Peticion::opcion('estado', ['completada','pendiente','cancelada']),
+            'estado' => $estado,
             'buscar' => Peticion::texto('q'),
         ];
 

@@ -463,7 +463,7 @@ final class ReporteRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT p.nombre, p.codigo,
+            SELECT p.id AS producto_id, p.nombre, p.codigo,
                    COUNT(*) AS veces,
                    SUM(vd.subtotal) AS facturado
             FROM venta_detalles vd
@@ -522,11 +522,17 @@ final class ReporteRepo extends Repo
      *
      * Las canceladas no entran: antes sí, y su total se sumaba al de la
      * pestaña aunque ninguna otra tabla las contara.
+     *
+     * Y ADEMÁS, al final, las ventas de ANTES del periodo que tuvieron cobros
+     * en él (anticipos, abonos, liquidaciones): con `anterior` = true y
+     * `cobrado_periodo`, lo que entró de ellas en el periodo. Antes esta tabla
+     * no las enseñaba y había que ir al Detalle de pagos a buscarlas.
+     * `liquidada` dice si con esos cobros quedó pagada.
      */
     public function detalle($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
-        return $this->todos("
+        $filas = $this->todos("
             SELECT v.id AS venta_id, v.codigo_venta AS folio, DATE(v.fecha) AS fecha,
                    COALESCE(c.nombre,'Público general') AS cliente,
                    -- Mismo criterio que el resumen: el área del producto
@@ -543,18 +549,46 @@ final class ReporteRepo extends Repo
                    v.total - COALESCE(pg.cobrado,0) AS saldo,
                    COALESCE(g.gastos,0) AS gastos,
                    COALESCE(cm.comision,0) AS comision,
+                   COALESCE(pp.monto,0) AS cobrado_periodo,
+                   COALESCE(pp.n,0)     AS cobros_periodo,
+                   pg.ultimo,
                    v.estado
             FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo FROM venta_pagos
                         WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            -- Lo que entró EN EL PERIODO de cada venta, sea del periodo o de antes.
+            LEFT JOIN ( SELECT venta_id, COUNT(*) n, SUM(monto) monto FROM venta_pagos
+                        WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) pp ON pp.venta_id = v.id
             LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
                         WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                         GROUP BY venta_id ) g ON g.venta_id = v.id
             LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
                         GROUP BY venta_id ) cm ON cm.venta_id = v.id
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
-            ORDER BY v.fecha", [$a, $b]);
+            WHERE v.estado <> 'cancelada'
+              AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
+            ORDER BY (v.fecha < ?), v.fecha", [$a, $b, $a, $b, $a, $a]);
+        return $this->marcarAnteriores($filas, $a, $b);
+    }
+
+    /**
+     * A cada fila (una venta o una línea de venta, con `fecha`, `total`,
+     * `ultimo` y el cobrado de su venta) le pone `anterior` (la venta es de
+     * antes del periodo) y `liquidada` (quedó pagada con un cobro del
+     * periodo).
+     */
+    private function marcarAnteriores(array $filas, $a, $b)
+    {
+        $ia = substr($a, 0, 10); $ib = substr($b, 0, 10);
+        foreach ($filas as &$f) {
+            $f['anterior']  = substr((string)$f['fecha'], 0, 10) < $ia;
+            $ultimo = isset($f['ultimo']) ? substr((string)$f['ultimo'], 0, 10) : '';
+            $saldo  = isset($f['saldo_venta']) ? (float)$f['saldo_venta'] : (float)($f['saldo'] ?? 1);
+            $f['liquidada'] = $f['anterior'] && $saldo <= 0.005 && $ultimo >= $ia && $ultimo < $ib;
+        }
+        unset($f);
+        return $filas;
     }
 
     /**
@@ -631,7 +665,8 @@ final class ReporteRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         return $this->todos("
-            SELECT COALESCE(c.nombre,'Público general') AS cliente,
+            SELECT COALESCE(v.cliente_id, 0) AS cliente_id,
+                   COALESCE(c.nombre,'Público general') AS cliente,
                    (SELECT cat.nombre
                     FROM venta_detalles d2
                     INNER JOIN ventas v2    ON v2.id = d2.venta_id
@@ -662,21 +697,101 @@ final class ReporteRepo extends Repo
     public function cobranza($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
-        return $this->todos("
+        // Con las ventas de ANTES del periodo que abonaron en él y todavía
+        // deben: un abono de este mes a una venta vieja también es cobranza
+        // que se está moviendo. Van marcadas (`anterior`).
+        $filas = $this->todos("
             SELECT v.id AS venta_id, v.codigo_venta, v.fecha,
                    COALESCE(c.nombre,'Público general') AS cliente,
                    v.total,
                    COALESCE(pg.cobrado,0) AS cobrado,
                    ROUND(v.total - COALESCE(pg.cobrado,0), 2) AS saldo,
+                   COALESCE(pp.monto,0) AS cobrado_periodo,
+                   pg.ultimo,
                    DATEDIFF(CURDATE(), COALESCE(pg.ultimo, v.fecha)) AS dias
             FROM ventas v
             LEFT JOIN clientes c ON c.id = v.cliente_id
             LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo
                         FROM venta_pagos WHERE cancelado = 0 GROUP BY venta_id ) pg
                    ON pg.venta_id = v.id
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            LEFT JOIN ( SELECT venta_id, SUM(monto) monto FROM venta_pagos
+                        WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) pp ON pp.venta_id = v.id
+            WHERE v.estado <> 'cancelada'
+              AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
               AND v.total - COALESCE(pg.cobrado,0) > 0.01
-            ORDER BY dias DESC, saldo DESC", [$a, $b]);
+            ORDER BY (v.fecha < ?), dias DESC, saldo DESC", [$a, $b, $a, $b, $a, $a]);
+        return $this->marcarAnteriores($filas, $a, $b);
+    }
+
+    /**
+     * Por producto: lo que entró en el periodo por ventas de ANTES del
+     * periodo. Cada cobro se reparte entre las líneas de su venta según lo
+     * que pesa cada una, igual que en el reporte por área.
+     *
+     * @return array ['filas' => [producto_id => [nombre, codigo, cobros,
+     *               monto]], 'cobros' => cobros distintos, 'monto' => total]
+     */
+    public function servicioAnteriores($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $peso = "CASE WHEN tot.suma = 0 THEN 1.0 / tot.n ELSE d.subtotal / tot.suma END";
+        $filas = $this->todos("
+            SELECT p.id AS producto_id, p.nombre, p.codigo,
+                   COUNT(DISTINCT pa.id)                    AS cobros,
+                   ROUND(SUM(pa.monto * ({$peso})), 2)      AS monto
+            FROM venta_pagos pa
+            INNER JOIN ventas v         ON v.id = pa.venta_id
+            INNER JOIN venta_detalles d ON d.venta_id = v.id
+            INNER JOIN productos p      ON p.id = d.producto_id
+            INNER JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                         FROM venta_detalles GROUP BY venta_id ) tot ON tot.venta_id = v.id
+            WHERE pa.cancelado = 0 AND v.estado <> 'cancelada'
+              AND pa.fecha_pago >= ? AND pa.fecha_pago < ? AND v.fecha < ?
+            GROUP BY p.id, p.nombre, p.codigo
+            ORDER BY monto DESC", [$a, $b, $a]);
+        // Un cobro de una venta con dos productos cuenta en los dos renglones:
+        // el total de cobros se cuenta aparte, sin repetir.
+        $tot = $this->uno("
+            SELECT COUNT(DISTINCT pa.id) AS cobros
+            FROM venta_pagos pa
+            INNER JOIN ventas v ON v.id = pa.venta_id
+            WHERE pa.cancelado = 0 AND v.estado <> 'cancelada'
+              AND pa.fecha_pago >= ? AND pa.fecha_pago < ? AND v.fecha < ?
+              AND EXISTS (SELECT 1 FROM venta_detalles dx WHERE dx.venta_id = v.id)",
+            [$a, $b, $a]) ?: ['cobros' => 0];
+        $r = [];
+        foreach ($filas as $f) $r[(int)$f['producto_id']] = $f;
+        return ['filas' => $r, 'cobros' => (int)$tot['cobros'],
+                'monto' => round(array_sum(array_column($filas, 'monto')), 2)];
+    }
+
+    /**
+     * Por cliente: lo que entró en el periodo por ventas suyas de ANTES del
+     * periodo, cuántos cobros fueron y cuántas de esas ventas quedaron
+     * pagadas. [cliente_id => [cliente, cobros, monto, liquidadas]]
+     * (cliente_id 0 es Público general).
+     */
+    public function clienteAnteriores($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $liq = self::LIQUIDA;
+        $filas = $this->todos("
+            SELECT COALESCE(v.cliente_id, 0)             AS cliente_id,
+                   COALESCE(c.nombre, 'Público general') AS cliente,
+                   COUNT(*)                              AS cobros,
+                   ROUND(SUM(p.monto), 2)                AS monto,
+                   COUNT(DISTINCT CASE WHEN {$liq} THEN p.venta_id END) AS liquidadas
+            FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+              AND p.fecha_pago >= ? AND p.fecha_pago < ? AND v.fecha < ?
+            GROUP BY COALESCE(v.cliente_id, 0), cliente
+            ORDER BY monto DESC", [$a, $b, $a]);
+        $r = [];
+        foreach ($filas as $f) $r[(int)$f['cliente_id']] = $f;
+        return $r;
     }
 
     /** Lo cobrado día por día. */
@@ -738,7 +853,10 @@ final class ReporteRepo extends Repo
              : "'Sin asignar'";
         $cpro = self::COMISION_POR_PRODUCTO;
 
-        return $this->todos("
+        // Con las líneas de las ventas de ANTES del periodo que tuvieron
+        // cobros en él: van marcadas (`anterior`) y con `cobrado_periodo`,
+        // lo que entró de esa línea en el periodo.
+        $filas = $this->todos("
             SELECT v.id                                    AS venta_id,
                    v.codigo_venta                          AS folio,
                    v.fecha,
@@ -778,6 +896,9 @@ final class ReporteRepo extends Repo
                    -- producto es, por su peso. Ver COMISION_POR_PRODUCTO.
                    ROUND(COALESCE(cp.comision,0)
                          + COALESCE(cs.comision * (d.subtotal / NULLIF(tot.suma,0)), 0), 2) AS comision,
+                   ROUND(COALESCE(pp.monto,0) * (d.subtotal / NULLIF(tot.suma,0)), 2) AS cobrado_periodo,
+                   v.total - COALESCE(pg.cobrado,0)        AS saldo_venta,
+                   pg.ultimo,
                    v.metodo_pago                           AS metodo,
                    suc.nombre                              AS sucursal
             FROM venta_detalles d
@@ -788,15 +909,20 @@ final class ReporteRepo extends Repo
             LEFT  JOIN sucursales suc ON suc.id = v.sucursal_id
             INNER JOIN ( SELECT venta_id, SUM(subtotal) suma
                          FROM venta_detalles GROUP BY venta_id ) tot ON tot.venta_id = v.id
-            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo FROM venta_pagos
                         WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) monto FROM venta_pagos
+                        WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) pp ON pp.venta_id = v.id
             LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
                         WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                         GROUP BY venta_id ) g ON g.venta_id = v.id
             {$cpro}
-            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
+            WHERE v.estado <> 'cancelada'
+              AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
             ORDER BY area_servicio, tipo_persona, v.fecha DESC, v.codigo_venta",
-            [$a, $b]);
+            [$a, $b, $a, $b, $a]);
+        return $this->marcarAnteriores($filas, $a, $b);
     }
 
     /**

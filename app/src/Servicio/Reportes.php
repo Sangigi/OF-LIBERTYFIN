@@ -38,15 +38,20 @@ final class Reportes
         ],
         'servicio' => [
             'rotulo' => 'Por producto',
-            'nota'   => 'Qué se vende más y qué deja más. No son lo mismo.',
+            'nota'   => 'Qué se vende más y qué deja más. No son lo mismo. «De ventas anteriores» '
+                      . 'es lo que entró en el periodo por abonos y liquidaciones de ventas de antes, '
+                      . 'repartido por producto; los productos que solo tuvieron eso salen resaltados.',
         ],
         'cliente' => [
             'rotulo' => 'Por cliente',
-            'nota'   => 'Lo que cada cliente ha comprado y lo que todavía debe.',
+            'nota'   => 'Lo que cada cliente ha comprado y lo que todavía debe. «De ventas anteriores» '
+                      . 'es lo que pagó en el periodo de compras de antes; quien solo abonó a una '
+                      . 'venta vieja sale resaltado.',
         ],
         'cobranza' => [
             'rotulo' => 'Cobranza',
-            'nota'   => 'Lo que falta por cobrar, de lo más viejo a lo más nuevo.',
+            'nota'   => 'Lo que falta por cobrar, de lo más viejo a lo más nuevo. Al final, marcadas, '
+                      . 'las ventas de antes que abonaron en el periodo y todavía deben.',
         ],
         'metodo' => [
             'rotulo' => 'Por forma de pago',
@@ -68,13 +73,16 @@ final class Reportes
         ],
         'detalle' => [
             'rotulo' => 'Detalle de ventas',
-            'nota'   => 'Una venta por renglón: las hechas en el periodo, con todo lo que se les '
-                      . 'ha cobrado. Los cobros que entraron en el periodo están en «Detalle de pagos».',
+            'nota'   => 'Una venta por renglón: las hechas en el periodo y, al final y marcadas, las de '
+                      . 'antes que tuvieron anticipos, abonos o liquidaciones en él. «Cobrado en el '
+                      . 'periodo» es lo que entró de cada una: sumado da lo mismo que «Entraron». '
+                      . 'Cada cobro, uno por uno, está en «Detalle de pagos».',
         ],
         'desglose' => [
             'rotulo' => 'Desglose por área',
             'nota'   => 'Una tabla por área, con el producto y el especialista de cada '
-                      . 'renglón. Contabilidad se parte en personas físicas y morales.',
+                      . 'renglón. Contabilidad se parte en personas físicas y morales. Cada área '
+                      . 'trae también, marcadas, las ventas de antes con cobros en el periodo.',
         ],
     ];
 
@@ -156,45 +164,95 @@ final class Reportes
                         function ($t) { return ['TOTAL', '', (int)$t['ventas'], $t['devengado']]; }));
 
             case 'servicio':
-                $f = $r->porServicio($desde, $hasta);
+                // Lo vendido en el periodo y, aparte, lo que entró por ventas
+                // anteriores de cada producto. Un producto que en el periodo
+                // solo recibió abonos de ventas viejas también sale, marcado.
+                $f   = $r->porServicio($desde, $hasta);
+                $ant = $r->servicioAnteriores($desde, $hasta);
+                $filas = [];
+                foreach ($f as $x) {
+                    $a = $ant['filas'][(int)$x['producto_id']] ?? null;
+                    unset($ant['filas'][(int)$x['producto_id']]);
+                    $filas[] = [$x['nombre'], (int)$x['veces'], $x['facturado'],
+                                $a ? (int)$a['cobros'] : '', $a ? (float)$a['monto'] : ''];
+                }
+                foreach ($ant['filas'] as $a) {
+                    $filas[] = [$a['nombre'], '', '', (int)$a['cobros'], (float)$a['monto'],
+                                '_origen' => 'anterior'];
+                }
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Producto', Libro::TEXTO, 44], ['Veces', Libro::NUMERO, 10],
-                     ['Vendido', Libro::MONEDA, 16]],
-                    array_map(function ($x) {
-                        return [$x['nombre'], (int)$x['veces'], $x['facturado']];
-                    }, $f),
+                     ['Vendido', Libro::MONEDA, 16],
+                     ['Cobros anteriores', Libro::NUMERO, 11],
+                     ['De ventas anteriores', Libro::MONEDA, 16]],
+                    $filas,
                     $this->sumar($f, ['veces','facturado'],
-                        function ($t) { return ['TOTAL', (int)$t['veces'], $t['facturado']]; }));
+                        function ($t) use ($ant) { return ['TOTAL', (int)$t['veces'], $t['facturado'],
+                            (int)$ant['cobros'], (float)$ant['monto']]; }));
 
             case 'cliente':
-                $f = $r->porCliente($desde, $hasta);
+                // Igual: sus compras del periodo y lo que pagó de compras de
+                // antes. Quien solo abonó a una venta vieja también sale.
+                $f     = $r->porCliente($desde, $hasta);
+                $todos = $r->clienteAnteriores($desde, $hasta);
+                $ant   = $todos;
+                $filas = [];
+                foreach ($f as $x) {
+                    $a = $ant[(int)$x['cliente_id']] ?? null;
+                    unset($ant[(int)$x['cliente_id']]);
+                    $filas[] = [$x['cliente'], $x['area'] ?? '', (int)$x['compras'],
+                                $x['vendido'], $x['cobrado'], $x['vendido'] - $x['cobrado'],
+                                $a ? (int)$a['cobros'] : '',
+                                $a ? ((int)$a['liquidadas'] ?: '') : '',
+                                $a ? (float)$a['monto'] : ''];
+                }
+                foreach ($ant as $a) {
+                    $filas[] = [$a['cliente'], '', '', '', '', '',
+                                (int)$a['cobros'], ((int)$a['liquidadas'] ?: ''), (float)$a['monto'],
+                                '_origen' => 'anterior'];
+                }
+                $tAnt = ['cobros' => 0, 'liquidadas' => 0, 'monto' => 0.0];
+                foreach ($todos as $a) {
+                    $tAnt['cobros'] += (int)$a['cobros'];
+                    $tAnt['liquidadas'] += (int)$a['liquidadas'];
+                    $tAnt['monto'] += (float)$a['monto'];
+                }
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Cliente', Libro::TEXTO, 34], ['Área', Libro::TEXTO, 24],
                      ['Compras', Libro::NUMERO, 10], ['Vendido', Libro::MONEDA, 15],
-                     ['Cobrado', Libro::MONEDA, 15], ['Debe', Libro::MONEDA, 15]],
-                    array_map(function ($x) {
-                        return [$x['cliente'], $x['area'] ?? '', (int)$x['compras'],
-                                $x['vendido'], $x['cobrado'], $x['vendido'] - $x['cobrado']];
-                    }, $f),
+                     ['Cobrado', Libro::MONEDA, 15], ['Debe', Libro::MONEDA, 15],
+                     ['Cobros anteriores', Libro::NUMERO, 11],
+                     ['Ventas liquidadas', Libro::NUMERO, 11],
+                     ['De ventas anteriores', Libro::MONEDA, 15]],
+                    $filas,
                     $this->sumar($f, ['compras','vendido','cobrado'],
-                        function ($t) { return ['TOTAL', '', (int)$t['compras'], $t['vendido'],
-                            $t['cobrado'], $t['vendido'] - $t['cobrado']]; }));
+                        function ($t) use ($tAnt) { return ['TOTAL', '', (int)$t['compras'], $t['vendido'],
+                            $t['cobrado'], $t['vendido'] - $t['cobrado'],
+                            $tAnt['cobros'], $tAnt['liquidadas'], round($tAnt['monto'], 2)]; }));
 
             case 'cobranza':
+                // Las ventas del periodo que deben y, al final, las de antes
+                // que abonaron en el periodo y todavía deben.
                 $f = $r->cobranza($desde, $hasta);
-                return $this->envolver($tipo, $desde, $hasta,
+                $rep = $this->envolver($tipo, $desde, $hasta,
                     [['Folio', Libro::TEXTO, 18], ['Cliente', Libro::TEXTO, 30],
-                     ['Fecha', Libro::FECHA, 12], ['Días', Libro::NUMERO, 8],
+                     ['Fecha', Libro::FECHA, 12], ['Origen', Libro::TEXTO, 17],
+                     ['Días', Libro::NUMERO, 8],
                      ['Total', Libro::MONEDA, 14], ['Cobrado', Libro::MONEDA, 14],
+                     ['Cobrado en el periodo', Libro::MONEDA, 15],
                      ['Debe', Libro::MONEDA, 14]],
                     array_map(function ($x) {
-                        return [$x['codigo_venta'], $x['cliente'], $x['fecha'], (int)$x['dias'],
-                                $x['total'], $x['cobrado'], $x['saldo'],
-                                '_venta' => (int)$x['venta_id']];
+                        return [$x['codigo_venta'], $x['cliente'], $x['fecha'],
+                                $x['anterior'] ? 'Venta anterior' : 'Venta del periodo',
+                                (int)$x['dias'],
+                                $x['total'], $x['cobrado'], (float)$x['cobrado_periodo'], $x['saldo'],
+                                '_venta' => (int)$x['venta_id'],
+                                '_origen' => $x['anterior'] ? 'anterior' : ''];
                     }, $f),
-                    $this->sumar($f, ['total','cobrado','saldo'],
-                        function ($t) { return ['TOTAL', '', '', '', $t['total'],
-                            $t['cobrado'], $t['saldo']]; }));
+                    $this->sumar($f, ['total','cobrado','cobrado_periodo','saldo'],
+                        function ($t) { return ['TOTAL', '', '', '', '', $t['total'],
+                            $t['cobrado'], $t['cobrado_periodo'], $t['saldo']]; }));
+                return $rep;
 
             case 'metodo':
                 $f = $r->porMetodo($desde, $hasta);
@@ -239,27 +297,65 @@ final class Reportes
                     array_fill(0, count($cols), ''));
 
             default: // detalle
+                // Las ventas del periodo y, al final y marcadas, las de antes
+                // con cobros en el periodo. "Cobrado en el periodo" es lo que
+                // entró de cada una: sumado da lo mismo que "Entraron".
                 $f = $r->detalle($desde, $hasta);
-                return $this->envolver('detalle', $desde, $hasta,
+                $rep = $this->envolver('detalle', $desde, $hasta,
                     [['Folio', Libro::TEXTO, 18], ['Cliente', Libro::TEXTO, 30],
                      ['Área', Libro::TEXTO, 24], ['Fecha', Libro::FECHA, 13],
+                     ['Origen', Libro::TEXTO, 17],
                      ['Base', Libro::MONEDA, 13], ['IVA', Libro::MONEDA, 12],
                      ['Total', Libro::MONEDA, 14], ['Cobrado', Libro::MONEDA, 14],
+                     ['Cobrado en el periodo', Libro::MONEDA, 15],
                      ['Debe', Libro::MONEDA, 13], ['Gastos', Libro::MONEDA, 13],
                      ['Comisión', Libro::MONEDA, 13], ['Utilidad', Libro::MONEDA, 14]],
                     array_map(function ($x) {
                         return [$x['folio'], $x['cliente'], $x['area'], $x['fecha'],
+                                $x['anterior'] ? ($x['liquidada'] ? 'Venta anterior · liquidada' : 'Venta anterior')
+                                               : 'Venta del periodo',
                                 $x['subtotal'], $x['iva'], $x['total'], $x['cobrado'],
+                                (float)$x['cobrado_periodo'],
                                 $x['saldo'], $x['gastos'], $x['comision'],
                                 $x['cobrado'] - $x['gastos'] - $x['comision'],
-                                '_venta' => (int)$x['venta_id']];
+                                '_venta'  => (int)$x['venta_id'],
+                                '_origen' => $x['anterior'] ? 'anterior' : ''];
                     }, $f),
-                    $this->sumar($f, ['subtotal','iva','total','cobrado','saldo','gastos','comision'],
-                        function ($t) { return ['TOTAL', '', '', '',
-                            $t['subtotal'], $t['iva'], $t['total'], $t['cobrado'],
+                    $this->sumar($f, ['subtotal','iva','total','cobrado','cobrado_periodo','saldo','gastos','comision'],
+                        function ($t) { return ['TOTAL', '', '', '', '',
+                            $t['subtotal'], $t['iva'], $t['total'], $t['cobrado'], $t['cobrado_periodo'],
                             $t['saldo'], $t['gastos'], $t['comision'],
                             $t['cobrado'] - $t['gastos'] - $t['comision']]; }));
+                $rep['partes'] = $this->partesDe($f, $desde, $hasta);
+                return $rep;
         }
+    }
+
+    /**
+     * El resumen "de dónde vino" para las tablas de VENTAS (detalle de
+     * ventas, cobranza): lo que entró en el periodo de ventas del periodo y
+     * de ventas anteriores, con cuántos cobros y cuántas quedaron pagadas.
+     * Es la misma forma que el del Detalle de pagos, así que se pinta igual
+     * en pantalla, en la hoja impresa y en el Excel.
+     */
+    private function partesDe(array $f, $desde, $hasta)
+    {
+        $p = [
+            'periodo'   => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
+                            'rotulo' => 'De ventas del periodo'],
+            'anterior'  => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
+                            'rotulo' => 'De ventas ' . self::rotuloAntes($desde, $hasta)],
+            'posterior' => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
+                            'rotulo' => 'De ventas con fecha posterior'],
+        ];
+        foreach ($f as $x) {
+            $k = !empty($x['anterior']) ? 'anterior' : 'periodo';
+            $p[$k]['monto']  += (float)($x['cobrado_periodo'] ?? 0);
+            $p[$k]['cobros'] += (int)($x['cobros_periodo'] ?? 0);
+            if (!empty($x['liquidada'])) $p[$k]['liquidadas'] += 1;
+        }
+        foreach ($p as $k => $v) $p[$k]['monto'] = round($v['monto'], 2);
+        return $p;
     }
 
     /**
@@ -536,6 +632,9 @@ final class Reportes
                <=> array_sum(array_column($a, 'cobrado'));
         });
 
+        // "Origen" y "Cobrado en el periodo": cada área trae también las
+        // líneas de ventas de ANTES del periodo que tuvieron cobros en él,
+        // marcadas, con lo que entró de cada una.
         $cols = [
             ['Folio',        Libro::TEXTO,  17],
             ['Cliente',      Libro::TEXTO,  28],
@@ -544,9 +643,11 @@ final class Reportes
             ['Descripción',  Libro::TEXTO,  34],
             ['Especialista', Libro::TEXTO,  22],
             ['Fecha',        Libro::FECHA,  12],
+            ['Origen',       Libro::TEXTO,  16],
             ['Cant.',        Libro::NUMERO,  8],
             ['Total',        Libro::MONEDA, 14],
             ['Cobrado',      Libro::MONEDA, 14],
+            ['Cobrado en el periodo', Libro::MONEDA, 15],
             ['Debe',         Libro::MONEDA, 13],
             ['Gastos',       Libro::MONEDA, 12],
             ['Comisión',     Libro::MONEDA, 13],
@@ -566,18 +667,24 @@ final class Reportes
                         // interesa de donde salio, y al reves.
                         $por === 'origen' ? $f['area_servicio'] : $f['area_origen'],
                         $f['producto'], $f['producto_desc'], $f['especialista'],
-                        $f['fecha'], $f['cantidad'],
-                        $f['total_linea'], $f['cobrado'], $f['saldo'],
+                        $f['fecha'],
+                        !empty($f['anterior']) ? (!empty($f['liquidada']) ? 'Anterior · liquidada' : 'Venta anterior')
+                                               : 'Del periodo',
+                        $f['cantidad'],
+                        $f['total_linea'], $f['cobrado'], (float)$f['cobrado_periodo'], $f['saldo'],
                         $f['gastos'], $f['comision'],
                         $f['cobrado'] - $f['gastos'] - $f['comision'],
                         ucfirst((string)$f['metodo']),
-                        // No es columna: la pantalla lo usa para abrir la venta.
-                        '_venta' => (int)$f['venta_id'],
+                        // No son columnas: la pantalla los usa para abrir la
+                        // venta y para resaltar las de otro periodo.
+                        '_venta'  => (int)$f['venta_id'],
+                        '_origen' => !empty($f['anterior']) ? 'anterior' : '',
                     ];
                 }, $gf),
-                'totales'  => ['TOTAL ' . mb_strtoupper($nombre), '', '', '', '', '', '', '',
+                'totales'  => ['TOTAL ' . mb_strtoupper($nombre), '', '', '', '', '', '', '', '',
                     array_sum(array_column($gf, 'total_linea')),
                     array_sum(array_column($gf, 'cobrado')),
+                    array_sum(array_column($gf, 'cobrado_periodo')),
                     array_sum(array_column($gf, 'saldo')),
                     array_sum(array_column($gf, 'gastos')),
                     array_sum(array_column($gf, 'comision')),

@@ -23,7 +23,8 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros, $soloPeriodo) 
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <select class="form-select form-select-sm" name="estado" style="width:auto">
     <option value="">Todos los estados</option>
-    <?php foreach (['completada'=>'Completadas','pendiente'=>'Pendientes','cancelada'=>'Canceladas'] as $k=>$v): ?>
+    <?php /* Los mismos estados que la insignia de cada fila. */
+    foreach (\LibertyFin\Datos\VentaRepo::ESTADOS as $k=>$v): ?>
       <option value="<?= $k ?>" <?= $filtros['estado']===$k?'selected':'' ?>><?= $v ?></option>
     <?php endforeach; ?>
   </select>
