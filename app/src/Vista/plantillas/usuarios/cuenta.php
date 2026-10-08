@@ -232,7 +232,121 @@ if (!empty($catalogo)):
                'cancelado'=>['Cancelado','bg-secondary']];
 ?>
 
-<?php if (in_array($estPago, ['por_pagar','rechazado'], true)): ?>
+<?php if (!empty($reciente)): $lr = $reciente; ?>
+<?php /* ─────────────────────────────────────────────────────
+     COBRO EN LÍNEA RECIÉN GENERADO
+
+     El usuario pidió pagar con tarjeta, SPEI o efectivo en tienda
+     desde el modal. En vez de dejarlo con la tarjeta de
+     transferencia —que ya no aplica— se le enseña lo que el
+     proveedor devolvió.
+
+     Se parece al modal de cobro de la Caja, pero en formato
+     tarjeta: aquí no hay cajero esperando, el usuario se lleva
+     los datos y los usa cuando pueda.
+
+     Se muestra UNA vez: el controlador limpia `lf_liga` al
+     terminar de pintar. Los datos quedan en el pago (Mis pagos) y
+     se pueden recuperar desde ahí.
+     ───────────────────────────────────────────────────── */ ?>
+<section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 45%,transparent);
+         margin-bottom:18px">
+  <header class="card-header">
+    <div>
+      <span>
+        <?php if ($lr['metodo'] === 'tarjeta'): ?>Pago con tarjeta
+        <?php elseif ($lr['metodo'] === 'spei'): ?>Transferencia SPEI
+        <?php else: ?>Pago en tienda<?php endif; ?>
+      </span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        <?= P::e($lr['descripcion']) ?> ·
+        <b class="lf-mono" style="color:var(--lf-brand-2)"><?= D::pesos($lr['monto']) ?></b>
+        <?php if (!empty($lr['pruebas'])): ?> · <span style="color:var(--lf-amb)">prueba</span><?php endif; ?>
+      </p>
+    </div>
+    <?php if (!empty($lr['vence'])): ?>
+      <span class="badge bg-secondary" style="flex-shrink:0">
+        Vence <?= date('d/m/Y', strtotime($lr['vence'])) ?></span>
+    <?php endif; ?>
+  </header>
+  <div class="card-body">
+    <?php if ($lr['metodo'] === 'tarjeta' && !empty($lr['liga'])): ?>
+      <p style="font-size:13px;color:var(--lf-tinta-3);margin:0 0 12px;line-height:1.55">
+        Pasa la tarjeta con este enlace. El cargo se procesa al momento
+        y tu plan se activa solo.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a class="btn btn-primary" href="<?= P::e($lr['liga']) ?>" target="_blank"
+           rel="noopener"><?= W::icono('cobro','16px') ?>Abrir la página de pago</a>
+        <button type="button" class="btn btn-secondary" data-copiar="<?= P::e($lr['liga']) ?>">
+          <?= W::icono('venta','16px') ?>Copiar la liga</button>
+      </div>
+
+    <?php elseif ($lr['metodo'] === 'spei' && !empty($lr['clabe'])): ?>
+      <p style="font-size:13px;color:var(--lf-tinta-3);margin:0 0 12px;line-height:1.55">
+        Transfiere desde tu banco a esta CLABE, por
+        <b><?= D::pesos($lr['monto']) ?></b> exactos.
+        El plan se activa en cuanto entre el depósito.</p>
+      <div style="padding:16px;border-radius:var(--lf-r);background:var(--lf-brand-soft);
+           color:var(--lf-brand-2);font-family:var(--lf-mono);font-size:20px;
+           letter-spacing:.5px;font-weight:700;text-align:center;word-break:break-all;
+           margin-bottom:12px">
+        <?= P::e($lr['clabe']) ?>
+      </div>
+      <button type="button" class="btn btn-secondary" style="width:100%"
+              data-copiar="<?= P::e($lr['clabe']) ?>">
+        <?= W::icono('venta','16px') ?>Copiar la CLABE</button>
+      <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px;line-height:1.5">
+        Referencia del cobro: <b class="lf-mono"><?= P::e($lr['referencia']) ?></b>.
+        Guárdala por si hay que reclamar.</p>
+
+    <?php elseif ($lr['metodo'] === 'efectivo' && !empty($lr['barras'])): ?>
+      <p style="font-size:13px;color:var(--lf-tinta-3);margin:0 0 12px;line-height:1.55">
+        Muestra este código en OXXO o tiendas participantes. Puedes pagar por
+        <b><?= D::pesos($lr['monto']) ?></b>.</p>
+      <div style="padding:18px;border-radius:var(--lf-r);background:var(--lf-brand-soft);
+           color:var(--lf-brand-2);font-family:var(--lf-mono);font-size:20px;
+           letter-spacing:1.5px;font-weight:700;text-align:center;word-break:break-all;
+           margin-bottom:12px">
+        <?= P::e($lr['barras']) ?>
+      </div>
+      <?php if (!empty($lr['imagen'])): ?>
+        <div style="text-align:center;margin-bottom:12px">
+          <img src="data:image/png;base64,<?= P::e($lr['imagen']) ?>"
+               alt="Código de barras" style="max-width:100%;max-height:110px">
+        </div>
+      <?php endif; ?>
+      <button type="button" class="btn btn-secondary" style="width:100%"
+              data-copiar="<?= P::e($lr['barras']) ?>">
+        <?= W::icono('venta','16px') ?>Copiar la referencia</button>
+
+    <?php else: ?>
+      <p style="font-size:13px;color:var(--lf-rojo);line-height:1.55">
+        El cobro quedó registrado pero el proveedor no devolvió los datos.
+        Usa la transferencia de abajo, o inténtalo de nuevo.</p>
+    <?php endif; ?>
+
+    <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:16px;
+              padding-top:14px;border-top:1px solid var(--lf-linea);line-height:1.55">
+      <b>Todavía no entró el dinero.</b> Tu plan se activa cuando el proveedor
+      confirme el pago, no al generar la referencia. Puedes ver el avance en
+      <a href="#mis-pagos">Mis pagos</a>.
+    </p>
+  </div>
+</section>
+<script>
+document.querySelectorAll('[data-copiar]').forEach(function (b) {
+  b.addEventListener('click', function () {
+    var t = b.dataset.copiar;
+    if (!t) return;
+    navigator.clipboard.writeText(t).then(function () {
+      var x = b.innerHTML; b.textContent = 'Copiado';
+      setTimeout(function () { b.innerHTML = x; }, 1600);
+    }).catch(function () {});
+  });
+});
+</script>
+
+<?php elseif (in_array($estPago, ['por_pagar','rechazado'], true)): ?>
 <section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 45%,transparent)">
   <header class="card-header">
     <div><span><?= $estPago === 'rechazado' ? 'Tu comprobante no se pudo validar' : 'Paga tu ' . P::e($ultimo['nombre_plan']) ?></span>
@@ -536,18 +650,18 @@ $pe = function ($n) { return D::pesos($n); };
 
     /* Avisos: lo que cambia respecto a hoy. */
     var av = [];
-if (esActual) {
-    av.push('Estás <b>renovando tu plan actual</b>: los días que te queden se suman al nuevo periodo.');
-} else {
-    av.push('Estás <b>cambiando de plan</b>: el nuevo plan reemplazará al anterior una vez confirmado el pago.');
-}
-if (metodoActivo === '_spei') {
-    av.push('Al confirmar, recibirás la <b>CLABE y la referencia</b> para realizar tu transferencia. Tu plan se actualizará automáticamente una vez confirmado el pago.');
-} else if (metodoActivo === '_tienda') {
-    av.push('Recibirás las instrucciones para realizar tu pago en <b>efectivo</b>. Tu plan se actualizará automáticamente una vez confirmado el pago.');
-} else {
-    av.push('Al confirmar el pago, se procesará el <b>cargo a tu tarjeta</b> y tu plan se actualizará automáticamente.');
-}
+    if (esActual) {
+      av.push('Estás <b>renovando tu plan actual</b>: los días que te queden se suman al nuevo periodo.');
+    } else {
+      av.push('Estás <b>cambiando de plan</b>: el nuevo plan reemplazará al anterior una vez confirmado el pago.');
+    }
+    if (metodoActivo === '_spei') {
+      av.push('Al confirmar, recibirás la <b>CLABE y la referencia</b> para realizar tu transferencia. Tu plan se actualizará automáticamente una vez confirmado el pago.');
+    } else if (metodoActivo === '_tienda') {
+      av.push('Recibirás las instrucciones para realizar tu pago en <b>efectivo</b>. Tu plan se actualizará automáticamente una vez confirmado el pago.');
+    } else {
+      av.push('Al confirmar el pago, se procesará el <b>cargo a tu tarjeta</b> y tu plan se actualizará automáticamente.');
+    }
 
     document.getElementById('confAvisos').innerHTML =
       av.map(function(a){ return '<p>' + a + '</p>'; }).join('');
@@ -607,7 +721,7 @@ if (metodoActivo === '_spei') {
 
 
 <?php if ($pagosPlan): ?>
-<section class="card">
+<section class="card" id="mis-pagos">
   <header class="card-header">Mis pagos</header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
     <table class="table">

@@ -181,6 +181,25 @@ final class PlanRepo
         return $pago;
     }
 
+     /**
+     * Guarda en el pago la referencia que devolvió el proveedor de cobro.
+     *
+     * Solo se persiste el VALOR de `referencia`; el resto de datos de la
+     * liga (liga, clabe, barras, imagen, vence, pruebas…) viven en el
+     * directorio de ligas (LigaRepo) y no duplicamos aquí.
+     */
+    public function guardarLiga($pagoId, array $datos)
+    {
+        $ref = trim((string)($datos['referencia'] ?? ''));
+        if ($ref === '') return false;
+
+        $this->asegurar();
+        $st = $this->principal->prepare(
+            "UPDATE pagos_plan SET referencia = ? WHERE id = ?");
+        $st->execute([$ref, (int)$pagoId]);
+        return $st->rowCount() > 0;
+    }
+
     /** Lo que espera revisión, de todas las empresas. */
     public function porRevisar()
     {
