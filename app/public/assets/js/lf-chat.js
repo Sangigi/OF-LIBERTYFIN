@@ -61,6 +61,67 @@
       .then(function (t) { try { return JSON.parse(t); } catch (e) { return null; } });
   }
 
+  /* POST con archivo. Va por XMLHttpRequest y no por fetch porque fetch
+     no dice cuánto se ha subido, y con una imagen pesada eso es justo lo
+     que se quiere ver. Igual que `pedir`: null si no contesta JSON. */
+  function subir(url, datos, avance) {
+    return new Promise(function (listo, fallo) {
+      var x = new XMLHttpRequest();
+      x.open('POST', url, true);
+      x.setRequestHeader('X-LF-Json', '1');
+      x.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      if (x.upload && avance) {
+        x.upload.onprogress = function (e) { if (e.lengthComputable && e.total) avance(e.loaded / e.total); };
+      }
+      x.onload = function () { var j = null; try { j = JSON.parse(x.responseText); } catch (e) {} listo(j); };
+      x.onerror = x.onabort = x.ontimeout = function () { fallo(new Error('red')); };
+      x.send(datos);
+    });
+  }
+
+  /* ── El círculo de carga sobre lo que se está subiendo ──
+     Sobre la miniatura: fondo oscuro y un anillo que se llena con el
+     porcentaje. Junto a un PDF: el anillo chico. Ya subido, mientras el
+     servidor lo guarda, el anillo gira. */
+  var VUELTA = 97.39;   // largo del anillo: 2π · 15.5
+  function ponerCarga(nodo) {
+    var donde = nodo.querySelector('.adj-img') || nodo.querySelector('.adj');
+    if (!donde || donde.querySelector('.lf-carga')) return;
+    var c = crear('span', 'lf-carga gira' + (donde.classList.contains('adj') ? ' chica' : ''));
+    c.setAttribute('role', 'progressbar');
+    c.setAttribute('aria-label', 'Subiendo el archivo');
+    c.setAttribute('aria-valuemin', '0');
+    c.setAttribute('aria-valuemax', '100');
+    c.innerHTML = '<svg viewBox="0 0 36 36" aria-hidden="true">'
+      + '<circle class="pista" cx="18" cy="18" r="15.5"/><circle class="avance" cx="18" cy="18" r="15.5"/></svg>';
+    c.appendChild(crear('small'));
+    donde.appendChild(c);
+    nodo.classList.add('con-carga');
+  }
+  function avanceCarga(nodo, p) {
+    var c = nodo.querySelector('.lf-carga');
+    if (!c) return;
+    var pct = Math.max(0, Math.min(100, Math.round(p * 100)));
+    var arco = c.querySelector('.avance');
+    if (pct >= 100) {
+      // Ya subió: ahora lo guarda el servidor. Gira hasta que llegue.
+      c.classList.add('gira');
+      arco.style.strokeDashoffset = '';
+      c.querySelector('small').textContent = '';
+      c.removeAttribute('aria-valuenow');
+      return;
+    }
+    c.classList.remove('gira');
+    arco.style.strokeDashoffset = (VUELTA * (1 - pct / 100)).toFixed(2);
+    c.querySelector('small').textContent = pct + '%';
+    c.setAttribute('aria-valuenow', String(pct));
+  }
+  function quitarCarga(nodo) {
+    var c = nodo.querySelector('.lf-carga');
+    if (c) c.remove();
+    nodo.classList.remove('con-carga');
+  }
+
   function crear(tag, clase, texto) {
     var n = document.createElement(tag);
     if (clase) n.className = clase;
@@ -449,6 +510,16 @@
           if (p) {
             // El "Enviando…" se vuelve el mensaje de verdad, sin saltar.
             nodo.classList.remove('nuevo');
+            // La imagen del servidor tarda un momento en bajar: mientras,
+            // se sigue viendo la que ya estaba, sin parpadeo.
+            var img = nodo.querySelector('.adj-img img');
+            if (img && p._lfUrl) {
+              var local = p._lfUrl, remota = img.src, pre = new Image();
+              p._lfUrl = null;
+              img.src = local;
+              pre.onload = pre.onerror = function () { img.src = remota; URL.revokeObjectURL(local); };
+              pre.src = remota;
+            }
             lista.replaceChild(nodo, p);
             soltar(p);
           } else {
@@ -530,7 +601,11 @@
       if (enviando || !cola.length) return;
       enviando = true;
       var item = cola[0];
-      pedir(form.action, { method: 'POST', body: item.fd }).then(function (j) {
+      // Con archivo se sube viendo el avance; sin archivo, como siempre.
+      var envio = item.conArchivo && window.XMLHttpRequest
+        ? subir(form.action, item.fd, function (p) { avanceCarga(item.nodo, p); })
+        : pedir(form.action, { method: 'POST', body: item.fd });
+      envio.then(function (j) {
         enviando = false; cola.shift();
         if (j && j.ok) {
           alEnviar.forEach(function (f) { f(); });
@@ -552,6 +627,7 @@
 
     function fallo(item, texto) {
       var n = item.nodo;
+      quitarCarga(n);
       n.classList.remove('enviando');
       n.classList.add('fallo');
       var f = n.querySelector('.fecha'); if (f) f.textContent = 'No se envió';
@@ -563,6 +639,7 @@
         barra.remove();
         n.classList.remove('fallo'); n.classList.add('enviando');
         if (f) f.textContent = 'Enviando…';
+        if (item.conArchivo) ponerCarga(n);
         cola.push(item); siguiente();
       });
       tirar.addEventListener('click', function () { soltar(n); despedir(n, 260); });
@@ -607,6 +684,7 @@
         nodo.classList.add('enviando');
         nodo._lfTexto = normal(texto || 'Adjuntó un archivo.');
         nodo._lfUrl = urlLocal;
+        if (archivo) ponerCarga(nodo);
         var vacio = raiz.querySelector('[data-lf-vacio]');
         if (vacio) vacio.hidden = true;
         lista.insertBefore(nodo, lista.querySelector('[data-lf-escribe-ind]'));
@@ -623,7 +701,7 @@
         cerrarEmojis();
         if (ta) ta.focus();
 
-        cola.push({ fd: fd, nodo: nodo });
+        cola.push({ fd: fd, nodo: nodo, conArchivo: !!archivo });
         siguiente();
       });
       /* En el chat flotante Enter envía y Shift+Enter hace salto de línea. */

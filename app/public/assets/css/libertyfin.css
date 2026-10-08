@@ -3305,3 +3305,38 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   .lf-adj-vista,.lf-chatf > .lista{animation:none!important}
   .lf-emoji-pop,.lf-emoji-bt,.lf-emoji-pop button,.lf-msj .adj-img img{transition:none!important}
 }
+
+/* ── Subiendo un archivo ──
+   Sobre la miniatura: fondo oscuro y un anillo que se llena con el
+   porcentaje real de la subida. Ya subido, gira mientras el servidor lo
+   guarda. Junto a un PDF va en chico, sin fondo. */
+.lf-msj .adj-img{position:relative}
+.lf-msj.enviando.con-carga{opacity:1}
+.lf-msj.enviando.con-carga .cab,.lf-msj.enviando.con-carga p{opacity:.65}
+.lf-carga{position:absolute;inset:0;display:grid;place-items:center;
+  background:rgba(10,14,12,.55);color:#fff;pointer-events:none;line-height:1;
+  animation:lf-aparece .2s ease backwards}
+.lf-carga > *{grid-area:1/1}
+.lf-carga svg{width:46px;height:46px;transform:rotate(-90deg);overflow:visible;
+  filter:drop-shadow(0 1px 3px rgba(0,0,0,.35))}
+.lf-carga circle{fill:none;stroke-width:3.2;stroke-linecap:round}
+.lf-carga .pista{stroke:currentColor;opacity:.25}
+.lf-carga .avance{stroke:currentColor;stroke-dasharray:97.39;stroke-dashoffset:97.39;
+  transition:stroke-dashoffset .3s var(--lf-suave)}
+.lf-carga small{font-size:10.5px;font-weight:700;font-variant-numeric:tabular-nums;
+  letter-spacing:.2px;text-shadow:0 1px 2px rgba(0,0,0,.4)}
+/* Sin avance que mostrar (al empezar y al terminar): el arco gira. */
+.lf-carga.gira .avance{stroke-dashoffset:68;transition:none}
+.lf-carga.gira svg{animation:lf-gira .9s linear infinite}
+@keyframes lf-gira{from{transform:rotate(-90deg)}to{transform:rotate(270deg)}}
+.lf-chatf .lf-carga svg{width:40px;height:40px}
+/* Junto a un PDF. */
+.lf-carga.chica{position:static;display:inline-flex;align-items:center;gap:5px;margin-left:4px;
+  background:none;color:inherit;animation:none}
+.lf-carga.chica > *{grid-area:auto}
+.lf-carga.chica svg{width:15px;height:15px;filter:none}
+.lf-carga.chica small{font-size:11px;text-shadow:none}
+@media (prefers-reduced-motion:reduce){
+  .lf-carga{animation:none}
+  .lf-carga.gira svg{animation-duration:2.4s}
+}
