@@ -148,7 +148,7 @@ final class UsuariosControlador
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'empresa'   => null, 'fiscales' => [], 'comercio' => [],
             'documentos'=> [], 'estadoDocs' => [],
-            'catalogo'  => null, 'pagosPlan' => [],
+            'catalogo'  => null, 'pagosPlan' => [], 'reciente' => null,
         ];
 
         $cuenta = new CuentaRepo($db);
@@ -173,6 +173,21 @@ final class UsuariosControlador
             } catch (\Throwable $e) {
                 error_log('[LibertyFin] plan: ' . $e->getMessage());
             }
+
+            // ─────────────────────────────────────────────────────
+            // COBRO EN LÍNEA RECIÉN GENERADO
+            //
+            // solicitarPlan() deja la liga / CLABE / código de barras
+            // en `$_SESSION['lf_liga']` y redirige aquí. Sin esta
+            // lectura, la pestaña Plan entra al `if (!empty($reciente))`
+            // con null, cae al último `else` de la vista y el usuario
+            // solo ve el aviso de texto — sin la liga, sin la CLABE,
+            // sin nada accionable. El comentario de la plantilla dice
+            // "el controlador limpia lf_liga al terminar de pintar":
+            // esta es esa limpieza.
+            // ─────────────────────────────────────────────────────
+            $datos['reciente'] = $_SESSION['lf_liga'] ?? null;
+            unset($_SESSION['lf_liga']);
         }
         if ($p === 'fiscales') {
             foreach (EmpresaRepo::FISCALES as $c) $datos['fiscales'][$c] = $cfg->valorDe('fiscal.' . $c, '');
@@ -240,7 +255,7 @@ final class UsuariosControlador
     }
 
     /** La empresa elige un plan para pagar. */
-public function solicitarPlan()
+    public function solicitarPlan()
     {
         if (empty($_SESSION['empresa_id'])) {
             $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
@@ -675,6 +690,7 @@ public function solicitarPlan()
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'empresa'   => null, 'fiscales' => [], 'comercio' => [], 'documentos' => [],
             'estadoDocs'=> ['estado' => 'aprobada', 'faltan' => [], 'aprobados' => 0, 'total' => 0],
+            'reciente'  => null,
         ]);
         unset($_SESSION['lf_aviso']);
     }
