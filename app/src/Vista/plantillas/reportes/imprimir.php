@@ -79,7 +79,7 @@ $alineado = function ($tipo) {
           <div<?= $k === 'periodo' ? '' : ' class="otro"' ?>>
             <small><?= P::e($p['rotulo']) ?></small>
             <b><?= D::pesos($p['monto']) ?></b>
-            <span><?= (int)$p['cobros'] ?> cobro<?= (int)$p['cobros'] === 1 ? '' : 's' ?></span>
+            <span><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes($p, $k)) ?></span>
           </div>
         <?php endforeach; ?>
       </div>

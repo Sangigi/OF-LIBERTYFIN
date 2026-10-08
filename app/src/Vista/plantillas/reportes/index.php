@@ -98,7 +98,10 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         De lo que entró, <b><?= D::pesos($r['de_anteriores']) ?></b> son
         <?= (int)$r['de_anteriores_cobros'] ?> cobro<?= $r['de_anteriores_cobros'] == 1 ? '' : 's' ?>
         de <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
-        <?= P::e($deAntes) ?>: anticipos y abonos que llegaron en este periodo.
+        <?= P::e($deAntes) ?>: anticipos, abonos y liquidaciones que llegaron en este periodo<?php
+        if (!empty($r['de_anteriores_liquidadas'])): ?>; con ellos quedaron pagadas
+        <b><?= (int)$r['de_anteriores_liquidadas'] ?></b>
+        venta<?= $r['de_anteriores_liquidadas'] == 1 ? '' : 's' ?><?php endif; ?>.
         <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
            data-ir-pestana="pagos">Ver cuáles</a>
       </p>
@@ -159,6 +162,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         $sinVentas = (int)$a['ventas'] === 0;
         $mAnt = (float)($a['de_anteriores'] ?? 0);
         $nAnt = (int)($a['cobros_ant'] ?? 0);
+        $lAnt = (int)($a['liquidadas_ant'] ?? 0);
         if ($mAnt > 0) $hayAnt = true; ?>
         <tr>
           <td data-label="Área"><b style="font-weight:600"><?= P::e($a['area']) ?></b></td>
@@ -184,7 +188,8 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
               <?php /* Un solo elemento: en el celular la celda es flex y, sueltos,
                        el monto y "N cobros" se iban a extremos opuestos. */ ?>
               <span class="lf-ant-val"><b><?= D::pesos($mAnt) ?></b>
-                <small><?= $nAnt ?> cobro<?= $nAnt === 1 ? '' : 's' ?></small></span>
+                <small><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes(
+                         ['cobros' => $nAnt, 'liquidadas' => $lAnt], 'anterior')) ?></small></span>
             <?php else: ?>–<?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
@@ -636,19 +641,19 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
         <div>
           <small><?= P::e($pt['periodo']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['periodo']['monto']) ?></b>
-          <span><?= (int)$pt['periodo']['cobros'] ?> cobro<?= $pt['periodo']['cobros'] == 1 ? '' : 's' ?></span>
+          <span><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes($pt['periodo'], 'periodo')) ?></span>
         </div>
         <div class="otro">
           <small><?= P::e($pt['anterior']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['anterior']['monto']) ?></b>
-          <span><?= (int)$pt['anterior']['cobros'] ?> cobro<?= $pt['anterior']['cobros'] == 1 ? '' : 's' ?>
+          <span><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes($pt['anterior'], 'anterior')) ?>
             · marcados <i class="lf-origen">Venta anterior</i></span>
         </div>
         <?php if ($pt['posterior']['cobros'] > 0): ?>
         <div class="otro">
           <small><?= P::e($pt['posterior']['rotulo']) ?></small>
           <b class="lf-mono"><?= D::pesos($pt['posterior']['monto']) ?></b>
-          <span><?= (int)$pt['posterior']['cobros'] ?> cobro<?= $pt['posterior']['cobros'] == 1 ? '' : 's' ?>
+          <span><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes($pt['posterior'], 'posterior')) ?>
             · su fecha se movió a mano</span>
         </div>
         <?php endif; ?>

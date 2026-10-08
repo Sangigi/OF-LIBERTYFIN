@@ -38,6 +38,17 @@ final class ReporteRepo extends Repo
                        WHEN tot.suma = 0 THEN 1.0 / tot.n
                        ELSE d.subtotal / tot.suma END";
 
+    /**
+     * ¿Este pago dejó su venta en cero? (1 o 0). Se usa con `p` (el pago) y
+     * `v` (su venta). Es el mismo cálculo que "Le falta" del Detalle de
+     * pagos —pagos vivos de la venta hasta este, por fecha y luego id—, así
+     * que "venta liquidada" y el estado "Liquidación" nunca se contradicen.
+     */
+    const LIQUIDA = "(v.total - (SELECT COALESCE(SUM(pl.monto),0) FROM venta_pagos pl
+                        WHERE pl.venta_id = p.venta_id AND pl.cancelado = 0
+                          AND (pl.fecha_pago < p.fecha_pago
+                               OR (pl.fecha_pago = p.fecha_pago AND pl.id <= p.id)))) <= 0.005";
+
     private function rango($desde, $hasta)
     {
         return [$desde . ' 00:00:00',
@@ -99,6 +110,7 @@ final class ReporteRepo extends Repo
             'de_anteriores'        => round((float)$anteriores['monto'], 2),
             'de_anteriores_cobros' => (int)$anteriores['cobros'],
             'de_anteriores_ventas' => (int)$anteriores['ventas'],
+            'de_anteriores_liquidadas' => (int)($anteriores['liquidadas'] ?? 0),
             'cobrado'    => $cobrado,
             'vendido'    => $vendido,
             'por_cobrar' => max(0, $vendido - $cobrado),
@@ -137,18 +149,22 @@ final class ReporteRepo extends Repo
     public function deAnteriores($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+        $liq = self::LIQUIDA;
         $r = $this->uno("
             SELECT COALESCE(SUM(p.monto),0)   AS monto,
                    COUNT(*)                   AS cobros,
-                   COUNT(DISTINCT p.venta_id) AS ventas
+                   COUNT(DISTINCT p.venta_id) AS ventas,
+                   COUNT(DISTINCT CASE WHEN {$liq} THEN p.venta_id END) AS liquidadas
             FROM venta_pagos p
             INNER JOIN ventas v ON v.id = p.venta_id
             WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
               AND p.fecha_pago >= ? AND p.fecha_pago < ?
               AND v.fecha < ?", [$a, $b, $a]);
-        return ['monto'  => round((float)($r['monto'] ?? 0), 2),
-                'cobros' => (int)($r['cobros'] ?? 0),
-                'ventas' => (int)($r['ventas'] ?? 0)];
+        return ['monto'      => round((float)($r['monto'] ?? 0), 2),
+                'cobros'     => (int)($r['cobros'] ?? 0),
+                'ventas'     => (int)($r['ventas'] ?? 0),
+                // Ventas de antes que quedaron pagadas en el periodo.
+                'liquidadas' => (int)($r['liquidadas'] ?? 0)];
     }
 
     /**
@@ -167,12 +183,15 @@ final class ReporteRepo extends Repo
     {
         list($a, $b) = $this->rango($desde, $hasta);
         $peso = self::PESO;
+        $liq  = self::LIQUIDA;
         return $this->todos("
             SELECT area,
                    COUNT(DISTINCT pago_id) AS cobros,
+                   COUNT(DISTINCT CASE WHEN liquida = 1 THEN venta_id END) AS liquidadas,
                    ROUND(SUM(monto), 2)    AS monto
             FROM (
-                SELECT p.id AS pago_id,
+                SELECT p.id AS pago_id, v.id AS venta_id,
+                       ({$liq}) AS liquida,
                        COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
                        p.monto * ({$peso}) AS monto
                 FROM venta_pagos p
@@ -219,6 +238,7 @@ final class ReporteRepo extends Repo
             $k = $clave($f['area']);
             $x = $ant[$k] ?? null;
             $filas[$i]['cobros_ant']    = $x ? (int)$x['cobros'] : 0;
+            $filas[$i]['liquidadas_ant'] = $x ? (int)$x['liquidadas'] : 0;
             $filas[$i]['de_anteriores'] = $x ? round((float)$x['monto'], 2) : 0.0;
             unset($ant[$k]);
         }
@@ -226,6 +246,7 @@ final class ReporteRepo extends Repo
             $filas[] = ['area' => $x['area'], 'ventas' => 0, 'vendido' => 0, 'cobrado' => 0,
                         'gastos' => 0, 'comisiones' => 0,
                         'cobros_ant'    => (int)$x['cobros'],
+                        'liquidadas_ant' => (int)$x['liquidadas'],
                         'de_anteriores' => round((float)$x['monto'], 2)];
         }
         return $filas;
@@ -438,6 +459,14 @@ final class ReporteRepo extends Repo
                          AND (p4.fecha_pago < p.fecha_pago
                               OR (p4.fecha_pago = p.fecha_pago AND p4.id <= p.id))
                    ), 2) AS le_falta,
+                   -- Cuántos pagos vivos tuvo la venta ANTES de este: con cero
+                   -- es el primero (anticipo o pago completo); si no, es un
+                   -- abono o la liquidación de un saldo.
+                   (SELECT COUNT(*) FROM venta_pagos p6
+                    WHERE p6.venta_id = p.venta_id AND p6.cancelado = 0
+                      AND (p6.fecha_pago < p.fecha_pago
+                           OR (p6.fecha_pago = p.fecha_pago AND p6.id < p.id))
+                   ) AS pagos_antes,
                    CASE WHEN p.folio IS NULL OR p.folio = '' THEN (
                        SELECT COUNT(*) FROM venta_pagos p3
                        WHERE p3.venta_id = p.venta_id

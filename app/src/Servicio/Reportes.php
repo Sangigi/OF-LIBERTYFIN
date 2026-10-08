@@ -23,7 +23,9 @@ final class Reportes
                       . 'productos de dos áreas reparte su dinero entre las dos. «De ventas '
                       . 'anteriores» es lo que entró en el periodo (anticipos, abonos y liquidaciones) '
                       . 'por ventas de antes del periodo; no suma a la utilidad, que es de las ventas '
-                      . 'del periodo. Un cobro repartido entre dos áreas cuenta en las dos.',
+                      . 'del periodo. «Ventas liquidadas» cuenta las ventas de antes que quedaron '
+                      . 'pagadas en el periodo: no son ventas nuevas. Un cobro repartido entre dos '
+                      . 'áreas cuenta en las dos.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
@@ -99,6 +101,7 @@ final class Reportes
                      ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
                      ['Utilidad', Libro::MONEDA, 15],
                      ['Cobros anteriores',    Libro::NUMERO, 11],
+                     ['Ventas liquidadas',    Libro::NUMERO, 11],
                      ['De ventas anteriores', Libro::MONEDA, 15]],
                     array_map(function ($x) {
                         // Un área que solo recibió abonos de ventas viejas no
@@ -106,6 +109,7 @@ final class Reportes
                         // vacías en vez de una fila de $0.00 que parece dato.
                         $sinVentas = (int)$x['ventas'] === 0;
                         $nAnt      = (int)($x['cobros_ant'] ?? 0);
+                        $lAnt      = (int)($x['liquidadas_ant'] ?? 0);
                         $mAnt      = (float)($x['de_anteriores'] ?? 0);
                         return [$x['area'],
                                 $sinVentas ? '' : (int)$x['ventas'],
@@ -115,6 +119,7 @@ final class Reportes
                                 $sinVentas ? '' : $x['comisiones'],
                                 $sinVentas ? '' : $x['cobrado'] - $x['gastos'] - $x['comisiones'],
                                 $nAnt > 0 ? $nAnt : '',
+                                $lAnt > 0 ? $lAnt : '',
                                 $mAnt > 0 ? $mAnt : ''];
                     }, $f),
                     // El total de las dos columnas sale de deAnteriores(), la
@@ -127,7 +132,7 @@ final class Reportes
                         function ($t) use ($ant) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
                             $t['cobrado'], $t['gastos'], $t['comisiones'],
                             $t['cobrado'] - $t['gastos'] - $t['comisiones'],
-                            (int)$ant['cobros'], (float)$ant['monto']]; }));
+                            (int)$ant['cobros'], (int)$ant['liquidadas'], (float)$ant['monto']]; }));
 
             case 'colaborador':
                 $f = $r->porColaborador($desde, $hasta);
@@ -294,17 +299,18 @@ final class Reportes
      */
     private function pagos(array $f, $desde, $hasta)
     {
-        $estados = ['anticipo' => 'Anticipo', 'abono' => 'Abono', 'liquidacion' => 'Liquidación'];
         // Lo que dice la columna "Origen". Es texto de verdad, no una marca de
         // pantalla: así sale igual en la hoja impresa y se puede filtrar en el
         // Excel, que era justo donde no se distinguía.
         $origenes = ['' => 'Venta del periodo', 'anterior' => 'Venta anterior',
                      'posterior' => 'Venta posterior'];
         $partes = [
-            'periodo'   => ['monto' => 0.0, 'cobros' => 0, 'rotulo' => 'De ventas del periodo'],
-            'anterior'  => ['monto' => 0.0, 'cobros' => 0,
+            'periodo'   => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
+                            'rotulo' => 'De ventas del periodo'],
+            'anterior'  => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
                             'rotulo' => 'De ventas ' . self::rotuloAntes($desde, $hasta)],
-            'posterior' => ['monto' => 0.0, 'cobros' => 0, 'rotulo' => 'De ventas con fecha posterior'],
+            'posterior' => ['monto' => 0.0, 'cobros' => 0, 'liquidadas' => 0,
+                            'rotulo' => 'De ventas con fecha posterior'],
         ];
         $filas = [];
         foreach ($f as $x) {
@@ -319,19 +325,27 @@ final class Reportes
             $partes[$parte]['monto']  += (float)$x['monto'];
             $partes[$parte]['cobros'] += 1;
 
-            // EL ESTADO SALE DEL MISMO SALDO QUE "LE FALTA".
+            // EL ESTADO SALE DEL SALDO, NO DEL TIPO GUARDADO.
             //
             // El tipo guardado se decide una sola vez, al capturar el pago, con
-            // los pagos que había en ese momento. Si después se captura un pago
-            // con fecha anterior, o se cancela otro, ya no corresponde: salía
-            // "Liquidación" con $3,000 por cobrar, o "Abono" dejando la venta
-            // en cero. Aquí manda el saldo: si este pago la deja en cero es
-            // liquidación; si no, lo que se guardó (anticipo o abono), y una
-            // "liquidación" que ya no liquida pasa a abono.
-            $falta = max(0, (float)$x['le_falta']);
-            $tipo  = (string)$x['tipo'];
-            if ($falta <= 0.005)             $tipo = 'liquidacion';
-            elseif ($tipo === 'liquidacion') $tipo = 'abono';
+            // los pagos que había en ese momento: si después se captura uno con
+            // fecha anterior o se cancela otro, ya no corresponde. Además, una
+            // venta cobrada completa en caja se guardaba como "liquidación", y
+            // se confundía con el pago que cierra el saldo de una venta vieja.
+            //
+            // Ahora, con lo que la venta tenía antes de este pago y lo que le
+            // falta después:
+            //   primer pago,  la deja en cero  ->  Pago completo (de contado)
+            //   primer pago,  deja saldo       ->  Anticipo
+            //   pago posterior, deja saldo     ->  Abono
+            //   pago posterior, la deja en 0   ->  Liquidación (cierra la venta)
+            $falta   = max(0, (float)$x['le_falta']);
+            $primero = (int)$x['pagos_antes'] === 0;
+            $liquida = $falta <= 0.005;
+            $estado  = $liquida ? ($primero ? 'Pago completo' : 'Liquidación')
+                                : ($primero ? 'Anticipo' : 'Abono');
+            // Cuántas ventas quedaron pagadas con un cobro del periodo, por origen.
+            if ($liquida) $partes[$parte]['liquidadas'] += 1;
 
             $filas[] = [
                 $x['fecha_pago'], $cobro, $x['codigo_venta'], $fv, $origenes[$origen],
@@ -339,7 +353,7 @@ final class Reportes
                 ucfirst((string)($x['metodo_pago'] ?: 'sin método')),
                 $x['total'],
                 $x['monto'],
-                $estados[$tipo] ?? ucfirst($tipo),
+                $estado,
                 $falta,
                 '_venta'  => (int)$x['venta_id'],
                 '_origen' => $origen,
@@ -361,7 +375,8 @@ final class Reportes
              // de la misma venta la contarían dos veces.
              ['Total venta',    Libro::MONEDA, 14],
              ['Monto',          Libro::MONEDA, 14],
-             // Anticipo, abono o liquidación: qué fue este pago para su venta.
+             // Pago completo, anticipo, abono o liquidación: qué fue este pago
+             // para su venta.
              // Se deriva del saldo de "Le falta" para que nunca se contradigan.
              ['Estado',         Libro::TEXTO,  13],
              // Lo que la venta quedó debiendo después de este pago. Tampoco
@@ -432,9 +447,29 @@ final class Reportes
             // se dice aunque sea cero: es justo la pregunta.
             if ($k === 'posterior' && empty($p['cobros'])) continue;
             $t[] = $p['rotulo'] . ': ' . Dinero::pesos($p['monto'])
-                 . ' (' . (int)$p['cobros'] . ' cobro' . ((int)$p['cobros'] === 1 ? '' : 's') . ')';
+                 . ' (' . self::cuentaPartes($p, $k) . ')';
         }
         return $t ? ' · ' . implode(' · ', $t) : '';
+    }
+
+    /**
+     * "2 cobros · 1 venta liquidada": lo que va debajo de cada monto del
+     * resumen por origen, igual en pantalla, en la hoja impresa y en el Excel.
+     *
+     * Las ventas liquidadas solo se dicen para ventas de OTRO periodo: ahí son
+     * ventas viejas que quedaron pagadas, el dato que se busca. En las del
+     * periodo casi todas son ventas cobradas completas en caja, y decirlo
+     * ahí las haría pasar por ventas nuevas.
+     */
+    public static function cuentaPartes(array $p, $k)
+    {
+        $n = (int)($p['cobros'] ?? 0);
+        $l = (int)($p['liquidadas'] ?? 0);
+        $t = $n . ' cobro' . ($n === 1 ? '' : 's');
+        if ($k !== 'periodo' && $l > 0) {
+            $t .= ' · ' . $l . ' venta' . ($l === 1 ? '' : 's') . ' liquidada' . ($l === 1 ? '' : 's');
+        }
+        return $t;
     }
 
     /**
