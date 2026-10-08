@@ -374,7 +374,7 @@ final class ComisionRepo extends Repo
      * comisión vieja sin producto, o con uno que ya no está en la venta,
      * cuenta como de toda la venta: igual que en AsignarComision.
      *
-     * @return array [venta_id => [ [id, producto, area, con, comisiones], ... ]]
+     * @return array [venta_id => [ [id, producto_id, producto, area, con, comisiones], ... ]]
      */
     public function lineasDe(array $ventaIds)
     {
@@ -382,7 +382,7 @@ final class ComisionRepo extends Repo
         if (!$ids) return [];
         $marcas = implode(',', array_fill(0, count($ids), '?'));
         $filas = $this->todos("
-            SELECT d.id, d.venta_id, COALESCE(p.nombre, 'Producto') AS producto,
+            SELECT d.id, d.venta_id, d.producto_id, COALESCE(p.nombre, 'Producto') AS producto,
                    COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
                    ( SELECT GROUP_CONCAT(vc.colaborador_id)
                      FROM venta_comisiones vc
@@ -406,6 +406,7 @@ final class ComisionRepo extends Repo
         $r = [];
         foreach ($filas as $f) {
             $f['id'] = (int)$f['id'];
+            $f['producto_id'] = (int)$f['producto_id'];
             $f['con'] = (string)$f['con'];
             $f['comisiones'] = (string)$f['comisiones'];
             $r[(int)$f['venta_id']][] = $f;

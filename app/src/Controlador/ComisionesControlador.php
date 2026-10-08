@@ -167,6 +167,8 @@ final class ComisionesControlador
             'cortado'   => $cortado,
             'tope'      => $tope,
             'equipo'    => $repo->equipoPorArea(),
+            // El porcentaje que cada quien suele cobrar, para sugerirlo.
+            'sugeridos' => $repo->porcentajesUsados(),
             'areas'     => (new \LibertyFin\Datos\CatalogoRepo($db))->areas(),
             'desde'     => $desde, 'hasta' => $hasta, 'area' => $area, 'esp' => $esp,
             'solo'      => $solo,
@@ -179,11 +181,15 @@ final class ComisionesControlador
     /**
      * ASIGNAR COMISIONES EN LOTE · la asignación.
      *
+     * Varias personas, cada una con su porcentaje y su alcance (todos los
+     * productos marcados, un área o un producto). Por cada venta, cada
+     * persona recibe una comisión en cada producto que le toca.
+     *
      * Una por una con AsignarComision: las MISMAS reglas que en el detalle de
-     * la venta (un solo producto, base comisionable mayor a cero, un mismo
-     * colaborador no dos veces). Cada venta va en su propia transacción: si
-     * una no se puede, las demás sí quedan, y al final se dice cuáles no y
-     * por qué en vez de detenerse en la primera.
+     * la venta (base comisionable mayor a cero, nadie dos veces en el mismo
+     * producto). Cada comisión va en su propia transacción: si una no se
+     * puede, las demás sí quedan, y al final se dice cuáles no y por qué en
+     * vez de detenerse en la primera.
      */
     public function asignarLote()
     {
@@ -209,13 +215,51 @@ final class ComisionesControlador
         }
 
         $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ventas'] ?? [])))));
-        $quien = (string)($_POST['colaborador'] ?? '');     // id de colaborador o 'esp'
-        $pct   = round((float)($_POST['porcentaje'] ?? 0), 2);
+        if (!$ids)             $falla('Marca al menos una venta.');
+        if (count($ids) > 300) $falla('Son demasiadas ventas de una vez: máximo 300.');
 
-        if (!$ids)                  $falla('Marca al menos una venta.');
-        if (count($ids) > 300)      $falla('Son demasiadas ventas de una vez: máximo 300.');
-        if ($quien === '')          $falla('Elige a quién se le asigna la comisión.');
-        if ($pct <= 0 || $pct > 100) $falla('El porcentaje debe ser mayor a 0 y hasta 100.');
+        // Quiénes, con cuánto y en qué: una fila por persona. 'esp' es "al
+        // especialista de cada venta". `en` es '' (todos los productos
+        // marcados), 'a:Área' o 'p:id de producto'.
+        $repo    = new ComisionRepo($db);
+        $nombres = [];
+        foreach ($repo->equipoPorArea() as $gente) {
+            foreach ($gente as $c) $nombres[(int)$c['id']] = $c['nombre'];
+        }
+        $pcts  = (array)($_POST['porcentaje'] ?? []);
+        $ens   = (array)($_POST['en'] ?? []);
+        $pares = []; $vistos = [];
+        foreach ((array)($_POST['colaborador'] ?? []) as $i => $q) {
+            $q   = trim((string)$q);
+            $pct = round((float)($pcts[$i] ?? 0), 2);
+            if ($q === '' && $pct == 0) continue;                       // fila vacía
+            if ($q === '' || ($q !== 'esp' && !isset($nombres[(int)$q]))) {
+                $falla('Elige a quién en cada fila.');
+            }
+            if ($pct <= 0 || $pct > 100) $falla('Cada porcentaje debe ser mayor a 0 y hasta 100.');
+
+            $en = trim((string)($ens[$i] ?? ''));
+            if (strpos($en, 'a:') === 0 && trim(substr($en, 2)) !== '') {
+                $en = 'a:' . mb_substr(trim(substr($en, 2)), 0, 100);
+            } elseif (strpos($en, 'p:') === 0 && (int)substr($en, 2) > 0) {
+                $en = 'p:' . (int)substr($en, 2);
+            } else {
+                $en = '';
+            }
+
+            // La misma persona en lo mismo dos veces es un error de captura;
+            // en cosas distintas sí se vale (Juan 10% en Legal y 5% en
+            // Contabilidad).
+            $clave = $q === 'esp' ? 'esp' : (string)(int)$q;
+            if (isset($vistos[$clave . '|' . $en])) {
+                $falla('Hay una persona dos veces con lo mismo: deja una sola fila.');
+            }
+            $vistos[$clave . '|' . $en] = true;
+            $pares[] = ['q' => $clave, 'pct' => $pct, 'en' => $en,
+                        'nombre' => $clave === 'esp' ? 'Especialista' : $nombres[(int)$clave]];
+        }
+        if (!$pares)            $falla('Elige a quién se le asigna la comisión.');
+        if (count($pares) > 10) $falla('Son demasiadas filas de una vez: máximo 10.');
 
         // Folio y especialista de cada venta, para los mensajes y para el modo
         // "al especialista de cada venta".
@@ -225,10 +269,23 @@ final class ComisionesControlador
         $info = [];
         foreach ($st->fetchAll() as $x) $info[(int)$x['id']] = $x;
 
-        // Los productos de cada venta: la comisión va a cada uno (o solo a
-        // los del área filtrada), con su propia base.
-        $area   = trim((string)($_POST['area'] ?? ''));
-        $lineas = (new ComisionRepo($db))->lineasDe($ids);
+        // Los productos de cada venta. En las de varios productos manda lo
+        // que se marcó en la lista; si no llegó nada, los del área filtrada
+        // (o todos), como se veían de entrada.
+        $area    = trim((string)($_POST['area'] ?? ''));
+        $lineas  = $repo->lineasDe($ids);
+        $elegido = (array)($_POST['lineas'] ?? []);
+
+        // Para los mensajes y la bitácora: "Ana 10% en Legal + Juan 5%".
+        $nombreProd = [];
+        foreach ($lineas as $ls) foreach ($ls as $l) $nombreProd[$l['producto_id']] = $l['producto'];
+        $reparto = implode(' + ', array_map(function ($p) use ($nombreProd) {
+            $en = '';
+            if (strpos($p['en'], 'a:') === 0) $en = ' en ' . substr($p['en'], 2);
+            if (strpos($p['en'], 'p:') === 0) $en = ' en ' . ($nombreProd[(int)substr($p['en'], 2)] ?? 'un producto');
+            return $p['nombre'] . ' ' . rtrim(rtrim(number_format($p['pct'], 2, '.', ''), '0'), '.') . '%' . $en;
+        }, $pares));
+        $varias = count($pares) > 1;
 
         $srv = new \LibertyFin\Servicio\AsignarComision($db);
         $hechas = 0; $enVentas = 0; $monto = 0.0; $omitidas = [];
@@ -236,40 +293,69 @@ final class ComisionesControlador
             $folio = $info[$id]['codigo_venta'] ?? ('#' . $id);
             if (!isset($info[$id])) { $omitidas[] = [$folio, 'La venta ya no existe']; continue; }
 
-            $col = $quien === 'esp' ? (int)($info[$id]['especialista_id'] ?? 0) : (int)$quien;
-            if ($col <= 0) { $omitidas[] = [$folio, 'No tiene especialista']; continue; }
-
             $todas = $lineas[$id] ?? [];
             if (!$todas) { $omitidas[] = [$folio, 'La venta no tiene productos']; continue; }
-            $obj = self::objetivo($todas, $area);
-            if (!$obj) { $omitidas[] = [$folio, 'No tiene productos de ' . $area]; continue; }
-
-            // Lo que esa persona ya comisiona no se toca ni se reporta como
-            // error: en la lista ya salía como no incluido.
-            $libres = array_filter($obj, function ($l) use ($col) {
-                return !in_array($col, array_map('intval', explode(',', $l['con'])), true);
-            });
-            if (!$libres) {
-                $omitidas[] = [$folio, $quien === 'esp' ? 'Su especialista ya tiene comisión' : 'Ya tiene comisión de esta persona'];
-                continue;
+            $varios = count($todas) > 1;
+            if ($varios && isset($elegido[$id])) {
+                $marcados = array_map('intval', (array)$elegido[$id]);
+                $obj = array_values(array_filter($todas, function ($l) use ($marcados) {
+                    return in_array($l['id'], $marcados, true);
+                }));
+                if (!$obj) { $omitidas[] = [$folio, 'No se marcó ningún producto']; continue; }
+            } else {
+                $obj = self::objetivo($todas, $area);
+                if (!$obj) { $omitidas[] = [$folio, 'No tiene productos de ' . $area]; continue; }
             }
 
-            $varios = count($todas) > 1;
-            $alguna = false;
-            foreach ($libres as $l) {
-                $donde = $varios ? $folio . ' · ' . $l['producto'] : $folio;
-                try {
-                    $r = $srv->asignar($id, $col, $pct, $l['id']);
-                    $hechas++;
-                    $alguna = true;
-                    $monto += (float)$r['asignada'];
-                } catch (\InvalidArgumentException $e) {
-                    $omitidas[] = [$donde, $e->getMessage()];
-                } catch (\Throwable $e) {
-                    error_log('[LibertyFin] comision en lote, venta ' . $id . ' linea ' . $l['id'] . ': ' . $e->getMessage());
-                    $omitidas[] = [$donde, 'No se pudo asignar (quedó anotado el error)'];
+            // Por producto: quién ya quedó (nadie dos veces en lo mismo; la
+            // primera fila gana) y cuánto porcentaje lleva (no más de 100).
+            $alguna = false; $aplico = false; $usados = []; $sumaPct = [];
+            foreach ($pares as $par) {
+                $mios = array_filter($obj, function ($l) use ($par) { return self::enAlcance($l, $par['en']); });
+                if (!$mios) continue;                    // en esta venta no hay nada para esta fila
+                $aplico = true;
+
+                $esp = $par['q'] === 'esp';
+                $col = $esp ? (int)($info[$id]['especialista_id'] ?? 0) : (int)$par['q'];
+                // Con varias filas, cada mensaje dice de quién es.
+                $quien = $varias ? ' · ' . ($esp ? 'especialista' : $par['nombre']) : '';
+                if ($col <= 0) { $omitidas[] = [$folio . $quien, 'No tiene especialista']; continue; }
+
+                // Lo que esa persona ya comisiona no se toca ni se reporta
+                // como error: en la lista ya salía como no incluido.
+                $libres = array_filter($mios, function ($l) use ($col, $usados) {
+                    return !in_array($col, array_map('intval', explode(',', $l['con'])), true)
+                        && !isset($usados[$col . ':' . $l['id']]);
+                });
+                if (!$libres) {
+                    $omitidas[] = [$folio . $quien,
+                        $esp ? 'Su especialista ya tiene comisión' : 'Ya tiene comisión de esta persona'];
+                    continue;
+                }
+
+                foreach ($libres as $l) {
+                    $donde = ($varios ? $folio . ' · ' . $l['producto'] : $folio) . $quien;
+                    if (($sumaPct[$l['id']] ?? 0) + $par['pct'] > 100.001) {
+                        $omitidas[] = [$donde, 'Con las demás filas pasa de 100% en este producto'];
+                        continue;
+                    }
+                    $usados[$col . ':' . $l['id']] = true;
+                    try {
+                        $r = $srv->asignar($id, $col, $par['pct'], $l['id']);
+                        $hechas++;
+                        $alguna = true;
+                        $monto += (float)$r['asignada'];
+                        $sumaPct[$l['id']] = ($sumaPct[$l['id']] ?? 0) + $par['pct'];
+                    } catch (\InvalidArgumentException $e) {
+                        $omitidas[] = [$donde, $e->getMessage()];
+                    } catch (\Throwable $e) {
+                        error_log('[LibertyFin] comision en lote, venta ' . $id . ' linea ' . $l['id']
+                                  . ' colaborador ' . $col . ': ' . $e->getMessage());
+                        $omitidas[] = [$donde, 'No se pudo asignar (quedó anotado el error)'];
+                    }
                 }
             }
+            if (!$aplico) $omitidas[] = [$folio, 'Sus productos no son para nadie de la lista'];
             if ($alguna) $enVentas++;
         }
 
@@ -277,12 +363,25 @@ final class ComisionesControlador
             Auditoria::anota('comision.lote',
                 $hechas . ' comisi' . ($hechas === 1 ? 'ón' : 'ones') . ' en ' . $enVentas . ' venta' . ($enVentas === 1 ? '' : 's'),
                 null,
-                ($quien === 'esp' ? 'especialista de cada venta' : 'colaborador ' . (int)$quien)
-                . ' al ' . $pct . '%' . ($area !== '' ? ' · ' . $area : ''));
+                $reparto . ($area !== '' ? ' · ' . $area : ''));
         }
         $_SESSION['lf_lote'] = ['hechas' => $hechas, 'ventas' => $enVentas, 'monto' => round($monto, 2),
-                                'omitidas' => $omitidas, 'pct' => $pct];
+                                'omitidas' => $omitidas, 'reparto' => $reparto];
         header('Location: ' . $volverA); exit;
+    }
+
+    /**
+     * ¿Este producto le toca a esta fila? '' = todos, 'a:Área' = los de esa
+     * área (sin distinguir mayúsculas), 'p:id' = ese producto del catálogo.
+     */
+    private static function enAlcance(array $linea, $en)
+    {
+        if ($en === '') return true;
+        if (strpos($en, 'a:') === 0) {
+            return mb_strtolower(trim((string)$linea['area'])) === mb_strtolower(trim(substr($en, 2)));
+        }
+        if (strpos($en, 'p:') === 0) return (int)$linea['producto_id'] === (int)substr($en, 2);
+        return false;
     }
 
     /**
