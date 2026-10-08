@@ -3004,3 +3004,9 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-ant{display:inline-block;margin-top:4px;padding:2px 8px;border-radius:999px;font-size:11px;
   background:color-mix(in srgb,var(--lf-amb) 13%,transparent);color:var(--lf-tinta-2)}
 .lf-lote-ant b{font-weight:700;color:var(--lf-amb)}
+/* Bitácora: ventas de meses anteriores (abonos y liquidaciones) dentro de un lote. */
+.lf-audit-det summary .ant{color:var(--lf-amb)}
+.lf-audit-det .nota{margin:8px 0 0;font-size:11.5px;color:var(--lf-tinta-3);line-height:1.5}
+.lf-audit-det .ant-v{display:inline-block;margin:3px 0 2px;padding:1px 8px;border-radius:999px;font-size:10.5px;
+  background:color-mix(in srgb,var(--lf-amb) 13%,transparent);color:var(--lf-tinta-2)}
+.lf-audit-det .ant-v b{color:var(--lf-amb);font-weight:700}

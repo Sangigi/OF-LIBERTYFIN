@@ -187,12 +187,13 @@ final class AsignarComision
                 $base, $com->asignada($pct),
                 $_SESSION['usuario_id'] ?? null,
             ]);
+            $nuevoId = (int)$this->db->lastInsertId();
             $this->db->commit();
         } catch (\Throwable $e) { $this->db->rollBack(); throw $e; }
 
         (new SincronizarComisiones($this->db))->paraVenta($ventaId);
 
-        return ['colaborador' => $col['nombre'], 'asignada' => $com->asignada($pct),
+        return ['id' => $nuevoId, 'colaborador' => $col['nombre'], 'asignada' => $com->asignada($pct),
                 'base' => $base, 'producto' => $l['producto'], 'varios' => $varios];
     }
 

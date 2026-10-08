@@ -90,21 +90,37 @@ $pesadas = ['pago.cancelar','gasto.borrar','servicio.precio','comision.quitar',
                     $vid = (int)($c['venta'] ?? 0);
                     if (!isset($porVenta[$vid])) {
                         $porVenta[$vid] = ['folio' => $c['folio'] ?? ('#' . $vid),
-                                           'cliente' => $c['cliente'] ?? '', 'monto' => 0.0, 'filas' => []];
+                                           'cliente' => $c['cliente'] ?? '', 'monto' => 0.0, 'filas' => [],
+                                           // Venta de antes del periodo: el abono o la
+                                           // liquidación que trajo su comisión aquí.
+                                           'anterior' => !empty($c['anterior']),
+                                           'fecha'    => $c['fecha_venta'] ?? '',
+                                           'cobro'    => $c['cobro'] ?? ''];
                     }
                     $porVenta[$vid]['filas'][] = $c;
                     $porVenta[$vid]['monto'] += (float)($c['monto'] ?? 0);
                 }
                 $nC = count((array)($det['comisiones'] ?? []));
                 $nV = count($porVenta);
+                $nAntV = count(array_filter($porVenta, function ($pv) { return $pv['anterior']; }));
                 $om = (array)($det['omitidas'] ?? []); ?>
               <details class="lf-audit-det">
                 <summary>
                   Ver <?= $nV ?> venta<?= $nV === 1 ? '' : 's' ?>
                   · <?= $nC ?> comisi<?= $nC === 1 ? 'ón' : 'ones' ?>
                   <?php if (isset($det['monto'])): ?> · <?= D::pesos($det['monto']) ?><?php endif; ?>
+                  <?php if ($nAntV): ?> · <span class="ant"><?= $nAntV ?> de meses anteriores</span><?php endif; ?>
                   <?php if ($om): ?> · <span class="om"><?= count($om) ?> sin asignar</span><?php endif; ?>
                 </summary>
+                <?php if (isset($det['en_periodo'])): ?>
+                  <p class="nota">
+                    <?= D::pesos($det['monto'] ?? 0) ?> es lo que tocaría si los clientes liquidan todo;
+                    <b><?= D::pesos($det['en_periodo']) ?></b> ya se generó con cobros del periodo
+                    <?php if (!empty($det['desde'])): ?>(<?= date('d/m/Y', strtotime($det['desde'])) ?> al
+                      <?= date('d/m/Y', strtotime($det['hasta'])) ?>)<?php endif; ?>
+                    y es lo que cuenta en Comisiones y Reportes de ese periodo.
+                  </p>
+                <?php endif; ?>
                 <?php if ($porVenta): ?>
                 <ul class="ventas">
                   <?php foreach ($porVenta as $vid => $pv): ?>
@@ -118,10 +134,18 @@ $pesadas = ['pago.cancelar','gasto.borrar','servicio.precio','comision.quitar',
                         <span class="cli"><?= P::e($pv['cliente']) ?></span>
                         <b class="lf-mono"><?= D::pesos($pv['monto']) ?></b>
                       </div>
+                      <?php if ($pv['anterior']): ?>
+                        <span class="ant-v">
+                          <b>Venta del <?= $pv['fecha'] ? date('d/m/Y', strtotime($pv['fecha'])) : 'mes anterior' ?></b>
+                          <?= $pv['cobro'] !== '' ? '· ' . P::e($pv['cobro']) : '' ?>
+                        </span>
+                      <?php endif; ?>
                       <?php foreach ($pv['filas'] as $c): ?>
                         <div class="c">
                           <span><?= P::e($c['colaborador'] ?? '') ?> · <?= $pctTxt($c['pct'] ?? 0) ?>
-                            <small><?= P::e($c['producto'] ?? '') ?></small></span>
+                            <small><?= P::e($c['producto'] ?? '') ?><?php
+                              if (isset($c['en_periodo'])): ?> · en el periodo
+                                <?= D::pesos($c['en_periodo']) ?><?php endif; ?></small></span>
                           <span class="lf-mono"><?= D::pesos($c['monto'] ?? 0) ?></span>
                         </div>
                       <?php endforeach; ?>

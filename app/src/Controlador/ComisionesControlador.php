@@ -267,17 +267,58 @@ final class ComisionesControlador
         if (!$pares)            $falla('Elige a quién se le asigna la comisión.');
         if (count($pares) > 10) $falla('Son demasiadas filas de una vez: máximo 10.');
 
-        // Folio y especialista de cada venta, para los mensajes y para el modo
-        // "al especialista de cada venta".
+        // El periodo de la lista: para saber qué ventas son de antes y qué
+        // generó cada comisión en él (lo que cuenta en Comisiones y Reportes).
+        $fechaOk = function ($s) {
+            $d = \DateTime::createFromFormat('Y-m-d', (string)$s);
+            return $d && $d->format('Y-m-d') === $s ? $s : null;
+        };
+        $pDesde = $fechaOk($_POST['desde'] ?? '') ?: date('Y-m-01');
+        $pHasta = $fechaOk($_POST['hasta'] ?? '') ?: date('Y-m-t');
+        $pA = $pDesde;
+        $pB = date('Y-m-d', strtotime($pHasta . ' +1 day'));
+
+        // Folio, especialista y cobros de cada venta: para los mensajes, el
+        // modo "al especialista de cada venta" y la bitácora.
         $marcas = implode(',', array_fill(0, count($ids), '?'));
         $st = $db->prepare("
-            SELECT v.id, v.codigo_venta, v.especialista_id,
-                   COALESCE(c.nombre, 'Público general') AS cliente
-            FROM ventas v LEFT JOIN clientes c ON c.id = v.cliente_id
+            SELECT v.id, v.codigo_venta, v.especialista_id, v.fecha, v.total,
+                   COALESCE(c.nombre, 'Público general') AS cliente,
+                   COALESCE(pg.cobrado, 0) AS cobrado, pg.ultimo,
+                   COALESCE(pp.n, 0) AS cobros_periodo, COALESCE(pp.monto, 0) AS cobrado_periodo,
+                   pp.ultimo AS ultimo_periodo
+            FROM ventas v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado, MAX(fecha_pago) ultimo
+                        FROM venta_pagos WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, COUNT(*) n, SUM(monto) monto, MAX(fecha_pago) ultimo
+                        FROM venta_pagos
+                        WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) pp ON pp.venta_id = v.id
             WHERE v.id IN ($marcas)");
-        $st->execute($ids);
+        $st->execute(array_merge([$pA, $pB], $ids));
         $info = [];
-        foreach ($st->fetchAll() as $x) $info[(int)$x['id']] = $x;
+        foreach ($st->fetchAll() as $x) {
+            // Venta de antes del periodo: qué se le cobró en él, que es lo que
+            // trae su comisión a este periodo. "abonó $1,500.00 el 03/10".
+            $x['anterior'] = substr((string)$x['fecha'], 0, 10) < $pA;
+            $x['cobro'] = '';
+            if ($x['anterior'] && (int)$x['cobros_periodo'] > 0) {
+                $liquido = (float)$x['total'] - (float)$x['cobrado'] <= 0.005
+                        && $x['ultimo'] >= $pA && $x['ultimo'] < $pB;
+                $n = (int)$x['cobros_periodo'];
+                $x['cobro'] = ($liquido ? 'liquidó' : ($n === 1 ? 'abonó' : $n . ' abonos:'))
+                            . ' ' . \LibertyFin\Dominio\Dinero::pesos($x['cobrado_periodo'])
+                            . ' el ' . date('d/m', strtotime($x['ultimo_periodo']));
+            }
+            $info[(int)$x['id']] = $x;
+        }
+
+        // Cuánto generó ya cada comisión nueva, y cuánto de eso en el periodo.
+        $generada = $db->prepare("
+            SELECT COALESCE(SUM(monto),0) AS total,
+                   COALESCE(SUM(CASE WHEN fecha_pago >= ? AND fecha_pago < ? THEN monto ELSE 0 END),0) AS periodo
+            FROM pago_comisiones WHERE venta_comision_id = ?");
 
         // Los productos de cada venta. En las de varios productos manda lo
         // que se marcó en la lista; si no llegó nada, los del área filtrada
@@ -365,14 +406,24 @@ final class ComisionesControlador
                         $hechas++;
                         $alguna = true;
                         $monto += (float)$r['asignada'];
+                        $gen = ['total' => 0, 'periodo' => 0];
+                        try {
+                            $generada->execute([$pA, $pB, (int)($r['id'] ?? 0)]);
+                            $gen = $generada->fetch() ?: $gen;
+                        } catch (\Throwable $e) { /* la bitácora sale sin esa cifra */ }
                         $bitacora[] = [
                             'venta'       => $id,
                             'folio'       => $folio,
                             'cliente'     => $info[$id]['cliente'],
+                            'fecha_venta' => substr((string)$info[$id]['fecha'], 0, 10),
+                            'anterior'    => (bool)$info[$id]['anterior'],
+                            'cobro'       => $info[$id]['cobro'],
                             'producto'    => $l['producto'],
                             'colaborador' => $r['colaborador'],
                             'pct'         => $par['pct'],
-                            'monto'       => (float)$r['asignada'],
+                            'monto'       => (float)$r['asignada'],       // si el cliente liquida
+                            'generada'    => round((float)$gen['total'], 2),   // ya ganada con lo cobrado
+                            'en_periodo'  => round((float)$gen['periodo'], 2), // la que cuenta en el periodo
                         ];
                         $sumaPct[$l['id']] = ($sumaPct[$l['id']] ?? 0) + $par['pct'];
                     } catch (\InvalidArgumentException $e) {
@@ -398,7 +449,9 @@ final class ComisionesControlador
                 $hechas . ' comisi' . ($hechas === 1 ? 'ón' : 'ones') . ' en ' . $enVentas . ' venta' . ($enVentas === 1 ? '' : 's'),
                 null,
                 $reparto . ($area !== '' ? ' · ' . $area : ''),
-                ['comisiones' => $bitacora, 'omitidas' => $omitidas, 'monto' => round($monto, 2)]);
+                ['comisiones' => $bitacora, 'omitidas' => $omitidas, 'monto' => round($monto, 2),
+                 'en_periodo' => round(array_sum(array_column($bitacora, 'en_periodo')), 2),
+                 'desde' => $pDesde, 'hasta' => $pHasta]);
         }
         $_SESSION['lf_lote'] = ['hechas' => $hechas, 'ventas' => $enVentas, 'monto' => round($monto, 2),
                                 'omitidas' => $omitidas, 'reparto' => $reparto];
