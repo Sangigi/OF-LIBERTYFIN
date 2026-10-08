@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 12;
+    const VERSION = 13;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -476,6 +476,24 @@ final class Migraciones
         }
     }
 
+    /**
+     * 13 · El detalle de una operación en lote, en la bitácora.
+     *
+     * `antes` y `despues` se recortan a mil caracteres: sirven para "el
+     * precio pasó de $800 a $999", no para la lista de 300 ventas que
+     * tocó una asignación de comisiones en lote. Esa lista va aparte, y
+     * es lo que la bitácora despliega para contestar "¿cuáles fueron?".
+     */
+    private static function v13(PDO $db)
+    {
+        if (self::hayTabla($db, 'lf_auditoria')
+            && !self::hayColumna($db, 'lf_auditoria', 'detalle')) {
+            try {
+                $db->exec("ALTER TABLE lf_auditoria ADD COLUMN detalle MEDIUMTEXT NULL AFTER despues");
+            } catch (\Throwable $e) { /* ya existe */ }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -490,5 +508,6 @@ final class Migraciones
         10 => 'Especialista asignado a la venta',
         11 => 'Avisos de pago de Paga de Todo (transacción, autorización, comprobante)',
         12 => 'Subfolios de cobro y servicios agregados a una venta existente',
+        13 => 'Detalle de las operaciones en lote en la bitácora',
     ];
 }

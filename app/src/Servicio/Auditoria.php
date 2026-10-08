@@ -31,6 +31,7 @@ final class Auditoria
         'comision.asignar'  => 'Asignó una comisión',
         'comision.quitar'   => 'Quitó una comisión',
         'comision.reasignar'=> 'Reasignó una comisión',
+        'comision.lote'     => 'Asignó comisiones en lote',
         'servicio.precio'   => 'Cambió un precio',
         'servicio.alternar' => 'Activó o desactivó un servicio',
         'gasto.borrar'      => 'Borró un gasto',
@@ -87,6 +88,50 @@ final class Auditoria
             // Se anota el fallo y se sigue. Ver la regla 1.
             error_log('[LibertyFin] auditoría (' . $accion . '): ' . $e->getMessage());
             return false;
+        }
+    }
+
+    /**
+     * Como `anota`, con el DETALLE de una operación en lote aparte: la
+     * lista de lo que tocó, para desplegarla en la bitácora.
+     *
+     * `antes` y `despues` se recortan a mil caracteres y ahí no cabe la
+     * lista de 300 ventas de una asignación en lote. El detalle va en su
+     * propia columna, sin recortar.
+     *
+     * Si la columna todavía no existe (la base se pone al día al entrar,
+     * y quien ya tenía sesión abierta no ha entrado), se anota sin
+     * detalle. Ver la regla 1.
+     */
+    public static function anotaConDetalle($accion, $sobre, $antes, $despues, array $detalle, PDO $db = null)
+    {
+        $conexion = $db ?: self::$db;
+        if (!$conexion) return false;
+
+        $json = json_encode($detalle, JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR);
+        if ($json === false) return self::anota($accion, $sobre, $antes, $despues, $db);
+
+        try {
+            $conexion->prepare("
+                INSERT INTO lf_auditoria
+                    (accion, sobre, antes, despues, detalle, usuario_id, usuario_nombre,
+                     usuario_rol, ip, creado_en)
+                VALUES (?,?,?,?,?,?,?,?,?,NOW())
+            ")->execute([
+                (string)$accion,
+                mb_substr((string)$sobre, 0, 200),
+                self::texto($antes),
+                self::texto($despues),
+                $json,
+                ($_SESSION['usuario_id'] ?? 0) ?: null,
+                mb_substr((string)($_SESSION['usuario_nombre'] ?? ''), 0, 160),
+                mb_substr((string)($_SESSION['usuario_rol'] ?? ''), 0, 40),
+                mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45),
+            ]);
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] auditoría con detalle (' . $accion . '): ' . $e->getMessage());
+            return self::anota($accion, $sobre, $antes, $despues, $db);
         }
     }
 

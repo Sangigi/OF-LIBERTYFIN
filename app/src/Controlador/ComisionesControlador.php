@@ -266,7 +266,11 @@ final class ComisionesControlador
         // Folio y especialista de cada venta, para los mensajes y para el modo
         // "al especialista de cada venta".
         $marcas = implode(',', array_fill(0, count($ids), '?'));
-        $st = $db->prepare("SELECT id, codigo_venta, especialista_id FROM ventas WHERE id IN ($marcas)");
+        $st = $db->prepare("
+            SELECT v.id, v.codigo_venta, v.especialista_id,
+                   COALESCE(c.nombre, 'Público general') AS cliente
+            FROM ventas v LEFT JOIN clientes c ON c.id = v.cliente_id
+            WHERE v.id IN ($marcas)");
         $st->execute($ids);
         $info = [];
         foreach ($st->fetchAll() as $x) $info[(int)$x['id']] = $x;
@@ -294,6 +298,7 @@ final class ComisionesControlador
 
         $srv = new \LibertyFin\Servicio\AsignarComision($db);
         $hechas = 0; $enVentas = 0; $monto = 0.0; $omitidas = [];
+        $bitacora = [];        // cada comisión asignada, para desplegarla en la bitácora
         foreach ($ids as $id) {
             $folio = $info[$id]['codigo_venta'] ?? ('#' . $id);
             if (!isset($info[$id])) { $omitidas[] = [$folio, 'La venta ya no existe']; continue; }
@@ -356,6 +361,15 @@ final class ComisionesControlador
                         $hechas++;
                         $alguna = true;
                         $monto += (float)$r['asignada'];
+                        $bitacora[] = [
+                            'venta'       => $id,
+                            'folio'       => $folio,
+                            'cliente'     => $info[$id]['cliente'],
+                            'producto'    => $l['producto'],
+                            'colaborador' => $r['colaborador'],
+                            'pct'         => $par['pct'],
+                            'monto'       => (float)$r['asignada'],
+                        ];
                         $sumaPct[$l['id']] = ($sumaPct[$l['id']] ?? 0) + $par['pct'];
                     } catch (\InvalidArgumentException $e) {
                         $omitidas[] = [$donde, $e->getMessage()];
@@ -374,10 +388,13 @@ final class ComisionesControlador
         }
 
         if ($hechas > 0) {
-            Auditoria::anota('comision.lote',
+            // Con la lista de cada comisión (y lo que no se pudo), para
+            // que la bitácora conteste "¿cuáles ventas fueron?".
+            Auditoria::anotaConDetalle('comision.lote',
                 $hechas . ' comisi' . ($hechas === 1 ? 'ón' : 'ones') . ' en ' . $enVentas . ' venta' . ($enVentas === 1 ? '' : 's'),
                 null,
-                $reparto . ($area !== '' ? ' · ' . $area : ''));
+                $reparto . ($area !== '' ? ' · ' . $area : ''),
+                ['comisiones' => $bitacora, 'omitidas' => $omitidas, 'monto' => round($monto, 2)]);
         }
         $_SESSION['lf_lote'] = ['hechas' => $hechas, 'ventas' => $enVentas, 'monto' => round($monto, 2),
                                 'omitidas' => $omitidas, 'reparto' => $reparto];

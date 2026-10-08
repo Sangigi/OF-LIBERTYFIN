@@ -2,6 +2,7 @@
 use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Vista\Widget as W;
 use LibertyFin\Servicio\Auditoria as A;
+use LibertyFin\Dominio\Dinero as D;
 
 $qs = function ($c = []) use ($filtros) {
     $b = array_filter([
@@ -12,6 +13,7 @@ $qs = function ($c = []) use ($filtros) {
     return '?' . http_build_query(array_merge($b, array_filter($c, function ($v) { return $v !== null; })));
 };
 $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
+$pctTxt = function ($p) { return rtrim(rtrim(number_format((float)$p, 2, '.', ''), '0'), '.') . '%'; };
 // Lo que mueve dinero se marca: es lo que se revisa primero.
 $pesadas = ['pago.cancelar','gasto.borrar','servicio.precio','comision.quitar',
             'usuario.rol','usuario.clave','usuario.alternar'];
@@ -78,6 +80,64 @@ $pesadas = ['pago.cancelar','gasto.borrar','servicio.precio','comision.quitar',
                   <span class="desp"><?= P::e(mb_substr($f['despues'], 0, 120)) ?></span>
                 <?php endif; ?>
               </div>
+            <?php endif; ?>
+            <?php
+            // Operaciones en lote: la lista de lo que tocaron, desplegable.
+            $det = !empty($f['detalle']) ? json_decode($f['detalle'], true) : null;
+            if (is_array($det) && (!empty($det['comisiones']) || !empty($det['omitidas']))):
+                $porVenta = [];
+                foreach ((array)($det['comisiones'] ?? []) as $c) {
+                    $vid = (int)($c['venta'] ?? 0);
+                    if (!isset($porVenta[$vid])) {
+                        $porVenta[$vid] = ['folio' => $c['folio'] ?? ('#' . $vid),
+                                           'cliente' => $c['cliente'] ?? '', 'monto' => 0.0, 'filas' => []];
+                    }
+                    $porVenta[$vid]['filas'][] = $c;
+                    $porVenta[$vid]['monto'] += (float)($c['monto'] ?? 0);
+                }
+                $nC = count((array)($det['comisiones'] ?? []));
+                $nV = count($porVenta);
+                $om = (array)($det['omitidas'] ?? []); ?>
+              <details class="lf-audit-det">
+                <summary>
+                  Ver <?= $nV ?> venta<?= $nV === 1 ? '' : 's' ?>
+                  · <?= $nC ?> comisi<?= $nC === 1 ? 'ón' : 'ones' ?>
+                  <?php if (isset($det['monto'])): ?> · <?= D::pesos($det['monto']) ?><?php endif; ?>
+                  <?php if ($om): ?> · <span class="om"><?= count($om) ?> sin asignar</span><?php endif; ?>
+                </summary>
+                <?php if ($porVenta): ?>
+                <ul class="ventas">
+                  <?php foreach ($porVenta as $vid => $pv): ?>
+                    <li>
+                      <div class="v">
+                        <?php if ($vid > 0): ?>
+                          <a href="/ventas/<?= $vid ?>" data-modal class="lf-mono"><?= P::e($pv['folio']) ?></a>
+                        <?php else: ?>
+                          <span class="lf-mono"><?= P::e($pv['folio']) ?></span>
+                        <?php endif; ?>
+                        <span class="cli"><?= P::e($pv['cliente']) ?></span>
+                        <b class="lf-mono"><?= D::pesos($pv['monto']) ?></b>
+                      </div>
+                      <?php foreach ($pv['filas'] as $c): ?>
+                        <div class="c">
+                          <span><?= P::e($c['colaborador'] ?? '') ?> · <?= $pctTxt($c['pct'] ?? 0) ?>
+                            <small><?= P::e($c['producto'] ?? '') ?></small></span>
+                          <span class="lf-mono"><?= D::pesos($c['monto'] ?? 0) ?></span>
+                        </div>
+                      <?php endforeach; ?>
+                    </li>
+                  <?php endforeach; ?>
+                </ul>
+                <?php endif; ?>
+                <?php if ($om): ?>
+                  <p class="om-t">No se asignaron</p>
+                  <ul class="omit">
+                    <?php foreach ($om as $o): ?>
+                      <li><b class="lf-mono"><?= P::e($o[0] ?? '') ?></b><span><?= P::e($o[1] ?? '') ?></span></li>
+                    <?php endforeach; ?>
+                  </ul>
+                <?php endif; ?>
+              </details>
             <?php endif; ?>
             <?php if ($f['ip']): ?>
               <div class="ip"><?= P::e($f['usuario_rol']) ?> · <?= P::e($f['ip']) ?></div>

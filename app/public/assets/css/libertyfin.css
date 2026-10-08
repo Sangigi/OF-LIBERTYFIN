@@ -2974,3 +2974,29 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-tabla.modo-persona tr.ajena{opacity:.45}
 
 @media(max-width:760px){ .lf-lote-modo{margin:0 14px 12px;top:4px} }
+
+/* Bitácora: lo que tocó una operación en lote, desplegable. */
+.lf-audit-det{margin-top:8px;font-size:12px}
+.lf-audit-det summary{cursor:pointer;display:inline-flex;align-items:center;gap:4px;flex-wrap:wrap;
+  padding:4px 10px;border:1px solid var(--lf-linea);border-radius:999px;background:var(--lf-sup);
+  font-weight:600;color:var(--lf-brand-2);list-style:none;user-select:none}
+.lf-audit-det summary::-webkit-details-marker{display:none}
+.lf-audit-det summary::before{content:"▸";font-size:10px;transition:transform .15s}
+.lf-audit-det[open] summary::before{transform:rotate(90deg)}
+.lf-audit-det summary .om{color:var(--lf-amb)}
+.lf-audit-det .ventas{list-style:none;margin:8px 0 0;padding:0;max-height:360px;overflow-y:auto;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);background:var(--lf-sup)}
+.lf-audit-det .ventas > li{padding:8px 12px;border-bottom:1px solid var(--lf-vidrio)}
+.lf-audit-det .ventas > li:last-child{border-bottom:0}
+.lf-audit-det .v{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.lf-audit-det .v a{font-weight:700;color:var(--lf-tinta);text-decoration:none}
+.lf-audit-det .v a:hover{color:var(--lf-brand)}
+.lf-audit-det .v .cli{flex:1;min-width:0;color:var(--lf-tinta-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-audit-det .v b{font-weight:700}
+.lf-audit-det .c{display:flex;justify-content:space-between;gap:10px;padding:3px 0 0 12px;color:var(--lf-tinta-2)}
+.lf-audit-det .c small{display:block;font-size:10.5px;color:var(--lf-tinta-4)}
+.lf-audit-det .om-t{margin:10px 0 4px;font-weight:700;color:var(--lf-amb);font-size:11.5px}
+.lf-audit-det .omit{list-style:none;margin:0;padding:0}
+.lf-audit-det .omit li{display:flex;gap:10px;padding:3px 0;border-bottom:1px solid var(--lf-vidrio)}
+.lf-audit-det .omit li b{flex:0 0 auto;font-size:11.5px}
+.lf-audit-det .omit li span{color:var(--lf-tinta-3)}
