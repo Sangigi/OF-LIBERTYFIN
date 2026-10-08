@@ -3138,7 +3138,6 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-chatf.sale{animation:lf-chat-cierra .24s cubic-bezier(.4,0,1,1) both;pointer-events:none}
 @keyframes lf-chat-abre{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:none}}
 @keyframes lf-chat-cierra{to{opacity:0;transform:translateY(14px) scale(.95)}}
-.lf-chatf header{background:linear-gradient(135deg,var(--lf-brand),color-mix(in srgb,var(--lf-brand) 78%,#000))}
 /* Minimizar: la altura es fija, así que se anima; el contenido se desvanece. */
 .lf-chatf .lista,.lf-chatf form{transition:opacity .22s ease}
 .lf-chatf.min{height:58px}
@@ -3164,8 +3163,8 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 @keyframes lf-onda{0%,70%,100%{transform:translateY(0) scale(.85);opacity:.35}35%{transform:translateY(-3px) scale(1);opacity:1}}
 
 /* ── La burbuja ──
-   Un círculo con degradado de la marca, sombra teñida de su color y un
-   brillo arriba. Al pasar el cursor se abre en una pastilla que dice
+   Un círculo del color de la marca, liso, con sombra teñida de su color y
+   un brillo arriba. Al pasar el cursor se abre en una pastilla que dice
    "Soporte". Con respuestas sin leer, un halo que respira. */
 .lf-chat-burbuja{position:fixed;right:20px;bottom:20px;z-index:405;
   display:inline-flex;align-items:center;height:56px;min-width:56px;padding:0 16px;
