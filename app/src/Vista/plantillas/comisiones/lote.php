@@ -271,22 +271,25 @@ $nDel = count($ventas) - $nAnt;
                 </span>
               <?php endif; ?>
               <?php if ($nLin > 1): ?>
-                <?php /* A qué productos va la comisión. Vienen marcados todos, o
-                         los del área si se filtró por área; se puede cambiar.
-                         El "0" oculto avisa que en esta venta se eligió, aunque
-                         se desmarquen todos. */ ?>
-                <input type="hidden" name="lineas[<?= (int)$v['id'] ?>][]" value="0">
+                <?php /* A qué productos va la comisión. Sin nadie seleccionado,
+                         las casillas son las de TODOS (vienen marcados todos, o
+                         los del área si se filtró por área). Con una persona
+                         seleccionada, son las de ELLA: Ana en uno y Juan en otro.
+                         No llevan `name`: lo que se envía, por persona, lo arma
+                         el script (lp[venta][fila][]). */ ?>
                 <ul class="lf-lote-prods">
                   <?php foreach ($v['lineas'] as $l): $fuera = !in_array($l['id'], $v['objetivo'], true); ?>
                     <li class="<?= $fuera ? 'fuera' : '' ?>">
                       <label>
-                        <input type="checkbox" data-prod name="lineas[<?= (int)$v['id'] ?>][]"
+                        <input type="checkbox" data-prod
                                value="<?= (int)$l['id'] ?>" data-con="<?= P::e($l['con']) ?>"
                                data-area="<?= P::e($clave($l['area'])) ?>" data-pid="<?= (int)$l['producto_id'] ?>"
                                <?= $fuera ? '' : 'checked' ?>>
                         <span><?= P::e($l['producto']) ?>
                           <small><?= P::e($l['area']) ?><?= $fuera ? ' · otra área' : '' ?><?=
-                            $l['comisiones'] !== '' ? ' · ' . P::e($l['comisiones']) : '' ?></small></span>
+                            $l['comisiones'] !== '' ? ' · ' . P::e($l['comisiones']) : '' ?></small>
+                          <?php /* Quién va en este producto (lo pinta el script). */ ?>
+                          <em class="quien"></em></span>
                       </label>
                     </li>
                   <?php endforeach; ?>
@@ -508,16 +511,46 @@ $nDel = count($ventas) - $nAnt;
   /* ══ Cada venta ══ */
   function ventaId(tr) { return tr.querySelector('input[name="ventas[]"]').value; }
 
-  /* Los productos de la venta que se van a comisionar: el único que
-     tiene, o los que estén marcados. Cada uno con quién ya comisiona. */
-  function productos(tr) {
-    var ps = tr.querySelectorAll('input[data-prod]');
+  /* Qué productos de cada venta van, en dos capas:
+       base   'venta:producto'        lo marcado para TODOS, sin nadie seleccionado
+       deUno  'venta:clave:producto'  lo marcado para UNA persona, con ella
+                                      seleccionada. Manda sobre lo de todos y
+                                      sobre su "En".
+     Sin nada propio, a cada persona le tocan los productos marcados para
+     todos que caen en su "En". Así Ana va en un producto y Juan en otro de
+     la misma venta, sin tocar "En". */
+  var base = {}, deUno = {};
+  filas.forEach(function (tr) {
+    var vid = ventaId(tr);
+    [].forEach.call(tr.querySelectorAll('input[data-prod]'), function (p) {
+      base[vid + ':' + p.value] = p.checked;
+    });
+  });
+
+  /* Todos los productos de la venta, cada uno con quién ya comisiona en él. */
+  function lineas(tr) {
+    var vid = ventaId(tr), ps = tr.querySelectorAll('input[data-prod]');
     if (!ps.length) {
       return +tr.dataset.n === 1
-        ? [{ k: tr.dataset.linea, c: tr.dataset.con || '', a: tr.dataset.area, p: tr.dataset.pid }] : [];
+        ? [{ k: tr.dataset.linea, c: tr.dataset.con || '', a: tr.dataset.area, p: tr.dataset.pid, base: true }] : [];
     }
-    return [].filter.call(ps, function (p) { return p.checked; }).map(function (p) {
-      return { k: p.value, c: p.dataset.con || '', a: p.dataset.area, p: p.dataset.pid };
+    return [].map.call(ps, function (p) {
+      return { k: p.value, c: p.dataset.con || '', a: p.dataset.area, p: p.dataset.pid,
+               base: base[vid + ':' + p.value] !== false, el: p };
+    });
+  }
+  /* Los marcados para todos. */
+  function productos(tr) { return lineas(tr).filter(function (l) { return l.base; }); }
+
+  function idDe(tr, x) { return x.q === 'esp' ? tr.dataset.esp : x.q; }
+  function yaTiene(l, id) { return (',' + l.c + ',').indexOf(',' + id + ',') !== -1; }
+
+  /* Los productos de esta venta que le tocan a esta persona. */
+  function deLaPersona(tr, x) {
+    var vid = ventaId(tr);
+    return lineas(tr).filter(function (l) {
+      var e = deUno[vid + ':' + x.k + ':' + l.k];
+      return e !== undefined ? e : (l.base && enAlcance(l, x.en));
     });
   }
 
@@ -550,15 +583,16 @@ $nDel = count($ventas) - $nAnt;
      los porcentajes no pasan de 100. Con `todos`, como si nadie se
      hubiera quitado: sirve para saber qué es posible. */
   function reparto(tr, todos) {
-    var ps = productos(tr), usados = {}, suma = {}, vid = ventaId(tr);
+    var usados = {}, suma = {}, vid = ventaId(tr);
     return quienes().map(function (x) {
-      var r = { x: x, libres: 0, aplica: false, quitado: false, motivo: '' };
+      var r = { x: x, libres: 0, aplica: false, quitado: false, motivo: '', mios: [], lineas: [] };
       var esp = x.q === 'esp';
-      var mios = ps.filter(function (p) { return enAlcance(p, x.en); });
+      var mios = deLaPersona(tr, x);
+      r.mios = mios;
       if (!mios.length) { r.motivo = 'No es de su alcance (' + (x.enTexto || 'sus productos') + ')'; return r; }
       r.aplica = true;
       if (!todos && quitado(vid, x.k)) { r.quitado = true; return r; }
-      var id = esp ? tr.dataset.esp : x.q;
+      var id = idDe(tr, x);
       if (!id || id === '0') { r.motivo = 'No tiene especialista'; return r; }
       var pasa = false;
       var l = mios.filter(function (p) {
@@ -568,6 +602,7 @@ $nDel = count($ventas) - $nAnt;
       });
       l.forEach(function (p) { usados[id + ':' + p.k] = true; suma[p.k] = (suma[p.k] || 0) + (x.pct || 0); });
       r.libres = l.length;
+      r.lineas = l;
       r.motivo = l.length ? '' : pasa ? 'Los porcentajes pasan de 100% en un producto'
                : esp ? 'Su especialista ya tiene comisión' : 'Ya tiene comisión';
       return r;
@@ -581,12 +616,13 @@ $nDel = count($ventas) - $nAnt;
   /* Por qué esta venta no se puede, aunque se quisiera. '' si sí se puede. */
   function imposible(tr) {
     if (tr.dataset.fijo) return tr.dataset.fijo;
-    if (!productos(tr).length) return 'Marca al menos un producto';
-    if (!quienes().length) return '';
+    if (!quienes().length) return productos(tr).length ? '' : 'Marca al menos un producto';
     var rs = reparto(tr, true);
     if (rs.some(function (r) { return r.libres; })) return '';
     var ap = rs.filter(function (r) { return r.aplica; });
-    if (!ap.length) return 'Sus productos no son para nadie de la lista';
+    if (!ap.length) {
+      return productos(tr).length ? 'Sus productos no son para nadie de la lista' : 'Marca al menos un producto';
+    }
     if (ap.length === 1) return ap[0].motivo;
     return 'Ya tienen comisión' + (ap.some(function (r) { return r.motivo === 'No tiene especialista'; })
       ? ' (y no tiene especialista)' : '');
@@ -606,11 +642,10 @@ $nDel = count($ventas) - $nAnt;
 
   /* "Lista", o cuántas comisiones salen de esta venta. */
   function listo(tr) {
-    var l = libres(tr), sel = productos(tr).length;
+    var l = libres(tr), n = +tr.dataset.n;
     if (quienes().length > 1) return 'Lista · ' + l + (l === 1 ? ' comisión' : ' comisiones');
-    if (+tr.dataset.n < 2) return 'Lista';
-    return 'Lista · ' + (l === sel ? l + (l === 1 ? ' producto' : ' productos')
-                                   : l + ' de ' + sel + ' productos');
+    if (n < 2) return 'Lista';
+    return 'Lista · ' + (l === n ? l + ' productos' : l + ' de ' + n + ' productos');
   }
 
   function marcadas() { return filas.filter(incluida); }
@@ -635,19 +670,27 @@ $nDel = count($ventas) - $nAnt;
       var c   = tr.querySelector('.lf-lote-sel');
       var vid = ventaId(tr);
       var no  = imposible(tr);
-      var rs  = no ? [] : reparto(tr);
+      // El reparto se calcula aunque la venta no se pueda "para todos": con
+      // una persona seleccionada, ella todavía puede ponerse productos.
+      var rs  = tr.dataset.fijo ? [] : reparto(tr);
       var va  = !no && (QS.length ? rs.some(function (r) { return r.libres; }) : !fuera[vid + ':*']);
 
       rs.forEach(function (r) { if (r.libres) porPersona[r.x.k] = (porPersona[r.x.k] || 0) + 1; });
 
       // La casilla: la venta para todos, o para la persona seleccionada.
       if (yo) {
-        var mio = no ? null : de(reparto(tr, true), activa);
-        var puede = !!(mio && mio.libres);
+        // Puede ir en esta venta si queda algún producto en el que todavía
+        // no comisione, aunque su "En" no lo incluya: aquí se elige a mano.
+        var idYo  = idDe(tr, yo);
+        var conId = !!idYo && idYo !== '0';
+        var puede = !tr.dataset.fijo && conId
+                    && lineas(tr).some(function (l) { return !yaTiene(l, idYo); });
+        var mio = de(rs, activa);
         c.disabled = !puede;
-        c.checked = puede && !quitado(vid, activa);
+        c.checked = !!(puede && mio && mio.libres);
         c.indeterminate = false;
-        c.title = puede ? '' : (no || (mio && mio.motivo) || '');
+        c.title = puede ? '' : (tr.dataset.fijo || (!conId ? 'No tiene especialista'
+                                                           : 'Ya comisiona en todos sus productos'));
         tr.classList.toggle('ajena', !puede);
         tr.classList.toggle('mia', c.checked);
       } else {
@@ -663,14 +706,22 @@ $nDel = count($ventas) - $nAnt;
       tr.classList.toggle('no', !!no || !va);
       tr.querySelector('.lf-lote-motivo').textContent = no || (va ? listo(tr) : 'No va');
 
-      // Lo que se envía: la venta si va, y a quiénes lleva.
+      // Lo que se envía: la venta si va, a quiénes lleva y, de cada quien,
+      // en qué productos (lp[venta][fila][]; el "0" marca que se eligió,
+      // aunque no quede ninguno).
       tr.querySelector('input[name="ventas[]"]').disabled = !va;
       var datos = tr.querySelector('.lf-lote-datos');
       datos.innerHTML = '';
       if (va && QS.length) {
         datos.appendChild(oculto('para[' + vid + '][]', '-'));
-        rs.forEach(function (r) { if (r.aplica && !r.quitado) datos.appendChild(oculto('para[' + vid + '][]', r.x.k)); });
+        rs.forEach(function (r) {
+          if (!r.aplica || r.quitado) return;
+          datos.appendChild(oculto('para[' + vid + '][]', r.x.k));
+          datos.appendChild(oculto('lp[' + vid + '][' + r.x.k + '][]', '0'));
+          r.mios.forEach(function (l) { datos.appendChild(oculto('lp[' + vid + '][' + r.x.k + '][]', l.k)); });
+        });
       }
+      pintarProductos(tr, rs, yo);
       pintarPara(tr, no ? [] : rs);
     });
 
@@ -690,11 +741,47 @@ $nDel = count($ventas) - $nAnt;
       var b = document.createElement('b'); b.textContent = yo.nombre; modoT.appendChild(b);
       modoT.appendChild(document.createTextNode(
         (yo.pct > 0 ? ' · ' + yo.pct + '%' : '') + (yo.en ? ' en ' + yo.enTexto : '')
-        + '. Marca o desmarca sus ventas; a los demás no les cambia nada.'));
+        + '. Marca sus ventas y, en las de varios productos, en cuáles va. '
+        + 'A los demás no les cambia nada.'));
     }
 
     contar();
     QS = null;
+  }
+
+  /* Las casillas de producto de una venta con varios: las de todos, o las
+     de la persona seleccionada. Junto a cada producto, quién va en él. */
+  function pintarProductos(tr, rs, yo) {
+    var ls = lineas(tr);
+    if (ls.length < 2 || !ls[0].el) return;
+    var vid = ventaId(tr);
+    var quien = {};
+    rs.forEach(function (r) {
+      r.lineas.forEach(function (l) { (quien[l.k] = quien[l.k] || []).push(r.x.corto); });
+    });
+    var idYo  = yo ? idDe(tr, yo) : null;
+    var conId = !!idYo && idYo !== '0';
+    var mios  = yo ? deLaPersona(tr, yo).map(function (l) { return l.k; }) : [];
+    var fueraYo = yo ? quitado(vid, activa) : false;
+    ls.forEach(function (l) {
+      var cb = l.el, li = cb.closest('li');
+      if (yo) {
+        var tiene = conId && yaTiene(l, idYo);
+        cb.disabled = !conId || tiene || !!tr.dataset.fijo;
+        cb.checked  = !cb.disabled && !fueraYo && mios.indexOf(l.k) !== -1;
+        li.title    = tiene ? 'Ya comisiona en este producto' : '';
+      } else {
+        cb.disabled = false;
+        cb.checked  = l.base;
+        li.title    = '';
+      }
+      li.classList.toggle('fuera', !cb.checked);
+      var em = li.querySelector('.quien');
+      if (em) {
+        em.textContent = !quienes().length ? ''
+          : quien[l.k] ? '→ ' + quien[l.k].join(', ') : '→ nadie';
+      }
+    });
   }
 
   function oculto(nombre, valor) {
@@ -750,8 +837,22 @@ $nDel = count($ventas) - $nAnt;
   /* ══ Marcar ══ */
   function marcarVenta(tr, si) {
     var vid = ventaId(tr);
-    if (activa) fuera[vid + ':' + activa] = !si;
-    else ponerVenta(vid, si);
+    if (!activa) { ponerVenta(vid, si); return; }
+    fuera[vid + ':' + activa] = !si;
+    if (!si) return;
+    // Si no le tocaba nada aquí (su "En" no cae en esta venta, o se le
+    // quitaron sus productos), al marcarla se le ponen los marcados para
+    // todos en los que todavía no comisiona; si no hay, todos los que pueda.
+    var x = persona(activa);
+    if (!x) return;
+    var mio = de(reparto(tr), activa);
+    if (mio && mio.libres) return;
+    var id = idDe(tr, x);
+    var puede = lineas(tr).filter(function (l) { return !yaTiene(l, id); });
+    var marcados = puede.filter(function (l) { return l.base; });
+    (marcados.length ? marcados : puede).forEach(function (l) {
+      deUno[vid + ':' + activa + ':' + l.k] = true;
+    });
   }
 
   form.addEventListener('change', function (e) {
@@ -765,7 +866,14 @@ $nDel = count($ventas) - $nAnt;
       marcarVenta(t.closest('tr'), t.checked);
       revisar();
     } else if (t.matches('input[data-prod]')) {
-      // Cambiar los productos de una venta puede cambiar si se puede o no.
+      // Con alguien seleccionado, el producto es suyo; si no, de todos.
+      var tr = t.closest('tr'), vid = ventaId(tr);
+      if (activa) {
+        deUno[vid + ':' + activa + ':' + t.value] = t.checked;
+        if (t.checked) fuera[vid + ':' + activa] = false;   // ponerse un producto es ir en la venta
+      } else {
+        base[vid + ':' + t.value] = t.checked;
+      }
       revisar();
     }
   });

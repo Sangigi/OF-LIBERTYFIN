@@ -3010,3 +3010,7 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-audit-det .ant-v{display:inline-block;margin:3px 0 2px;padding:1px 8px;border-radius:999px;font-size:10.5px;
   background:color-mix(in srgb,var(--lf-amb) 13%,transparent);color:var(--lf-tinta-2)}
 .lf-audit-det .ant-v b{color:var(--lf-amb);font-weight:700}
+/* Quién va en cada producto de una venta con varios. */
+.lf-lote-prods li .quien{display:block;font-style:normal;font-size:10.5px;font-weight:600;color:var(--lf-brand-2)}
+.lf-lote-prods li.fuera .quien{color:var(--lf-tinta-4);font-weight:500}
+.lf-lote-tabla.modo-persona .lf-lote-prods{border-left-color:var(--lf-brand)}

@@ -329,6 +329,10 @@ final class ComisionesControlador
         // Por venta, a quiénes de las filas lleva (los chips). Si no llegó,
         // lleva a todos a los que les toca.
         $paraPost = (array)($_POST['para'] ?? []);
+        // Por venta y por persona, en qué productos va (lo arma la lista: con
+        // una persona seleccionada se le eligen los suyos). Manda sobre lo
+        // marcado para todos y sobre su "En". Si no llegó, se usa lo de antes.
+        $lpPost = (array)($_POST['lp'] ?? []);
 
         // Para los mensajes y la bitácora: "Ana 10% en Legal + Juan 5%".
         $nombreProd = [];
@@ -351,15 +355,17 @@ final class ComisionesControlador
             $todas = $lineas[$id] ?? [];
             if (!$todas) { $omitidas[] = [$folio, 'La venta no tiene productos']; continue; }
             $varios = count($todas) > 1;
+            // Lo que cada persona eligió en esta venta, si llegó.
+            $lpVenta = isset($lpPost[$id]) ? (array)$lpPost[$id] : null;
             if ($varios && isset($elegido[$id])) {
                 $marcados = array_map('intval', (array)$elegido[$id]);
                 $obj = array_values(array_filter($todas, function ($l) use ($marcados) {
                     return in_array($l['id'], $marcados, true);
                 }));
-                if (!$obj) { $omitidas[] = [$folio, 'No se marcó ningún producto']; continue; }
+                if (!$obj && $lpVenta === null) { $omitidas[] = [$folio, 'No se marcó ningún producto']; continue; }
             } else {
                 $obj = self::objetivo($todas, $area);
-                if (!$obj) { $omitidas[] = [$folio, 'No tiene productos de ' . $area]; continue; }
+                if (!$obj && $lpVenta === null) { $omitidas[] = [$folio, 'No tiene productos de ' . $area]; continue; }
             }
 
             // Por producto: quién ya quedó (nadie dos veces en lo mismo; la
@@ -368,7 +374,16 @@ final class ComisionesControlador
 
             $alguna = false; $aplico = false; $quitados = false; $usados = []; $sumaPct = [];
             foreach ($pares as $par) {
-                $mios = array_filter($obj, function ($l) use ($par) { return self::enAlcance($l, $par['en']); });
+                if ($lpVenta !== null && isset($lpVenta[$par['k']])) {
+                    // Los productos que se le eligieron a esta persona en esta
+                    // venta (solo los que son de la venta: el resto se ignora).
+                    $suyos = array_map('intval', (array)$lpVenta[$par['k']]);
+                    $mios = array_filter($todas, function ($l) use ($suyos) {
+                        return in_array($l['id'], $suyos, true);
+                    });
+                } else {
+                    $mios = array_filter($obj, function ($l) use ($par) { return self::enAlcance($l, $par['en']); });
+                }
                 if (!$mios) continue;                    // en esta venta no hay nada para esta fila
                 if ($para !== null && !in_array($par['k'], $para, true)) {
                     $quitados = true;                    // se quitó de esta venta a propósito
