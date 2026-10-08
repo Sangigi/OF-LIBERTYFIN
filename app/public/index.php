@@ -156,6 +156,7 @@ $r->post('/ayuda/{id}/responder', ['LibertyFin\Controlador\AyudaControlador', 'r
 $r->get('/ayuda/novedades',       ['LibertyFin\Controlador\AyudaControlador', 'novedades']);
 $r->get('/ayuda/{id}/mensajes',   ['LibertyFin\Controlador\AyudaControlador', 'mensajes']);
 $r->post('/ayuda/{id}/escribiendo', ['LibertyFin\Controlador\AyudaControlador', 'escribiendo']);
+$r->post('/ayuda/{id}/adjunto',     ['LibertyFin\Controlador\AyudaControlador', 'adjunto']);
 $r->get('/plataforma',            ['LibertyFin\Controlador\PlataformaControlador', 'index']);
 $r->post('/plataforma/usuario',   ['LibertyFin\Controlador\PlataformaControlador', 'guardarUsuario']);
 $r->post('/plataforma/alternar',  ['LibertyFin\Controlador\PlataformaControlador', 'alternarUsuario']);
@@ -175,6 +176,7 @@ $r->get('/tickets/{id}/mensajes', ['LibertyFin\Controlador\TicketsControlador', 
 // Lo que espera respuesta de soporte (JSON): cuenta del menú y avisos.
 $r->get('/tickets/novedades',     ['LibertyFin\Controlador\TicketsControlador', 'novedades']);
 $r->post('/tickets/{id}/escribiendo', ['LibertyFin\Controlador\TicketsControlador', 'escribiendo']);
+$r->post('/tickets/{id}/adjunto',     ['LibertyFin\Controlador\TicketsControlador', 'adjunto']);
 $r->post('/tickets/{id}/cambiar', ['LibertyFin\Controlador\TicketsControlador', 'cambiar']);
 $r->get('/soporte',               ['LibertyFin\Controlador\SoporteControlador', 'index']);
 $r->get('/soporte/{id}',          ['LibertyFin\Controlador\SoporteControlador', 'ficha']);
@@ -279,6 +281,7 @@ $permisos = [
   '/ayuda/novedades'        => 'abrir.ticket',
   '/ayuda/{id}/mensajes'    => 'abrir.ticket',
   '/ayuda/{id}/escribiendo' => 'abrir.ticket',
+  '/ayuda/{id}/adjunto'     => 'abrir.ticket',
   '/plataforma'             => 'usuarios.plataforma',
   '/plataforma/usuario'     => 'usuarios.plataforma',
   '/plataforma/alternar'    => 'usuarios.plataforma',
@@ -297,6 +300,7 @@ $permisos = [
   '/tickets/{id}/mensajes'  => 'ver.tickets',
   '/tickets/novedades'      => 'ver.tickets',
   '/tickets/{id}/escribiendo' => 'ver.tickets',
+  '/tickets/{id}/adjunto'     => 'ver.tickets',
   '/tickets/{id}/cambiar'   => 'ver.tickets',
   '/soporte'                => 'ver.empresas',
   '/soporte/{id}'           => 'ver.empresas',

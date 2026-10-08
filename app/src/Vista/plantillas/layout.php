@@ -272,6 +272,19 @@ $lfSoporte = \LibertyFin\Dominio\Permisos::puede('ver.tickets');
         var nuevo = doc.querySelector('.lf-cont');
         if (!nuevo) { location.href = url; return; }
 
+        /* ¿SE ACTUALIZÓ LA APLICACIÓN? Cambiar de sección sin recargar
+           conserva el JS y el CSS con que se abrió la pestaña. Si desde
+           entonces se subió una versión nueva, la página llega pensada
+           para lo nuevo y se seguiría viendo con lo viejo. Se compara la
+           versión (?v=) de lo que carga el <head> y, si cambió, se
+           recarga completa una vez. */
+        var versiones = function (d) {
+          return [].map.call(d.head ? d.head.querySelectorAll('link[href*="?v="], script[src*="?v="]') : [],
+            function (n) { return n.getAttribute('href') || n.getAttribute('src'); }).sort().join('|');
+        };
+        var vNueva = versiones(doc);
+        if (vNueva && vNueva !== versiones(document)) { location.href = url; return; }
+
         cont.innerHTML = nuevo.innerHTML;
 
         /* La barra superior y el menú viajan con la página pedida. Sin

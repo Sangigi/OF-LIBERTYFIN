@@ -111,14 +111,21 @@ final class TicketsControlador
     {
         if (!$this->token()) $this->a('/tickets/' . $id, 'No se pudo verificar el formulario.', 'error');
         try {
+            // El adjunto: ya subido mientras escribía (solo llega su
+            // clave), o con el mensaje, como antes.
             $adjunto = null;
-            if (!empty($_FILES['adjunto']['name'])) {
+            $previo = trim((string)($_POST['adjunto_previo'] ?? ''));
+            if ($previo !== '') {
+                $adjunto = \LibertyFin\Servicio\AdjuntoPrevio::ruta($id, $previo);
+                if (!$adjunto) $this->a('/tickets/' . $id, 'El archivo ya no está disponible. Adjúntalo de nuevo.', 'error');
+            } elseif (!empty($_FILES['adjunto']['name'])) {
                 $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
             }
             $repo = new TicketRepo($this->principal());
             $nuevo = $repo->responder(
                 $id, $_POST['cuerpo'] ?? '', !empty($_POST['interno']), $adjunto,
                 $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
+            if ($previo !== '') \LibertyFin\Servicio\AdjuntoPrevio::usado($previo);
 
             // EL CORREO "RESPONDIMOS TU TICKET":
             //   · solo a quien ABRIÓ el ticket. Antes iba al administrador de
@@ -215,6 +222,19 @@ final class TicketsControlador
     }
 
     /**
+     * Sube el adjunto ANTES de enviar la respuesta (ver
+     * Servicio\AdjuntoPrevio): el chat lo manda en cuanto se pega o elige.
+     */
+    public function adjunto($id)
+    {
+        if (!$this->token()) $this->json(['ok' => false, 'error' => 'No se pudo verificar el formulario.'], 403);
+        if (!(new TicketRepo($this->principal()))->uno($id)) {
+            $this->json(['ok' => false, 'error' => 'Ese ticket no existe.'], 404);
+        }
+        $this->json(\LibertyFin\Servicio\AdjuntoPrevio::subir((int)$id));
+    }
+
+    /**
      * Soporte está tecleando en este ticket. Las notas internas no se
      * avisan: el chat no llama aquí si está marcada "Nota interna".
      */
@@ -260,6 +280,14 @@ final class TicketsControlador
                     'autor'      => $t['autor'] ?: 'El cliente',
                     'extracto'   => mb_strlen($txt) > 120 ? mb_substr($txt, 0, 117) . '…' : $txt,
                     'mio'        => (int)$t['asignado_a'] === $yo,
+                    // Nadie lo ha tomado: cualquiera de soporte puede.
+                    'libre'      => empty($t['asignado_a']),
+                    // Es el primer mensaje: un ticket recién abierto.
+                    'nuevo'      => !empty($t['es_primero']),
+                    'prioridad'  => $t['prioridad'] ?? 'normal',
+                    // Segundos desde el mensaje, con el reloj de la base:
+                    // así no importa la zona horaria del navegador.
+                    'hace'       => max(0, (int)($t['hace'] ?? 0)),
                 ];
             }, $f),
         ]);

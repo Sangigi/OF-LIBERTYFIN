@@ -40,6 +40,18 @@ $aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '
         <?= W::icono($a[1], '15px') ?><?= P::e($a[2]) ?></a>
     <?php endforeach; ?>
 
+    <?php /* La campana de soporte: los tickets que esperan respuesta.
+             La llena assets/js/lf-chat.js; aquí solo va el lugar. */
+    if (\LibertyFin\Dominio\Permisos::puede('ver.tickets')): ?>
+      <div class="lf-campana" data-lf-campana>
+        <button type="button" class="lf-campana-bt" aria-haspopup="true" aria-expanded="false"
+                aria-label="Tickets que esperan tu respuesta" title="Tickets que esperan tu respuesta">
+          <?= W::icono('campana', '17px') ?>
+          <span class="lf-noti-num" hidden></span>
+        </button>
+      </div>
+    <?php endif; ?>
+
     <button type="button" class="lf-tema" id="lfTema"
             aria-label="Cambiar entre claro y oscuro" title="Cambiar tema">
       <span class="claro"><?= W::icono('luna', '16px') ?></span>

@@ -54,8 +54,21 @@ final class TicketRepo
         'otro'        => 'Otro',
     ];
 
+    /**
+     * Súbelo al cambiar lo que `asegurar()` crea o agrega: así cada sesión
+     * vuelve a revisar una vez.
+     */
+    const ESQUEMA = 4;
+
     public function asegurar()
     {
+        // YA REVISADO EN ESTA SESIÓN. Revisar cuesta tres CREATE TABLE y
+        // una consulta a information_schema —lenta en un hosting
+        // compartido—, y el chat pregunta varias veces por minuto: cada
+        // mensaje esperaba eso de más. La estructura no cambia entre una
+        // pregunta y otra; basta con revisarla una vez por sesión.
+        if ((int)($_SESSION['lf_tickets_esquema'] ?? 0) === self::ESQUEMA) return;
+
         $this->db->exec("
             CREATE TABLE IF NOT EXISTS tickets (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -173,6 +186,7 @@ final class TicketRepo
                     $this->db->exec("ALTER TABLE tickets ADD COLUMN visto_cliente INT NOT NULL DEFAULT 0");
                 }
                 $columnas = true;
+                if (session_status() === PHP_SESSION_ACTIVE) $_SESSION['lf_tickets_esquema'] = self::ESQUEMA;
             } catch (\Throwable $e) {
                 error_log('[LibertyFin] columnas de tickets: ' . $e->getMessage());
             }
@@ -368,8 +382,10 @@ final class TicketRepo
         $this->asegurar();
         try {
             $st = $this->db->prepare("
-                SELECT t.id, t.folio, t.asunto, t.asignado_a, e.nombre_empresa,
-                       m.id AS mensaje_id, m.autor_nombre AS autor, m.cuerpo
+                SELECT t.id, t.folio, t.asunto, t.asignado_a, t.prioridad, e.nombre_empresa,
+                       m.id AS mensaje_id, m.autor_nombre AS autor, m.cuerpo,
+                       TIMESTAMPDIFF(SECOND, m.creado_en, NOW()) AS hace,
+                       (SELECT MIN(p.id) FROM ticket_mensajes p WHERE p.ticket_id = t.id) = m.id AS es_primero
                 FROM tickets t
                 LEFT JOIN empresas e ON e.id = t.empresa_id
                 INNER JOIN ( SELECT ticket_id, MAX(id) AS ultimo FROM ticket_mensajes

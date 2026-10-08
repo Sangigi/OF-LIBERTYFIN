@@ -16,7 +16,9 @@
       marcado con "Reintentar".
 
       Además: emojis, pegar una captura con Ctrl+V (o arrastrarla) y la
-      vista previa de lo que se va a adjuntar.
+      vista previa de lo que se va a adjuntar. La imagen se achica (WebP)
+      y empieza a subir en cuanto se adjunta, mientras se termina de
+      escribir: al dar Enviar ya está arriba y el mensaje sale al momento.
 
    2. NOVEDADES DEL CLIENTE. Para quien puede abrir reportes, cada 20 s se
       pregunta si soporte le contestó algo que no ha visto: el menú "Ayuda"
@@ -26,9 +28,10 @@
       chat en la esquina, esté en la pantalla que esté. Arriba lleva sus
       reportes sin resolver para cambiar de uno a otro sin salir.
 
-   4. NOVEDADES DE SOPORTE. Para quien atiende tickets: el menú "Tickets"
-      lleva la cuenta de los que esperan su respuesta y sale un aviso
-      cuando un cliente contesta.
+   4. NOVEDADES DE SOPORTE. Para quien atiende tickets: una campana arriba
+      con los que esperan su respuesta, la cuenta en el menú y en el
+      título de la pestaña, un aviso con sonido cuando un cliente escribe
+      y, con la pestaña en segundo plano, un aviso del escritorio.
 
    Se carga una sola vez desde el layout. Las conversaciones de las
    páginas se ligan con LFChat.enlazar(), que las vistas llaman al final
@@ -64,12 +67,13 @@
   /* POST con archivo. Va por XMLHttpRequest y no por fetch porque fetch
      no dice cuánto se ha subido, y con una imagen pesada eso es justo lo
      que se quiere ver. Igual que `pedir`: null si no contesta JSON. */
-  function subir(url, datos, avance) {
+  function subir(url, datos, avance, alAbrir) {
     return new Promise(function (listo, fallo) {
       var x = new XMLHttpRequest();
       x.open('POST', url, true);
       x.setRequestHeader('X-LF-Json', '1');
       x.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      if (alAbrir) alAbrir(x);   // para poder cancelarla
       if (x.upload && avance) {
         x.upload.onprogress = function (e) { if (e.lengthComputable && e.total) avance(e.loaded / e.total); };
       }
@@ -84,10 +88,8 @@
      porcentaje. Junto a un PDF: el anillo chico. Ya subido, mientras el
      servidor lo guarda, el anillo gira. */
   var VUELTA = 97.39;   // largo del anillo: 2π · 15.5
-  function ponerCarga(nodo) {
-    var donde = nodo.querySelector('.adj-img') || nodo.querySelector('.adj');
-    if (!donde || donde.querySelector('.lf-carga')) return;
-    var c = crear('span', 'lf-carga gira' + (donde.classList.contains('adj') ? ' chica' : ''));
+  function anillo(chica) {
+    var c = crear('span', 'lf-carga gira' + (chica ? ' chica' : ''));
     c.setAttribute('role', 'progressbar');
     c.setAttribute('aria-label', 'Subiendo el archivo');
     c.setAttribute('aria-valuemin', '0');
@@ -95,12 +97,19 @@
     c.innerHTML = '<svg viewBox="0 0 36 36" aria-hidden="true">'
       + '<circle class="pista" cx="18" cy="18" r="15.5"/><circle class="avance" cx="18" cy="18" r="15.5"/></svg>';
     c.appendChild(crear('small'));
-    donde.appendChild(c);
+    return c;
+  }
+  function ponerCarga(nodo) {
+    var donde = nodo.querySelector('.adj-img') || nodo.querySelector('.adj');
+    if (!donde || donde.querySelector('.lf-carga')) return;
+    donde.appendChild(anillo(donde.classList.contains('adj')));
     nodo.classList.add('con-carga');
   }
   function avanceCarga(nodo, p) {
     var c = nodo.querySelector('.lf-carga');
-    if (!c) return;
+    if (c) avanzar(c, p);
+  }
+  function avanzar(c, p) {
     var pct = Math.max(0, Math.min(100, Math.round(p * 100)));
     var arco = c.querySelector('.avance');
     if (pct >= 100) {
@@ -229,15 +238,23 @@
     ind.querySelector('small').textContent = nombre + ' está escribiendo…';
   }
 
-  /* Con la pestaña en segundo plano, el título avisa que llegó algo. */
-  var tituloAntes = null;
-  function avisoTitulo() {
-    if (tituloAntes === null) tituloAntes = document.title;
-    document.title = '💬 Nuevo mensaje · ' + tituloAntes;
+  /* ── El título de la pestaña ──
+     "💬" delante: llegó un mensaje con la pestaña en segundo plano.
+     "(3)" delante: tickets que esperan respuesta (soporte). Se arma sobre
+     el título de la página, que cambia al navegar sin recargar. */
+  var marcaChat = false, cuentaTitulo = 0;
+  var PREFIJO = /^(💬 )?(\(\d+\+?\) )?/;
+  function pintarTitulo() {
+    var base = document.title.replace(PREFIJO, '');
+    var pre = (marcaChat ? '💬 ' : '')
+            + (cuentaTitulo ? '(' + (cuentaTitulo > 9 ? '9+' : cuentaTitulo) + ') ' : '');
+    if (document.title !== pre + base) document.title = pre + base;
   }
+  function avisoTitulo() { marcaChat = true; pintarTitulo(); }
   document.addEventListener('visibilitychange', function () {
-    if (!document.hidden && tituloAntes !== null) { document.title = tituloAntes; tituloAntes = null; }
+    if (!document.hidden && marcaChat) { marcaChat = false; pintarTitulo(); }
   });
+  document.addEventListener('lf:cargado', pintarTitulo);
 
   /* ── Emojis ──
      Un botón junto a "Adjuntar" abre la tabla; el emoji va donde está el
@@ -317,29 +334,104 @@
     if (v._url) { URL.revokeObjectURL(v._url); v._url = null; }
     v.innerHTML = '';
     if (!archivo) { v.hidden = true; return; }
+    // La miniatura va en su cajita: encima se pinta el avance de la subida.
+    var mini = crear('span', 'mini');
     if (/^image\//.test(archivo.type)) {
       v._url = URL.createObjectURL(archivo);
       var img = crear('img'); img.src = v._url; img.alt = '';
-      v.appendChild(img);
+      mini.appendChild(img);
     } else {
-      v.appendChild(crear('span', 'doc', 'PDF'));
+      mini.appendChild(crear('span', 'doc', 'PDF'));
     }
+    v.appendChild(mini);
     var txt = crear('span', 'txt');
     txt.appendChild(crear('b', '', nombre));
-    txt.appendChild(crear('small', '', peso(archivo.size)));
+    var tam = crear('small', '', peso(archivo.size));
+    tam.setAttribute('data-peso', peso(archivo.size));
+    txt.appendChild(tam);
     v.appendChild(txt);
     var x = boton('x', '×', 'Quitar el adjunto');
     x.addEventListener('click', function () { quitarAdjunto(form); });
     v.appendChild(x);
+    v.classList.remove('lista');
     v.hidden = false;
   }
 
+  /* Quita lo adjunto. Si se estaba subiendo por adelantado, se cancela. */
   function quitarAdjunto(form) {
+    var adj = form._lfAdj;
+    if (adj && adj.subida && !adj.subida.listo && adj.subida.xhr) {
+      try { adj.subida.xhr.abort(); } catch (e) {}
+    }
     form._lfAdj = null;
+    form._lfTurno = (form._lfTurno || 0) + 1;   // lo que se esté preparando ya no vale
+    form._lfPreparando = false;
     var inp = form.querySelector('input[type=file]');
-    if (inp && inp.value) { inp.value = ''; inp.dispatchEvent(new Event('change', { bubbles: true })); }
+    if (inp && inp.value) {
+      form._lfSilencio = true; inp.value = '';
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+      form._lfSilencio = false;
+    }
     vistaPrevia(form, null);
     etiqueta(form, '');
+  }
+
+  /* ── SE SUBE EN CUANTO SE ADJUNTA ──
+     Mientras la persona termina de escribir, la imagen ya va subiendo. Al
+     dar Enviar el mensaje solo lleva su clave y sale al instante. Si esta
+     subida falla, no pasa nada: el archivo se manda con el mensaje, como
+     antes. */
+  function urlAdjunto(form) {
+    var u = form.getAttribute('action') || '';
+    return /\/responder$/.test(u) ? u.replace(/\/responder$/, '/adjunto') : '';
+  }
+
+  function presubir(form) {
+    var adj = form._lfAdj, url = urlAdjunto(form);
+    if (!adj || !url || !window.XMLHttpRequest || !window.Promise
+        || !window.FormData || !FormData.prototype.set) return;
+    var s = { avance: 0, clave: '', listo: false, fallo: false, oyentes: [], xhr: null };
+    adj.subida = s;
+    var fd = new FormData();
+    fd.append('token', (form.querySelector('input[name=token]') || {}).value || token());
+    fd.append('adjunto', adj.blob, adj.nombre);
+    function contar() { s.oyentes.forEach(function (f) { f(s); }); }
+    s.promesa = subir(url, fd, function (p) { s.avance = p; contar(); }, function (x) { s.xhr = x; })
+      .then(function (j) {
+        if (j && j.ok && j.clave) { s.clave = j.clave; s.listo = true; s.avance = 1; }
+        else s.fallo = true;
+        contar();
+        return s;
+      }, function () { s.fallo = true; contar(); return s; });
+    s.oyentes.push(function () { avanceVista(form, s); });
+    avanceVista(form, s);
+  }
+
+  /* El avance en la vista previa: el anillo sobre la miniatura y el
+     porcentaje en el texto; al terminar, "lista para enviar". */
+  function avanceVista(form, s) {
+    var v = form._lfVista;
+    if (!v || v.hidden || !form._lfAdj || form._lfAdj.subida !== s) return;
+    var mini = v.querySelector('.mini'), tam = v.querySelector('.txt small');
+    var c = mini && mini.querySelector('.lf-carga');
+    var base = tam ? tam.getAttribute('data-peso') : '';
+    if (s.listo || s.fallo) {
+      if (c) c.remove();
+      if (tam) tam.textContent = base + (s.listo ? ' · lista para enviar' : '');
+      v.classList.toggle('lista', s.listo);
+      return;
+    }
+    if (!c && mini) { c = anillo(false); mini.appendChild(c); }
+    if (c) avanzar(c, s.avance);
+    if (tam) tam.textContent = base + ' · subiendo ' + Math.round(s.avance * 100) + '%';
+  }
+
+  /* Si se dio Enviar mientras la imagen se preparaba, ahora sí. */
+  function enviarSiEsperaba(form) {
+    if (!form._lfEnviarLuego) return;
+    form._lfEnviarLuego = false;
+    if (form.requestSubmit) form.requestSubmit();
+    else form.dispatchEvent(new Event('submit', { cancelable: true }));
   }
 
   function fechaArchivo() {
@@ -347,34 +439,57 @@
     return d.getFullYear() + z(d.getMonth() + 1) + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()) + z(d.getSeconds());
   }
 
-  /* Una captura muy pesada se vuelve JPEG antes de subirla: se ve igual
-     y sube varias veces más rápido. */
+  /* LAS IMÁGENES SE ACHICAN ANTES DE SUBIR. Una captura en PNG pesa de 2
+     a 5 MB; en WebP, del mismo tamaño en pantalla y con el texto igual de
+     nítido, unos 300 KB: sube diez veces más rápido. Lo que ya es ligero
+     se manda tal cual. Si el navegador no sabe hacer WebP, JPEG. Y si el
+     resultado no pesa menos, se queda el original. */
+  var LIGERO = 358400;   // 350 KB
   function aligerar(blob, listo) {
-    if (blob.size <= 2097152 || !/^image\/(png|webp)$/.test(blob.type) || !window.createImageBitmap) { listo(blob); return; }
+    if (blob.size <= LIGERO || !/^image\/(png|jpeg|webp)$/.test(blob.type) || !window.createImageBitmap) { listo(blob); return; }
     createImageBitmap(blob).then(function (bmp) {
       var max = 2560, k = Math.min(1, max / Math.max(bmp.width, bmp.height));
       var c = document.createElement('canvas');
-      c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+      c.width = Math.max(1, Math.round(bmp.width * k)); c.height = Math.max(1, Math.round(bmp.height * k));
       var g = c.getContext('2d');
       g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
       g.drawImage(bmp, 0, 0, c.width, c.height);
-      c.toBlob(function (j) { listo(j && j.size < blob.size ? j : blob); }, 'image/jpeg', 0.9);
+      if (bmp.close) bmp.close();
+      c.toBlob(function (w) {
+        if (w && w.type === 'image/webp' && w.size < blob.size) { listo(w); return; }
+        c.toBlob(function (j) { listo(j && j.size < blob.size ? j : blob); }, 'image/jpeg', 0.86);
+      }, 'image/webp', 0.86);
     }, function () { listo(blob); });
   }
 
+  /* Pegado, arrastrado o elegido: todo pasa por aquí. Se achica, se
+     enseña y empieza a subir de una vez. */
   function ponerArchivo(form, blob, deDonde) {
     if (!blob) return;
-    if (!TIPOS.test(blob.type)) { avisoEn(form, 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP) o PDF.'); return; }
+    if (!TIPOS.test(blob.type)) {
+      avisoEn(form, 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP) o PDF.');
+      if (deDonde === 'elegido') quitarAdjunto(form);   // que no se mande de todos modos
+      return;
+    }
     var err = form.querySelector('[data-lf-error]'); if (err) err.hidden = true;
+    quitarAdjunto(form);                       // lo de antes se reemplaza
+    var turno = form._lfTurno;
+    form._lfPreparando = true;
     aligerar(blob, function (b) {
-      if (b.size > MAX_ARCHIVO) { avisoEn(form, 'El archivo pesa ' + peso(b.size) + '; el máximo es 10 MB.'); return; }
+      if (form._lfTurno !== turno) return;     // mientras tanto se quitó o se eligió otro
+      form._lfPreparando = false;
+      if (b.size > MAX_ARCHIVO) {
+        avisoEn(form, 'El archivo pesa ' + peso(b.size) + '; el máximo es 10 MB.');
+        form._lfEnviarLuego = false;
+        return;
+      }
       var ext = b.type === 'application/pdf' ? 'pdf' : b.type === 'image/jpeg' ? 'jpg' : b.type.split('/')[1];
       var nombre = (deDonde === 'pegado' ? 'captura-' + fechaArchivo() : (blob.name || 'archivo').replace(/\.[^.]+$/, '')) + '.' + ext;
-      var inp = form.querySelector('input[type=file]');
-      if (inp && inp.value) { form._lfSilencio = true; inp.value = ''; inp.dispatchEvent(new Event('change', { bubbles: true })); form._lfSilencio = false; }
-      form._lfAdj = { blob: b, nombre: nombre };
+      form._lfAdj = { blob: b, nombre: nombre, subida: null };
       vistaPrevia(form, b, nombre);
       etiqueta(form, nombre);
+      presubir(form);
+      if (form._lfEnviarLuego) { enviarSiEsperaba(form); return; }
       var ta = form.querySelector('textarea'); if (ta) ta.focus();
     });
   }
@@ -395,17 +510,12 @@
     if (pie) pie.parentNode.insertBefore(vista, pie); else form.appendChild(vista);
     form._lfVista = vista;
 
+    // Lo elegido con el botón también se achica y sube por adelantado.
+    // (Cancelar el diálogo no quita lo que ya estaba adjunto.)
     if (inp) inp.addEventListener('change', function () {
       if (form._lfSilencio) return;
-      form._lfAdj = null;
       var f = inp.files && inp.files[0];
-      if (f && f.size > MAX_ARCHIVO) {
-        avisoEn(form, 'El archivo pesa ' + peso(f.size) + '; el máximo es 10 MB.');
-        inp.value = '';
-        f = null;
-        setTimeout(function () { etiqueta(form, ''); }, 0);
-      }
-      vistaPrevia(form, f || null, f ? f.name : '');
+      if (f) ponerArchivo(form, f, 'elegido');
     });
 
     // La zona (el chat flotante) se queda al cambiar de reporte y el
@@ -600,12 +710,30 @@
     function siguiente() {
       if (enviando || !cola.length) return;
       enviando = true;
-      var item = cola[0];
-      // Con archivo se sube viendo el avance; sin archivo, como siempre.
-      var envio = item.conArchivo && window.XMLHttpRequest
-        ? subir(form.action, item.fd, function (p) { avanceCarga(item.nodo, p); })
-        : pedir(form.action, { method: 'POST', body: item.fd });
-      envio.then(function (j) {
+      var item = cola[0], s = item.subida;
+      // ¿La imagen sigue subiendo desde que se adjuntó? El globo sigue
+      // ese mismo avance; el mensaje sale en cuanto termine.
+      if (s && !s.listo && !s.fallo) {
+        avanceCarga(item.nodo, s.avance);
+        s.oyentes.push(function () { if (!s.listo && !s.fallo) avanceCarga(item.nodo, s.avance); });
+      }
+      (s ? s.promesa : Promise.resolve(null)).then(function () {
+        var fd = item.fd;
+        // Ya está en el servidor: el mensaje solo lleva su clave.
+        if (s && s.listo) {
+          fd.set('adjunto_previo', s.clave);
+          avanceCarga(item.nodo, 1);
+          return pedir(form.action, { method: 'POST', body: fd });
+        }
+        // Si no, el archivo va con el mensaje, viendo el avance.
+        if (item.blob) {
+          if (fd.delete) fd.delete('adjunto_previo');
+          fd.set('adjunto', item.blob, item.nombre);
+        }
+        return item.conArchivo && window.XMLHttpRequest
+          ? subir(form.action, fd, function (p) { avanceCarga(item.nodo, p); })
+          : pedir(form.action, { method: 'POST', body: fd });
+      }).then(function (j) {
         enviando = false; cola.shift();
         if (j && j.ok) {
           alEnviar.forEach(function (f) { f(); });
@@ -640,6 +768,9 @@
         n.classList.remove('fallo'); n.classList.add('enviando');
         if (f) f.textContent = 'Enviando…';
         if (item.conArchivo) ponerCarga(n);
+        // Al reintentar, el archivo va con el mensaje: lo subido por
+        // adelantado pudo haberse perdido (sesión nueva, por ejemplo).
+        if (item.blob) item.subida = null;
         cola.push(item); siguiente();
       });
       tirar.addEventListener('click', function () { soltar(n); despedir(n, 260); });
@@ -655,17 +786,30 @@
       });
       form.addEventListener('submit', function (e) {
         e.preventDefault();
+        // La imagen todavía se está achicando (una fracción de segundo):
+        // se envía en cuanto quede, sin perderla.
+        if (form._lfPreparando) { form._lfEnviarLuego = true; return; }
         var ta  = form.querySelector('textarea');
         var texto = ta ? ta.value.trim() : '';
         var adj = form._lfAdj;
         var inp = form.querySelector('input[type=file]');
-        var elegido = inp && inp.files && inp.files[0];
+        var elegido = !adj && inp && inp.files && inp.files[0];
         if (!texto && !adj && !elegido) { if (ta) ta.focus(); return; }
         var err = form.querySelector('[data-lf-error]');
         if (err) err.hidden = true;
 
+        // El archivo no va en este FormData: o ya se subió (va su clave)
+        // o se agrega al momento de mandarlo (ver siguiente()).
         var fd = new FormData(form);
-        if (adj) { if (fd.set) fd.set('adjunto', adj.blob, adj.nombre); else fd.append('adjunto', adj.blob, adj.nombre); }
+        var item = { fd: fd, blob: null, nombre: '', subida: null };
+        if (adj) {
+          if (fd.set && fd.delete) {
+            fd.delete('adjunto');
+            item.blob = adj.blob; item.nombre = adj.nombre; item.subida = adj.subida || null;
+          } else {
+            fd.append('adjunto', adj.blob, adj.nombre);
+          }
+        }
         var interno = form.querySelector('input[name=interno]');
 
         // Al momento en la lista, como "Enviando…".
@@ -701,7 +845,9 @@
         cerrarEmojis();
         if (ta) ta.focus();
 
-        cola.push({ fd: fd, nodo: nodo, conArchivo: !!archivo });
+        item.nodo = nodo;
+        item.conArchivo = !!archivo;
+        cola.push(item);
         siguiente();
       });
       /* En el chat flotante Enter envía y Shift+Enter hace salto de línea. */
@@ -1013,37 +1159,272 @@
   }
 
   /* ══ 4 · Novedades de soporte ══
-     Los tickets que esperan respuesta de quien atiende (los suyos y los
-     que nadie ha tomado). El aviso sale una vez por mensaje; la primera
-     vez en un navegador no se avisa lo viejo: para eso está la cuenta. */
+     Los tickets que esperan respuesta de quien atiende: los suyos y los
+     que nadie ha tomado. Llegan por cinco lados, para que no se escape
+     ninguno:
+
+       · la CAMPANA de arriba, con la lista (quién, de qué empresa, hace
+         cuánto, si es nuevo o nadie lo ha tomado);
+       · la cuenta en el menú "Tickets" y en el título de la pestaña;
+       · un aviso dentro de la plataforma y un sonido corto;
+       · un aviso del ESCRITORIO si la pestaña está en segundo plano (hay
+         que permitirlo una vez, desde la campana).
+
+     Se pregunta cada 15 s; en segundo plano cada 30 s, que es justo
+     cuando el aviso del escritorio sirve. Cada mensaje se avisa UNA vez;
+     la primera vez en un navegador no se avisa lo viejo: para eso está
+     la lista. */
+  var CADA_SOPORTE = 15000, CADA_SOPORTE_OCULTA = 30000;
+  var campana = null;                   // lo último que contestó el servidor
+  var revisarSoporte = function () {};
+
   function soporteNovedades() {
     if (document.body.getAttribute('data-lf-soporte') !== '1' || !window.fetch) return;
+    var reloj = null, vivo = true;
 
     function revisar() {
-      if (document.hidden) return;
+      if (!vivo) return;
+      clearTimeout(reloj);
       pedir('/tickets/novedades').then(function (j) {
-        if (!j || !j.ok) return;
-        marcarEnlace('/tickets', j.esperando, '1 ticket espera tu respuesta', 'tickets esperan tu respuesta');
-        var primera = !leer('lf_sop_inicio');
-        guardar('lf_sop_inicio', '1');
-        var nuevos = (j.tickets || []).filter(function (t) {
-          return (+leer('lf_sop_avisado_' + t.id) || 0) < t.mensaje_id;
-        });
-        nuevos.forEach(function (t) { guardar('lf_sop_avisado_' + t.id, t.mensaje_id); });
-        // Si ya está en ese ticket, lo está viendo.
-        nuevos = nuevos.filter(function (t) { return location.pathname !== '/tickets/' + t.id; });
-        if (primera || !nuevos.length) return;
-        var t = nuevos[0];
-        avisar(t.autor + (t.empresa ? ' (' + t.empresa + ')' : '') + ' respondió',
-               t.folio + ' · ' + t.extracto + (nuevos.length > 1 ? '  ·  y ' + (nuevos.length - 1) + ' más' : ''),
-               function () { ir('/tickets/' + t.id); });
-      }, function () {});
+        if (!j) { vivo = false; return; }          // la sesión venció: no insistir
+        if (j.ok) recibirSoporte(j);
+        reloj = setTimeout(revisar, document.hidden ? CADA_SOPORTE_OCULTA : CADA_SOPORTE);
+      }, function () {
+        reloj = setTimeout(revisar, CADA_SOPORTE_OCULTA);
+      });
     }
+    revisarSoporte = revisar;
     alEnviar.push(function () { setTimeout(revisar, 800); });
-
-    setTimeout(revisar, 1500);
-    setInterval(revisar, CADA_NOVEDADES);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) revisar(); });
+    // La barra de arriba se cambia al navegar: la campana nueva llega vacía.
+    document.addEventListener('lf:cargado', function () { pintarCampana(); });
+    setTimeout(revisar, 900);
+  }
+
+  function recibirSoporte(j) {
+    campana = j;
+    var n = +j.esperando || 0;
+    marcarEnlace('/tickets', n, '1 ticket espera tu respuesta', 'tickets esperan tu respuesta');
+    cuentaTitulo = n; pintarTitulo();
+    pintarCampana();
+
+    var primera = !leer('lf_sop_inicio');
+    guardar('lf_sop_inicio', '1');
+    var nuevos = (j.tickets || []).filter(function (t) {
+      return (+leer('lf_sop_avisado_' + t.id) || 0) < t.mensaje_id;
+    });
+    nuevos.forEach(function (t) { guardar('lf_sop_avisado_' + t.id, t.mensaje_id); });
+    // Si está viendo ese ticket, ya lo vio.
+    nuevos = nuevos.filter(function (t) {
+      return document.hidden || location.pathname !== '/tickets/' + t.id;
+    });
+    if (primera || !nuevos.length) return;
+
+    var t = nuevos[0], mas = nuevos.length - 1;
+    var titulo = t.autor + (t.empresa ? ' (' + t.empresa + ')' : '')
+               + (t.nuevo ? ' abrió un ticket' : ' respondió');
+    var linea = t.folio + ' · ' + t.extracto + (mas > 0 ? '  ·  y ' + mas + ' más' : '');
+    var abrir = function () { ir('/tickets/' + t.id); };
+    if (document.hidden || !document.hasFocus()) escritorio(titulo, linea, t.id, abrir);
+    if (!document.hidden) avisar(titulo, linea, abrir);
+    sonar();
+  }
+
+  /* "hace 3 min", con los segundos que mide la base. */
+  function hace(seg) {
+    seg = +seg || 0;
+    if (seg < 60) return 'hace un momento';
+    var m = Math.floor(seg / 60);
+    if (m < 60) return 'hace ' + m + ' min';
+    var h = Math.floor(m / 60);
+    if (h < 24) return 'hace ' + h + ' h';
+    var d = Math.floor(h / 24);
+    return d === 1 ? 'hace 1 día' : 'hace ' + d + ' días';
+  }
+
+  /* ── La campana ──
+     Vive en la barra de arriba (topbar.php la pone solo para soporte).
+     El número es cuántos esperan respuesta; el punto que late, que hay
+     algo que no se ha visto desde la última vez que se abrió. */
+  function pintarCampana() {
+    var j = campana;
+    if (!j) return;
+    var n = +j.esperando || 0;
+    var visto = +leer('lf_sop_campana_vista') || 0;
+    var maximo = (j.tickets || []).reduce(function (a, t) { return Math.max(a, t.mensaje_id); }, 0);
+    [].forEach.call(document.querySelectorAll('[data-lf-campana]'), function (c) {
+      var num = c.querySelector('.lf-noti-num');
+      var txt = n > 9 ? '9+' : String(n || '');
+      if (num.textContent !== txt) {
+        num.textContent = txt;
+        num.classList.remove('pop'); void num.offsetWidth; if (n) num.classList.add('pop');
+      }
+      num.hidden = !n;
+      c.classList.toggle('con-nuevos', maximo > visto);
+      var pop = c.querySelector('.lf-campana-pop');
+      if (pop && !pop.hidden) llenarCampana(pop);
+    });
+  }
+
+  function llenarCampana(pop) {
+    var j = campana || { esperando: 0, tickets: [] };
+    var visto = +leer('lf_sop_campana_vista') || 0;
+    pop.innerHTML = '';
+
+    var cab = crear('header');
+    cab.appendChild(crear('b', '', 'Esperan tu respuesta'));
+    if (+j.esperando) cab.appendChild(crear('span', 'cuantos', String(j.esperando)));
+    pop.appendChild(cab);
+
+    var lista = crear('div', 'lista');
+    if (!(j.tickets || []).length) {
+      var nada = crear('div', 'nada');
+      nada.appendChild(crear('span', 'ico', '✓'));
+      nada.appendChild(crear('b', '', 'Nada pendiente'));
+      nada.appendChild(crear('small', '', 'Todos los clientes tienen respuesta.'));
+      lista.appendChild(nada);
+    }
+    (j.tickets || []).forEach(function (t) {
+      var a = crear('a', 'it' + (t.mensaje_id > visto ? ' sin-ver' : ''));
+      a.href = '/tickets/' + (+t.id);
+      a.setAttribute('data-parcial', '');
+      a.appendChild(crear('span', 'pri pri-' + (t.prioridad || 'normal')));
+      var tx = crear('span', 'tx');
+      var l1 = crear('span', 'l1');
+      l1.appendChild(crear('b', '', t.folio));
+      if (t.empresa) l1.appendChild(crear('span', 'emp', t.empresa));
+      tx.appendChild(l1);
+      tx.appendChild(crear('span', 'as', t.asunto || ''));
+      tx.appendChild(crear('small', '', (t.autor ? t.autor + ': ' : '') + (t.extracto || '')));
+      a.appendChild(tx);
+      var meta = crear('span', 'meta');
+      meta.appendChild(crear('small', '', hace(t.hace)));
+      if (t.nuevo) meta.appendChild(crear('span', 'tag nuevo', 'Nuevo'));
+      else if (t.libre) meta.appendChild(crear('span', 'tag', 'Sin asignar'));
+      a.appendChild(meta);
+      lista.appendChild(a);
+    });
+    pop.appendChild(lista);
+
+    // El pie: ir a la bandeja y cómo avisar.
+    var pie = crear('footer');
+    var todos = crear('a', 'todos', 'Ver la bandeja');
+    todos.href = '/tickets'; todos.setAttribute('data-parcial', '');
+    pie.appendChild(todos);
+
+    var op = crear('div', 'ops');
+    var son = crear('label', 'op');
+    var chk = crear('input'); chk.type = 'checkbox'; chk.checked = leer('lf_sop_sonido') !== '0';
+    chk.addEventListener('change', function () { guardar('lf_sop_sonido', chk.checked ? '1' : '0'); if (chk.checked) sonar(true); });
+    son.appendChild(chk); son.appendChild(document.createTextNode(' Sonido'));
+    op.appendChild(son);
+
+    if (window.Notification) {
+      if (Notification.permission === 'granted') {
+        var esc = crear('label', 'op');
+        var ce = crear('input'); ce.type = 'checkbox'; ce.checked = leer('lf_sop_escritorio') !== '0';
+        ce.addEventListener('change', function () { guardar('lf_sop_escritorio', ce.checked ? '1' : '0'); });
+        esc.appendChild(ce); esc.appendChild(document.createTextNode(' Escritorio'));
+        op.appendChild(esc);
+      } else if (Notification.permission === 'default') {
+        var pedirPermiso = boton('permiso', 'Activar avisos del escritorio');
+        pedirPermiso.addEventListener('click', function (e) {
+          e.stopPropagation();
+          var r = Notification.requestPermission(function () { llenarCampana(pop); });
+          if (r && r.then) r.then(function () { llenarCampana(pop); });
+        });
+        op.appendChild(pedirPermiso);
+      } else {
+        op.appendChild(crear('small', 'bloq', 'Avisos del escritorio bloqueados en el navegador'));
+      }
+    }
+    pie.appendChild(op);
+    pop.appendChild(pie);
+  }
+
+  function abrirCampana(c) {
+    var pop = c.querySelector('.lf-campana-pop');
+    if (!pop) {
+      pop = crear('div', 'lf-campana-pop');
+      pop.setAttribute('role', 'dialog');
+      pop.setAttribute('aria-label', 'Tickets que esperan tu respuesta');
+      c.appendChild(pop);
+    }
+    pop.hidden = false;
+    c.classList.add('abierta');
+    c.querySelector('.lf-campana-bt').setAttribute('aria-expanded', 'true');
+    llenarCampana(pop);
+    // Lo que se ve aquí ya se vio: el punto deja de latir.
+    var maximo = ((campana && campana.tickets) || []).reduce(function (a, t) { return Math.max(a, t.mensaje_id); }, 0);
+    if (maximo) guardar('lf_sop_campana_vista', maximo);
+    c.classList.remove('con-nuevos');
+    revisarSoporte();     // y se trae lo más reciente
+  }
+
+  function cerrarCampana() {
+    [].forEach.call(document.querySelectorAll('[data-lf-campana].abierta'), function (c) {
+      c.classList.remove('abierta');
+      var pop = c.querySelector('.lf-campana-pop'); if (pop) pop.hidden = true;
+      c.querySelector('.lf-campana-bt').setAttribute('aria-expanded', 'false');
+    });
+  }
+
+  document.addEventListener('click', function (e) {
+    var bt = e.target.closest && e.target.closest('.lf-campana-bt');
+    if (bt) {
+      var c = bt.closest('[data-lf-campana]');
+      if (c.classList.contains('abierta')) cerrarCampana(); else abrirCampana(c);
+      return;
+    }
+    // Un clic en un ticket de la lista navega y cierra; fuera, cierra.
+    var dentro = e.target.closest && e.target.closest('.lf-campana-pop');
+    if (!dentro || e.target.closest('a')) cerrarCampana();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarCampana(); });
+
+  /* ── El sonido ──
+     Dos notas cortas y suaves, hechas en el navegador (sin archivo). Los
+     navegadores no dejan sonar nada hasta que la persona toca la página
+     una vez: el primer clic deja listo el audio. */
+  var audio = null;
+  function prepararAudio() {
+    if (audio) { if (audio.state === 'suspended' && audio.resume) audio.resume(); return; }
+    var C = window.AudioContext || window.webkitAudioContext;
+    if (!C) return;
+    try { audio = new C(); } catch (e) { audio = null; }
+  }
+  document.addEventListener('pointerdown', prepararAudio, true);
+  document.addEventListener('keydown', prepararAudio, true);
+
+  function sonar(siempre) {
+    if (!siempre && leer('lf_sop_sonido') === '0') return;
+    if (!audio || audio.state !== 'running') return;
+    try {
+      var t0 = audio.currentTime;
+      [[880, 0], [1318.5, 0.13]].forEach(function (nota) {
+        var o = audio.createOscillator(), g = audio.createGain();
+        o.type = 'sine';
+        o.frequency.value = nota[0];
+        g.gain.setValueAtTime(0.0001, t0 + nota[1]);
+        g.gain.exponentialRampToValueAtTime(0.09, t0 + nota[1] + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + nota[1] + 0.32);
+        o.connect(g); g.connect(audio.destination);
+        o.start(t0 + nota[1]); o.stop(t0 + nota[1] + 0.36);
+      });
+    } catch (e) {}
+  }
+
+  /* ── El aviso del escritorio ──
+     Solo si la pestaña no está a la vista (si lo está, basta el de la
+     plataforma) y si se permitió. Al darle clic, abre el ticket. */
+  function escritorio(titulo, linea, id, abrir) {
+    if (!window.Notification || Notification.permission !== 'granted') return;
+    if (leer('lf_sop_escritorio') === '0') return;
+    try {
+      var n = new Notification(titulo, { body: linea, tag: 'lf-ticket-' + id });
+      n.onclick = function () { window.focus(); abrir(); n.close(); };
+      setTimeout(function () { n.close(); }, 20000);
+    } catch (e) {}
   }
 
   /* Cualquier botón [data-lf-abrir-chat='{"id":…}'] abre ese reporte en el

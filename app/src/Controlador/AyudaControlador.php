@@ -125,14 +125,21 @@ final class AyudaControlador
         $t    = $this->miTicket($repo, $id, $emp);
         if (!$t) $this->a('Ese ticket no es tuyo.', 'error');
         try {
+            // El adjunto: ya subido mientras escribía (solo se manda su
+            // clave), o con el mensaje, como antes.
             $adjunto = null;
-            if (!empty($_FILES['adjunto']['name'])) {
+            $previo = trim((string)($_POST['adjunto_previo'] ?? ''));
+            if ($previo !== '') {
+                $adjunto = \LibertyFin\Servicio\AdjuntoPrevio::ruta($id, $previo);
+                if (!$adjunto) $this->a('El archivo ya no está disponible. Adjúntalo de nuevo.', 'error', $id);
+            } elseif (!empty($_FILES['adjunto']['name'])) {
                 $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
             }
             // `interno` va en false SIEMPRE: el cliente no escribe notas
             // internas, y dejar que llegue por POST sería regalárselas.
             $nuevo = $repo->responder($id, $_POST['cuerpo'] ?? '', false, $adjunto,
                 $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
+            if ($previo !== '') \LibertyFin\Servicio\AdjuntoPrevio::usado($previo);
 
             // UN aviso a quien ATIENDE el ticket —solo a esa persona, no a
             // todo soporte— y solo con el primer mensaje de la tanda y si no
@@ -213,7 +220,7 @@ final class AyudaControlador
      *
      * Se suelta la sesión antes: PHP la tiene bloqueada mientras un pedido
      * la usa, y una espera de 20 s dejaría congeladas las demás pantallas
-     * del mismo usuario. Pregunta cada 0.6 s con una consulta ligera.
+     * del mismo usuario. Pregunta cada 0.35 s con una consulta ligera.
      *
      * @param string $ladoOtro   'soporte' o 'cliente': de quién importa el "escribiendo".
      * @param string $conoce     lo que el chat ya sabe que escribe el otro ('' = nadie).
@@ -229,8 +236,22 @@ final class AyudaControlador
             if ($p['ultimo'] > (int)$desde) return;
             $ahora = $p[$ladoOtro] !== null ? ($p[$ladoOtro] ?: $porDefecto) : '';
             if ($ahora !== (string)$conoce) return;
-            usleep(600000);
+            usleep(350000);
         } while (microtime(true) < $fin);
+    }
+
+    /**
+     * Sube el adjunto ANTES de enviar el mensaje (ver Servicio\AdjuntoPrevio):
+     * el chat lo manda en cuanto se pega o elige la imagen.
+     */
+    public function adjunto($id)
+    {
+        if (!$this->token()) $this->json(['ok' => false, 'error' => 'No se pudo verificar el formulario.'], 403);
+        $repo = new TicketRepo($this->principal());
+        if (!$this->miTicket($repo, (int)$id, (int)($_SESSION['empresa_id'] ?? 0))) {
+            $this->json(['ok' => false, 'error' => 'Ese ticket no es tuyo.'], 404);
+        }
+        $this->json(\LibertyFin\Servicio\AdjuntoPrevio::subir((int)$id));
     }
 
     /** El cliente está tecleando en este ticket (lo avisa el chat). */
