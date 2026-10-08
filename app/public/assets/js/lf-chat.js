@@ -93,11 +93,21 @@
     p.hidden = false;
   }
 
+  /* Hasta abajo de la lista; suave cuando llega algo mientras se mira. */
+  function bajar(lista, suave) {
+    if (suave && lista.scrollTo) lista.scrollTo({ top: lista.scrollHeight, behavior: 'smooth' });
+    else lista.scrollTop = lista.scrollHeight;
+  }
+
   /* "Ana está escribiendo…" con los tres puntos. Va siempre al final de
      la lista; lo nuevo se inserta antes que él. */
   function indicador(lista, nombre) {
     var ind = lista.querySelector('[data-lf-escribe-ind]');
-    if (!nombre) { if (ind) ind.remove(); return; }
+    if (!nombre) {
+      // Se va con su animación; sin la marca, lo nuevo ya no se pone antes.
+      if (ind) { ind.removeAttribute('data-lf-escribe-ind'); despedir(ind, 200); }
+      return;
+    }
     if (!ind) {
       ind = crear('div', 'lf-escribe');
       ind.setAttribute('data-lf-escribe-ind', '');
@@ -161,7 +171,7 @@
         }
         // El otro lado está tecleando: los tres puntos.
         indicador(lista, j.escribiendo || null);
-        if (abajo && (nuevos.length || j.escribiendo)) lista.scrollTop = lista.scrollHeight;
+        if (abajo && (nuevos.length || j.escribiendo)) bajar(lista, true);
         if (j.cerrado && form) {
           form.hidden = true;
           if (!raiz.querySelector('[data-lf-cerrado]')) {
@@ -219,7 +229,7 @@
       }
     }
 
-    if (flota) lista.scrollTop = lista.scrollHeight;
+    if (flota) bajar(lista, false);
     traer();
     reloj = setInterval(traer, CADA_CHAT);
     raiz._lfChat = { traer: traer, parar: parar };
@@ -255,59 +265,92 @@
     });
   }
 
+  /* Quita un elemento con su animación de salida (clase `sale`), no de
+     golpe. Si no hay animación (movimiento reducido), se va al momento. */
+  function despedir(n, ms) {
+    if (!n || !n.parentNode || n._saliendo) return;
+    n._saliendo = true;
+    n.classList.add('sale');
+    setTimeout(function () { if (n.parentNode) n.remove(); }, ms || 260);
+  }
+
   /* El aviso dentro de la plataforma. */
   function avisar(t) {
-    var viejo = document.querySelector('.lf-toast-chat');
-    if (viejo) viejo.remove();
+    despedir(document.querySelector('.lf-toast-chat'), 200);
     var caja = crear('div', 'lf-toast-chat');
     caja.setAttribute('role', 'status');
+    var ico = crear('span', 'ico');
+    ico.innerHTML = ICONO_CHAT;
+    caja.appendChild(ico);
     var txt = crear('div', 'txt');
     txt.appendChild(crear('b', '', t.autor + ' te respondió'));
     txt.appendChild(crear('small', '', t.folio + ' · ' + t.extracto));
     caja.appendChild(txt);
     var ver = crear('button', 'btn btn-primary btn-sm', 'Ver');
     ver.type = 'button';
-    ver.addEventListener('click', function () { caja.remove(); abrirChat(t); });
+    ver.addEventListener('click', function () { despedir(caja, 200); abrirChat(t); });
     var x = crear('button', 'x', '×');
     x.type = 'button'; x.setAttribute('aria-label', 'Cerrar aviso');
-    x.addEventListener('click', function () { caja.remove(); });
+    x.addEventListener('click', function () { despedir(caja, 200); });
     caja.appendChild(ver); caja.appendChild(x);
     document.body.appendChild(caja);
-    setTimeout(function () { if (caja.parentNode) caja.classList.add('va'); }, 9000);
-    setTimeout(function () { if (caja.parentNode) caja.remove(); }, 9600);
+    setTimeout(function () { despedir(caja, 320); }, 9000);
   }
 
   /* ── La burbuja: vuelve a abrir el chat después de cerrarlo ──
      Se ve mientras el chat está cerrado y hay un reporte vivo. Lleva la
-     cuenta de lo que soporte escribió y no se ha leído. */
-  var burbuja = null, ultimoActivo = null, pendiente = null;
+     cuenta de lo que soporte escribió y no se ha leído, y al pasar el
+     cursor se abre en una pastilla que dice qué es. */
+  var ICONO_CHAT = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+    + 'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L5 20l1.1-3.6C4.5 15 3.5 13.2 3.5 11.1 3.5 6.8 7.1 3.5 12 3.5z"/>'
+    + '<path d="M8.6 11.2h.01M12 11.2h.01M15.4 11.2h.01" stroke-width="2.6"/></svg>';
+  var burbuja = null, ultimoActivo = null, pendiente = null, sinLeerAhora = 0;
 
   function pintarBurbuja(sinLeer) {
+    if (typeof sinLeer === 'number') sinLeerAhora = sinLeer;
     var hay = !!(pendiente || ultimoActivo);
-    if (!hay || panel) { if (burbuja) burbuja.hidden = true; return; }
-    if (!burbuja) {
-      burbuja = crear('button', 'lf-chat-burbuja');
+    if (!burbuja && hay) {
+      burbuja = crear('button', 'lf-chat-burbuja oculta');
       burbuja.type = 'button';
       burbuja.setAttribute('aria-label', 'Abrir el chat con soporte');
-      burbuja.title = 'Chat con soporte';
-      burbuja.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v8a2.5 2.5 0 0 1-2.5 2.5H10l-4.2 3.4c-.6.5-1.3 0-1.3-.6V16A2.5 2.5 0 0 1 4 13.5z"/></svg>';
+      var ico = crear('span', 'ico');
+      ico.innerHTML = ICONO_CHAT;
+      burbuja.appendChild(ico);
+      burbuja.appendChild(crear('span', 'lbl', 'Soporte'));
       burbuja.appendChild(crear('span', 'lf-noti-num'));
       burbuja.addEventListener('click', function () {
         var t = pendiente || ultimoActivo;
         if (t) abrirChat(t);
       });
       document.body.appendChild(burbuja);
+      // Un cuadro después, para que la entrada se anime.
+      requestAnimationFrame(function () { requestAnimationFrame(function () { pintarBurbuja(); }); });
+      return;
     }
-    burbuja.hidden = false;
+    if (!burbuja) return;
+    // Se esconde (con animación) mientras el chat está abierto.
+    burbuja.classList.toggle('oculta', !hay || !!panel);
+    burbuja.classList.toggle('con-nuevos', sinLeerAhora > 0);
     var num = burbuja.querySelector('.lf-noti-num');
-    num.hidden = !sinLeer;
-    num.textContent = sinLeer > 9 ? '9+' : (sinLeer || '');
+    var texto = sinLeerAhora > 9 ? '9+' : String(sinLeerAhora || '');
+    if (num.textContent !== texto) {
+      num.textContent = texto;
+      // El número "salta" al cambiar, para que se note.
+      num.classList.remove('pop'); void num.offsetWidth; if (sinLeerAhora) num.classList.add('pop');
+    }
+    num.hidden = !sinLeerAhora;
   }
 
   function cerrarChat() {
-    if (panel) { if (panel._lfChat) panel._lfChat.parar(); panel.remove(); panel = null; }
+    if (panel) {
+      var p = panel;
+      panel = null;
+      if (p._lfChat) p._lfChat.parar();
+      despedir(p, 240);
+    }
     sesionGuardar('lf_chat_abierto', null);
-    pintarBurbuja(0);
+    pintarBurbuja();
   }
 
   function abrirChat(t) {
@@ -317,7 +360,6 @@
       return;
     }
     if (panel) { if (panel._lfChat) panel._lfChat.parar(); panel.remove(); panel = null; }
-    if (burbuja) burbuja.hidden = true;
     sesionGuardar('lf_chat_abierto', JSON.stringify({ id: t.id, folio: t.folio || '', asunto: t.asunto || '' }));
 
     panel = crear('div', 'lf-chatf');
@@ -375,8 +417,9 @@
     panel.appendChild(form);
 
     document.body.appendChild(panel);
+    pintarBurbuja();            // la burbuja se va mientras el chat está abierto
     conversacion(panel);
-    ta.focus();
+    ta.focus({ preventScroll: true });
   }
 
   function clienteNovedades() {

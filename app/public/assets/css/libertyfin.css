@@ -3119,20 +3119,98 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 @keyframes lf-punto{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-4px);opacity:1}}
 @media (prefers-reduced-motion:reduce){ .lf-escribe .puntos i{animation:none;opacity:.7} }
 
-/* La burbuja: vuelve a abrir el chat después de cerrarlo. */
-.lf-chat-burbuja{position:fixed;right:18px;bottom:18px;z-index:405;width:54px;height:54px;
-  border:0;border-radius:50%;background:var(--lf-brand);color:#fff;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;
-  box-shadow:0 10px 26px rgba(0,0,0,.22);animation:lf-chat-sube .25s ease;transition:transform .15s}
-.lf-chat-burbuja:hover{transform:translateY(-2px)}
-.lf-chat-burbuja[hidden]{display:none}
-.lf-chat-burbuja svg{width:24px;height:24px;fill:currentColor}
-.lf-chat-burbuja .lf-noti-num{position:absolute;top:-3px;right:-3px;margin:0}
+
+/* ══════════════════════════════════════════════════════
+   CHAT · MOVIMIENTO
+   Todo se mueve con transform y opacity (lo que el navegador anima sin
+   recalcular la página) y con dos curvas: una que frena suave al llegar
+   y otra con un rebote corto para lo que "salta" a la vista.
+   ══════════════════════════════════════════════════════ */
+:root{--lf-suave:cubic-bezier(.22,1,.36,1);--lf-rebote:cubic-bezier(.34,1.45,.64,1)}
+
+/* Un mensaje que llega: sube y aparece, sin destello. */
+.lf-msj.nuevo{animation:lf-msj-entra .42s var(--lf-suave) both}
+@keyframes lf-msj-entra{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+
+/* El chat flotante: crece desde su esquina y se va hacia ella. */
+.lf-chatf{transform-origin:100% 100%;animation:lf-chat-abre .38s var(--lf-suave) both;
+  transition:height .36s var(--lf-suave)}
+.lf-chatf.sale{animation:lf-chat-cierra .24s cubic-bezier(.4,0,1,1) both;pointer-events:none}
+@keyframes lf-chat-abre{from{opacity:0;transform:translateY(18px) scale(.94)}to{opacity:1;transform:none}}
+@keyframes lf-chat-cierra{to{opacity:0;transform:translateY(14px) scale(.95)}}
+.lf-chatf header{background:linear-gradient(135deg,var(--lf-brand),color-mix(in srgb,var(--lf-brand) 78%,#000))}
+/* Minimizar: la altura es fija, así que se anima; el contenido se desvanece. */
+.lf-chatf .lista,.lf-chatf form{transition:opacity .22s ease}
+.lf-chatf.min{height:58px}
+.lf-chatf.min .lista,.lf-chatf.min form{display:block;opacity:0;pointer-events:none}
+
+/* El aviso: entra desde la derecha con un rebote corto y se va igual. */
+.lf-toast-chat{animation:lf-toast-entra .46s var(--lf-rebote) both;border-radius:16px;
+  border:1px solid color-mix(in srgb,var(--lf-linea) 85%,transparent);border-left-width:1px;
+  background:color-mix(in srgb,var(--lf-sup) 90%,transparent);
+  -webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4)}
+.lf-toast-chat .ico{flex:0 0 auto;width:38px;height:38px;border-radius:12px;display:grid;place-items:center;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-toast-chat .ico svg{width:21px;height:21px}
+.lf-toast-chat.sale{animation:lf-toast-sale .3s var(--lf-suave) both}
+@keyframes lf-toast-entra{from{opacity:0;transform:translateX(28px) scale(.96)}to{opacity:1;transform:none}}
+@keyframes lf-toast-sale{to{opacity:0;transform:translateX(28px) scale(.97)}}
+
+/* "Está escribiendo…": aparece y se va suave; los puntos ondulan. */
+.lf-escribe{animation:lf-msj-entra .3s var(--lf-suave) both}
+.lf-escribe.sale{animation:lf-desvanece .2s ease both}
+@keyframes lf-desvanece{to{opacity:0;transform:translateY(4px)}}
+.lf-escribe .puntos i{animation:lf-onda 1.3s infinite cubic-bezier(.45,0,.55,1)}
+@keyframes lf-onda{0%,70%,100%{transform:translateY(0) scale(.85);opacity:.35}35%{transform:translateY(-3px) scale(1);opacity:1}}
+
+/* ── La burbuja ──
+   Un círculo con degradado de la marca, sombra teñida de su color y un
+   brillo arriba. Al pasar el cursor se abre en una pastilla que dice
+   "Soporte". Con respuestas sin leer, un halo que respira. */
+.lf-chat-burbuja{position:fixed;right:20px;bottom:20px;z-index:405;
+  display:inline-flex;align-items:center;height:56px;min-width:56px;padding:0 16px;
+  border:0;border-radius:999px;cursor:pointer;color:#fff;font:inherit;
+  background:linear-gradient(140deg,color-mix(in srgb,var(--lf-brand) 80%,#fff) 0%,
+             var(--lf-brand) 45%,color-mix(in srgb,var(--lf-brand) 76%,#000) 100%);
+  box-shadow:0 12px 28px -8px color-mix(in srgb,var(--lf-brand) 70%,transparent),
+             0 2px 6px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.3);
+  transform-origin:100% 100%;
+  transition:transform .45s var(--lf-rebote),opacity .3s var(--lf-suave),box-shadow .3s ease}
+.lf-chat-burbuja .ico{display:grid;place-items:center;width:24px;height:24px;flex:0 0 auto;
+  transition:transform .45s var(--lf-rebote)}
+.lf-chat-burbuja .ico svg{width:24px;height:24px}
+.lf-chat-burbuja .lbl{max-width:0;margin-left:0;overflow:hidden;white-space:nowrap;opacity:0;
+  font-size:13.5px;font-weight:600;letter-spacing:-.1px;
+  transition:max-width .42s var(--lf-suave),margin .42s var(--lf-suave),opacity .25s ease}
+.lf-chat-burbuja:hover,.lf-chat-burbuja:focus-visible{transform:translateY(-3px);
+  box-shadow:0 18px 34px -10px color-mix(in srgb,var(--lf-brand) 75%,transparent),
+             0 3px 8px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.3)}
+.lf-chat-burbuja:hover .lbl,.lf-chat-burbuja:focus-visible .lbl{max-width:90px;margin-left:9px;opacity:1}
+.lf-chat-burbuja:hover .ico{transform:rotate(-8deg) scale(1.05)}
+.lf-chat-burbuja:active{transform:scale(.95);transition-duration:.12s}
+.lf-chat-burbuja:focus-visible{outline:3px solid color-mix(in srgb,var(--lf-brand) 40%,transparent);outline-offset:3px}
+.lf-chat-burbuja.oculta{opacity:0;transform:translateY(12px) scale(.4);pointer-events:none}
+.lf-chat-burbuja.con-nuevos::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  animation:lf-halo 2.4s var(--lf-suave) infinite;pointer-events:none}
+@keyframes lf-halo{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--lf-brand) 55%,transparent)}
+                   70%,100%{box-shadow:0 0 0 16px color-mix(in srgb,var(--lf-brand) 0%,transparent)}}
+.lf-chat-burbuja .lf-noti-num{position:absolute;top:-4px;right:-4px;margin:0}
+.lf-noti-num.pop{animation:lf-pop .5s var(--lf-rebote)}
+@keyframes lf-pop{from{transform:scale(.3)}to{transform:scale(1)}}
+
 @media(max-width:940px){
-  /* Encima de la barra de abajo, no tapándola. */
-  .lf-chat-burbuja{bottom:calc(74px + env(safe-area-inset-bottom,0px));right:14px}
+  /* Encima de la barra de abajo del celular, no tapándola. */
+  .lf-chat-burbuja{bottom:calc(76px + env(safe-area-inset-bottom,0px));right:14px;height:52px;min-width:52px;padding:0 14px}
   .lf-chatf{bottom:calc(70px + env(safe-area-inset-bottom,0px))}
 }
 @media(max-width:560px){
   .lf-chatf{height:min(64vh,520px)}
+  .lf-chatf.min{height:58px}
+}
+
+/* Quien pidió menos movimiento al sistema, lo tiene aquí también. */
+@media (prefers-reduced-motion:reduce){
+  .lf-msj.nuevo,.lf-chatf,.lf-chatf.sale,.lf-toast-chat,.lf-toast-chat.sale,.lf-escribe,.lf-escribe.sale,
+  .lf-chat-burbuja.con-nuevos::before,.lf-noti-num.pop,.lf-escribe .puntos i{animation:none!important}
+  .lf-chatf,.lf-chat-burbuja,.lf-chat-burbuja .ico,.lf-chat-burbuja .lbl{transition:none!important}
 }
