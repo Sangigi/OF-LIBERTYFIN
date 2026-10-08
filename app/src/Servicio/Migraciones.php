@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 13;
+    const VERSION = 14;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -494,6 +494,22 @@ final class Migraciones
         }
     }
 
+    /**
+     * 14 · El banco de un pago con tarjeta o SPEI.
+     *
+     * El esquema actual ya trae `venta_pagos.banco`, pero bases más
+     * viejas no. Sin la columna el cobro fallaría al guardarlo.
+     */
+    private static function v14(PDO $db)
+    {
+        if (self::hayTabla($db, 'venta_pagos')
+            && !self::hayColumna($db, 'venta_pagos', 'banco')) {
+            try {
+                $db->exec("ALTER TABLE venta_pagos ADD COLUMN banco VARCHAR(100) NULL AFTER metodo_pago");
+            } catch (\Throwable $e) { /* ya existe */ }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -509,5 +525,6 @@ final class Migraciones
         11 => 'Avisos de pago de Paga de Todo (transacción, autorización, comprobante)',
         12 => 'Subfolios de cobro y servicios agregados a una venta existente',
         13 => 'Detalle de las operaciones en lote en la bitácora',
+        14 => 'Banco del pago con tarjeta o SPEI',
     ];
 }

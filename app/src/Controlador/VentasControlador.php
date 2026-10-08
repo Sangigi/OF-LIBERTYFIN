@@ -123,6 +123,9 @@ final class VentasControlador
                                     (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(), true)
                                     ? $_POST['metodo'] : 'efectivo',
                 'referencia' => trim($_POST['referencia'] ?? ''),
+                // En efectivo no hay banco, aunque llegue algo escrito.
+                'banco'      => ($_POST['metodo'] ?? '') === 'efectivo'
+                                    ? '' : mb_substr(trim($_POST['banco'] ?? ''), 0, 100),
                 'fecha'      => Peticion::fecha('fecha', '') ?: ($_POST['fecha'] ?? ''),
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
             ]);

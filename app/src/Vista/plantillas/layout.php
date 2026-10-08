@@ -55,10 +55,13 @@ $chatJs = __DIR__ . '/../../../public/assets/js/lf-chat.js';
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 // Quien puede abrir reportes (el cliente) recibe los avisos y el chat.
 $lfAyuda = !empty($_SESSION['empresa_db']) && \LibertyFin\Dominio\Permisos::puede('abrir.ticket');
+// Y quien atiende tickets (soporte) recibe los suyos: qué espera su respuesta.
+$lfSoporte = \LibertyFin\Dominio\Permisos::puede('ver.tickets');
 ?>
 <script src="/assets/js/lf-chat.js?v=<?= is_file($chatJs) ? filemtime($chatJs) : '1' ?>" defer></script>
 </head>
-<body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>">
+<body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>"
+      data-lf-soporte="<?= $lfSoporte ? '1' : '0' ?>" data-lf-yo="<?= P::e($_SESSION['usuario_nombre'] ?? '') ?>">
 <div class="lf-app">
   <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
   <div class="lf-main">

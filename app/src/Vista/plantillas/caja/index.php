@@ -271,6 +271,16 @@ $token = $_SESSION['lf_token'];
         <input class="form-control lf-mono" type="text" name="referencia" id="refTransf"
                maxlength="60" autocomplete="off" placeholder="Para cuadrar el depósito después">
       </div>
+      <?php /* El banco, con tarjeta o SPEI: para cuadrar contra el estado
+               de cuenta. Texto libre con sugerencias: la lista ayuda a
+               escribirlo igual siempre, pero si el banco no está se
+               escribe y ya. */ ?>
+      <div class="ref" id="cajaBanco" hidden>
+        <label for="bancoPago"><span id="lblBanco">Banco</span> <small>(opcional)</small></label>
+        <input class="form-control" type="text" name="banco" id="bancoPago" list="lfBancos"
+               maxlength="60" autocomplete="off" placeholder="Escribe o elige: BBVA, Banorte, Nu…">
+        <?= \LibertyFin\Dominio\Bancos::datalist('lfBancos') ?>
+      </div>
     </div>
 
 
@@ -567,6 +577,16 @@ $token = $_SESSION['lf_token'];
       var omitir = linea && sl && sl.checked;
       if (caja) caja.hidden = linea && !omitir;
       if (rf) { rf.hidden = !omitir; if (rf.hidden) $('refTransf').value = ''; }
+      /* El banco: solo con tarjeta o SPEI ya pagados (en efectivo, en
+         tienda o con liga no hay banco que anotar). */
+      var bc = $('cajaBanco');
+      if (bc) {
+        var tipo = act ? act.dataset.linea : '';
+        var conBanco = omitir && (tipo === 'tarjeta' || tipo === 'spei');
+        bc.hidden = !conBanco;
+        if (!conBanco) $('bancoPago').value = '';
+        else $('lblBanco').textContent = tipo === 'spei' ? 'Banco desde el que transfirió' : 'Banco de la tarjeta';
+      }
       if (linea && !omitir) { $('anticipo').dataset.manual = ''; $('anticipo').value = '0'; }
       calcular();
     }
@@ -716,7 +736,8 @@ $token = $_SESSION['lf_token'];
         desc: $('descVenta') ? $('descVenta').value : '',
         metodo: $('comoPaga').value,
         sinLiga: $('sinLiga') ? $('sinLiga').checked : null,
-        ref: $('refTransf') ? $('refTransf').value : ''
+        ref: $('refTransf') ? $('refTransf').value : '',
+        banco: $('bancoPago') ? $('bancoPago').value : ''
       }));
     } catch (e) { /* sin sessionStorage se opera igual, solo que sin guardar */ }
   };
@@ -736,7 +757,9 @@ $token = $_SESSION['lf_token'];
       lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio}; }),
       total: cap, anticipo: ant, saldo: cap - ant,
       liga: esLinea && !(sl && sl.checked),
-      metodo: act ? act.textContent.trim() : 'Efectivo',
+      metodo: (act ? act.textContent.trim() : 'Efectivo')
+              + ($('bancoPago') && $('bancoPago').value.trim() && !$('cajaBanco').hidden
+                 ? ' · ' + $('bancoPago').value.trim() : ''),
       cliente: ($('buscaCliente').value || '').trim(),
       esp: (se && se.value) ? se.options[se.selectedIndex].text : '',
       ampliar: v ? v.folio : ''
@@ -774,6 +797,7 @@ $token = $_SESSION['lf_token'];
       if (bm) bm.click();
       if ($('sinLiga') && g.sinLiga !== null) $('sinLiga').checked = !!g.sinLiga;
       if ($('refTransf')) $('refTransf').value = g.ref || '';
+      if ($('bancoPago')) $('bancoPago').value = g.banco || '';
       $('anticipo').value = g.anticipo;
       $('anticipo').dataset.manual = g.manual || '';
       if ($('sinLiga')) $('sinLiga').dispatchEvent(new Event('change'));

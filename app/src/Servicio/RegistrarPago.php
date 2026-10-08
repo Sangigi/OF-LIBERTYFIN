@@ -52,17 +52,21 @@ final class RegistrarPago
         // un depósito contra el abono que le toca. Ver Servicio\Folio.
         $folio = Folio::siguiente($this->db, $ventaId);
 
+        // El banco (tarjeta o transferencia) va solo si se anotó: los
+        // abonos que llegan por liga o en efectivo no lo traen.
+        $banco = trim((string)($datos['banco'] ?? ''));
         $this->db->prepare("
             INSERT INTO venta_pagos
-                (venta_id, folio, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id)
-            VALUES (?,?,?,?,?,?,?,0,?)
-        ")->execute([
+                (venta_id, folio, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id"
+                . ($banco !== '' ? ", banco" : "") . ")
+            VALUES (?,?,?,?,?,?,?,0,?" . ($banco !== '' ? ",?" : "") . ")
+        ")->execute(array_merge([
             $ventaId, $folio, $monto, $tipo,
             $datos['metodo'] ?? 'efectivo',
             !empty($datos['referencia']) ? $datos['referencia'] : null,
             $fecha,
             $datos['usuario_id'] ?? null,
-        ]);
+        ], $banco !== '' ? [$banco] : []));
         $pagoId = (int)$this->db->lastInsertId();
 
         (new SincronizarComisiones($this->db))->paraVenta($ventaId);

@@ -29,6 +29,31 @@ final class Avisos
 
     public static function activos() { return Integraciones::activa('smtp'); }
 
+    /**
+     * Manda un aviso DESPUÉS de contestarle al navegador.
+     *
+     * Hablar con el SMTP tarda de uno a varios segundos, y en el chat eso
+     * se sentía: el mensaje no salía hasta que el correo terminaba. Aquí
+     * primero se entrega la respuesta y luego, ya sin nadie esperando, se
+     * manda el correo. Se suelta la sesión antes, para no frenar las demás
+     * pantallas del usuario mientras tanto.
+     *
+     * Con PHP-FPM o LiteSpeed la respuesta sale al momento; con mod_php no
+     * hay cómo cortarla antes y simplemente tarda lo mismo que antes.
+     */
+    public static function despues(callable $enviar)
+    {
+        register_shutdown_function(function () use ($enviar) {
+            if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+            if (function_exists('fastcgi_finish_request')) fastcgi_finish_request();
+            elseif (function_exists('litespeed_finish_request')) litespeed_finish_request();
+            @ignore_user_abort(true);
+            @set_time_limit(60);
+            try { $enviar(); }
+            catch (\Throwable $e) { error_log('[LibertyFin] aviso diferido: ' . $e->getMessage()); }
+        });
+    }
+
     /** La cuenta quedó lista. Lleva la contraseña, una sola vez. */
     public static function cuentaCreada($para, $nombre, $empresa, $usuario, $clave, $url)
     {
@@ -103,6 +128,26 @@ final class Avisos
           . (mb_strlen($respuesta) > 400 ? '…' : '') . '</p>',
             ['Ver el ticket', $url]);
         return $c->enviar($para, 'Respondimos tu ticket ' . $folio, $html);
+    }
+
+    /**
+     * A quien ATIENDE un ticket: el cliente contestó. Una sola vez por
+     * tanda (ver TicketRepo::debeAvisarSoporte) y SIN el texto del mensaje:
+     * el correo puede reenviarse o leerse en otro lado, y la conversación
+     * se lee dentro de la plataforma.
+     */
+    public static function ticketClienteRespondio($para, $folio, $asunto, $empresa, $url)
+    {
+        $c = self::correo();
+        if (!$c) return false;
+        $html = Correo::plantilla('El cliente respondió',
+            '<p style="color:#6d7a74;font-size:13px;font-family:ui-monospace,monospace">'
+          . htmlspecialchars($folio, ENT_QUOTES)
+          . ($empresa !== '' ? ' · ' . htmlspecialchars($empresa, ENT_QUOTES) : '') . '</p>'
+          . '<p style="font-weight:600;margin-bottom:14px">' . htmlspecialchars($asunto, ENT_QUOTES) . '</p>'
+          . '<p>Hay una respuesta nueva en un ticket que atiendes. Entra para leerla y contestar.</p>',
+            ['Abrir el ticket', $url]);
+        return $c->enviar($para, 'El cliente respondió el ticket ' . $folio, $html);
     }
 
     /** La suscripción está por vencer. Una sola vez, no todos los días. */

@@ -105,16 +105,20 @@ final class RegistrarVenta
             // ── El primer pago. Solo si de verdad entró dinero. ──
             if ($anticipo > 0) {
                 // El primer cobro es el -01 de esta venta.
+                // El banco (tarjeta o SPEI) va solo si se anotó: así un
+                // cobro en efectivo no depende de que la columna exista.
+                $banco = trim((string)($ctx['banco'] ?? ''));
                 $this->db->prepare("
                     INSERT INTO venta_pagos
-                        (venta_id, folio, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id)
-                    VALUES (?,?,?,?,?,?,NOW(),0,?)
-                ")->execute([
+                        (venta_id, folio, monto, tipo, metodo_pago, referencia, fecha_pago, cancelado, usuario_id"
+                        . ($banco !== '' ? ", banco" : "") . ")
+                    VALUES (?,?,?,?,?,?,NOW(),0,?" . ($banco !== '' ? ",?" : "") . ")
+                ")->execute(array_merge([
                     $ventaId, Folio::formar($codigo, 1), $anticipo, $ticket->tipoPago($anticipo),
                     $ctx['metodo_pago'] ?? 'efectivo',
                     $ctx['referencia'] ?: null,
                     $ctx['usuario_id'] ?: null,
-                ]);
+                ], $banco !== '' ? [$banco] : []));
             }
 
             $this->db->commit();

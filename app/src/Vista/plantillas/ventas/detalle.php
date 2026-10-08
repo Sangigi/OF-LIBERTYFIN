@@ -120,7 +120,10 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
                     <?= P::e($p['motivo_cancelacion']) ?></span>
                 <?php endif; ?>
               </td>
-              <td data-label="Método" style="font-size:12.5px"><?= P::e($p['metodo_pago']) ?></td>
+              <td data-label="Método" style="font-size:12.5px"><?= P::e($p['metodo_pago']) ?>
+                <?php if (!empty($p['banco'])): ?>
+                  <span style="display:block;color:var(--lf-tinta-4);font-size:11px"><?= P::e($p['banco']) ?></span>
+                <?php endif; ?></td>
               <td data-label="Monto" class="text-end lf-mono" style="font-weight:700">
                 <?= $canc ? '<s>' . D::pesos($p['monto']) . '</s>' : D::pesos($p['monto']) ?></td>
               <td data-label="Comisión" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
@@ -165,12 +168,33 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               <?php endforeach; ?>
             </select>
           </div>
+          <?php /* El banco, con transferencia o tarjeta: texto libre con
+                   sugerencias. En efectivo se esconde (no hay banco). */ ?>
+          <div style="flex:1;min-width:130px" id="abonoBanco">
+            <label class="form-label">Banco</label>
+            <input class="form-control" type="text" name="banco" list="lfBancosAbono" maxlength="60"
+                   autocomplete="off" placeholder="Opcional">
+            <?= \LibertyFin\Dominio\Bancos::datalist('lfBancosAbono') ?>
+          </div>
           <div style="flex:1;min-width:130px">
             <label class="form-label">Referencia</label>
             <input class="form-control" type="text" name="referencia" placeholder="Opcional">
           </div>
           <button class="btn btn-primary" type="submit"><?= W::icono('cobro','15px') ?>Registrar</button>
         </form>
+        <script>
+        (function(){
+          var sel = document.querySelector('form[action$="/pagar"] select[name=metodo]');
+          var caja = document.getElementById('abonoBanco');
+          if (!sel || !caja) return;
+          function ver(){
+            caja.hidden = sel.value === 'efectivo';
+            if (caja.hidden) caja.querySelector('input').value = '';
+          }
+          sel.addEventListener('change', ver);
+          ver();
+        })();
+        </script>
         <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:10px">
           No se puede abonar más del saldo. La comisión se libera en proporción a lo cobrado.</p>
       </div>

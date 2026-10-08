@@ -3212,3 +3212,96 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   .lf-chat-burbuja.con-nuevos::before,.lf-noti-num.pop,.lf-escribe .puntos i{animation:none!important}
   .lf-chatf,.lf-chat-burbuja,.lf-chat-burbuja .ico,.lf-chat-burbuja .lbl{transition:none!important}
 }
+
+
+/* ══════════════════════════════════════════════════════
+   CHAT · ENVÍO AL MOMENTO, EMOJIS, CAPTURAS Y PESTAÑAS
+   ══════════════════════════════════════════════════════ */
+
+/* Una imagen adjunta se ve en miniatura; al dar clic se abre completa. */
+.lf-msj .adj-img{display:block;width:max-content;max-width:min(260px,100%);margin-top:9px;line-height:0;
+  border-radius:12px;overflow:hidden;border:1px solid var(--lf-linea);background:var(--lf-vidrio)}
+.lf-msj .adj-img img{display:block;max-width:100%;max-height:200px;object-fit:cover;
+  transition:transform .3s var(--lf-suave)}
+.lf-msj .adj-img:hover img{transform:scale(1.03)}
+.lf-chatf .lf-msj .adj-img{max-width:min(220px,100%)}
+.lf-chatf .lf-msj .adj-img img{max-height:160px}
+
+/* Lo que se está enviando ya está en la lista, un poco más tenue; si
+   falla, se dice y se puede reintentar. */
+.lf-msj.enviando{opacity:.6;transition:opacity .25s ease}
+.lf-msj.enviando .fecha{font-style:italic}
+.lf-msj.fallo .fecha{color:var(--lf-rojo);font-weight:600}
+.lf-msj.fallo p{color:var(--lf-tinta-3)}
+.lf-msj.sale{opacity:0;transform:translateY(4px);transition:opacity .25s ease,transform .25s ease}
+.lf-reintento{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px}
+.lf-reintento small{flex:1 1 100%;font-size:11.5px;color:var(--lf-rojo)}
+.lf-reintento button{padding:3px 11px;border:1px solid var(--lf-linea);border-radius:999px;background:var(--lf-sup);
+  font:inherit;font-size:11.5px;font-weight:600;color:var(--lf-tinta-2);cursor:pointer}
+.lf-reintento button:first-of-type{border-color:var(--lf-brand);color:var(--lf-brand-2)}
+
+/* Emojis: un botón junto a "Adjuntar" y la tabla encima. */
+.lf-emoji{position:relative;display:inline-flex;flex:0 0 auto}
+.lf-emoji-bt{display:inline-grid;place-items:center;width:34px;height:34px;padding:0;
+  border:1px solid var(--lf-linea);border-radius:10px;background:var(--lf-sup);
+  font-size:17px;line-height:1;cursor:pointer;
+  transition:border-color .2s ease,box-shadow .2s ease,transform .3s var(--lf-rebote)}
+.lf-emoji-bt:hover{border-color:var(--lf-brand);transform:scale(1.06)}
+.lf-emoji.abierto .lf-emoji-bt{border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-glow)}
+.lf-emoji-pop{position:absolute;left:0;bottom:calc(100% + 8px);z-index:30;
+  display:grid;grid-template-columns:repeat(8,32px);gap:2px;padding:8px;
+  border-radius:14px;border:1px solid var(--lf-linea);background:var(--lf-sup);
+  box-shadow:var(--lf-s3, 0 12px 32px rgba(0,0,0,.16));
+  opacity:0;visibility:hidden;pointer-events:none;transform:translateY(6px) scale(.97);transform-origin:0 100%;
+  transition:opacity .18s ease,transform .26s var(--lf-suave),visibility 0s linear .26s}
+.lf-emoji.abierto .lf-emoji-pop{opacity:1;visibility:visible;pointer-events:auto;transform:none;transition-delay:0s}
+.lf-emoji-pop button{width:32px;height:32px;padding:0;border:0;border-radius:8px;background:none;
+  font-size:19px;line-height:1;cursor:pointer;transition:background .15s ease,transform .2s var(--lf-rebote)}
+.lf-emoji-pop button:hover,.lf-emoji-pop button:focus-visible{background:var(--lf-vidrio);transform:scale(1.18);outline:none}
+.lf-chatf .lf-emoji-bt{width:30px;height:30px;font-size:15px}
+.lf-chatf .lf-emoji-pop{grid-template-columns:repeat(7,32px)}
+@media(max-width:420px){ .lf-emoji-pop{grid-template-columns:repeat(7,32px)} }
+
+/* Lo que se va a adjuntar (elegido, pegado o arrastrado), antes de enviar. */
+.lf-adj-vista{display:flex;align-items:center;gap:10px;margin-top:8px;padding:6px 6px 6px 6px;
+  border:1px solid var(--lf-linea);border-radius:12px;background:var(--lf-vidrio);
+  animation:lf-msj-entra .3s var(--lf-suave) both}
+.lf-adj-vista[hidden]{display:none}
+.lf-adj-vista img{flex:0 0 auto;width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--lf-sup)}
+.lf-adj-vista .doc{flex:0 0 auto;display:grid;place-items:center;width:44px;height:44px;border-radius:8px;
+  background:var(--lf-rojo-soft);color:var(--lf-rojo);font-size:11px;font-weight:800;letter-spacing:.3px}
+.lf-adj-vista .txt{flex:1;min-width:0}
+.lf-adj-vista .txt b{display:block;font-size:12px;font-weight:600;color:var(--lf-tinta-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-adj-vista .txt small{font-size:11px;color:var(--lf-tinta-4)}
+.lf-adj-vista .x{flex:0 0 auto;padding:4px 8px;border:0;border-radius:8px;background:none;
+  font-size:18px;line-height:1;color:var(--lf-tinta-4);cursor:pointer}
+.lf-adj-vista .x:hover{background:var(--lf-sup);color:var(--lf-rojo)}
+
+/* Soltar un archivo encima del chat. */
+.lf-soltar{outline:2px dashed var(--lf-brand);outline-offset:-6px;background:var(--lf-brand-soft)}
+
+/* Las pestañas del chat flotante: los reportes sin resolver del cliente. */
+.lf-chatf-tickets{flex:0 0 auto;display:flex;gap:6px;padding:10px 10px 8px;overflow-x:auto;
+  scrollbar-width:none;border-bottom:1px solid var(--lf-linea);background:var(--lf-sup)}
+.lf-chatf-tickets[hidden]{display:none}
+.lf-chatf-tickets::-webkit-scrollbar{display:none}
+.lf-chatf-tickets .pes{position:relative;flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-start;
+  max-width:150px;padding:5px 10px;border:1px solid var(--lf-linea);border-radius:10px;
+  background:var(--lf-sup);font:inherit;text-align:left;cursor:pointer;
+  transition:border-color .2s ease,background .2s ease}
+.lf-chatf-tickets .pes b{font-size:11px;font-weight:700;font-family:var(--lf-mono);color:var(--lf-tinta-2)}
+.lf-chatf-tickets .pes .as{max-width:100%;font-size:11px;color:var(--lf-tinta-4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-chatf-tickets .pes:hover{border-color:var(--lf-brand)}
+.lf-chatf-tickets .pes.on{border-color:var(--lf-brand);background:var(--lf-brand-soft)}
+.lf-chatf-tickets .pes.on b{color:var(--lf-brand-2)}
+.lf-chatf-tickets .pes .lf-noti-num{position:absolute;top:-6px;right:-6px;margin:0}
+/* Al cambiar de reporte, la conversación nueva aparece suave. */
+.lf-chatf > .lista{animation:lf-aparece .25s ease backwards}
+@keyframes lf-aparece{from{opacity:0}}
+
+@media (prefers-reduced-motion:reduce){
+  .lf-adj-vista,.lf-chatf > .lista{animation:none!important}
+  .lf-emoji-pop,.lf-emoji-bt,.lf-emoji-pop button,.lf-msj .adj-img img{transition:none!important}
+}

@@ -122,7 +122,8 @@ final class AyudaControlador
         if (!$this->token()) $this->a('No se pudo verificar el formulario.', 'error');
         $repo = new TicketRepo($this->principal());
         $emp  = (int)($_SESSION['empresa_id'] ?? 0);
-        if (!$this->miTicket($repo, $id, $emp)) $this->a('Ese ticket no es tuyo.', 'error');
+        $t    = $this->miTicket($repo, $id, $emp);
+        if (!$t) $this->a('Ese ticket no es tuyo.', 'error');
         try {
             $adjunto = null;
             if (!empty($_FILES['adjunto']['name'])) {
@@ -130,8 +131,30 @@ final class AyudaControlador
             }
             // `interno` va en false SIEMPRE: el cliente no escribe notas
             // internas, y dejar que llegue por POST sería regalárselas.
-            $repo->responder($id, $_POST['cuerpo'] ?? '', false, $adjunto,
+            $nuevo = $repo->responder($id, $_POST['cuerpo'] ?? '', false, $adjunto,
                 $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
+
+            // UN aviso a quien ATIENDE el ticket —solo a esa persona, no a
+            // todo soporte— y solo con el primer mensaje de la tanda y si no
+            // tiene la conversación abierta. Sin el texto del mensaje: se lee
+            // dentro de la plataforma.
+            if ($nuevo && $repo->debeAvisarSoporte($id, $nuevo)) {
+                $para = $repo->correoDelAgente($t);
+                if ($para) {
+                    $url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                         . ($_SERVER['HTTP_HOST'] ?? '') . '/tickets/' . (int)$id;
+                    // Después de contestar: el chat no espera al correo.
+                    \LibertyFin\Servicio\Avisos::despues(function () use ($para, $t, $url) {
+                        \LibertyFin\Servicio\Avisos::ticketClienteRespondio($para, $t['folio'], $t['asunto'],
+                            $t['nombre_empresa'] ?? '', $url);
+                    });
+                }
+            }
+            // El chat recibe el id del mensaje para cambiar el "enviando…"
+            // por el mensaje de verdad.
+            if (($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1') {
+                $this->json(['ok' => true, 'mensaje' => 'Respuesta enviada.', 'id' => (int)$nuevo]);
+            }
             $this->a('Respuesta enviada.', 'ok', $id);
         } catch (\InvalidArgumentException $e) {
             $this->a($e->getMessage(), 'error', $id);
@@ -154,10 +177,22 @@ final class AyudaControlador
         $emp  = (int)($_SESSION['empresa_id'] ?? 0);
         $t    = $this->miTicket($repo, (int)$id, $emp);
         if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no es tuyo.'], 404);
+        $creador = $this->esCreador($t);
+        // Quien abrió el ticket tiene el chat abierto: no hace falta correo.
+        if ($creador) $repo->marcarActivo($id, 'cliente');
 
-        $nuevos = $repo->mensajesDesde($id, Peticion::entero('desde'), false);
+        $desde = Peticion::entero('desde');
+        // EN VIVO: con `esperar=1` la respuesta no sale hasta que haya algo
+        // nuevo —un mensaje, o soporte empezó o dejó de escribir— o pasen
+        // 20 s. Llega en menos de un segundo en vez de esperar la siguiente
+        // pregunta.
+        if (Peticion::entero('esperar') === 1) {
+            self::esperar($repo, $id, $desde, false, 'soporte', Peticion::texto('escribe'), 'Soporte');
+        }
+
+        $nuevos = $repo->mensajesDesde($id, $desde, false);
         $fotos  = $nuevos ? $repo->fotos($nuevos, $_SESSION['empresa_db'] ?? null, true) : [];
-        if ($nuevos && $this->esCreador($t)) {
+        if ($nuevos && $creador) {
             $repo->marcarVistoCliente($id, max(array_column($nuevos, 'id')));
         }
         $esc = $repo->escribiendoAhora($id);
@@ -171,6 +206,31 @@ final class AyudaControlador
                 return TicketRepo::aJson($m, $fotos, 'cliente');
             }, $nuevos),
         ]);
+    }
+
+    /**
+     * Espera, sin bloquear al usuario, a que haya algo nuevo en el ticket.
+     *
+     * Se suelta la sesión antes: PHP la tiene bloqueada mientras un pedido
+     * la usa, y una espera de 20 s dejaría congeladas las demás pantallas
+     * del mismo usuario. Pregunta cada 0.6 s con una consulta ligera.
+     *
+     * @param string $ladoOtro   'soporte' o 'cliente': de quién importa el "escribiendo".
+     * @param string $conoce     lo que el chat ya sabe que escribe el otro ('' = nadie).
+     * @param string $porDefecto nombre a mostrar si no se guardó uno.
+     */
+    public static function esperar(TicketRepo $repo, $id, $desde, $conInternos, $ladoOtro, $conoce, $porDefecto)
+    {
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+        @set_time_limit(45);
+        $fin = microtime(true) + 20;
+        do {
+            $p = $repo->pulso($id, $conInternos);
+            if ($p['ultimo'] > (int)$desde) return;
+            $ahora = $p[$ladoOtro] !== null ? ($p[$ladoOtro] ?: $porDefecto) : '';
+            if ($ahora !== (string)$conoce) return;
+            usleep(600000);
+        } while (microtime(true) < $fin);
     }
 
     /** El cliente está tecleando en este ticket (lo avisa el chat). */
@@ -197,12 +257,16 @@ final class AyudaControlador
         $repo = new TicketRepo($this->principal());
         $yo   = (int)($_SESSION['usuario_id'] ?? 0);
         $n    = $repo->novedadesCliente($emp, $yo);
-        // El reporte vivo más reciente: con él, la burbuja vuelve a abrir
-        // el chat después de cerrarlo.
-        $act  = $repo->activoCliente($emp, $yo);
+        // Los reportes de esta persona sin solucionar: los que se alternan
+        // dentro del chat. El primero es el que abre la burbuja.
+        $act  = array_map(function ($a) {
+            return ['id' => (int)$a['id'], 'folio' => $a['folio'], 'asunto' => $a['asunto'],
+                    'estado' => $a['estado'], 'sin_leer' => (int)$a['sin_leer']];
+        }, $repo->activosCliente($emp, $yo));
         $this->json([
             'ok'       => true,
-            'activo'   => $act ? ['id' => (int)$act['id'], 'folio' => $act['folio'], 'asunto' => $act['asunto']] : null,
+            'activos'  => $act,
+            'activo'   => $act ? $act[0] : null,
             'sin_leer' => $n['sin_leer'],
             'tickets'  => array_map(function ($t) {
                 $txt = trim(preg_replace('/\s+/u', ' ', (string)$t['cuerpo']));

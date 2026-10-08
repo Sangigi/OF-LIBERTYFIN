@@ -198,6 +198,10 @@ final class CajaControlador
                 // mostrador, o uno de los de linea con guion bajo delante.
                 'metodo_pago'    => self::metodoDe($_POST['como_paga'] ?? '', $db),
                 'referencia'     => trim($_POST['referencia'] ?? ''),
+                // El banco solo cuenta con tarjeta o SPEI ya pagados: con
+                // liga todavía no se sabe, y en efectivo no hay banco.
+                'banco'          => ($sinLiga && in_array($enLineaPedida, ['tarjeta', 'spei'], true))
+                                    ? mb_substr(trim($_POST['banco'] ?? ''), 0, 100) : '',
                 'descripcion'    => trim($_POST['descripcion'] ?? ''),
                 'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
             ]);

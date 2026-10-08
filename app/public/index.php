@@ -172,6 +172,8 @@ $r->post('/tickets/crear',        ['LibertyFin\Controlador\TicketsControlador', 
 $r->get('/tickets/{id}',          ['LibertyFin\Controlador\TicketsControlador', 'ver']);
 $r->post('/tickets/{id}/responder',['LibertyFin\Controlador\TicketsControlador', 'responder']);
 $r->get('/tickets/{id}/mensajes', ['LibertyFin\Controlador\TicketsControlador', 'mensajes']);
+// Lo que espera respuesta de soporte (JSON): cuenta del menú y avisos.
+$r->get('/tickets/novedades',     ['LibertyFin\Controlador\TicketsControlador', 'novedades']);
 $r->post('/tickets/{id}/escribiendo', ['LibertyFin\Controlador\TicketsControlador', 'escribiendo']);
 $r->post('/tickets/{id}/cambiar', ['LibertyFin\Controlador\TicketsControlador', 'cambiar']);
 $r->get('/soporte',               ['LibertyFin\Controlador\SoporteControlador', 'index']);
@@ -293,6 +295,7 @@ $permisos = [
   '/tickets/{id}'           => 'ver.tickets',
   '/tickets/{id}/responder' => 'ver.tickets',
   '/tickets/{id}/mensajes'  => 'ver.tickets',
+  '/tickets/novedades'      => 'ver.tickets',
   '/tickets/{id}/escribiendo' => 'ver.tickets',
   '/tickets/{id}/cambiar'   => 'ver.tickets',
   '/soporte'                => 'ver.empresas',

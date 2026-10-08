@@ -63,6 +63,7 @@ final class TicketsControlador
             return;
         }
         $mensajes = $repo->mensajes($id);
+        $this->leyendo($repo, $t, $mensajes);
         Plantilla::pagina('tickets/detalle', [
             'titulo'    => $t['folio'],
             'icono'     => 'alerta',
@@ -115,21 +116,33 @@ final class TicketsControlador
                 $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
             }
             $repo = new TicketRepo($this->principal());
-            $repo->responder(
+            $nuevo = $repo->responder(
                 $id, $_POST['cuerpo'] ?? '', !empty($_POST['interno']), $adjunto,
                 $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '');
 
-            // Una nota interna NO se avisa: el cliente ni siquiera la ve.
+            // EL CORREO "RESPONDIMOS TU TICKET":
+            //   · solo a quien ABRIÓ el ticket. Antes iba al administrador de
+            //     la empresa, que no siempre es parte de la conversación.
+            //   · una vez por tanda: si ya tenía una respuesta sin leer, ese
+            //     correo ya salió; y nunca si tiene el chat abierto.
+            //   · una nota interna nunca: el cliente ni siquiera la ve.
+            //   · se manda DESPUÉS de contestar: el chat no espera al SMTP.
             $aviso = '';
-            if (empty($_POST['interno'])) {
+            if (empty($_POST['interno']) && $nuevo && $repo->debeAvisarCliente($id, $nuevo)) {
                 $t = $repo->uno($id);
-                if ($t && !empty($t['email_admin'])) {
-                    $ok = Avisos::ticketRespondido($t['email_admin'], $t['folio'], $t['asunto'],
-                        $_POST['cuerpo'] ?? '',
-                        (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
-                            . ($_SERVER['HTTP_HOST'] ?? '') . '/tickets/' . (int)$id);
-                    $aviso = $ok ? ' Se le avisó por correo.' : ' El correo no salió.';
+                $para = $t ? $repo->correoDelCreador($t) : '';
+                if ($para) {
+                    $cuerpo = trim((string)($_POST['cuerpo'] ?? '')) ?: 'Adjuntó un archivo.';
+                    $url = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                         . ($_SERVER['HTTP_HOST'] ?? '') . '/ayuda?ver=' . (int)$id;
+                    Avisos::despues(function () use ($para, $t, $cuerpo, $url) {
+                        Avisos::ticketRespondido($para, $t['folio'], $t['asunto'], $cuerpo, $url);
+                    });
+                    $aviso = ' Se le avisa por correo.';
                 }
+            }
+            if (($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1') {
+                $this->json(['ok' => true, 'mensaje' => 'Respuesta agregada.' . $aviso, 'id' => (int)$nuevo]);
             }
             $this->a('/tickets/' . $id, 'Respuesta agregada.' . $aviso, 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -179,8 +192,15 @@ final class TicketsControlador
         $repo = new TicketRepo($this->principal());
         $t = $repo->uno($id);
         if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no existe.'], 404);
-        $nuevos = $repo->mensajesDesde($id, Peticion::entero('desde'), true);
+        $desde = Peticion::entero('desde');
+        $this->leyendo($repo, $t, []);
+        // En vivo: espera hasta 20 s a que haya algo nuevo (ver AyudaControlador::esperar).
+        if (Peticion::entero('esperar') === 1) {
+            AyudaControlador::esperar($repo, $id, $desde, true, 'cliente', Peticion::texto('escribe'), 'El cliente');
+        }
+        $nuevos = $repo->mensajesDesde($id, $desde, true);
         $fotos  = $nuevos ? $repo->fotos($nuevos, $t['nombre_base_datos'] ?? null, false) : [];
+        $this->leyendo($repo, $t, $nuevos);
         $esc    = $repo->escribiendoAhora($id);
         $this->json([
             'ok'       => true,
@@ -203,6 +223,46 @@ final class TicketsControlador
         if (!$this->token()) $this->json(['ok' => false], 403);
         (new TicketRepo($this->principal()))->escribiendo($id, 'soporte', $_SESSION['usuario_nombre'] ?? '');
         $this->json(['ok' => true]);
+    }
+
+    /**
+     * Quien ATIENDE el ticket lo tiene abierto: está en la conversación (no
+     * hace falta correo) y leyó lo que se le muestra. Si lo mira otro de
+     * soporte no cuenta: el aviso es para quien lo atiende.
+     */
+    private function leyendo(TicketRepo $repo, array $t, array $mensajes)
+    {
+        if ((int)($t['asignado_a'] ?? 0) !== (int)($_SESSION['usuario_id'] ?? 0)) return;
+        $repo->marcarActivo($t['id'], 'soporte');
+        if ($mensajes) $repo->marcarVistoSoporte($t['id'], max(array_column($mensajes, 'id')));
+    }
+
+    /**
+     * LAS NOVEDADES DE SOPORTE (JSON): los tickets que esperan respuesta de
+     * quien pregunta —los suyos y los que nadie ha tomado—. Lo consulta cada
+     * página de soporte para la cuenta del menú y el aviso.
+     */
+    public function novedades()
+    {
+        $yo = (int)($_SESSION['usuario_id'] ?? 0);
+        $f  = (new TicketRepo($this->principal()))->novedadesSoporte($yo);
+        $this->json([
+            'ok'        => true,
+            'esperando' => count($f),
+            'tickets'   => array_map(function ($t) use ($yo) {
+                $txt = trim(preg_replace('/\s+/u', ' ', (string)$t['cuerpo']));
+                return [
+                    'id'         => (int)$t['id'],
+                    'folio'      => $t['folio'],
+                    'asunto'     => $t['asunto'],
+                    'empresa'    => $t['nombre_empresa'] ?? '',
+                    'mensaje_id' => (int)$t['mensaje_id'],
+                    'autor'      => $t['autor'] ?: 'El cliente',
+                    'extracto'   => mb_strlen($txt) > 120 ? mb_substr($txt, 0, 117) . '…' : $txt,
+                    'mio'        => (int)$t['asignado_a'] === $yo,
+                ];
+            }, $f),
+        ]);
     }
 
     private function json(array $datos, $codigo = 200)

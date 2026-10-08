@@ -65,7 +65,10 @@ $comoVa = [
             <span class="fecha"><?= date('d/m/Y H:i', strtotime($m['creado_en'])) ?></span>
           </div>
           <p><?= nl2br(P::e($m['cuerpo'])) ?></p>
-          <?php if ($m['adjunto']): ?>
+          <?php if ($m['adjunto'] && preg_match('/\.(png|jpe?g|webp|gif)$/i', $m['adjunto'])): ?>
+            <a href="<?= P::e($m['adjunto']) ?>" target="_blank" rel="noopener" class="adj-img">
+              <img src="<?= P::e($m['adjunto']) ?>" alt="Imagen adjunta" loading="lazy"></a>
+          <?php elseif ($m['adjunto']): ?>
             <a href="<?= P::e($m['adjunto']) ?>" target="_blank" rel="noopener" class="adj">
               <?= W::icono('serv','14px') ?>Ver archivo</a>
           <?php endif; ?>
@@ -105,7 +108,7 @@ $comoVa = [
           <input type="file" name="adjunto" id="adjResp"
                  accept="image/png,image/jpeg,image/webp,application/pdf">
           <label class="bt" for="adjResp">Adjuntar evidencia</label>
-          <span class="n" data-vacio="Imagen o PDF, opcional">Imagen o PDF, opcional</span>
+          <span class="n" data-vacio="Imagen o PDF, o pega una captura (Ctrl+V)">Imagen o PDF, o pega una captura (Ctrl+V)</span>
         </span>
         <button class="btn btn-primary" type="submit">Enviar</button>
       </div>

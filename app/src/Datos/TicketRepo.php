@@ -123,8 +123,33 @@ final class TicketRepo
                     WHERE TABLE_SCHEMA = DATABASE()
                       AND ((TABLE_NAME = 'ticket_mensajes' AND COLUMN_NAME = 'autor_tipo')
                         OR (TABLE_NAME = 'tickets' AND COLUMN_NAME IN
-                            ('creado_tipo','visto_cliente','escribe_cliente','escribe_soporte')))");
+                            ('creado_tipo','visto_cliente','escribe_cliente','escribe_soporte',
+                             'cliente_activo_en','visto_soporte'))
+                        OR (TABLE_NAME IN ('ticket_mensajes','tickets')
+                            AND COLUMN_NAME IN ('cuerpo','asunto')
+                            AND CHARACTER_SET_NAME <> 'utf8mb4'))");
                 $hay = $st->fetchAll(PDO::FETCH_COLUMN);
+                // EMOJIS. Ocupan 4 bytes y el `utf8` viejo de MySQL solo
+                // guarda 3: un 😀 haría fallar el mensaje entero. Las tablas
+                // nuevas ya nacen en utf8mb4; las de instalaciones viejas se
+                // convierten una vez (aparecen aquí solo si NO son utf8mb4).
+                if (in_array('ticket_mensajes.cuerpo', $hay, true)) {
+                    $this->db->exec("ALTER TABLE ticket_mensajes CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                }
+                if (in_array('tickets.asunto', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets CONVERT TO CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+                }
+                // Quién está DENTRO de la conversación ahora (su chat preguntó
+                // hace poco) y hasta dónde leyó soporte: con eso se decide si
+                // un correo hace falta o si la otra persona ya lo está viendo.
+                if (!in_array('tickets.cliente_activo_en', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets
+                                     ADD COLUMN cliente_activo_en DATETIME NULL,
+                                     ADD COLUMN soporte_activo_en DATETIME NULL");
+                }
+                if (!in_array('tickets.visto_soporte', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets ADD COLUMN visto_soporte INT NOT NULL DEFAULT 0");
+                }
                 // "Está escribiendo…": cuándo tecleó cada lado por última vez
                 // y quién. Se apaga solo a los pocos segundos y al enviar.
                 if (!in_array('tickets.escribe_cliente', $hay, true)) {
@@ -202,6 +227,187 @@ final class TicketRepo
         } catch (\Throwable $e) {
             return ['cliente' => null, 'soporte' => null];
         }
+    }
+
+    /**
+     * El pulso del chat en UNA consulta ligera: el último mensaje y quién
+     * está tecleando. Es lo que se pregunta en cada vuelta de la espera.
+     */
+    public function pulso($ticketId, $conInternos)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT (SELECT COALESCE(MAX(m.id),0) FROM ticket_mensajes m
+                        WHERE m.ticket_id = t.id" . ($conInternos ? "" : " AND m.interno = 0") . ") AS ultimo,
+                       CASE WHEN t.escribe_cliente IS NOT NULL
+                             AND TIMESTAMPDIFF(SECOND, t.escribe_cliente, NOW()) <= 7
+                            THEN COALESCE(t.escribe_cliente_nombre, '') END AS cliente,
+                       CASE WHEN t.escribe_soporte IS NOT NULL
+                             AND TIMESTAMPDIFF(SECOND, t.escribe_soporte, NOW()) <= 7
+                            THEN COALESCE(t.escribe_soporte_nombre, '') END AS soporte
+                FROM tickets t WHERE t.id = ?");
+            $st->execute([(int)$ticketId]);
+            $f = $st->fetch() ?: [];
+            return ['ultimo' => (int)($f['ultimo'] ?? 0),
+                    'cliente' => $f['cliente'] ?? null, 'soporte' => $f['soporte'] ?? null];
+        } catch (\Throwable $e) {
+            return ['ultimo' => $this->ultimoId($ticketId, $conInternos), 'cliente' => null, 'soporte' => null];
+        }
+    }
+
+    /** El id del último mensaje (con o sin notas internas). Barato: para esperar. */
+    public function ultimoId($ticketId, $conInternos)
+    {
+        $st = $this->db->prepare("SELECT COALESCE(MAX(id),0) FROM ticket_mensajes
+                                  WHERE ticket_id = ?" . ($conInternos ? "" : " AND interno = 0"));
+        $st->execute([(int)$ticketId]);
+        return (int)$st->fetchColumn();
+    }
+
+    /** Este lado tiene la conversación abierta ahora mismo. */
+    public function marcarActivo($ticketId, $lado)
+    {
+        if (!in_array($lado, ['cliente', 'soporte'], true)) return;
+        try {
+            $this->db->prepare("UPDATE tickets SET {$lado}_activo_en = NOW() WHERE id = ?")
+                     ->execute([(int)$ticketId]);
+        } catch (\Throwable $e) { /* sin la columna todavía */ }
+    }
+
+    /** Quien atiende el ticket ya leyó hasta este mensaje. Nunca retrocede. */
+    public function marcarVistoSoporte($ticketId, $hastaId)
+    {
+        try {
+            $this->db->prepare("UPDATE tickets SET visto_soporte = GREATEST(visto_soporte, ?) WHERE id = ?")
+                     ->execute([(int)$hastaId, (int)$ticketId]);
+        } catch (\Throwable $e) { /* sin la columna todavía */ }
+    }
+
+    /**
+     * ¿Hace falta avisarle por correo al CLIENTE de este mensaje de soporte?
+     *
+     * Solo una vez por tanda: si ya tenía un mensaje de soporte sin leer, el
+     * correo de ese ya salió. Y no si tiene el chat abierto (preguntó en el
+     * último minuto y medio): lo está viendo en vivo.
+     */
+    public function debeAvisarCliente($ticketId, $mensajeId)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT (t.cliente_activo_en IS NOT NULL
+                        AND TIMESTAMPDIFF(SECOND, t.cliente_activo_en, NOW()) <= 90) AS en_linea,
+                       (SELECT COUNT(*) FROM ticket_mensajes m
+                        WHERE m.ticket_id = t.id AND m.interno = 0 AND m.autor_tipo = 'plataforma'
+                          AND m.id > t.visto_cliente AND m.id < ?) AS sin_leer_antes
+                FROM tickets t WHERE t.id = ?");
+            $st->execute([(int)$mensajeId, (int)$ticketId]);
+            $f = $st->fetch();
+            return $f && !(int)$f['en_linea'] && !(int)$f['sin_leer_antes'];
+        } catch (\Throwable $e) { return true; }
+    }
+
+    /**
+     * ¿Hace falta avisarle a quien ATIENDE el ticket de este mensaje del
+     * cliente? Igual: una vez por tanda y no si tiene la conversación abierta.
+     */
+    public function debeAvisarSoporte($ticketId, $mensajeId)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT t.asignado_a,
+                       (t.soporte_activo_en IS NOT NULL
+                        AND TIMESTAMPDIFF(SECOND, t.soporte_activo_en, NOW()) <= 90) AS en_linea,
+                       (SELECT COUNT(*) FROM ticket_mensajes m
+                        WHERE m.ticket_id = t.id AND m.interno = 0 AND m.autor_tipo = 'empresa'
+                          AND m.id > t.visto_soporte AND m.id < ?) AS sin_leer_antes
+                FROM tickets t WHERE t.id = ?");
+            $st->execute([(int)$mensajeId, (int)$ticketId]);
+            $f = $st->fetch();
+            return $f && (int)$f['asignado_a'] > 0 && !(int)$f['en_linea'] && !(int)$f['sin_leer_antes'];
+        } catch (\Throwable $e) { return false; }
+    }
+
+    /**
+     * El correo de quien ABRIÓ el ticket (un usuario de la empresa), de la
+     * base de su empresa. Solo a esa persona se le avisa: ni al
+     * administrador ni a otros de la empresa, que no son parte de la
+     * conversación.
+     */
+    public function correoDelCreador(array $t)
+    {
+        if (!in_array($t['creado_tipo'] ?? null, [null, '', 'empresa'], true)) return '';
+        if (empty($t['nombre_base_datos']) || empty($t['creado_por'])) return '';
+        try {
+            $st = Conexion::de($t['nombre_base_datos'])->prepare("SELECT email FROM usuarios WHERE id = ?");
+            $st->execute([(int)$t['creado_por']]);
+            $e = trim((string)$st->fetchColumn());
+            return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : '';
+        } catch (\Throwable $e) { return ''; }
+    }
+
+    /** El correo de quien ATIENDE el ticket (cuenta de plataforma). */
+    public function correoDelAgente(array $t)
+    {
+        if (empty($t['asignado_a'])) return '';
+        try {
+            $st = $this->db->prepare("SELECT email FROM usuarios_plataforma WHERE id = ? AND activo = 1");
+            $st->execute([(int)$t['asignado_a']]);
+            $e = trim((string)$st->fetchColumn());
+            return filter_var($e, FILTER_VALIDATE_EMAIL) ? $e : '';
+        } catch (\Throwable $e) { return ''; }
+    }
+
+    /**
+     * LO QUE ESPERA RESPUESTA DE SOPORTE: tickets abiertos o en curso cuyo
+     * último mensaje visible es del cliente. De ellos, los que atiende esta
+     * persona y los que nadie ha tomado (cualquiera de soporte puede).
+     * Los de otro agente no: no son suyos.
+     */
+    public function novedadesSoporte($usuarioId)
+    {
+        $this->asegurar();
+        try {
+            $st = $this->db->prepare("
+                SELECT t.id, t.folio, t.asunto, t.asignado_a, e.nombre_empresa,
+                       m.id AS mensaje_id, m.autor_nombre AS autor, m.cuerpo
+                FROM tickets t
+                LEFT JOIN empresas e ON e.id = t.empresa_id
+                INNER JOIN ( SELECT ticket_id, MAX(id) AS ultimo FROM ticket_mensajes
+                             WHERE interno = 0 GROUP BY ticket_id ) u ON u.ticket_id = t.id
+                INNER JOIN ticket_mensajes m ON m.id = u.ultimo
+                WHERE t.estado IN ('abierto', 'en_curso')
+                  AND (m.autor_tipo = 'empresa'
+                       OR (m.autor_tipo IS NULL AND m.autor_id = t.creado_por))
+                  AND (t.asignado_a = ? OR t.asignado_a IS NULL)
+                ORDER BY m.id DESC
+                LIMIT 20");
+            $st->execute([(int)$usuarioId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) { return []; }
+    }
+
+    /**
+     * Los reportes de esta persona que siguen sin solucionarse (ni
+     * resueltos ni cerrados), el más movido primero, con cuántas respuestas
+     * de soporte no ha leído en cada uno. Son los que se alternan en el chat.
+     */
+    public function activosCliente($empresaId, $usuarioId)
+    {
+        try {
+            $st = $this->db->prepare("
+                SELECT t.id, t.folio, t.asunto, t.estado,
+                       (SELECT COUNT(*) FROM ticket_mensajes m
+                        WHERE m.ticket_id = t.id AND m.interno = 0 AND m.autor_tipo = 'plataforma'
+                          AND m.id > t.visto_cliente) AS sin_leer
+                FROM tickets t
+                WHERE t.empresa_id = ? AND t.creado_por = ?
+                  AND (t.creado_tipo = 'empresa' OR t.creado_tipo IS NULL)
+                  AND t.estado NOT IN ('resuelto', 'cerrado')
+                ORDER BY (SELECT MAX(mm.id) FROM ticket_mensajes mm WHERE mm.ticket_id = t.id) DESC, t.id DESC
+                LIMIT 15");
+            $st->execute([(int)$empresaId, (int)$usuarioId]);
+            return $st->fetchAll();
+        } catch (\Throwable $e) { return []; }
     }
 
     /**
@@ -405,6 +611,9 @@ final class TicketRepo
     public function responder($ticketId, $cuerpo, $interno, $adjunto, $usuarioId, $usuarioNombre)
     {
         $cuerpo = trim((string)$cuerpo);
+        // Una captura pegada puede ir sola, sin texto. Se le pone uno para
+        // que la lista, el aviso y el correo no muestren un mensaje vacío.
+        if ($cuerpo === '' && $adjunto) $cuerpo = 'Adjuntó un archivo.';
         if ($cuerpo === '') throw new \InvalidArgumentException('Escribe la respuesta');
 
         $t = $this->uno($ticketId);
@@ -416,6 +625,7 @@ final class TicketRepo
             VALUES (?,?,?,?,?,?,?,NOW())
         ")->execute([(int)$ticketId, $cuerpo, $interno ? 1 : 0, $adjunto ?: null,
                      $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
+        $nuevoId = (int)$this->db->lastInsertId();
 
         // Una nota interna NO cuenta como primera respuesta: el cliente no
         // la ve, así que para él nadie le ha contestado todavía. Y lo que
@@ -440,7 +650,9 @@ final class TicketRepo
         if (!$deSoporte && $t['estado'] === 'esperando') {
             $this->cambiar($ticketId, 'estado', 'en_curso', $usuarioId, $usuarioNombre);
         }
-        return true;
+        // Quien escribe está en la conversación.
+        $this->marcarActivo($ticketId, $deSoporte ? 'soporte' : 'cliente');
+        return $nuevoId;
     }
 
     // ── Cambios de estado ───────────────────────────────────────
