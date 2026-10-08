@@ -22,6 +22,10 @@ use PDO;
  *   sesión antes del ingreso se queda dentro después.
  *
  * · Cinco intentos y quince minutos de espera, por sesión.
+ *
+ * · Una sesión por cuenta. Si la cuenta está abierta (con movimiento
+ *   reciente) en otro navegador, antes de entrar se pregunta si se cierra
+ *   esa sesión; nunca se bloquea la entrada. Ver SesionUnica.
  */
 final class Autenticar
 {
@@ -71,6 +75,7 @@ final class Autenticar
             if (empty($plataforma['activo'])) {
                 throw new \RuntimeException('Esta cuenta está desactivada.');
             }
+            if ($this->preguntar(SesionUnica::cuenta('p', $plataforma['id']), $identificador)) return 'confirmar';
             return $this->abrirPlataforma($plataforma);
         }
 
@@ -100,6 +105,78 @@ final class Autenticar
         // necesitaba. Entra, pero el portero (public/index.php) la deja
         // solo en Mi cuenta → Plan, o en un aviso si no puede pagar.
 
+        if ($this->preguntar(SesionUnica::cuenta('e', $usuario['id'], $empresa['id']), $identificador)) {
+            return 'confirmar';
+        }
+        return $this->abrirEmpresa($empresa, $usuario);
+    }
+
+    /**
+     * ¿La cuenta está abierta AHORA en otro navegador? Entonces no se entra
+     * todavía: se guarda lo necesario para terminar y se le pregunta si
+     * cierra la otra sesión (ver SesionUnica). La contraseña ya se
+     * comprobó; lo pendiente vale unos minutos y solo en esta sesión.
+     */
+    private function preguntar($cuenta, $identificador)
+    {
+        $otra = SesionUnica::otraActiva($cuenta);
+        if (!$otra) return false;
+        unset($_SESSION['lf_intentos'], $_SESSION['lf_ultimo_intento']);
+        $_SESSION['lf_login_pendiente'] = [
+            'cuenta'        => $cuenta,
+            'identificador' => (string)$identificador,
+            'recordar'      => !empty($_POST['recordar']),
+            'hasta'         => time() + SesionUnica::ESPERA,
+            'otra'          => ['dispositivo' => (string)$otra['dispositivo'],
+                                'hace' => (int)$otra['hace'], 'ip' => (string)$otra['ip']],
+        ];
+        return true;
+    }
+
+    /**
+     * "Cerrarla y entrar aquí". Se vuelve a buscar la cuenta —pudo
+     * desactivarse mientras tanto— y se entra; la otra sesión se cierra
+     * sola en su siguiente clic.
+     *
+     * @throws \RuntimeException con un mensaje apto para mostrar
+     */
+    public function confirmar()
+    {
+        $p = SesionUnica::pendiente();
+        unset($_SESSION['lf_login_pendiente']);
+        if (!$p) throw new \RuntimeException('Pasó demasiado tiempo. Vuelve a escribir tu contraseña.');
+        if (!empty($p['recordar'])) $_POST['recordar'] = '1';
+        $antes = $p['otra']['dispositivo'] ?? '';
+
+        if (strpos($p['cuenta'], 'p:') === 0) {
+            $u = $this->repo->usuarioPlataforma($p['identificador']);
+            if (!$u || SesionUnica::cuenta('p', $u['id']) !== $p['cuenta']) {
+                throw new \RuntimeException('No se pudo entrar. Vuelve a intentarlo.');
+            }
+            if (empty($u['activo'])) throw new \RuntimeException('Esta cuenta está desactivada.');
+            return $this->abrirPlataforma($u);
+        }
+
+        $h = $this->repo->buscar($p['identificador']);
+        if (!$h || SesionUnica::cuenta('e', $h['usuario']['id'], $h['empresa']['id']) !== $p['cuenta']) {
+            throw new \RuntimeException('No se pudo entrar. Vuelve a intentarlo.');
+        }
+        if (!$h['empresa']['activo']) {
+            throw new \RuntimeException('La cuenta de ' . $h['empresa']['nombre_empresa'] . ' está inactiva.');
+        }
+        $r = $this->abrirEmpresa($h['empresa'], $h['usuario']);
+        // En la bitácora de la empresa: quién entró y qué sesión cerró.
+        try {
+            Auditoria::anota('sesion.reemplazar', $_SESSION['usuario_nombre'] ?? '',
+                $antes, SesionUnica::dispositivo(),
+                \LibertyFin\Datos\Conexion::de($h['empresa']['nombre_base_datos']));
+        } catch (\Throwable $e) { /* sin bitácora se entra igual */ }
+        return $r;
+    }
+
+    /** Abre la sesión de un usuario de empresa (la contraseña ya se comprobó). */
+    private function abrirEmpresa(array $empresa, array $usuario)
+    {
         $sucursal = $this->repo->sucursal($empresa['nombre_base_datos'], $usuario['sucursal_id']);
 
         // Id nuevo: lo anterior de esta sesión deja de servir.
@@ -164,6 +241,8 @@ final class Autenticar
             if (!$ur->vioGuia($usuario['id'])) $_SESSION['lf_mostrar_guia'] = true;
         } catch (\Throwable $e) { /* sin personalización se ve el tema base */ }
 
+        // Esta pasa a ser LA sesión de la cuenta; otra que hubiera, sale.
+        SesionUnica::abrir(SesionUnica::cuenta('e', $usuario['id'], $empresa['id']));
         return $_SESSION;
     }
 
@@ -240,6 +319,9 @@ final class Autenticar
         } catch (\Throwable $e) { $_SESSION['lf_global'] = []; }
 
         $this->repo->marcarAccesoPlataforma((int)$u['id']);
+        // Esta pasa a ser LA sesión de la cuenta; otra que hubiera, sale.
+        unset($_SESSION['lf_login_pendiente'], $_SESSION['lf_motivo_salida']);
+        SesionUnica::abrir(SesionUnica::cuenta('p', $u['id']));
         return true;
     }
 

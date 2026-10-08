@@ -26,6 +26,42 @@ $token = $_SESSION['lf_token'];
   </div>
 
   <div class="lf-tarjeta">
+  <?php if (!empty($pendiente)):
+    /* LA CUENTA YA ESTÁ ABIERTA en otro dispositivo (ver
+       Servicio\SesionUnica). La contraseña ya se comprobó: aquí solo se
+       decide si se cierra la otra sesión y se entra. */
+    $otra = $pendiente['otra'] ?? []; ?>
+    <div class="lf-sesion-abierta" data-lf-sesion-abierta>
+      <h1>Tu cuenta ya está abierta</h1>
+      <p class="lf-sub">Hay una sesión activa con esta cuenta en otro dispositivo.</p>
+
+      <div class="lf-disp">
+        <span class="ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+               stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>
+          </svg>
+        </span>
+        <span class="txt">
+          <b><?= P::e($otra['dispositivo'] ?? 'Otro dispositivo') ?></b>
+          <small>Activa <?= P::e(\LibertyFin\Servicio\SesionUnica::hace($otra['hace'] ?? 0)) ?>
+            <?php $ip = \LibertyFin\Servicio\SesionUnica::ipCorta($otra['ip'] ?? ''); ?>
+            <?= $ip !== '' ? ' · desde ' . P::e($ip) : '' ?></small>
+        </span>
+      </div>
+
+      <p class="lf-nota">Si continúas, esa sesión se cerrará y quien la esté usando
+        tendrá que volver a entrar. Si no la reconoces, entra y cambia tu contraseña.</p>
+
+      <form method="post" action="/login/confirmar">
+        <input type="hidden" name="token" value="<?= P::e($token) ?>">
+        <button class="lf-boton" type="submit">
+          <span class="txt">Cerrarla y entrar aquí</span>
+        </button>
+      </form>
+      <a class="lf-olvide lf-cancelar" href="/login?cancelar=1">Cancelar</a>
+    </div>
+  <?php else: ?>
     <h1>Iniciar sesión</h1>
     <p class="lf-sub">Sistema de gestión de negocios · Multiempresa</p>
 
@@ -89,6 +125,7 @@ $token = $_SESSION['lf_token'];
         <span class="giro" aria-hidden="true"></span>
       </button>
     </form>
+  <?php endif; ?>
   </div>
 
   <p class="lf-pie-entrada">
@@ -276,6 +313,23 @@ $token = $_SESSION['lf_token'];
            intentos, que trae su propio texto—. */
         var doc = new DOMParser().parseFromString(res.html, 'text/html'),
             msg = doc.querySelector('.lf-msg');
+
+        /* La contraseña era correcta, pero la cuenta está abierta en otro
+           dispositivo: en vez de la X, la pregunta de si se cierra. */
+        var abierta = doc.querySelector('[data-lf-sesion-abierta]');
+        if (abierta) {
+          soltar();
+          var tarjeta = f.closest('.lf-tarjeta');
+          if (tarjeta) {
+            tarjeta.innerHTML = '';
+            tarjeta.appendChild(document.importNode(abierta, true));
+            var bt = tarjeta.querySelector('button');
+            if (bt) bt.focus();
+          } else {
+            location.replace('/login');
+          }
+          return;
+        }
 
         /* El token puede haber rotado: reenviar el viejo daría un error
            de formulario en vez del de contraseña, y nadie entendería

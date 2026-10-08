@@ -61,7 +61,21 @@
     opciones.headers = { 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' };
     return fetch(url, opciones)
       .then(function (r) { return r.text(); })
-      .then(function (t) { try { return JSON.parse(t); } catch (e) { return null; } });
+      .then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) { return null; }
+        if (j && j.sesion_cerrada) aEntrar();
+        return j;
+      });
+  }
+
+  /* La cuenta se abrió en otro dispositivo y esta sesión se cerró (ver
+     Servicio\SesionUnica): a la pantalla de entrar, que dice por qué. */
+  var saliendo = false;
+  function aEntrar() {
+    if (saliendo) return;
+    saliendo = true;
+    location.href = '/login';
   }
 
   /* POST con archivo. Va por XMLHttpRequest y no por fetch porque fetch
@@ -77,7 +91,12 @@
       if (x.upload && avance) {
         x.upload.onprogress = function (e) { if (e.lengthComputable && e.total) avance(e.loaded / e.total); };
       }
-      x.onload = function () { var j = null; try { j = JSON.parse(x.responseText); } catch (e) {} listo(j); };
+      x.onload = function () {
+        var j = null;
+        try { j = JSON.parse(x.responseText); } catch (e) {}
+        if (j && j.sesion_cerrada) aEntrar();
+        listo(j);
+      };
       x.onerror = x.onabort = x.ontimeout = function () { fallo(new Error('red')); };
       x.send(datos);
     });

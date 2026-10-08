@@ -3426,3 +3426,36 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 }
 /* El ticket que se está viendo ahora, en la lista de la campana. */
 .lf-campana-pop .it.aqui{box-shadow:inset 3px 0 0 var(--lf-brand)}
+
+/* La barra de abajo del celular se esconde al bajar y vuelve al subir
+   (ver parciales/sidebar.php). La burbuja del chat la acompaña. */
+@media(max-width:940px){
+  .lf-dedo{transition:transform .32s var(--lf-suave),box-shadow .32s ease}
+  .lf-dedo-oculta .lf-dedo{transform:translateY(calc(100% + 4px));box-shadow:none}
+  .lf-dedo-oculta .lf-dedo:focus-within{transform:none}
+  .lf-chat-burbuja{transition:transform .45s var(--lf-rebote),opacity .3s var(--lf-suave),
+    box-shadow .3s ease,bottom .32s var(--lf-suave)}
+  .lf-dedo-oculta .lf-chat-burbuja{bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+}
+@media(max-width:940px) and (prefers-reduced-motion:reduce){
+  .lf-dedo,.lf-chat-burbuja{transition:none!important}
+}
+
+/* ══════════════════════════════════════════════════════
+   ENTRAR · LA CUENTA YA ESTÁ ABIERTA EN OTRO DISPOSITIVO
+   Sobre el verde de la tarjeta de entrar: dónde está abierta, desde
+   cuándo, y qué pasa si se continúa (ver Servicio\SesionUnica).
+   ══════════════════════════════════════════════════════ */
+.lf-sesion-abierta{animation:lf-aparece .3s ease backwards}
+.lf-sesion-abierta .lf-disp{display:flex;align-items:center;gap:12px;margin:4px 0 16px;padding:12px 14px;
+  border-radius:12px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.18)}
+.lf-sesion-abierta .lf-disp .ico{flex:0 0 auto;display:grid;place-items:center;width:40px;height:40px;
+  border-radius:10px;background:rgba(255,255,255,.14);color:#fff}
+.lf-sesion-abierta .lf-disp .ico svg{width:21px;height:21px}
+.lf-sesion-abierta .lf-disp .txt{min-width:0}
+.lf-sesion-abierta .lf-disp b{display:block;font-size:14px;font-weight:700;color:#fff}
+.lf-sesion-abierta .lf-disp small{display:block;margin-top:2px;font-size:12px;
+  color:color-mix(in srgb,#fff 70%,transparent)}
+.lf-sesion-abierta .lf-nota{margin:0 0 18px;font-size:12.5px;line-height:1.5;
+  color:color-mix(in srgb,#fff 80%,transparent)}
+.lf-sesion-abierta .lf-cancelar{text-align:center;margin:14px 0 0}

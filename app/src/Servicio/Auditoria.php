@@ -47,6 +47,7 @@ final class Auditoria
         'doc.revisar'       => 'Revisó un documento',
         'empresa.alta'      => 'Dio de alta una empresa',
         'seccion.alternar'  => 'Encendió o apagó una sección',
+        'sesion.reemplazar' => 'Cerró su sesión en otro dispositivo al entrar',
     ];
 
     private static $db = null;

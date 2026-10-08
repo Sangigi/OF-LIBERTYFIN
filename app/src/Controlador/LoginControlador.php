@@ -12,11 +12,33 @@ final class LoginControlador
         if (Autenticar::sesionValida()) { header('Location: /'); exit; }
         if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 
+        // "Cancelar" en la pregunta de la otra sesión: se vuelve al formulario.
+        if (isset($_GET['cancelar'])) {
+            unset($_SESSION['lf_login_pendiente']);
+            header('Location: /login'); exit;
+        }
+
+        // Si la sesión se cerró porque la cuenta se abrió en otro lado, se
+        // dice. Solo se da por leído en una vista normal: una consulta de
+        // fondo (el chat, la campana) que rebota aquí no debe gastarlo.
+        $error = $_SESSION['lf_error'] ?? null;
+        $motivo = $_SESSION['lf_motivo_salida'] ?? null;
+        if (!$error && $motivo && $motivo[0] === 'otra-sesion') {
+            $error = 'Se inició sesión con tu cuenta en otro dispositivo'
+                   . (!empty($motivo[1]) ? ' (' . $motivo[1] . ')' : '')
+                   . '. Si no fuiste tú, entra y cambia tu contraseña.';
+        }
+        $deFondo = ($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1' || !empty($_SERVER['HTTP_X_LF_PARCIAL'])
+                || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+        if (!$deFondo) unset($_SESSION['lf_motivo_salida']);
+
         Plantilla::pagina('login', [
-            'titulo'  => 'Entrar',
-            'error'   => $_SESSION['lf_error'] ?? null,
-            'usuario' => $_SESSION['lf_usuario'] ?? '',
-            'bloqueo' => Autenticar::bloqueoRestante(),
+            'titulo'    => 'Entrar',
+            'error'     => $error,
+            'usuario'   => $_SESSION['lf_usuario'] ?? '',
+            'bloqueo'   => Autenticar::bloqueoRestante(),
+            // La cuenta está abierta en otro dispositivo: se pregunta.
+            'pendiente' => \LibertyFin\Servicio\SesionUnica::pendiente(),
         ], 'layout-limpio');
         unset($_SESSION['lf_error'], $_SESSION['lf_usuario']);
     }
@@ -32,7 +54,10 @@ final class LoginControlador
         try {
             $principal = Conexion::de($GLOBALS['lf_bd_principal']);
             (new \LibertyFin\Datos\AutenticacionRepo($principal))->prepararIndice();
-            (new Autenticar($principal))->entrar($id, $_POST['clave'] ?? '');
+            $r = (new Autenticar($principal))->entrar($id, $_POST['clave'] ?? '');
+            // La cuenta está abierta en otro dispositivo: la pantalla de
+            // entrar pregunta si se cierra (ver confirmar()).
+            if ($r === 'confirmar') { header('Location: /login'); exit; }
             header('Location: /'); exit;
         } catch (\RuntimeException $e) {
             return $this->fallo($e->getMessage(), $id);
@@ -42,8 +67,28 @@ final class LoginControlador
         }
     }
 
+    /** "Cerrarla y entrar aquí": la otra sesión de la cuenta sale. */
+    public function confirmar()
+    {
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            return $this->fallo('La sesión expiró. Intenta de nuevo.', '');
+        }
+        try {
+            (new Autenticar(Conexion::de($GLOBALS['lf_bd_principal'])))->confirmar();
+            header('Location: /'); exit;
+        } catch (\RuntimeException $e) {
+            return $this->fallo($e->getMessage(), '');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] login (confirmar): ' . $e->getMessage());
+            return $this->fallo('No se pudo conectar. Inténtalo en un momento.', '');
+        }
+    }
+
     public function salir()
     {
+        // La cuenta queda libre: entrar desde otro lado ya no pregunta.
+        \LibertyFin\Servicio\SesionUnica::cerrar();
         Autenticar::salir();
         session_start();
         $_SESSION['lf_error'] = 'Sesión cerrada.';

@@ -206,4 +206,40 @@ foreach ($menu as $m) {
     if (e.target.closest('a')) estado(false);
   });
 })();
+
+/* AL BAJAR, LA BARRA DE ABAJO SE ESCONDE (solo en el celular).
+   Leyendo una lista larga, la barra tapaba siempre la última fila a la
+   vista. Al deslizar hacia abajo se va; en cuanto se sube un poco,
+   vuelve. También vuelve arriba del todo, al llegar al final de la
+   página y al cambiar de sección. Los temblores del dedo (menos de 8 px)
+   no cuentan, para que no parpadee. */
+(function(){
+  if (window.lfDedoListo) return;
+  window.lfDedoListo = true;
+  var dedo = document.querySelector('.lf-dedo');
+  if (!dedo) return;
+  var movil = window.matchMedia ? window.matchMedia('(max-width: 940px)') : null;
+  var antes = Math.max(0, window.pageYOffset || 0), pendiente = false;
+
+  function poner(oculta){ document.body.classList.toggle('lf-dedo-oculta', oculta); }
+  function revisar(){
+    pendiente = false;
+    var y = Math.max(0, window.pageYOffset || 0);
+    var alFinal = window.innerHeight + y >= document.documentElement.scrollHeight - 4;
+    if ((movil && !movil.matches) || y < 60 || alFinal
+        || document.body.classList.contains('lf-menu-abierto')) {
+      poner(false); antes = y; return;
+    }
+    var d = y - antes;
+    if (Math.abs(d) < 8) return;
+    poner(d > 0);
+    antes = y;
+  }
+  window.addEventListener('scroll', function(){
+    if (!pendiente) { pendiente = true; requestAnimationFrame(revisar); }
+  }, { passive: true });
+  document.addEventListener('lf:cargado', function(){
+    poner(false); antes = Math.max(0, window.pageYOffset || 0);
+  });
+})();
 </script>

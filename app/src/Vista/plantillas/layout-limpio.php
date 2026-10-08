@@ -27,7 +27,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Google+Sans:ital,opsz,wght@0,17..18,400..700;1,17..18,400..700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/css/libertyfin.css?v=1">
+<?php /* La versión es la fecha del archivo: con `?v=1` fijo, el navegador
+         seguía usando la hoja vieja después de cada cambio. */
+$hojaLimpia = __DIR__ . '/../../../public/assets/css/libertyfin.css'; ?>
+<link rel="stylesheet" href="/assets/css/libertyfin.css?v=<?= is_file($hojaLimpia) ? filemtime($hojaLimpia) : '1' ?>">
 </head>
 <body class="lf-centro"><?= $contenido ?></body>
 </html>

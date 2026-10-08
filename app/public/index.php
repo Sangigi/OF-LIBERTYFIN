@@ -52,6 +52,8 @@ $r = new Router();
 // Públicas
 $r->get('/login',  ['LibertyFin\Controlador\LoginControlador', 'mostrar']);
 $r->post('/login', ['LibertyFin\Controlador\LoginControlador', 'entrar']);
+// "Cerrarla y entrar aquí", cuando la cuenta está abierta en otro dispositivo.
+$r->post('/login/confirmar', ['LibertyFin\Controlador\LoginControlador', 'confirmar']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);
 // El registro solo existe si hay credenciales de cPanel: sin ellas no se
@@ -325,7 +327,7 @@ $permisos = [
   '/cuenta/plan/comprobante' => 'editar.empresa',
 ];
 
-$publicas = ['/login', '/salir', '/registro', '/ayuda-acceso',
+$publicas = ['/login', '/login/confirmar', '/salir', '/registro', '/ayuda-acceso',
     // Los avisos del proveedor de pago. No pueden pedir sesión: quien
     // llama es un servidor de Paga de Todo, no una persona con cookie.
     // Su puerta es el secreto de la URL, que revisa el controlador.
@@ -338,6 +340,25 @@ $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH),
 // El portero: una sola línea decide quién pasa, en vez de repetir la
 // comprobación al inicio de cada archivo como hacía el sistema anterior.
 if (!in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
+    header('Location: /login'); exit;
+}
+
+// UNA SESIÓN POR CUENTA (ver Servicio\SesionUnica). Si la cuenta se abrió
+// en otro dispositivo, esta sesión se cierra aquí. No se destruye: se
+// vacía, y queda solo el motivo para que la pantalla de entrar lo diga.
+// Una consulta de fondo (el chat, la campana) recibe JSON en vez de la
+// página de entrar, y el navegador manda a la persona a /login.
+if (!in_array($ruta, $publicas, true) && !\LibertyFin\Servicio\SesionUnica::vigente()) {
+    $_SESSION = ['lf_motivo_salida' => ['otra-sesion', \LibertyFin\Servicio\SesionUnica::$desplazadaPor]];
+    $deFondo = ($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1' || !empty($_SERVER['HTTP_X_LF_PARCIAL'])
+            || ($_SERVER['HTTP_X_REQUESTED_WITH'] ?? '') === 'XMLHttpRequest';
+    if ($deFondo) {
+        http_response_code(401);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['ok' => false, 'sesion_cerrada' => true,
+            'error' => 'Se inició sesión con tu cuenta en otro dispositivo.'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     header('Location: /login'); exit;
 }
 
