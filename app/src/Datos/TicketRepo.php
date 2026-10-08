@@ -102,6 +102,95 @@ final class TicketRepo
                 creado_en DATETIME NOT NULL,
                 KEY ix_te_ticket (ticket_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // DE QUÉ TABLA ES EL AUTOR. `autor_id` solo no basta: soporte vive en
+        // `usuarios_plataforma` y el cliente en el `usuarios` de su empresa,
+        // y los ids se repiten. Sin esto, al cliente un mensaje de soporte
+        // podía salirle como "Tú", y no había forma de saber de quién era la
+        // foto. Los mensajes viejos quedan en NULL: sin foto y como antes.
+        static $tipo = false;
+        if (!$tipo) {
+            try {
+                $st = $this->db->query("
+                    SELECT COUNT(*) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticket_mensajes'
+                      AND COLUMN_NAME = 'autor_tipo'");
+                if (!(int)$st->fetchColumn()) {
+                    $this->db->exec("ALTER TABLE ticket_mensajes
+                                     ADD COLUMN autor_tipo VARCHAR(12) NULL AFTER autor_nombre");
+                }
+                $tipo = true;
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] ticket_mensajes.autor_tipo: ' . $e->getMessage());
+            }
+        }
+    }
+
+    /** 'plataforma' (soporte, validación, superadmin) o 'empresa' (el cliente). */
+    private static function tipoAutor()
+    {
+        return !empty($_SESSION['plataforma']) ? 'plataforma' : 'empresa';
+    }
+
+    /**
+     * ¿Este mensaje lo escribí yo? Por tipo Y id: el id solo se repite entre
+     * soporte y empresas. Los mensajes viejos (sin tipo) se comparan por id,
+     * como antes.
+     */
+    public static function esMio(array $m)
+    {
+        $yo = (int)($_SESSION['usuario_id'] ?? 0);
+        if (!$yo || (int)($m['autor_id'] ?? 0) !== $yo) return false;
+        return empty($m['autor_tipo']) || $m['autor_tipo'] === self::tipoAutor();
+    }
+
+    /**
+     * La foto de quien escribió cada mensaje: [id del mensaje => ruta].
+     *
+     * La del cliente sale de la base de SU empresa. La de soporte, de su
+     * cuenta de plataforma, y si `$paraCliente` solo cuando esa persona
+     * eligió mostrarla (Mi cuenta → "Mostrar mi foto a los clientes").
+     * Se busca al pintar, no se copia al mensaje: quitar la foto o dejar de
+     * mostrarla aplica también a lo ya escrito.
+     *
+     * @param string|null $baseEmpresa  la base de la empresa del ticket
+     */
+    public function fotos(array $mensajes, $baseEmpresa, $paraCliente)
+    {
+        $plat = []; $emp = [];
+        foreach ($mensajes as $m) {
+            $id = (int)($m['autor_id'] ?? 0);
+            if (!$id) continue;
+            if (($m['autor_tipo'] ?? '') === 'plataforma') $plat[] = $id;
+            if (($m['autor_tipo'] ?? '') === 'empresa')    $emp[]  = $id;
+        }
+
+        $fp = $plat ? (new AutenticacionRepo($this->db))->fotosPlataforma($plat) : [];
+
+        $fe = [];
+        $emp = array_values(array_unique($emp));
+        if ($emp && $baseEmpresa) {
+            try {
+                $st = Conexion::de($baseEmpresa)->prepare("
+                    SELECT id, COALESCE(foto,'') AS foto FROM usuarios
+                    WHERE id IN (" . implode(',', array_fill(0, count($emp), '?')) . ")");
+                $st->execute($emp);
+                foreach ($st->fetchAll() as $f) $fe[(int)$f['id']] = (string)$f['foto'];
+            } catch (\Throwable $e) { /* sin columna foto o sin base: sin fotos */ }
+        }
+
+        $r = [];
+        foreach ($mensajes as $m) {
+            $id = (int)($m['autor_id'] ?? 0);
+            $foto = '';
+            if (($m['autor_tipo'] ?? '') === 'plataforma' && isset($fp[$id])) {
+                if (!$paraCliente || $fp[$id]['publica']) $foto = $fp[$id]['foto'];
+            } elseif (($m['autor_tipo'] ?? '') === 'empresa') {
+                $foto = $fe[$id] ?? '';
+            }
+            if ($foto !== '') $r[(int)$m['id']] = $foto;
+        }
+        return $r;
     }
 
     // ── Crear y responder ───────────────────────────────────────
@@ -133,9 +222,9 @@ final class TicketRepo
         $id = (int)$this->db->lastInsertId();
 
         $this->db->prepare("
-            INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, autor_id, autor_nombre, creado_en)
-            VALUES (?,?,0,?,?,NOW())
-        ")->execute([$id, $cuerpo, $usuarioId ?: null, $usuarioNombre]);
+            INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, autor_id, autor_nombre, autor_tipo, creado_en)
+            VALUES (?,?,0,?,?,?,NOW())
+        ")->execute([$id, $cuerpo, $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
 
         $this->evento($id, 'creado', null, $folio, $usuarioId, $usuarioNombre);
         return ['id' => $id, 'folio' => $folio];
@@ -151,10 +240,10 @@ final class TicketRepo
 
         $this->db->prepare("
             INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, adjunto,
-                                         autor_id, autor_nombre, creado_en)
-            VALUES (?,?,?,?,?,?,NOW())
+                                         autor_id, autor_nombre, autor_tipo, creado_en)
+            VALUES (?,?,?,?,?,?,?,NOW())
         ")->execute([(int)$ticketId, $cuerpo, $interno ? 1 : 0, $adjunto ?: null,
-                     $usuarioId ?: null, $usuarioNombre]);
+                     $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
 
         // Una nota interna NO cuenta como primera respuesta: el cliente no
         // la ve, así que para él nadie le ha contestado todavía.

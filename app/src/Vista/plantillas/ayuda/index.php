@@ -42,9 +42,13 @@ $comoVa = [
         Todavía no hay mensajes en este reporte.</p>
     <?php endif; ?>
     <?php foreach ($mensajes as $m):
-      $mio = (int)$m['autor_id'] === (int)($_SESSION['usuario_id'] ?? 0); ?>
+      // Por tipo y id: el id solo se repite entre soporte y la empresa, y
+      // un mensaje de soporte salía como "Tú".
+      $mio  = T::esMio($m);
+      $foto = $fotos[(int)$m['id']] ?? ''; ?>
       <div class="lf-msj">
-        <span class="lf-av <?= $mio ? 'gris' : '' ?>"><?= P::e($ini($m['autor_nombre'])) ?></span>
+        <span class="lf-av <?= $mio ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
+              <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
         <div class="cuerpo">
           <div class="cab">
             <b><?= $mio ? 'Tú' : P::e($m['autor_nombre'] ?: 'LibertyFin') ?></b>

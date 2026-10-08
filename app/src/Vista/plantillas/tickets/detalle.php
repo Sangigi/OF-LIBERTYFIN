@@ -65,12 +65,16 @@ document.addEventListener('click', function(ev){
             <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente</p></div>
       </header>
       <div class="card-body">
-        <?php foreach ($mensajes as $m): ?>
+        <?php foreach ($mensajes as $m):
+          $foto = $fotos[(int)$m['id']] ?? '';
+          $deCliente = ($m['autor_tipo'] ?? '') === 'empresa'; ?>
           <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?>">
-            <span class="lf-av <?= $m['interno'] ? 'gris' : '' ?>"><?= P::e($ini($m['autor_nombre'])) ?></span>
+            <span class="lf-av <?= $m['interno'] ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
+                  <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
             <div class="cuerpo">
               <div class="cab">
                 <b><?= P::e($m['autor_nombre'] ?: 'Sistema') ?></b>
+                <?php if ($deCliente): ?><span class="badge bg-secondary">Cliente</span><?php endif; ?>
                 <?php if ($m['interno']): ?>
                   <span class="badge bg-secondary">Nota interna</span>
                 <?php endif; ?>

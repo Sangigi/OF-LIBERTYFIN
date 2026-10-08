@@ -436,6 +436,38 @@ final class UsuariosControlador
         header('Location: /'); exit;
     }
 
+    /**
+     * Si el CLIENTE ve mi foto en los tickets de soporte. Solo cuentas de
+     * plataforma: el equipo de soporte siempre se ve entre sí.
+     * Responde JSON cuando se guarda por detrás (data-guardar).
+     */
+    public function fotoPublica()
+    {
+        $json = ($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1';
+        $responder = function ($ok, $texto) use ($json) {
+            if ($json) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => $ok, 'mensaje' => $texto]);
+                exit;
+            }
+            $this->volver('/cuenta', $texto, $ok ? 'ok' : 'error');
+        };
+        if (empty($_SESSION['plataforma'])) $responder(false, 'Esta opción es de las cuentas de soporte.');
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $responder(false, 'No se pudo verificar el formulario.');
+        }
+        try {
+            $si = !empty($_POST['publica']);
+            $this->cuentasPlataforma()->guardarFotoPublica((int)($_SESSION['usuario_id'] ?? 0), $si);
+            $responder(true, $si ? 'Los clientes verán tu foto en los tickets.'
+                                 : 'Los clientes verán solo tu inicial.');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] foto pública: ' . $e->getMessage());
+            $responder(false, 'No se pudo guardar.');
+        }
+    }
+
     /** Las cuentas de plataforma viven en la base principal. */
     private function cuentasPlataforma()
     {
@@ -445,10 +477,13 @@ final class UsuariosControlador
     /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
     private function miCuentaPlataforma()
     {
-        $foto = '';
+        $foto = ''; $fotoPublica = false;
         if (!empty($_SESSION['plataforma'])) {
-            try { $foto = $this->cuentasPlataforma()->fotoPlataforma((int)($_SESSION['usuario_id'] ?? 0)); }
-            catch (\Throwable $e) { $foto = ''; }
+            try {
+                $cp = $this->cuentasPlataforma();
+                $foto = $cp->fotoPlataforma((int)($_SESSION['usuario_id'] ?? 0));
+                $fotoPublica = $cp->fotoPublicaPlataforma((int)($_SESSION['usuario_id'] ?? 0));
+            } catch (\Throwable $e) { $foto = ''; }
         }
         Plantilla::pagina('usuarios/cuenta', [
             'titulo'    => 'Mi cuenta',
@@ -457,6 +492,7 @@ final class UsuariosControlador
             'pestana'   => 'perfil',
             'pestanas'  => ['perfil' => 'Mi perfil'],
             'foto'      => $foto,
+            'fotoPublica' => $fotoPublica,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'empresa'   => null, 'fiscales' => [], 'comercio' => [], 'documentos' => [],
             'estadoDocs'=> ['estado' => 'aprobada', 'faltan' => [], 'aprobados' => 0, 'total' => 0],

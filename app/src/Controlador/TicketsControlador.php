@@ -62,12 +62,16 @@ final class TicketsControlador
             Plantilla::pagina('errores/404', ['titulo'=>'No encontrado','icono'=>'alerta','subtitulo'=>'']);
             return;
         }
+        $mensajes = $repo->mensajes($id);
         Plantilla::pagina('tickets/detalle', [
             'titulo'    => $t['folio'],
             'icono'     => 'alerta',
             'subtitulo' => $t['asunto'],
             't'         => $t,
-            'mensajes'  => $repo->mensajes($id),
+            'mensajes'  => $mensajes,
+            // La foto de cada quien: la del cliente sale de su empresa. Aquí
+            // dentro el equipo se ve entre sí aunque no la muestre al cliente.
+            'fotos'     => $repo->fotos($mensajes, $t['nombre_base_datos'] ?? null, false),
             'eventos'   => $repo->eventos($id),
             // Las plantillas se cargan aquí y no en otra pantalla: una
             // respuesta guardada que hay que ir a buscar a otro lado no se

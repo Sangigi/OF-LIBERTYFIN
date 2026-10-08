@@ -49,6 +49,8 @@ final class AyudaControlador
                                 count($repo->bandeja(['empresa'=>$emp], 500)) / $porPag)) : 1,
             'abierto'    => $abierto,
             'mensajes'   => $mensajes,
+            // La de soporte, solo si esa persona eligió mostrarla.
+            'fotos'      => $abierto ? $repo->fotos($mensajes, $_SESSION['empresa_db'] ?? null, true) : [],
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);

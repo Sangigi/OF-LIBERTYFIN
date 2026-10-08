@@ -94,6 +94,21 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
             <?php endif; ?>
           </div>
         </form>
+
+        <?php /* Solo cuentas de soporte: si el CLIENTE ve esta foto en los
+                 tickets. Se guarda al marcar, sin recargar. Nace apagada:
+                 enseñarle la foto de alguien del equipo a un cliente lo
+                 decide esa persona. */
+        if (!empty($_SESSION['plataforma'])): ?>
+          <form method="post" action="/cuenta/foto-publica" class="lf-foto-pub" data-guardar data-al-elegir>
+            <input type="hidden" name="token" value="<?= P::e($token) ?>">
+            <label class="lf-foto-pub-chk">
+              <input type="checkbox" name="publica" value="1" <?= !empty($fotoPublica) ? 'checked' : '' ?>>
+              <span><b>Mostrar mi foto a los clientes en soporte</b>
+                <small>Apagado, en los tickets ven solo tu inicial. Tu equipo siempre la ve.</small></span>
+            </label>
+          </form>
+        <?php endif; ?>
       </div>
     </section>
 

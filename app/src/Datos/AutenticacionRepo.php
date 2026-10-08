@@ -172,22 +172,78 @@ final class AutenticacionRepo
     // empresa: van aquí, en la suya. Antes "Mi cuenta" solo sabía guardar en
     // la base de una empresa y a estas cuentas les decía que no tenían una.
 
-    /** La columna `foto` se agrega sola la primera vez que hace falta. */
+    /**
+     * Las columnas `foto` y `foto_publica` se agregan solas la primera vez
+     * que hacen falta.
+     *
+     * `foto_publica`: si el CLIENTE ve la foto de esta persona en los
+     * tickets. Nace apagada: enseñarle a un cliente la foto de alguien del
+     * equipo lo decide esa persona, no el sistema.
+     */
     private function asegurarFotoPlataforma()
     {
+        static $listo = false;
+        if ($listo) return true;
         try {
             $st = $this->principal->query("
-                SELECT COUNT(*) FROM information_schema.COLUMNS
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS
                 WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios_plataforma'
-                  AND COLUMN_NAME = 'foto'");
-            if (!(int)$st->fetchColumn()) {
+                  AND COLUMN_NAME IN ('foto','foto_publica')");
+            $hay = $st->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('foto', $hay, true)) {
                 $this->principal->exec("ALTER TABLE usuarios_plataforma ADD COLUMN foto VARCHAR(255) NULL AFTER email");
             }
-            return true;
+            if (!in_array('foto_publica', $hay, true)) {
+                $this->principal->exec("ALTER TABLE usuarios_plataforma
+                                        ADD COLUMN foto_publica TINYINT(1) NOT NULL DEFAULT 0 AFTER foto");
+            }
+            return $listo = true;
         } catch (\Throwable $e) {
             error_log('[LibertyFin] foto de plataforma: ' . $e->getMessage());
             return false;
         }
+    }
+
+    /** ¿El cliente ve la foto de esta persona en los tickets? */
+    public function fotoPublicaPlataforma($id)
+    {
+        if (!$this->asegurarFotoPlataforma()) return false;
+        try {
+            $st = $this->principal->prepare("SELECT foto_publica FROM usuarios_plataforma WHERE id = ?");
+            $st->execute([(int)$id]);
+            return (bool)$st->fetchColumn();
+        } catch (\Throwable $e) { return false; }
+    }
+
+    public function guardarFotoPublica($id, $si)
+    {
+        if (!$this->asegurarFotoPlataforma()) {
+            throw new \RuntimeException('No se pudo preparar la tabla de cuentas de plataforma');
+        }
+        $this->principal->prepare("UPDATE usuarios_plataforma SET foto_publica = ? WHERE id = ?")
+                        ->execute([$si ? 1 : 0, (int)$id]);
+        return true;
+    }
+
+    /**
+     * Fotos de varias cuentas de plataforma: [id => ['foto', 'publica']].
+     * Para los tickets, donde cada mensaje lleva la foto de quien lo escribió.
+     */
+    public function fotosPlataforma(array $ids)
+    {
+        $ids = array_values(array_unique(array_filter(array_map('intval', $ids))));
+        if (!$ids || !$this->asegurarFotoPlataforma()) return [];
+        try {
+            $st = $this->principal->prepare("
+                SELECT id, COALESCE(foto,'') AS foto, foto_publica FROM usuarios_plataforma
+                WHERE id IN (" . implode(',', array_fill(0, count($ids), '?')) . ")");
+            $st->execute($ids);
+            $r = [];
+            foreach ($st->fetchAll() as $f) {
+                $r[(int)$f['id']] = ['foto' => (string)$f['foto'], 'publica' => (bool)$f['foto_publica']];
+            }
+            return $r;
+        } catch (\Throwable $e) { return []; }
     }
 
     public function fotoPlataforma($id)
