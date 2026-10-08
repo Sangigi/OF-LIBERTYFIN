@@ -165,6 +165,69 @@ final class AutenticacionRepo
         }
     }
 
+    // ── Mi cuenta, para una cuenta de plataforma ──
+    //
+    // Soporte, validación y superadmin no pertenecen a ninguna empresa, así
+    // que su foto y su contraseña no pueden ir en la tabla `usuarios` de una
+    // empresa: van aquí, en la suya. Antes "Mi cuenta" solo sabía guardar en
+    // la base de una empresa y a estas cuentas les decía que no tenían una.
+
+    /** La columna `foto` se agrega sola la primera vez que hace falta. */
+    private function asegurarFotoPlataforma()
+    {
+        try {
+            $st = $this->principal->query("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios_plataforma'
+                  AND COLUMN_NAME = 'foto'");
+            if (!(int)$st->fetchColumn()) {
+                $this->principal->exec("ALTER TABLE usuarios_plataforma ADD COLUMN foto VARCHAR(255) NULL AFTER email");
+            }
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] foto de plataforma: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    public function fotoPlataforma($id)
+    {
+        if (!$this->asegurarFotoPlataforma()) return '';
+        try {
+            $st = $this->principal->prepare("SELECT COALESCE(foto,'') FROM usuarios_plataforma WHERE id = ?");
+            $st->execute([(int)$id]);
+            return (string)$st->fetchColumn();
+        } catch (\Throwable $e) { return ''; }
+    }
+
+    public function guardarFotoPlataforma($id, $ruta)
+    {
+        if (!$this->asegurarFotoPlataforma()) {
+            throw new \RuntimeException('No se pudo preparar la tabla de cuentas de plataforma');
+        }
+        $this->principal->prepare("UPDATE usuarios_plataforma SET foto = ? WHERE id = ?")
+                        ->execute([$ruta ?: null, (int)$id]);
+        return true;
+    }
+
+    /** Las mismas reglas que en una empresa: ver UsuarioRepo::cambiarClave. */
+    public function cambiarClavePlataforma($id, $actual, $nueva)
+    {
+        $st = $this->principal->prepare("SELECT username, password FROM usuarios_plataforma WHERE id = ?");
+        $st->execute([(int)$id]);
+        $u = $st->fetch();
+        if (!$u || !password_verify((string)$actual, (string)$u['password'])) {
+            throw new \InvalidArgumentException('La contraseña actual no es correcta');
+        }
+        UsuarioRepo::revisarClave($nueva, $u['username']);
+        if (password_verify((string)$nueva, (string)$u['password'])) {
+            throw new \InvalidArgumentException('La nueva contraseña es igual a la anterior');
+        }
+        $this->principal->prepare("UPDATE usuarios_plataforma SET password = ? WHERE id = ?")
+                        ->execute([password_hash($nueva, PASSWORD_DEFAULT), (int)$id]);
+        return true;
+    }
+
     /** Busca en la tabla de plataforma. Se consulta ANTES que las empresas. */
     public function usuarioPlataforma($identificador)
     {

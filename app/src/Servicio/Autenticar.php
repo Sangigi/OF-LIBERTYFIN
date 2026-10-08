@@ -225,6 +225,9 @@ final class Autenticar
         $_SESSION['user_agent']     = $_SERVER['HTTP_USER_AGENT'] ?? '';
         // Sin empresa: es la marca de que estas claves NO deben existir.
         unset($_SESSION['empresa_db'], $_SESSION['empresa_id'], $_SESSION['sucursal_id']);
+        // Su foto vive en su propia tabla (ver Mi cuenta).
+        unset($_SESSION['lf_foto']);
+        if (!empty($u['foto'])) $_SESSION['lf_foto'] = $u['foto'];
 
 
         // Los interruptores globales se leen UNA vez al entrar y viven en

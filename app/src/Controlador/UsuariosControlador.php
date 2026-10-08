@@ -314,15 +314,23 @@ final class UsuariosControlador
 
     public function cambiarClave()
     {
-        if (empty($_SESSION['empresa_db'])) {
+        // Soporte, validación y superadmin no tienen empresa: su cuenta vive
+        // en la base principal y ahí se cambia.
+        $plataforma = empty($_SESSION['empresa_db']) && !empty($_SESSION['plataforma']);
+        if (empty($_SESSION['empresa_db']) && !$plataforma) {
             $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
         }
-        $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta');
         try {
-            (new UsuarioRepo($db))->cambiarClave(
-                (int)($_SESSION['usuario_id'] ?? 0),
-                $_POST['actual'] ?? '', $_POST['nueva'] ?? '');
+            if ($plataforma) {
+                $this->cuentasPlataforma()->cambiarClavePlataforma(
+                    (int)($_SESSION['usuario_id'] ?? 0),
+                    $_POST['actual'] ?? '', $_POST['nueva'] ?? '');
+            } else {
+                (new UsuarioRepo(Conexion::de($_SESSION['empresa_db'])))->cambiarClave(
+                    (int)($_SESSION['usuario_id'] ?? 0),
+                    $_POST['actual'] ?? '', $_POST['nueva'] ?? '');
+            }
 
             // Se cierra la sesión a propósito: si alguien cambió la
             // contraseña porque sospecha que se la sabían, dejar la sesión
@@ -372,24 +380,33 @@ final class UsuariosControlador
     /** Foto de perfil. Cada quien la suya, sin pedir permiso a nadie. */
     public function guardarFoto()
     {
-        if (empty($_SESSION['empresa_db'])) {
+        // Una cuenta de plataforma guarda su foto en la base principal.
+        $plataforma = empty($_SESSION['empresa_db']) && !empty($_SESSION['plataforma']);
+        if (empty($_SESSION['empresa_db']) && !$plataforma) {
             $this->volver('/cuenta', 'Esa acción es de una empresa y tu cuenta no pertenece a ninguna.', 'error');
         }
-        $db = Conexion::de($_SESSION['empresa_db']);
         $this->token('/cuenta');
-        $repo = new UsuarioRepo($db);
-        $id   = (int)($_SESSION['usuario_id'] ?? 0);
+        $id = (int)($_SESSION['usuario_id'] ?? 0);
+        if ($plataforma) {
+            $cp = $this->cuentasPlataforma();
+            $leer    = function () use ($cp, $id) { return $cp->fotoPlataforma($id); };
+            $guardar = function ($ruta) use ($cp, $id) { return $cp->guardarFotoPlataforma($id, $ruta); };
+        } else {
+            $repo = new UsuarioRepo(Conexion::de($_SESSION['empresa_db']));
+            $leer    = function () use ($repo, $id) { return $repo->foto($id); };
+            $guardar = function ($ruta) use ($repo, $id) { return $repo->guardarFoto($id, $ruta); };
+        }
         try {
             if (!empty($_POST['quitar'])) {
-                $antes = $repo->foto($id);
-                $repo->guardarFoto($id, '');
+                $antes = $leer();
+                $guardar('');
                 unset($_SESSION['lf_foto']);
                 if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
                 $this->volver('/cuenta', 'Foto quitada.', 'ok');
             }
-            $antes = $repo->foto($id);
+            $antes = $leer();
             $ruta  = \LibertyFin\Servicio\Archivos::imagen($_FILES['foto'] ?? [], 'perfil');
-            $repo->guardarFoto($id, $ruta);
+            $guardar($ruta);
             $_SESSION['lf_foto'] = $ruta;
             if ($antes) \LibertyFin\Servicio\Archivos::borrar($antes);
             $this->volver('/cuenta', 'Foto actualizada.', 'ok');
@@ -419,16 +436,27 @@ final class UsuariosControlador
         header('Location: /'); exit;
     }
 
+    /** Las cuentas de plataforma viven en la base principal. */
+    private function cuentasPlataforma()
+    {
+        return new \LibertyFin\Datos\AutenticacionRepo(Conexion::de($GLOBALS['lf_bd_principal'] ?? ''));
+    }
+
     /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
     private function miCuentaPlataforma()
     {
+        $foto = '';
+        if (!empty($_SESSION['plataforma'])) {
+            try { $foto = $this->cuentasPlataforma()->fotoPlataforma((int)($_SESSION['usuario_id'] ?? 0)); }
+            catch (\Throwable $e) { $foto = ''; }
+        }
         Plantilla::pagina('usuarios/cuenta', [
             'titulo'    => 'Mi cuenta',
             'icono'     => 'cliente',
             'subtitulo' => 'Mi perfil',
             'pestana'   => 'perfil',
             'pestanas'  => ['perfil' => 'Mi perfil'],
-            'foto'      => '',
+            'foto'      => $foto,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'empresa'   => null, 'fiscales' => [], 'comercio' => [], 'documentos' => [],
             'estadoDocs'=> ['estado' => 'aprobada', 'faltan' => [], 'aprobados' => 0, 'total' => 0],
