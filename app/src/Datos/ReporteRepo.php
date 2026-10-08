@@ -106,6 +106,21 @@ final class ReporteRepo extends Repo
         $anteriores = $conAnteriores ? $this->deAnteriores($desde, $hasta)
                                      : ['monto' => 0, 'cobros' => 0, 'ventas' => 0];
 
+        // LO QUE TODAVÍA DEBEN LAS VENTAS DEL PERIODO.
+        //
+        // Se calculaba como "facturado − cobrado", pero el cobrado es por
+        // fecha de pago e incluye los abonos de ventas de meses anteriores:
+        // en octubre de 2026 entraron $4,500 de ventas de agosto, la resta
+        // daba negativo y la pantalla decía "quedan $0.00 sin cobrar"
+        // cuando una venta del mes debía $900. Ahora es el saldo de cada
+        // venta del periodo, con todo lo que se le ha cobrado.
+        $porCobrar = (float)$this->valor("
+            SELECT COALESCE(SUM(GREATEST(v.total - COALESCE(pg.cobrado,0), 0)),0)
+            FROM ventas v
+            LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
+                        WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+            WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?", [$a, $b]);
+
         return [
             'de_anteriores'        => round((float)$anteriores['monto'], 2),
             'de_anteriores_cobros' => (int)$anteriores['cobros'],
@@ -113,7 +128,7 @@ final class ReporteRepo extends Repo
             'de_anteriores_liquidadas' => (int)($anteriores['liquidadas'] ?? 0),
             'cobrado'    => $cobrado,
             'vendido'    => $vendido,
-            'por_cobrar' => max(0, $vendido - $cobrado),
+            'por_cobrar' => round($porCobrar, 2),
             'iva'        => $iva,
             'operacion'  => $operacion,
             'generales'  => $generales,

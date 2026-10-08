@@ -99,9 +99,10 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         <?= (int)$r['de_anteriores_cobros'] ?> cobro<?= $r['de_anteriores_cobros'] == 1 ? '' : 's' ?>
         de <?= (int)$r['de_anteriores_ventas'] ?> venta<?= $r['de_anteriores_ventas'] == 1 ? '' : 's' ?>
         <?= P::e($deAntes) ?>: anticipos, abonos y liquidaciones que llegaron en este periodo<?php
-        if (!empty($r['de_anteriores_liquidadas'])): ?>; con ellos quedaron pagadas
+        if (!empty($r['de_anteriores_liquidadas'])): $liq1 = $r['de_anteriores_liquidadas'] == 1; ?>;
+        con ellos <?= $liq1 ? 'quedó pagada' : 'quedaron pagadas' ?>
         <b><?= (int)$r['de_anteriores_liquidadas'] ?></b>
-        venta<?= $r['de_anteriores_liquidadas'] == 1 ? '' : 's' ?><?php endif; ?>.
+        venta<?= $liq1 ? '' : 's' ?><?php endif; ?>.
         <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
            data-ir-pestana="pagos">Ver cuáles</a>
       </p>
@@ -200,9 +201,9 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
     El margen es lo que queda después de gastos y comisiones. Un área con mucho
     cobrado y margen bajo está trabajando para pagar comisiones.
     <?php if ($hayAnt): ?>
-      <br>«De ventas anteriores» es lo que entró en el periodo por anticipos y abonos de
-      ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta. No suma al
-      margen, que es de las ventas del periodo.
+      <br>«De ventas anteriores» es lo que entró en el periodo por anticipos, abonos y
+      liquidaciones de ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta.
+      No suma al margen, que es de las ventas del periodo.
       <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
          data-ir-pestana="pagos">Ver cada cobro</a>
     <?php endif; ?>
