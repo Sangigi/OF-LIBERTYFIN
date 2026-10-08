@@ -277,7 +277,7 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
             <td data-label="Estado">
               <div class="lf-lote-estado">
                 <span class="lf-lote-motivo"><?= $fijo ? P::e($fijo) : 'Lista' ?></span>
-                <?php /* Con dos o más personas, a quiénes lleva esta venta (lo pinta el script). */ ?>
+                <?php /* Con dos o más personas, quiénes van en esta venta. Solo se lee; lo pinta el script. */ ?>
                 <div class="lf-lote-para" hidden></div>
                 <?php /* Lo que se envía de "a quiénes": lo llena el script. */ ?>
                 <div class="lf-lote-datos" hidden></div>
@@ -678,25 +678,21 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
     return i;
   }
 
-  /* Los chips de la venta: quiénes van en ella. Tocar uno quita o pone a
-     esa persona solo en esta venta. Salen con dos o más personas. */
+  /* Quiénes van en esta venta, para verlo de un vistazo sin seleccionar a
+     cada persona. Solo se lee: se cambia tocando la tarjeta de la persona.
+     Antes eran chips que también editaban, y era lo mismo que la tarjeta
+     por otro camino. Sale con dos o más personas. */
   function pintarPara(tr, rs) {
     var box = tr.querySelector('.lf-lote-para');
     box.innerHTML = '';
-    var aplican = rs.filter(function (r) { return r.aplica; });
-    if (quienes().length < 2 || !aplican.length) { box.hidden = true; return; }
+    var van = rs.filter(function (r) { return r.libres; });
+    if (quienes().length < 2 || !van.length) { box.hidden = true; return; }
     box.hidden = false;
-    aplican.forEach(function (r) {
-      var l = document.createElement('label');
-      var c = document.createElement('input');
-      c.type = 'checkbox'; c.value = r.x.k;
-      c.setAttribute('data-para', '');
-      c.checked = !r.quitado;
-      l.title = c.checked ? 'Quitar de esta venta' : 'Poner en esta venta';
-      if (r.x.k === activa) l.className = 'yo';
-      l.appendChild(c);
-      l.appendChild(document.createTextNode(r.x.corto + (r.x.en ? ' · ' + r.x.enTexto : '')));
-      box.appendChild(l);
+    van.forEach(function (r) {
+      var s = document.createElement('span');
+      s.textContent = r.x.corto;
+      if (r.x.k === activa) s.className = 'yo';
+      box.appendChild(s);
     });
   }
 
@@ -742,9 +738,6 @@ $clave = function ($area) { return mb_strtolower(trim((string)$area)); };
       revisar();
     } else if (t.matches('.lf-lote-sel')) {
       marcarVenta(t.closest('tr'), t.checked);
-      revisar();
-    } else if (t.matches('input[data-para]')) {
-      fuera[ventaId(t.closest('tr')) + ':' + t.value] = !t.checked;
       revisar();
     } else if (t.matches('input[data-prod]')) {
       // Cambiar los productos de una venta puede cambiar si se puede o no.

@@ -2944,16 +2944,12 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   .lf-lote-quien label.pct{flex:1 1 auto}
   .lf-lote-mas{padding:0 14px 16px}
 }
-/* A quiénes lleva cada venta: chips que se apagan para quitar a alguien solo de esa venta. */
+/* Quiénes van en cada venta: solo se lee; se cambia desde la tarjeta de la persona. */
 .lf-lote-estado{display:flex;flex-direction:column;gap:6px;align-items:flex-start}
-.lf-lote-para{display:flex;flex-wrap:wrap;gap:5px}
-.lf-lote-para label{display:inline-flex;align-items:center;gap:5px;margin:0;padding:3px 9px 3px 7px;
-  border:1px solid var(--lf-linea);border-radius:999px;font-size:11.5px;font-weight:500;
-  color:var(--lf-tinta-2);background:var(--lf-sup);cursor:pointer;white-space:nowrap;user-select:none}
-.lf-lote-para label:has(input:checked){border-color:var(--lf-brand);background:var(--lf-brand-soft);color:var(--lf-brand-2)}
-.lf-lote-para label:has(input:not(:checked)){text-decoration:line-through;opacity:.6}
-.lf-lote-para input{width:13px;height:13px;margin:0;accent-color:var(--lf-brand)}
-@media(max-width:760px){ .lf-lote-estado{align-items:flex-end} .lf-lote-para{justify-content:flex-end} }
+.lf-lote-para{font-size:11px;color:var(--lf-tinta-4);line-height:1.4}
+.lf-lote-para span + span::before{content:" · "}
+.lf-lote-para span.yo{color:var(--lf-brand-2);font-weight:700}
+@media(max-width:760px){ .lf-lote-estado{align-items:flex-end} .lf-lote-para{text-align:right} }
 /* La tarjeta de cada persona: tocarla la selecciona para elegir sus ventas. */
 .lf-lote-quienes .lf-lote-quien:hover{border-color:color-mix(in srgb,var(--lf-brand) 45%,var(--lf-linea))}
 .lf-lote-quienes .lf-lote-quien.activa{border-color:var(--lf-brand);background:var(--lf-brand-soft);
@@ -2976,5 +2972,5 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-lote-tabla.modo-persona tbody td:first-child{background:color-mix(in srgb,var(--lf-brand) 7%,transparent)}
 .lf-lote-tabla.modo-persona tr.mia td{background:color-mix(in srgb,var(--lf-brand) 5%,transparent)}
 .lf-lote-tabla.modo-persona tr.ajena{opacity:.45}
-.lf-lote-para label.yo{box-shadow:0 0 0 2px var(--lf-brand)}
+
 @media(max-width:760px){ .lf-lote-modo{margin:0 14px 12px;top:4px} }
