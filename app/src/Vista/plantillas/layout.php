@@ -48,8 +48,17 @@ $marca = $_SESSION['lf_marca_color'] ?? '';
 if (preg_match('/^#[0-9a-fA-F]{6}$/', (string)$marca)): ?>
 <style>:root{--lf-brand:<?= $marca ?>}</style>
 <?php endif; ?>
+<?php
+// El chat de soporte: conversaciones en vivo, avisos de respuesta y el
+// chat flotante del cliente. Va con `defer` y su fecha, como la hoja.
+$chatJs = __DIR__ . '/../../../public/assets/js/lf-chat.js';
+if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
+// Quien puede abrir reportes (el cliente) recibe los avisos y el chat.
+$lfAyuda = !empty($_SESSION['empresa_db']) && \LibertyFin\Dominio\Permisos::puede('abrir.ticket');
+?>
+<script src="/assets/js/lf-chat.js?v=<?= is_file($chatJs) ? filemtime($chatJs) : '1' ?>" defer></script>
 </head>
-<body>
+<body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>">
 <div class="lf-app">
   <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
   <div class="lf-main">

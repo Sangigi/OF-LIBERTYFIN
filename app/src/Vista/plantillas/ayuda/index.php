@@ -27,7 +27,10 @@ $comoVa = [
   <a class="btn btn-secondary btn-sm" href="/ayuda">Volver a mis reportes</a>
 </div>
 
-<section class="card">
+<?php /* La conversación es un chat en vivo: lo nuevo aparece solo y se
+         contesta sin recargar (ver assets/js/lf-chat.js). */ ?>
+<section class="card" data-lf-chat="/ayuda/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="cliente"
+         data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
   <header class="card-header">
     <div><span><?= P::e($t['asunto']) ?></span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:3px;font-weight:400;
@@ -36,9 +39,9 @@ $comoVa = [
     <span class="badge <?= $comoVa[$t['estado']][1] ?? 'bg-secondary' ?>">
       <?= P::e($comoVa[$t['estado']][0] ?? $t['estado']) ?></span>
   </header>
-  <div class="card-body">
+  <div class="card-body lf-chat-lista" data-lf-lista>
     <?php if (!$mensajes): ?>
-      <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:22px">
+      <p data-lf-vacio style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:22px">
         Todavía no hay mensajes en este reporte.</p>
     <?php endif; ?>
     <?php foreach ($mensajes as $m):
@@ -46,7 +49,7 @@ $comoVa = [
       // un mensaje de soporte salía como "Tú".
       $mio  = T::esMio($m);
       $foto = $fotos[(int)$m['id']] ?? ''; ?>
-      <div class="lf-msj">
+      <div class="lf-msj<?= $mio ? ' mio' : '' ?>" data-id="<?= (int)$m['id'] ?>">
         <span class="lf-av <?= $mio ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
               <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
         <div class="cuerpo">
@@ -85,19 +88,25 @@ $comoVa = [
 
   <?php if ($t['estado'] !== 'cerrado'): ?>
   <div class="card-body" style="border-top:1px solid var(--lf-linea)">
-    <form method="post" action="/ayuda/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data">
+    <form method="post" action="/ayuda/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
+          data-lf-enviar>
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
                 placeholder="Agrega algo al reporte"></textarea>
-      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:12px">
-        <input type="file" name="adjunto" style="font-size:11.5px;flex:1 1 150px;min-width:0;max-width:100%"
-               accept="image/png,image/jpeg,image/webp,application/pdf">
+      <div class="lf-resp-pie">
+        <span class="lf-file">
+          <input type="file" name="adjunto" id="adjResp"
+                 accept="image/png,image/jpeg,image/webp,application/pdf">
+          <label class="bt" for="adjResp">Adjuntar evidencia</label>
+          <span class="n" data-vacio="Imagen o PDF, opcional">Imagen o PDF, opcional</span>
+        </span>
         <button class="btn btn-primary" type="submit">Enviar</button>
       </div>
     </form>
   </div>
   <?php endif; ?>
 </section>
+<script>window.LFChat && LFChat.enlazar(document);</script>
 
 <?php else: ?>
 

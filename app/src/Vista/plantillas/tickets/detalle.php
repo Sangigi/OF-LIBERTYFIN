@@ -57,18 +57,22 @@ document.addEventListener('click', function(ev){
 
 <div class="lf-split">
   <div>
-    <section class="card">
+    <?php /* Chat en vivo: lo que escriba el cliente aparece solo, y la
+             respuesta se envía sin recargar (ver assets/js/lf-chat.js). */ ?>
+    <section class="card" data-lf-chat="/tickets/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="soporte"
+             data-lf-form="#formResp"
+             data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
       <header class="card-header">
         <div><span>Conversación</span>
           <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
             <?php $pub = 0; foreach ($mensajes as $x) if (empty($x['interno'])) $pub++; ?>
-            <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente</p></div>
+            <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente · se actualiza sola</p></div>
       </header>
-      <div class="card-body">
+      <div class="card-body lf-chat-lista" data-lf-lista>
         <?php foreach ($mensajes as $m):
           $foto = $fotos[(int)$m['id']] ?? '';
           $deCliente = ($m['autor_tipo'] ?? '') === 'empresa'; ?>
-          <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?>">
+          <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?>" data-id="<?= (int)$m['id'] ?>">
             <span class="lf-av <?= $m['interno'] ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
                   <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
             <div class="cuerpo">
@@ -95,7 +99,8 @@ document.addEventListener('click', function(ev){
     <section class="card">
       <header class="card-header">Responder</header>
       <div class="card-body">
-        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data">
+        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
+              id="formResp" data-lf-enviar>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <?php if ($plantillas): ?>
             <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px;align-items:center">
@@ -108,12 +113,16 @@ document.addEventListener('click', function(ev){
           <?php endif; ?>
           <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="4" required
                     placeholder="Qué encontraste y qué tiene que hacer"></textarea>
-          <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px">
-            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;cursor:pointer">
+          <div class="lf-resp-pie">
+            <label class="lf-resp-interno">
               <input type="checkbox" name="interno" value="1"> Nota interna
             </label>
-            <input type="file" name="adjunto" style="font-size:11.5px;flex:1 1 150px;min-width:0;max-width:100%"
-                   accept="image/png,image/jpeg,image/webp,application/pdf">
+            <span class="lf-file">
+              <input type="file" name="adjunto" id="adjResp"
+                     accept="image/png,image/jpeg,image/webp,application/pdf">
+              <label class="bt" for="adjResp">Adjuntar evidencia</label>
+              <span class="n" data-vacio="Imagen o PDF, opcional">Imagen o PDF, opcional</span>
+            </span>
             <button class="btn btn-primary" type="submit">Enviar</button>
           </div>
           <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:11px;line-height:1.5">
@@ -254,3 +263,4 @@ document.addEventListener('click', function(ev){
     <?php endif; ?>
   </div>
 </div>
+<script>window.LFChat && LFChat.enlazar(document);</script>

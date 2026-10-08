@@ -170,6 +170,36 @@ final class TicketsControlador
         }
     }
 
+    /**
+     * EL CHAT · los mensajes nuevos de un ticket, para soporte (JSON).
+     * Incluye las notas internas: aquí sí se ven.
+     */
+    public function mensajes($id)
+    {
+        $repo = new TicketRepo($this->principal());
+        $t = $repo->uno($id);
+        if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no existe.'], 404);
+        $nuevos = $repo->mensajesDesde($id, Peticion::entero('desde'), true);
+        $fotos  = $nuevos ? $repo->fotos($nuevos, $t['nombre_base_datos'] ?? null, false) : [];
+        $this->json([
+            'ok'       => true,
+            'estado'   => $t['estado'],
+            'cerrado'  => $t['estado'] === 'cerrado',
+            'mensajes' => array_map(function ($m) use ($fotos) {
+                return TicketRepo::aJson($m, $fotos, 'soporte');
+            }, $nuevos),
+        ]);
+    }
+
+    private function json(array $datos, $codigo = 200)
+    {
+        http_response_code($codigo);
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store');
+        echo json_encode($datos, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
     private function principal() { return Conexion::de($GLOBALS['lf_bd_principal'] ?? ''); }
 
     private function token()
@@ -180,6 +210,10 @@ final class TicketsControlador
 
     private function a($ruta, $texto, $tipo)
     {
+        // Enviado desde el chat (sin recargar): JSON y sin aviso en la sesión.
+        if (($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1') {
+            $this->json(['ok' => $tipo === 'ok', 'mensaje' => $texto]);
+        }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: ' . $ruta); exit;
     }

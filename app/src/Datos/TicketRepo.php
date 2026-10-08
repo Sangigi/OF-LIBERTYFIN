@@ -108,22 +108,119 @@ final class TicketRepo
         // y los ids se repiten. Sin esto, al cliente un mensaje de soporte
         // podía salirle como "Tú", y no había forma de saber de quién era la
         // foto. Los mensajes viejos quedan en NULL: sin foto y como antes.
-        static $tipo = false;
-        if (!$tipo) {
+        //
+        // Y en el ticket:
+        //   creado_tipo    quién lo abrió (igual que autor_tipo): para avisarle
+        //                  a ESA persona cuando soporte conteste.
+        //   visto_cliente  el último mensaje que el cliente ya vio. Lo que
+        //                  soporte escriba después es una novedad: se le avisa
+        //                  dentro de la plataforma y se le abre el chat.
+        static $columnas = false;
+        if (!$columnas) {
             try {
                 $st = $this->db->query("
-                    SELECT COUNT(*) FROM information_schema.COLUMNS
-                    WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'ticket_mensajes'
-                      AND COLUMN_NAME = 'autor_tipo'");
-                if (!(int)$st->fetchColumn()) {
+                    SELECT CONCAT(TABLE_NAME, '.', COLUMN_NAME) FROM information_schema.COLUMNS
+                    WHERE TABLE_SCHEMA = DATABASE()
+                      AND ((TABLE_NAME = 'ticket_mensajes' AND COLUMN_NAME = 'autor_tipo')
+                        OR (TABLE_NAME = 'tickets' AND COLUMN_NAME IN ('creado_tipo','visto_cliente')))");
+                $hay = $st->fetchAll(PDO::FETCH_COLUMN);
+                if (!in_array('ticket_mensajes.autor_tipo', $hay, true)) {
                     $this->db->exec("ALTER TABLE ticket_mensajes
                                      ADD COLUMN autor_tipo VARCHAR(12) NULL AFTER autor_nombre");
                 }
-                $tipo = true;
+                if (!in_array('tickets.creado_tipo', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets ADD COLUMN creado_tipo VARCHAR(12) NULL AFTER creado_nombre");
+                }
+                if (!in_array('tickets.visto_cliente', $hay, true)) {
+                    $this->db->exec("ALTER TABLE tickets ADD COLUMN visto_cliente INT NOT NULL DEFAULT 0");
+                }
+                $columnas = true;
             } catch (\Throwable $e) {
-                error_log('[LibertyFin] ticket_mensajes.autor_tipo: ' . $e->getMessage());
+                error_log('[LibertyFin] columnas de tickets: ' . $e->getMessage());
             }
         }
+    }
+
+    // ── El chat: mensajes nuevos, visto y novedades ─────────────
+
+    /** Los mensajes de un ticket posteriores a `$desdeId`. */
+    public function mensajesDesde($ticketId, $desdeId, $conInternos)
+    {
+        $st = $this->db->prepare("
+            SELECT * FROM ticket_mensajes
+            WHERE ticket_id = ? AND id > ?" . ($conInternos ? "" : " AND interno = 0") . "
+            ORDER BY id");
+        $st->execute([(int)$ticketId, (int)$desdeId]);
+        return $st->fetchAll();
+    }
+
+    /** El cliente ya vio hasta este mensaje. Nunca retrocede. */
+    public function marcarVistoCliente($ticketId, $hastaId)
+    {
+        try {
+            $this->db->prepare("UPDATE tickets SET visto_cliente = GREATEST(visto_cliente, ?) WHERE id = ?")
+                     ->execute([(int)$hastaId, (int)$ticketId]);
+        } catch (\Throwable $e) { /* sin la columna todavía: no pasa nada */ }
+    }
+
+    /**
+     * Lo que soporte le contestó a ESTA persona y todavía no ve: de los
+     * tickets que ella abrió, los mensajes de soporte (no las notas
+     * internas) posteriores a lo último que vio.
+     *
+     * @return array ['sin_leer' => n, 'tickets' => [[id, folio, asunto,
+     *               mensaje_id, autor, cuerpo, creado_en, nuevos]]]
+     */
+    public function novedadesCliente($empresaId, $usuarioId)
+    {
+        $this->asegurar();
+        try {
+            $st = $this->db->prepare("
+                SELECT t.id, t.folio, t.asunto, t.estado,
+                       m.id AS mensaje_id, m.autor_nombre AS autor, m.cuerpo, m.creado_en,
+                       x.nuevos
+                FROM tickets t
+                INNER JOIN ( SELECT mm.ticket_id, MAX(mm.id) AS ultimo, COUNT(*) AS nuevos
+                             FROM ticket_mensajes mm
+                             INNER JOIN tickets tt ON tt.id = mm.ticket_id
+                             WHERE tt.empresa_id = ? AND mm.interno = 0
+                               AND mm.autor_tipo = 'plataforma' AND mm.id > tt.visto_cliente
+                             GROUP BY mm.ticket_id ) x ON x.ticket_id = t.id
+                INNER JOIN ticket_mensajes m ON m.id = x.ultimo
+                WHERE t.empresa_id = ? AND t.creado_por = ?
+                  AND (t.creado_tipo = 'empresa' OR t.creado_tipo IS NULL)
+                ORDER BY m.id DESC
+                LIMIT 10");
+            $st->execute([(int)$empresaId, (int)$empresaId, (int)$usuarioId]);
+            $filas = $st->fetchAll();
+        } catch (\Throwable $e) {
+            return ['sin_leer' => 0, 'tickets' => []];
+        }
+        $n = 0;
+        foreach ($filas as $f) $n += (int)$f['nuevos'];
+        return ['sin_leer' => $n, 'tickets' => $filas];
+    }
+
+    /**
+     * Un mensaje listo para el chat (JSON). El texto va tal cual: quien lo
+     * pinta lo pone como texto, nunca como HTML.
+     */
+    public static function aJson(array $m, array $fotos, $quienLee)
+    {
+        $nombre = (string)($m['autor_nombre'] ?? '');
+        $mio = self::esMio($m);
+        return [
+            'id'      => (int)$m['id'],
+            'autor'   => $mio && $quienLee === 'cliente' ? 'Tú' : ($nombre !== '' ? $nombre : 'LibertyFin'),
+            'inicial' => mb_strtoupper(mb_substr(trim($nombre), 0, 1) ?: '?'),
+            'foto'    => $fotos[(int)$m['id']] ?? '',
+            'tipo'    => (string)($m['autor_tipo'] ?? ''),
+            'mio'     => $mio,
+            'interno' => !empty($m['interno']),
+            'cuerpo'  => (string)$m['cuerpo'],
+            'adjunto' => (string)($m['adjunto'] ?? ''),
+            'fecha'   => date('d/m/Y H:i', strtotime($m['creado_en'])),
+        ];
     }
 
     /** 'plataforma' (soporte, validación, superadmin) o 'empresa' (el cliente). */
@@ -220,10 +317,10 @@ final class TicketRepo
 
         $this->db->prepare("
             INSERT INTO tickets (folio, empresa_id, asunto, categoria, prioridad, estado,
-                                 creado_por, creado_nombre, creado_en)
-            VALUES (?,?,?,?,?, 'abierto', ?,?, NOW())
+                                 creado_por, creado_nombre, creado_tipo, creado_en)
+            VALUES (?,?,?,?,?, 'abierto', ?,?,?, NOW())
         ")->execute([$folio, ((int)($d['empresa_id'] ?? 0)) ?: null, $asunto, $cat, $prio,
-                     $usuarioId ?: null, $usuarioNombre]);
+                     $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
         $id = (int)$this->db->lastInsertId();
 
         $this->db->prepare("
@@ -251,12 +348,20 @@ final class TicketRepo
                      $usuarioId ?: null, $usuarioNombre, self::tipoAutor()]);
 
         // Una nota interna NO cuenta como primera respuesta: el cliente no
-        // la ve, así que para él nadie le ha contestado todavía.
-        if (!$interno && empty($t['primera_respuesta_en'])) {
+        // la ve, así que para él nadie le ha contestado todavía. Y lo que
+        // escribe el CLIENTE tampoco: antes contaba, y un ticket al que solo
+        // él le había agregado algo salía como "respondido" y "en curso".
+        $deSoporte = self::tipoAutor() === 'plataforma';
+        if (!$interno && $deSoporte && empty($t['primera_respuesta_en'])) {
             $this->db->prepare("UPDATE tickets SET primera_respuesta_en = NOW() WHERE id = ?")
                      ->execute([(int)$ticketId]);
         }
-        if (!$interno && $t['estado'] === 'abierto') {
+        if (!$interno && $deSoporte && $t['estado'] === 'abierto') {
+            $this->cambiar($ticketId, 'estado', 'en_curso', $usuarioId, $usuarioNombre);
+        }
+        // Si soporte esperaba al cliente y el cliente contestó, vuelve a
+        // ser turno de soporte.
+        if (!$deSoporte && $t['estado'] === 'esperando') {
             $this->cambiar($ticketId, 'estado', 'en_curso', $usuarioId, $usuarioNombre);
         }
         return true;
