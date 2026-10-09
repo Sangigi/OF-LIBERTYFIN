@@ -3181,7 +3181,8 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   font-size:13.5px;font-weight:600;letter-spacing:-.1px;
   transition:max-width .42s var(--lf-suave),margin .42s var(--lf-suave),opacity .25s ease}
 .lf-chat-burbuja:hover,.lf-chat-burbuja:focus-visible{transform:translateY(-3px);
-  box-shadow:0 18px 34px -10px color-mix(in srgb,var(--lf-brand) 75%,transparent),
+  /* box-shadow:0 18px 34px -10px */
+   color-mix(in srgb,var(--lf-brand) 75%,transparent),
              0 3px 8px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.3)}
 .lf-chat-burbuja:hover .lbl,.lf-chat-burbuja:focus-visible .lbl{max-width:90px;margin-left:9px;opacity:1}
 .lf-chat-burbuja:hover .ico{transform:rotate(-8deg) scale(1.05)}
