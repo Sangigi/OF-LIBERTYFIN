@@ -407,13 +407,13 @@ if (!empty($catalogo)):
            solo se pinta el botón de copiar. Un enlace a una
            ficha que no existe es peor que no ofrecer el enlace.
            ───────────────────────────────────────────────────── */ ?>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+<div style="display:flex;gap:8px;flex-wrap:wrap">
         <button type="button" class="btn btn-secondary" style="flex:1;min-width:180px"
                 data-copiar="<?= P::e($lr['barras']) ?>">
           <?= W::icono('venta','16px') ?>Copiar la referencia</button>
         <?php if (!empty($lr['liga_id'])): ?>
           <a class="btn btn-secondary" style="flex:1;min-width:180px"
-             href="/ligas/<?= (int)$lr['liga_id'] ?>/documento"
+             href="/cuenta/plan/liga/<?= (int)$lr['liga_id'] ?>/documento"
              target="_blank" rel="noopener">
             <?= W::icono('baja','16px') ?>Ver comprobante</a>
         <?php endif; ?>

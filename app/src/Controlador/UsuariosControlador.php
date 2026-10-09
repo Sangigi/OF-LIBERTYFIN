@@ -494,7 +494,7 @@ final class UsuariosControlador
         // lo que se guardó al crear la liga desde la pestaña Plan.
         // ─────────────────────────────────────────────────────
         $mia = (string)($_SESSION['empresa_nombre'] ?? '');
-        if ($mia !== '' && ($l['cliente'] ?? '') !== $mia) {
+        if ($mia !== '' && ($l['cliente_nombre'] ?? '') !== $mia) {
             $this->json(['ok' => false, 'error' => 'No es tuya'], 403);
         }
 
@@ -809,6 +809,66 @@ final class UsuariosControlador
     {
         return new \LibertyFin\Datos\AutenticacionRepo(Conexion::de($GLOBALS['lf_bd_principal'] ?? ''));
     }
+
+    /**
+ * El comprobante imprimible de un cobro de plan en efectivo en tienda.
+ * Mismo armado de plantilla que LigasControlador::documento() para que
+ * la ficha se vea idéntica: una es el cobro del plan, la otra el de la
+ * venta, pero las dos son "cómo pagar en tienda".
+ */
+public function documentoPlan($id)
+{
+    if (empty($_SESSION['empresa_id'])) {
+        http_response_code(404);
+        Plantilla::pagina('errores/404',
+            ['titulo' => 'No existe', 'icono' => 'alerta', 'subtitulo' => '']);
+        return;
+    }
+
+    $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+    $l = (new \LibertyFin\Datos\LigaRepo($principal))->porId((int)$id);
+    if (!$l) {
+        http_response_code(404);
+        Plantilla::pagina('errores/404',
+            ['titulo' => 'No existe', 'icono' => 'alerta', 'subtitulo' => '']);
+        return;
+    }
+
+    // La liga es de la empresa que la pidió. El nombre con el que se
+    // creó se guardó en `cliente_nombre`. Sin esta comprobación,
+    // cambiar el id en la URL mostraría el comprobante de otra empresa
+    // —cobro de plan ajeno, con su referencia y su monto— con solo
+    // probar números. Mismo criterio que estadoPlan().
+    $mia = (string)($_SESSION['empresa_nombre'] ?? '');
+    if ($mia !== '' && ($l['cliente_nombre'] ?? '') !== $mia) {
+        http_response_code(403);
+        Plantilla::pagina('errores/404',
+            ['titulo' => 'Sin permiso', 'icono' => 'alerta', 'subtitulo' => '']);
+        return;
+    }
+
+    $cfg = \LibertyFin\Servicio\Integraciones::de('spei') ?: [];
+
+    // Mismo armado de tiendas que LigasControlador::tiendas(): la lista
+    // depende del convenio del proveedor. Poner una fija manda gente a
+    // una cadena donde la van a rechazar.
+    $tiendas = array_filter(array_map('trim',
+        explode(',', (string)($cfg['tiendas'] ?? ''))));
+    if (!$tiendas) {
+        $tiendas = ['OXXO', '7-Eleven', 'Farmacias Guadalajara',
+                    'Farmacias Benavides', 'Circle K', 'Waldos',
+                    'Del Sol', 'Woolworth'];
+    }
+
+    Plantilla::pagina('ligas/documento', [
+        'titulo'   => 'Ficha de pago',
+        'l'        => $l,
+        'empresa'  => $_SESSION['empresa_nombre'] ?? 'LibertyFin',
+        'convenio' => trim((string)($cfg['nombre_convenio'] ?? ''))
+                      ?: ($_SESSION['empresa_nombre'] ?? 'LibertyFin'),
+        'tiendas'  => $tiendas,
+    ], 'layout-limpio');
+}
 
     /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
     private function miCuentaPlataforma()
