@@ -38,8 +38,13 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
 <?php endif; ?>
 
 
-<?php /* ═══════ MI PERFIL ═══════ */ if ($pestana === 'perfil'): ?>
-<div class="lf-split">
+<?php /* ═══════ MI PERFIL ═══════
+   `lf-perfil`: aquí las tarjetas miden lo que su contenido. Con las
+   columnas de igual altura del resto del sistema, la de la contraseña se
+   estiraba hasta el fondo de la otra columna y quedaba un cuadro enorme
+   casi vacío. */ if ($pestana === 'perfil'): ?>
+<div class="lf-split lf-perfil">
+  <div>
   <section class="card">
     <header class="card-header">Cambiar mi contraseña</header>
     <div class="card-body" style="max-width:400px">
@@ -65,6 +70,87 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
       </p>
     </div>
   </section>
+
+  <?php /* Solo cuentas de soporte: su tema y su color van con la CUENTA
+           (al entrar desde otro equipo se ven igual). El color es uno de
+           los ya probados, los mismos que una empresa elige para su marca.
+           Compacto a propósito: son dos decisiones, en dos renglones. Se
+           guarda al elegir, sin recargar. */
+  if (!empty($_SESSION['plataforma']) && isset($apariencia)):
+    $apTema = $apariencia['tema'] ?: 'light'; ?>
+  <section class="card">
+    <header class="card-header">Apariencia</header>
+    <div class="card-body">
+      <form method="post" action="/cuenta/apariencia" id="lfApariencia" class="lf-apariencia"
+            data-guardar data-al-elegir data-tema-guardado="<?= P::e($apariencia['tema']) ?>">
+        <input type="hidden" name="token" value="<?= P::e($token) ?>">
+        <div class="fila">
+          <span class="et" id="etTema">Tema</span>
+          <div class="lf-segmento" role="radiogroup" aria-labelledby="etTema">
+            <?php foreach (['light' => ['Claro', 'sol'], 'dark' => ['Oscuro', 'luna'], 'auto' => ['Automático', '']] as $k => $m): ?>
+              <label class="<?= $apTema === $k ? 'on' : '' ?>"
+                     <?= $k === 'auto' ? 'title="Claro u oscuro, igual que tu equipo"' : '' ?>>
+                <input type="radio" name="tema" value="<?= $k ?>" <?= $apTema === $k ? 'checked' : '' ?>>
+                <?= $m[1] ? W::icono($m[1], '14px') : '' ?><?= P::e($m[0]) ?>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <div class="fila">
+          <span class="et" id="etColor">Color</span>
+          <div class="lf-colores" role="radiogroup" aria-labelledby="etColor">
+            <?php foreach (W::COLORES as $c => $nombre): ?>
+              <label class="lf-color<?= $apariencia['color'] === $c ? ' on' : '' ?>"
+                     style="background:<?= $c ?>" title="<?= P::e($nombre) ?>">
+                <input type="radio" name="color" value="<?= $c ?>" aria-label="<?= P::e($nombre) ?>"
+                       <?= $apariencia['color'] === $c ? 'checked' : '' ?>>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </div>
+        <p class="nota">Solo cambia cómo lo ves tú, en cualquier equipo donde entres.
+          <?= $apariencia['color'] === '' ? 'Sin color elegido se usa el verde de LibertyFin.' : '' ?></p>
+        <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
+      </form>
+    </div>
+  </section>
+  <script>
+  (function(){
+    var f = document.getElementById('lfApariencia');
+    if (!f) return;
+    var raiz = document.documentElement;
+    // Con JavaScript se guarda al elegir: el botón sobra.
+    var b = f.querySelector('.lf-sin-js');
+    if (b) b.style.display = 'none';
+    function marcar() {
+      [].forEach.call(f.querySelectorAll('.lf-segmento label, .lf-color'), function (m) {
+        var r = m.querySelector('input');
+        m.classList.toggle('on', !!(r && r.checked));
+      });
+    }
+    /* Sin tema guardado en la cuenta, se marca el que se está viendo en
+       este navegador: si no, al elegir un color se guardaría "Claro" a
+       quien lo usa en oscuro. */
+    if (!f.getAttribute('data-tema-guardado')) {
+      var visto = raiz.hasAttribute('data-tema-auto') ? 'auto'
+                : (raiz.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
+      var r = f.querySelector('input[name=tema][value="' + visto + '"]');
+      if (r) { r.checked = true; marcar(); }
+    }
+    // Se ve al momento; el layout lo guarda por detrás (data-guardar).
+    f.addEventListener('change', function (e) {
+      var i = e.target;
+      if (i.name === 'tema') {
+        if (window.lfAplicarTema) window.lfAplicarTema(i.value);
+        try { localStorage.setItem('lf-tema', i.value); } catch (x) {}
+      }
+      if (i.name === 'color') raiz.style.setProperty('--lf-brand', i.value);
+      marcar();
+    });
+  })();
+  </script>
+  <?php endif; ?>
+  </div>
 
   <div>
     <section class="card">
@@ -111,87 +197,6 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
         <?php endif; ?>
       </div>
     </section>
-
-    <?php /* Solo cuentas de soporte: su tema y su color van con la CUENTA
-             (al entrar desde otro equipo se ven igual). El color es uno de
-             los ya probados, los mismos que una empresa elige para su
-             marca. Se guarda al elegir, sin recargar. */
-    if (!empty($_SESSION['plataforma']) && isset($apariencia)):
-      $apTema = $apariencia['tema'] ?: 'light'; ?>
-    <section class="card">
-      <header class="card-header">Apariencia</header>
-      <div class="card-body">
-        <form method="post" action="/cuenta/apariencia" id="lfApariencia" data-guardar data-al-elegir
-              data-tema-guardado="<?= P::e($apariencia['tema']) ?>">
-          <input type="hidden" name="token" value="<?= P::e($token) ?>">
-          <span class="form-label">Tema</span>
-          <div class="lf-modos lf-temas">
-            <?php foreach ([
-              'light' => ['Claro', 'Fondo blanco'],
-              'dark'  => ['Oscuro', 'Cansa menos de noche'],
-              'auto'  => ['Automático', 'Igual que tu equipo'],
-            ] as $k => $m): ?>
-              <label class="m<?= $apTema === $k ? ' on' : '' ?>">
-                <input type="radio" name="tema" value="<?= $k ?>" <?= $apTema === $k ? 'checked' : '' ?>>
-                <span><b><?= P::e($m[0]) ?></b><small><?= P::e($m[1]) ?></small></span>
-              </label>
-            <?php endforeach; ?>
-          </div>
-
-          <span class="form-label" style="display:block;margin-top:16px">Color</span>
-          <div class="lf-colores">
-            <?php foreach (W::COLORES as $c => $nombre): ?>
-              <label class="lf-color<?= $apariencia['color'] === $c ? ' on' : '' ?>"
-                     style="background:<?= $c ?>" title="<?= P::e($nombre) ?>">
-                <input type="radio" name="color" value="<?= $c ?>" aria-label="<?= P::e($nombre) ?>"
-                       <?= $apariencia['color'] === $c ? 'checked' : '' ?>>
-              </label>
-            <?php endforeach; ?>
-          </div>
-          <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:10px;line-height:1.45">
-            Los mismos colores que una empresa puede elegir para su marca.
-            <?= $apariencia['color'] === '' ? 'Sin elegir, se usa el verde de LibertyFin.' : '' ?>
-            Solo cambia cómo lo ves tú.</p>
-          <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
-        </form>
-      </div>
-    </section>
-    <script>
-    (function(){
-      var f = document.getElementById('lfApariencia');
-      if (!f) return;
-      var raiz = document.documentElement;
-      // Con JavaScript se guarda al elegir: el botón sobra.
-      var b = f.querySelector('.lf-sin-js');
-      if (b) b.style.display = 'none';
-      function marcar() {
-        [].forEach.call(f.querySelectorAll('.m, .lf-color'), function (m) {
-          var r = m.querySelector('input');
-          m.classList.toggle('on', !!(r && r.checked));
-        });
-      }
-      /* Sin tema guardado en la cuenta, se marca el que se está viendo en
-         este navegador: si no, al elegir un color se guardaría "Claro" a
-         quien lo usa en oscuro. */
-      if (!f.getAttribute('data-tema-guardado')) {
-        var visto = raiz.hasAttribute('data-tema-auto') ? 'auto'
-                  : (raiz.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
-        var r = f.querySelector('input[name=tema][value="' + visto + '"]');
-        if (r) { r.checked = true; marcar(); }
-      }
-      // Se ve al momento; el layout lo guarda por detrás (data-guardar).
-      f.addEventListener('change', function (e) {
-        var i = e.target;
-        if (i.name === 'tema') {
-          if (window.lfAplicarTema) window.lfAplicarTema(i.value);
-          try { localStorage.setItem('lf-tema', i.value); } catch (x) {}
-        }
-        if (i.name === 'color') raiz.style.setProperty('--lf-brand', i.value);
-        marcar();
-      });
-    })();
-    </script>
-    <?php endif; ?>
 
     <section class="card">
       <header class="card-header">Mis datos</header>

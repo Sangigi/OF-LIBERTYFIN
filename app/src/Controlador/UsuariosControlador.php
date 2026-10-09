@@ -545,7 +545,10 @@ final class UsuariosControlador
                         error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
                     }
 
-                    $ligaRepo->marcarPagada($l['id']);
+                    // Sin pago_id: ese campo apunta al abono de una venta y
+                    // aquí no hay venta, hay un pago de plan (ya aprobado
+                    // arriba). Omitirlo es un error fatal en PHP 8.
+                    $ligaRepo->marcarPagada($l['id'], null);
                     $this->json([
                         'ok'      => true,
                         'pagado'  => true,

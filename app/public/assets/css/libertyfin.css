@@ -3759,12 +3759,36 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
   font-size:13px;color:var(--lf-tinta-3);background:var(--lf-sup)}
 form[data-lf-ticket-cambio] select:disabled{opacity:.7}
 
-/* Mi cuenta (soporte) · Apariencia: tema en tres opciones y los colores
-   ya probados como radios (el círculo es la etiqueta; el radio no se ve,
-   pero se puede elegir con el teclado). */
-.lf-temas{flex-direction:row;flex-wrap:wrap;align-items:stretch;margin-top:6px}
-.lf-temas .m{flex:1 1 130px;width:auto}
+/* Mi cuenta · Mi perfil: cada tarjeta mide lo que su contenido. Las
+   columnas de igual altura estiraban la de la contraseña hasta el fondo
+   de la otra columna: un cuadro enorme casi vacío. */
+.lf-split.lf-perfil{align-items:start}
+.lf-split.lf-perfil > div > .card:last-child{flex:none}
+
+/* Apariencia (soporte): dos renglones, tema y color. Los radios no se
+   ven (la etiqueta es el botón), pero se eligen con el teclado. */
+.lf-apariencia{display:flex;flex-wrap:wrap;align-items:center;gap:14px 30px}
+.lf-apariencia .fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lf-apariencia .et{font-size:12.5px;font-weight:600;color:var(--lf-tinta-3);min-width:42px}
+.lf-apariencia .nota{flex-basis:100%;margin:0;font-size:11px;line-height:1.45;color:var(--lf-tinta-4)}
+.lf-apariencia [data-aviso]{flex-basis:100%;margin:0}
+.lf-segmento{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r-pill);background:var(--lf-vidrio)}
+.lf-segmento label{position:relative;display:inline-flex;align-items:center;gap:6px;margin:0;
+  padding:6px 13px;border-radius:var(--lf-r-pill);font-size:12.5px;font-weight:600;
+  color:var(--lf-tinta-3);cursor:pointer;white-space:nowrap;transition:background .15s,color .15s}
+.lf-segmento label:hover{color:var(--lf-tinta)}
+.lf-segmento label.on{background:var(--lf-sup);color:var(--lf-tinta);box-shadow:var(--lf-s1)}
+.lf-segmento label.on svg{color:var(--lf-brand)}
+.lf-segmento input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.lf-segmento label:focus-within{box-shadow:0 0 0 2px var(--lf-brand-ring)}
+.lf-apariencia .lf-colores{gap:8px}
+.lf-apariencia .lf-color{width:26px;height:26px}
 .lf-colores label.lf-color{position:relative;margin:0}
 .lf-colores label.lf-color input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
 .lf-colores label.lf-color:focus-within{box-shadow:0 0 0 2px var(--lf-sup),0 0 0 4px var(--lf-brand-ring)}
 .lf-colores label.lf-color.on:focus-within{box-shadow:0 0 0 2px var(--lf-tinta)}
+@media(max-width:420px){
+  .lf-segmento label{padding:6px 10px}
+  .lf-apariencia .et{min-width:0;flex-basis:100%}
+}

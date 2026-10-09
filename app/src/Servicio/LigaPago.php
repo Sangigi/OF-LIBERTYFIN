@@ -169,15 +169,19 @@ final class LigaPago
         return isset(self::CONSULTA[self::servicioDe($metodo)]);
     }
 
-        public static function semilla($ventaId = 0)
+        public static function semilla($ventaId = 0, $prefijo = '9')
     {
         $ventaId = (int)$ventaId;
+        // El prefijo dice DE QUÉ es el cobro: 9 una venta, 8 un pago de
+        // plan (UsuariosControlador). Antes el 8 se pasaba pero aquí no se
+        // leía: la venta 12 y el pago de plan 12 sacaban la misma semilla.
+        $prefijo = preg_match('/^[1-9]$/', (string)$prefijo) ? (string)$prefijo : '9';
         if ($ventaId > 0) {
-            // El 9 va delante para que la referencia empiece con un
+            // El prefijo va delante para que la referencia empiece con un
             // dígito distinto al de las que se generan por tiempo:
             // facilita reconocerlas en el panel del proveedor.
             return substr(
-                '9' . str_pad((string)$ventaId, 6, '0', STR_PAD_LEFT) . date('ymdHi'),
+                $prefijo . str_pad((string)$ventaId, 6, '0', STR_PAD_LEFT) . date('ymdHi'),
                 0, 9
             );
         }
