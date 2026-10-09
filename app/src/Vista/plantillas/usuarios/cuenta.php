@@ -387,9 +387,37 @@ if (!empty($catalogo)):
                alt="Código de barras" style="max-width:100%;max-height:110px">
         </div>
       <?php endif; ?>
-      <button type="button" class="btn btn-secondary" style="width:100%"
-              data-copiar="<?= P::e($lr['barras']) ?>">
-        <?= W::icono('venta','16px') ?>Copiar la referencia</button>
+
+      <?php /* ─────────────────────────────────────────────────────
+           COPIAR LA REFERENCIA O VER EL COMPROBANTE
+
+           El comprobante es la ficha que se imprime o se le manda
+           al cliente: trae el código de barras, la referencia
+           escrita por si el escáner falla, los pasos y la lista de
+           tiendas donde se puede pagar. Es lo mismo que da la
+           Caja cuando cobra en efectivo en tienda.
+
+           El enlace apunta a `/ligas/<liga_id>/documento`, que es
+           la fila del directorio de ligas. Ese id viaja en la
+           sesión porque el controlador lo captura al crear la
+           liga: el `pago_id` de esta misma sesión es de otra
+           tabla y no serviría.
+
+           Si el id no llegó —porque la liga no se pudo guardar—
+           solo se pinta el botón de copiar. Un enlace a una
+           ficha que no existe es peor que no ofrecer el enlace.
+           ───────────────────────────────────────────────────── */ ?>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-secondary" style="flex:1;min-width:180px"
+                data-copiar="<?= P::e($lr['barras']) ?>">
+          <?= W::icono('venta','16px') ?>Copiar la referencia</button>
+        <?php if (!empty($lr['liga_id'])): ?>
+          <a class="btn btn-secondary" style="flex:1;min-width:180px"
+             href="/ligas/<?= (int)$lr['liga_id'] ?>/documento"
+             target="_blank" rel="noopener">
+            <?= W::icono('baja','16px') ?>Ver comprobante</a>
+        <?php endif; ?>
+      </div>
 
     <?php else: ?>
       <p style="font-size:13px;color:var(--lf-rojo);line-height:1.55">
