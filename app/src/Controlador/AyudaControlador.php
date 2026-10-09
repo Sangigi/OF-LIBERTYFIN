@@ -125,8 +125,12 @@ final class AyudaControlador
                     \LibertyFin\Servicio\Push::aSoporte($nuevoT, true);
                 });
             }
+            // Directo a SU conversación: ahí ve su primer mensaje y puede
+            // agregar algo. Antes volvía a la lista y parecía que el reporte
+            // no tenía chat.
             $this->a('Listo, tu reporte quedó con el folio ' . $r['folio']
-                . '. Te avisamos por correo en cuanto lo veamos.', 'ok');
+                . '. Te contestamos aquí mismo; si cierras esta pantalla, te avisamos cuando respondamos.',
+                'ok', $r['id']);
         } catch (\InvalidArgumentException $e) {
             // Si el reporte no se creó, el archivo subido sobra.
             if ($adjunto) \LibertyFin\Servicio\Archivos::borrar($adjunto);
