@@ -503,6 +503,27 @@ final class PagosEntrantesControlador
 
                 // ─────────────────────────────────────────────────
                 // AVISO DE PAGO CONFIRMADO
+                //
+                // El destinatario es el correo del usuario que CREÓ la
+                // liga, guardado en `ligas.usuario_correo` cuando el
+                // admin estaba logueado en la pestaña Plan. Aquí no hay
+                // sesión —el proveedor pega sin cookies—, así que la
+                // única forma de tener ese correo es haberlo persistido
+                // al crear la liga (ver UsuariosControlador::generarLigaPlan).
+                //
+                // Es el correo correcto y no el del expediente de la
+                // empresa por una razón: quien contrató el plan es quien
+                // tiene que enterarse de que quedó activo. El correo del
+                // expediente puede ser del contador o del titular, que ni
+                // saben que se pidió un plan nuevo.
+                //
+                // Fallback: si la liga es vieja y no trae `usuario_correo`,
+                // se intenta `email_admin` del retorno de aprobarPorPago.
+                // Si tampoco, se apunta en el log y ya.
+                //
+                // Envuelto en su propio try/catch: el pago YA quedó
+                // aprobado. Un SMTP caído no puede hacer que le
+                // contestemos 500 al proveedor por un correo que no salió.
                 // ─────────────────────────────────────────────────
                 $destino = (string)($l['usuario_correo'] ?? '');
                 if ($destino === '') {
