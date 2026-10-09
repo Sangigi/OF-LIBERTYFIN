@@ -3509,3 +3509,13 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   transition:opacity .2s ease,transform .3s var(--lf-suave)}
 .lf-ir-abajo.ver{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){ .lf-ir-abajo{transition:none} }
+/* El alto exacto lo pone lf-chat.js (lo que queda de pantalla). Que la
+   lista no "arrastre" a la página al llegar a su principio o a su fin. */
+.lf-chat-ventana{overscroll-behavior:contain}
+/* Con la ventana de chat, el panel no necesita su alto mínimo de pantalla
+   completa (la ventana ya la llena): ese mínimo, más el margen de arriba,
+   dejaba siempre unos píxeles de página que desplazar. */
+.lf-main:has(.lf-chat-ventana){min-height:0}
+/* Y menos aire debajo de la ventana: que llegue casi al borde, como una app. */
+.lf-cont:has(.lf-chat-ventana){padding-bottom:16px}
+.lf-chat-ventana{margin-bottom:0}

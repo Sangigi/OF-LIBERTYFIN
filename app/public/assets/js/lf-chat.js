@@ -963,7 +963,65 @@
 
   function enlazar(ambito) {
     [].forEach.call((ambito || document).querySelectorAll('[data-lf-chat]'), conversacion);
+    ajustarVentanas();
   }
+
+  /* ── La ventana de chat ocupa JUSTO lo que queda de pantalla ──
+     Como en WhatsApp: la página no se mueve, solo la lista de mensajes.
+     Se mide desde donde empieza la ventana hasta el borde de abajo (en el
+     celular, hasta la barra del pulgar), y se vuelve a medir al cambiar
+     el tamaño, al girar el teléfono o al abrir el teclado. En soporte la
+     columna de al lado (estado, prioridad…) se desplaza por su cuenta en
+     vez de alargar la página. */
+  var ALTO_MINIMO = 340;
+  function ajustarVentanas() {
+    [].forEach.call(document.querySelectorAll('.lf-chat-ventana'), ajustarVentana);
+  }
+  function ajustarVentana(v) {
+    if (!v.isConnected) return;
+    var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    var lista = v.querySelector('[data-lf-lista]');
+    var alFin = lista && lista.scrollHeight - lista.scrollTop - lista.clientHeight < 80;
+
+    var dedo = document.querySelector('.lf-dedo');
+    var barra = (dedo && getComputedStyle(dedo).display !== 'none') ? dedo.getBoundingClientRect().height : 0;
+    var arriba = v.getBoundingClientRect().top + (window.pageYOffset || 0);
+    var split = v.closest('.lf-split');
+    var lado = split && split.children[1] && split.children[1] !== v ? split.children[1] : null;
+    var dosColumnas = !!(split && getComputedStyle(split).gridTemplateColumns.split(' ').length > 1);
+    // En el celular la columna de al lado queda DEBAJO del chat: se llega
+    // a ella bajando la página, como antes.
+    var apilado = !!(lado && !dosColumnas);
+
+    var alto = Math.max(ALTO_MINIMO, Math.floor(vh - arriba - barra - 14));
+    v.style.height = alto + 'px';
+    if (lado) {
+      lado.style.maxHeight = dosColumnas ? alto + 'px' : '';
+      lado.style.overflowY = dosColumnas ? 'auto' : '';
+      lado.style.overscrollBehavior = dosColumnas ? 'contain' : '';
+    }
+    // Lo que todavía sobre de página (márgenes, rellenos) se le quita a la
+    // ventana: que no quede nada que desplazar.
+    if (!apilado) {
+      var sobra = document.documentElement.scrollHeight - vh;
+      if (sobra > 0) {
+        alto = Math.max(ALTO_MINIMO, alto - Math.ceil(sobra));
+        v.style.height = alto + 'px';
+        if (lado && dosColumnas) lado.style.maxHeight = alto + 'px';
+      }
+    }
+    if (alFin) lista.scrollTop = lista.scrollHeight;
+  }
+  var ajustePendiente = false;
+  function alCambiarTamano() {
+    if (ajustePendiente) return;
+    ajustePendiente = true;
+    requestAnimationFrame(function () { ajustePendiente = false; ajustarVentanas(); });
+  }
+  window.addEventListener('resize', alCambiarTamano);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', alCambiarTamano);
+  window.addEventListener('load', alCambiarTamano);
+  document.addEventListener('lf:cargado', alCambiarTamano);
 
   /* ══ Piezas compartidas por las novedades ══ */
   function leer(k)      { try { return localStorage.getItem(k); } catch (e) { return null; } }
