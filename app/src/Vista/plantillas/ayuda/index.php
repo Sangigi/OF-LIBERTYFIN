@@ -36,6 +36,10 @@ $comoVa = [
     <button type="button" class="btn btn-secondary btn-sm" data-lf-push hidden
             title="Te avisamos en el escritorio cuando soporte responda, aunque cierres LibertyFin">
       Avisarme cuando respondan</button>
+    <?php /* Ya activados: manda uno de prueba para comprobar que llegan. */ ?>
+    <button type="button" class="btn btn-secondary btn-sm" data-lf-push-probar hidden
+            title="Manda un aviso de prueba a este navegador">
+      Probar aviso</button>
   <?php endif; ?>
 </div>
 

@@ -40,23 +40,24 @@ function ventanas() {
 var GENERICO = { titulo: 'LibertyFin', cuerpo: 'Tienes un aviso nuevo.', url: '/', tag: 'lf-aviso' };
 
 self.addEventListener('push', function (e) {
-  e.waitUntil(ventanas().then(function (vs) {
-    var mirando = vs.some(function (v) { return v.visibilityState === 'visible' && v.focused; });
-    if (mirando) return null;
-
-    return self.registration.pushManager.getSubscription().then(function (s) {
-      if (!s) return null;
-      // La dirección va codificada: el filtro de seguridad del hosting
-      // rechaza (406) cualquier campo que traiga "https://..." tal cual.
-      return fetch('/push/pendiente', {
-        method: 'POST',
-        credentials: 'omit',
-        cache: 'no-store',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'ep=' + encodeURIComponent(codificar(s.endpoint))
-      }).then(function (r) { return r.json(); }).then(null, function () { return null; });
-    }).then(function (j) {
-      var a = (j && j.ok && j.aviso) || GENERICO;
+  e.waitUntil(self.registration.pushManager.getSubscription().then(function (s) {
+    if (!s) return null;
+    // La dirección va codificada: el filtro de seguridad del hosting
+    // rechaza (406) cualquier campo que traiga "https://..." tal cual.
+    return fetch('/push/pendiente', {
+      method: 'POST',
+      credentials: 'omit',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'ep=' + encodeURIComponent(codificar(s.endpoint))
+    }).then(function (r) { return r.json(); }).then(null, function () { return null; });
+  }).then(function (j) {
+    var a = (j && j.ok && j.aviso) || GENERICO;
+    return ventanas().then(function (vs) {
+      // Con LibertyFin a la vista no se muestra (la página ya avisa por
+      // dentro), salvo el aviso de prueba, que se pidió mirando.
+      var mirando = vs.some(function (v) { return v.visibilityState === 'visible' && v.focused; });
+      if (mirando && !a.forzar) return null;
       return self.registration.showNotification(a.titulo || GENERICO.titulo, {
         body: a.cuerpo || '',
         tag: a.tag || GENERICO.tag,

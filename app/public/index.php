@@ -60,6 +60,7 @@ $r->get('/sesion/pulso',      ['LibertyFin\Controlador\LoginControlador', 'pulso
 $r->get('/push/llave',         ['LibertyFin\Controlador\PushControlador', 'llave']);
 $r->post('/push/suscribir',    ['LibertyFin\Controlador\PushControlador', 'suscribir']);
 $r->post('/push/quitar',       ['LibertyFin\Controlador\PushControlador', 'quitar']);
+$r->post('/push/probar',       ['LibertyFin\Controlador\PushControlador', 'probar']);
 $r->post('/push/pendiente',    ['LibertyFin\Controlador\PushControlador', 'pendiente']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);

@@ -30,6 +30,19 @@ final class PushControlador
                      'error' => $ok ? '' : 'No se pudo guardar la suscripción.']);
     }
 
+    /**
+     * "Probar aviso": manda uno de prueba a ESTE navegador ahora mismo y
+     * devuelve qué contestó el servicio de avisos, para saber dónde se
+     * pierde si no aparece.
+     */
+    public function probar()
+    {
+        if (!$this->token()) $this->json(['ok' => false, 'error' => 'El formulario venció: recarga la página.'], 403);
+        $cuenta = SesionUnica::cuentaDeSesion();
+        $res = Push::probar($cuenta, SesionUnica::navegador());
+        $this->json(['ok' => true, 'resultados' => $res]);
+    }
+
     public function quitar()
     {
         if (!$this->token()) $this->json(['ok' => false], 403);

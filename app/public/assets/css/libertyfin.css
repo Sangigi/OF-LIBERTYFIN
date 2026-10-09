@@ -3561,3 +3561,8 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 @media(max-width:940px) and (prefers-reduced-motion:reduce){
   .lf-split-chat > div:last-child{transition:none}
 }
+
+/* Avisos informativos (sin "Ver"): el texto completo, no una línea cortada. */
+.lf-toast-chat.largo{align-items:flex-start}
+.lf-toast-chat.largo small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45;margin-top:3px}
+[data-lf-push-probar][hidden]{display:none!important}

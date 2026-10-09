@@ -208,19 +208,24 @@ final class Push
      * `$aviso`: titulo, cuerpo, url, tag (el tag junta los avisos del
      * mismo ticket en uno solo, en vez de apilarlos).
      */
-    public static function enviar(array $cuentas, array $aviso)
+    public static function enviar(array $cuentas, array $aviso, $soloNavegador = null)
     {
+        $res = [];
         $cuentas = array_values(array_unique(array_filter($cuentas)));
-        if (!$cuentas) return;
+        if (!$cuentas) return $res;
         $ll = self::llaves();
-        if (!$ll || !function_exists('curl_init')) return;
+        if (!$ll) return [['error' => 'El servidor no tiene llaves para los avisos (OpenSSL).']];
+        if (!function_exists('curl_init')) return [['error' => 'El servidor no tiene curl.']];
         try {
             $db = self::db();
             $marcas = implode(',', array_fill(0, count($cuentas), '?'));
-            $st = $db->prepare("SELECT id, endpoint FROM lf_push WHERE cuenta IN ($marcas)");
-            $st->execute($cuentas);
+            $sql = "SELECT id, endpoint FROM lf_push WHERE cuenta IN ($marcas)";
+            $par = $cuentas;
+            if ($soloNavegador) { $sql .= " AND disp = ?"; $par[] = $soloNavegador; }
+            $st = $db->prepare($sql);
+            $st->execute($par);
             $subs = $st->fetchAll();
-            if (!$subs) return;
+            if (!$subs) return $res;
 
             $json = json_encode($aviso, JSON_UNESCAPED_UNICODE);
             $guardar = $db->prepare("UPDATE lf_push SET aviso = ? WHERE id = ?");
@@ -229,19 +234,42 @@ final class Push
             foreach ($subs as $s) {
                 $guardar->execute([$json, (int)$s['id']]);
                 $partes = parse_url($s['endpoint']);
-                $aud = ($partes['scheme'] ?? 'https') . '://' . ($partes['host'] ?? '');
+                $host = $partes['host'] ?? '';
+                $aud = ($partes['scheme'] ?? 'https') . '://' . $host;
                 if (!isset($firmas[$aud])) $firmas[$aud] = self::firma($aud, $ll);
-                if (!$firmas[$aud]) continue;
-                $codigo = self::tocar($s['endpoint'], $firmas[$aud], $ll['publica']);
+                if (!$firmas[$aud]) {
+                    $res[] = ['servicio' => $host, 'codigo' => 0, 'error' => 'No se pudo firmar el aviso (OpenSSL).'];
+                    continue;
+                }
+                list($codigo, $cuerpo) = self::tocar($s['endpoint'], $firmas[$aud], $ll['publica']);
+                $res[] = ['servicio' => $host, 'codigo' => $codigo, 'respuesta' => mb_substr($cuerpo, 0, 200)];
                 // 404/410: el navegador ya no tiene esa suscripción.
                 if ($codigo === 404 || $codigo === 410) $borrar->execute([(int)$s['id']]);
-                elseif ($codigo && ($codigo < 200 || $codigo >= 300)) {
-                    error_log('[LibertyFin] push: el servicio contestó HTTP ' . $codigo);
+                elseif ($codigo < 200 || $codigo >= 300) {
+                    error_log('[LibertyFin] push: ' . $host . ' contestó HTTP ' . $codigo . ' ' . mb_substr($cuerpo, 0, 200));
                 }
             }
         } catch (\Throwable $e) {
             error_log('[LibertyFin] push (enviar): ' . $e->getMessage());
+            $res[] = ['error' => 'Falló el envío en el servidor.'];
         }
+        return $res;
+    }
+
+    /**
+     * Un aviso de PRUEBA a este navegador, ahora mismo, y lo que contestó
+     * el servicio de avisos. Se muestra aunque LibertyFin esté a la vista
+     * (`forzar`): quien lo pide está mirando la pantalla.
+     */
+    public static function probar($cuenta, $disp)
+    {
+        return self::enviar([$cuenta], [
+            'titulo' => 'Aviso de prueba de LibertyFin',
+            'cuerpo' => 'Si ves esto, los avisos de escritorio funcionan en este navegador.',
+            'url'    => '/',
+            'tag'    => 'lf-prueba',
+            'forzar' => true,
+        ], $disp);
     }
 
     /** El JWT de VAPID (ES256) para un servicio de avisos. */
@@ -277,7 +305,7 @@ final class Push
         return $out;
     }
 
-    /** El toque vacío. Devuelve el código HTTP (0 si no hubo conexión). */
+    /** El toque vacío. Devuelve [código HTTP (0 si no hubo conexión), respuesta]. */
     private static function tocar($endpoint, $jwt, $publica)
     {
         $ch = curl_init($endpoint);
@@ -296,10 +324,11 @@ final class Push
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_SSL_VERIFYHOST => 2,
         ]);
-        curl_exec($ch);
+        $cuerpo = curl_exec($ch);
         $codigo = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error  = curl_error($ch);
         curl_close($ch);
-        return $codigo;
+        return [$codigo, $cuerpo === false ? $error : trim((string)$cuerpo)];
     }
 
     // ── A quién ─────────────────────────────────────────────────

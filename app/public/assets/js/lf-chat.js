@@ -1105,17 +1105,20 @@
     txt.appendChild(crear('b', '', titulo));
     txt.appendChild(crear('small', '', linea));
     caja.appendChild(txt);
-    // Sin `alVer` es solo informativo: sin botón "Ver".
+    // Sin `alVer` es solo informativo: sin botón "Ver", con el texto
+    // completo (no en una línea cortada) y más tiempo para leerlo.
     if (alVer) {
       var ver = boton('btn btn-primary btn-sm', 'Ver');
       ver.addEventListener('click', function () { despedir(caja, 200); alVer(); });
       caja.appendChild(ver);
+    } else {
+      caja.classList.add('largo');
     }
     var x = boton('x', '×', 'Cerrar aviso');
     x.addEventListener('click', function () { despedir(caja, 200); });
     caja.appendChild(x);
     document.body.appendChild(caja);
-    setTimeout(function () { despedir(caja, 320); }, 9000);
+    setTimeout(function () { despedir(caja, 320); }, alVer ? 9000 : 20000);
   }
 
   var ICONO_CHAT = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
@@ -1575,6 +1578,11 @@
       });
       ep.appendChild(cp); ep.appendChild(document.createTextNode(' Escritorio'));
       op.appendChild(ep);
+      if (pushActivo()) {
+        var pb = boton('permiso', 'Probar', 'Mandar un aviso de prueba a este navegador');
+        pb.setAttribute('data-lf-push-probar', '');
+        op.appendChild(pb);
+      }
       // Si no se pudo activar, se dice por qué (no solo se desmarca).
       if (falloPush && !pushActivo()) op.appendChild(crear('small', 'bloq err', falloPush));
     } else if (window.Notification) {
@@ -1886,11 +1894,64 @@
   }
 
   /* Los botones "Avisarme cuando respondan": solo si se puede y todavía
-     no están activados. */
+     no están activados. Y "Probar aviso", solo cuando ya lo están. */
   function pintarOfertas() {
     var ocultar = !PUSH || pushActivo() || Notification.permission === 'denied';
     [].forEach.call(document.querySelectorAll('[data-lf-push]'), function (b) { b.hidden = ocultar; });
+    [].forEach.call(document.querySelectorAll('[data-lf-push-probar]'), function (b) { b.hidden = !pushActivo(); });
   }
+
+  /* "Probar aviso": el servidor manda uno de prueba a ESTE navegador
+     ahora mismo y dice qué contestó el servicio de avisos. Así se sabe
+     dónde se pierde: en el servidor, en el servicio, o en el sistema
+     (Windows oculta las notificaciones del navegador, "No molestar"…). */
+  function probarPush() {
+    if (!pushActivo()) {
+      return Promise.resolve(['Avisos no activados', 'Primero activa los avisos en este navegador.']);
+    }
+    return fetch('/push/probar', {
+      method: 'POST', credentials: 'same-origin',
+      body: formulario({ token: token() }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) {}
+        return { estado: r.status, j: j };
+      });
+    }).then(function (x) {
+      if (!x.j) return ['No se pudo probar', 'El servidor no contestó como se esperaba (HTTP ' + x.estado + ').'];
+      if (x.j.sesion_cerrada) { aEntrar(); return ['Tu sesión se cerró', '']; }
+      var r = (x.j.resultados || [])[0];
+      if (!r) {
+        guardar('lf_push', ''); pintarOfertas();
+        return ['Este navegador no está suscrito', 'Vuelve a activar los avisos.'];
+      }
+      if (r.error) return ['No se pudo enviar el aviso', r.error];
+      if (r.codigo >= 200 && r.codigo < 300) {
+        return ['Aviso de prueba enviado',
+                'Debe aparecer en unos segundos. Si no aparece, revisa que Windows permita las notificaciones '
+                + 'de este navegador (Configuración → Sistema → Notificaciones) y que "No molestar" esté apagado.'];
+      }
+      if (r.codigo === 404 || r.codigo === 410) {
+        guardar('lf_push', ''); pintarOfertas();
+        return ['La suscripción venció', 'Vuelve a activar los avisos en este navegador.'];
+      }
+      return ['El servicio de avisos rechazó el envío',
+              'HTTP ' + r.codigo + (r.servicio ? ' · ' + r.servicio : '') + (r.respuesta ? ' · ' + r.respuesta : '')];
+    }, function () { return ['No se pudo probar', 'No hubo conexión con el servidor.']; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-lf-push-probar]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    cerrarCampana();
+    b.disabled = true;
+    probarPush().then(function (m) { b.disabled = false; avisar(m[0], m[1], null); });
+  });
 
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-lf-push]');
