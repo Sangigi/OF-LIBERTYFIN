@@ -213,6 +213,7 @@ $r->get('/cuenta',               ['LibertyFin\Controlador\UsuariosControlador', 
 $r->post('/cuenta/clave',        ['LibertyFin\Controlador\UsuariosControlador', 'cambiarClave']);
 $r->post('/cuenta/foto',         ['LibertyFin\Controlador\UsuariosControlador', 'guardarFoto']);
 $r->post('/cuenta/foto-publica', ['LibertyFin\Controlador\UsuariosControlador', 'fotoPublica']);
+$r->post('/cuenta/apariencia',   ['LibertyFin\Controlador\UsuariosControlador', 'apariencia']);
 $r->post('/cuenta/fiscales',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarFiscales']);
 $r->post('/cuenta/comercio',     ['LibertyFin\Controlador\UsuariosControlador', 'guardarComercio']);
 $r->post('/cuenta/documento',    ['LibertyFin\Controlador\UsuariosControlador', 'subirDocumento']);

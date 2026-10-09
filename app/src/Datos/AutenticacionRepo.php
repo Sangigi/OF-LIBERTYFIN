@@ -266,6 +266,71 @@ final class AutenticacionRepo
         return true;
     }
 
+    /**
+     * APARIENCIA de una cuenta de plataforma: tema (light, dark, auto) y
+     * color. Se guarda en la cuenta y no en el navegador, para que siga a
+     * la persona a cualquier equipo. Las columnas se agregan solas.
+     */
+    const TEMAS = ['light', 'dark', 'auto'];
+
+    private function asegurarApariencia()
+    {
+        static $listo = false;
+        if ($listo) return true;
+        try {
+            $st = $this->principal->query("
+                SELECT COLUMN_NAME FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios_plataforma'
+                  AND COLUMN_NAME IN ('tema','color')");
+            $hay = $st->fetchAll(PDO::FETCH_COLUMN);
+            if (!in_array('tema', $hay, true)) {
+                $this->principal->exec("ALTER TABLE usuarios_plataforma ADD COLUMN tema VARCHAR(8) NULL");
+            }
+            if (!in_array('color', $hay, true)) {
+                $this->principal->exec("ALTER TABLE usuarios_plataforma ADD COLUMN color CHAR(7) NULL");
+            }
+            return $listo = true;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] apariencia de plataforma: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** ['tema' => 'light'|'dark'|'auto'|'', 'color' => '#rrggbb'|'']; '' = sin elegir. */
+    public function apariencia($id)
+    {
+        $vacia = ['tema' => '', 'color' => ''];
+        if (!$this->asegurarApariencia()) return $vacia;
+        try {
+            $st = $this->principal->prepare("
+                SELECT COALESCE(tema,'') AS tema, COALESCE(color,'') AS color
+                FROM usuarios_plataforma WHERE id = ?");
+            $st->execute([(int)$id]);
+            $f = $st->fetch();
+            if (!$f) return $vacia;
+            return [
+                'tema'  => in_array($f['tema'], self::TEMAS, true) ? $f['tema'] : '',
+                'color' => preg_match('/^#[0-9a-f]{6}$/i', $f['color']) ? strtolower($f['color']) : '',
+            ];
+        } catch (\Throwable $e) { return $vacia; }
+    }
+
+    /** null = no se toca ese dato (el botón de la barra solo cambia el tema). */
+    public function guardarApariencia($id, $tema, $color)
+    {
+        if (!$this->asegurarApariencia()) {
+            throw new \RuntimeException('No se pudo preparar la tabla de cuentas de plataforma');
+        }
+        $sets = []; $p = [];
+        if ($tema !== null)  { $sets[] = 'tema = ?';  $p[] = $tema ?: null; }
+        if ($color !== null) { $sets[] = 'color = ?'; $p[] = $color ?: null; }
+        if (!$sets) return true;
+        $p[] = (int)$id;
+        $this->principal->prepare("UPDATE usuarios_plataforma SET " . implode(', ', $sets) . " WHERE id = ?")
+                        ->execute($p);
+        return true;
+    }
+
     /** Las mismas reglas que en una empresa: ver UsuarioRepo::cambiarClave. */
     public function cambiarClavePlataforma($id, $actual, $nueva)
     {

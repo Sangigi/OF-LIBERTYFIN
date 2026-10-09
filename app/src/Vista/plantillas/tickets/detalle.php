@@ -178,7 +178,7 @@ document.addEventListener('click', function(ev){
       <?php /* Los cambios se guardan sin recargar (lf-chat.js); aquí se dice
                "Guardando…" / "Guardado". */ ?>
       <header class="card-header">Estado
-        <span class="lf-guardado" data-lf-guardado aria-live="polite"></span></header>
+        <span class="lf-tk-guardado" data-lf-guardado aria-live="polite"></span></header>
       <div class="card-body">
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar" data-lf-ticket-cambio>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">

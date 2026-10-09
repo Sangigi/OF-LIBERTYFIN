@@ -88,7 +88,7 @@ $em = $empresa; ?>
           <div style="flex:1;min-width:250px">
             <label class="form-label">Color de la marca</label>
             <div class="lf-colores">
-              <?php foreach (['#27ae60','#1d6fa5','#7c3aed','#c2410c','#be123c','#0f766e','#2c3e50'] as $c): ?>
+              <?php foreach (array_keys(W::COLORES) as $c): ?>
                 <span class="lf-color<?= strtolower($marca['color'])===$c ? ' on' : '' ?>"
                       data-color="<?= $c ?>" style="background:<?= $c ?>"
                       role="button" tabindex="0" aria-label="Color <?= $c ?>"></span>

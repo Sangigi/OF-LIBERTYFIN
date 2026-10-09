@@ -52,7 +52,8 @@ $aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '
       </div>
     <?php endif; ?>
 
-    <button type="button" class="lf-tema" id="lfTema"
+    <?php /* `data-lf-cuenta`: soporte guarda el tema en su cuenta, no solo aquí. */ ?>
+    <button type="button" class="lf-tema" id="lfTema"<?= !empty($_SESSION['plataforma']) ? ' data-lf-cuenta' : '' ?>
             aria-label="Cambiar entre claro y oscuro" title="Cambiar tema">
       <span class="claro"><?= W::icono('luna', '16px') ?></span>
       <span class="oscuro"><?= W::icono('sol', '16px') ?></span>
@@ -68,11 +69,22 @@ $aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '
   if (window.lfTemaListo) return;
   window.lfTemaListo = true;
   document.addEventListener('click', function(ev){
-    if (!ev.target.closest('#lfTema')) return;
+    var b = ev.target.closest('#lfTema');
+    if (!b) return;
     var raiz = document.documentElement;
     var nuevo = raiz.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    raiz.setAttribute('data-theme', nuevo);
+    if (window.lfAplicarTema) window.lfAplicarTema(nuevo);
+    else raiz.setAttribute('data-theme', nuevo);
     try { localStorage.setItem('lf-tema', nuevo); } catch (e) {}
+    // Cuenta de soporte: también en su cuenta, para que la siga a otro equipo.
+    if (b.hasAttribute('data-lf-cuenta') && window.fetch) {
+      var d = new FormData();
+      d.append('token', document.body.getAttribute('data-lf-token') || '');
+      d.append('tema', nuevo);
+      fetch('/cuenta/apariencia', { method: 'POST', body: d, credentials: 'same-origin',
+        headers: { 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(null, function () {});
+    }
   });
 })();
 </script>

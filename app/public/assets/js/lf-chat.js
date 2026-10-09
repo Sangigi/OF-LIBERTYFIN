@@ -2227,8 +2227,8 @@
     if (!s) return;
     clearTimeout(s._lfT);
     s.textContent = texto;
-    s.className = 'lf-guardado ' + clase;
-    if (clase === 'listo') s._lfT = setTimeout(function () { s.className = 'lf-guardado'; }, 2600);
+    s.className = 'lf-tk-guardado ' + clase;
+    if (clase === 'listo') s._lfT = setTimeout(function () { s.className = 'lf-tk-guardado'; }, 2600);
   }
 
   function refrescarTicket() {

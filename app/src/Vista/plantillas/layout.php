@@ -10,16 +10,33 @@ use LibertyFin\Vista\Widget as W;
 // del documento, la página aparecería en claro y saltaría a oscuro. Ese
 // parpadeo blanco es lo que hace que un modo oscuro se sienta barato.
 (function(){
-  try {
-    var t = localStorage.getItem('lf-tema');
-    if (t === 'dark' || t === 'light') {
-      document.documentElement.setAttribute('data-theme', t);
-      return;
+  var raiz = document.documentElement;
+  var oscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
+  /* 'auto' (como el equipo) solo existe si la persona lo eligió en Mi
+     cuenta: entonces sí se sigue al sistema, y al momento si cambia. */
+  window.lfAplicarTema = function (t) {
+    if (t === 'auto') {
+      raiz.setAttribute('data-tema-auto', '');
+      raiz.setAttribute('data-theme', oscuro && oscuro.matches ? 'dark' : 'light');
+    } else {
+      raiz.removeAttribute('data-tema-auto');
+      raiz.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
     }
+  };
+  if (oscuro && oscuro.addEventListener) oscuro.addEventListener('change', function () {
+    if (raiz.hasAttribute('data-tema-auto')) window.lfAplicarTema('auto');
+  });
+  // Soporte guarda su tema en la cuenta (Mi cuenta): ese manda sobre lo
+  // que recuerde este navegador, para verse igual en cualquier equipo.
+  var cuenta = <?= json_encode((string)($_SESSION['lf_tema'] ?? '')) ?>;
+  var t = cuenta;
+  try {
+    if (cuenta) localStorage.setItem('lf-tema', cuenta);
+    else t = localStorage.getItem('lf-tema');
   } catch (e) {}
   // Sin preferencia guardada: claro. NUNCA se hereda del sistema sin que
   // el usuario lo pida.
-  document.documentElement.setAttribute('data-theme', 'light');
+  window.lfAplicarTema(t === 'dark' || t === 'auto' ? t : 'light');
 })();
 </script>
 

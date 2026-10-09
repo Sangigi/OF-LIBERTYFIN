@@ -3749,12 +3749,22 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 .lf-alta-lleno-txt svg{color:var(--lf-amb);flex:none;margin-top:2px}
 
 /* Ticket (soporte) · "Guardando…" / "Guardado" junto a "Estado". */
-.lf-guardado{margin-left:auto;align-self:center;font-size:12px;font-weight:500;
+.lf-tk-guardado{margin-left:auto;align-self:center;font-size:12px;font-weight:500;
   color:var(--lf-tinta-4);opacity:0;transition:opacity .25s}
-.lf-guardado.guardando,.lf-guardado.listo{opacity:1}
-.lf-guardado.listo{color:var(--lf-brand-2)}
-.lf-guardado.listo::before{content:'✓ '}
+.lf-tk-guardado.guardando,.lf-tk-guardado.listo{opacity:1}
+.lf-tk-guardado.listo{color:var(--lf-brand-2)}
+.lf-tk-guardado.listo::before{content:'✓ '}
 .lf-chat-pie[hidden],.lf-chat-cerrado[hidden]{display:none !important}
 .lf-chat-cerrado{flex:0 0 auto;margin:0;padding:12px 16px;border-top:1px solid var(--lf-linea);
   font-size:13px;color:var(--lf-tinta-3);background:var(--lf-sup)}
 form[data-lf-ticket-cambio] select:disabled{opacity:.7}
+
+/* Mi cuenta (soporte) · Apariencia: tema en tres opciones y los colores
+   ya probados como radios (el círculo es la etiqueta; el radio no se ve,
+   pero se puede elegir con el teclado). */
+.lf-temas{flex-direction:row;flex-wrap:wrap;align-items:stretch;margin-top:6px}
+.lf-temas .m{flex:1 1 130px;width:auto}
+.lf-colores label.lf-color{position:relative;margin:0}
+.lf-colores label.lf-color input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.lf-colores label.lf-color:focus-within{box-shadow:0 0 0 2px var(--lf-sup),0 0 0 4px var(--lf-brand-ring)}
+.lf-colores label.lf-color.on:focus-within{box-shadow:0 0 0 2px var(--lf-tinta)}

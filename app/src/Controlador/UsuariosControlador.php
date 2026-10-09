@@ -821,6 +821,51 @@ final class UsuariosControlador
      * plataforma: el equipo de soporte siempre se ve entre sí.
      * Responde JSON cuando se guarda por detrás (data-guardar).
      */
+    /**
+     * Tema y color de una cuenta de soporte. Llega de Mi cuenta (los dos)
+     * o del botón de la barra (solo el tema): lo que no viene no se toca.
+     * El color solo puede ser uno de los ya probados (Widget::COLORES).
+     */
+    public function apariencia()
+    {
+        $json = ($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1';
+        $responder = function ($ok, $texto) use ($json) {
+            if ($json) {
+                header('Content-Type: application/json; charset=utf-8');
+                echo json_encode(['ok' => $ok, 'mensaje' => $texto]);
+                exit;
+            }
+            $this->volver('/cuenta', $texto, $ok ? 'ok' : 'error');
+        };
+        if (empty($_SESSION['plataforma'])) $responder(false, 'Esta opción es de las cuentas de soporte.');
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $responder(false, 'No se pudo verificar el formulario.');
+        }
+
+        $tema = isset($_POST['tema']) ? (string)$_POST['tema'] : null;
+        if ($tema !== null && !in_array($tema, \LibertyFin\Datos\AutenticacionRepo::TEMAS, true)) {
+            $responder(false, 'Ese tema no existe.');
+        }
+        $color = isset($_POST['color']) ? strtolower(trim((string)$_POST['color'])) : null;
+        if ($color !== null && $color !== '' && !isset(\LibertyFin\Vista\Widget::COLORES[$color])) {
+            $responder(false, 'Elige uno de los colores de la lista.');
+        }
+
+        try {
+            $this->cuentasPlataforma()->guardarApariencia((int)($_SESSION['usuario_id'] ?? 0), $tema, $color);
+            if ($tema !== null) $_SESSION['lf_tema'] = $tema;
+            if ($color !== null) {
+                if ($color === '') unset($_SESSION['lf_marca_color']);
+                else $_SESSION['lf_marca_color'] = $color;
+            }
+            $responder(true, 'Guardado. Se verá así en cualquier equipo donde entres.');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] apariencia: ' . $e->getMessage());
+            $responder(false, 'No se pudo guardar.');
+        }
+    }
+
     public function fotoPublica()
     {
         $json = ($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1';
@@ -917,12 +962,13 @@ public function documentoPlan($id)
     /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
     private function miCuentaPlataforma()
     {
-        $foto = ''; $fotoPublica = false;
+        $foto = ''; $fotoPublica = false; $apariencia = null;
         if (!empty($_SESSION['plataforma'])) {
             try {
                 $cp = $this->cuentasPlataforma();
                 $foto = $cp->fotoPlataforma((int)($_SESSION['usuario_id'] ?? 0));
                 $fotoPublica = $cp->fotoPublicaPlataforma((int)($_SESSION['usuario_id'] ?? 0));
+                $apariencia = $cp->apariencia((int)($_SESSION['usuario_id'] ?? 0));
             } catch (\Throwable $e) { $foto = ''; }
         }
         Plantilla::pagina('usuarios/cuenta', [
@@ -933,6 +979,7 @@ public function documentoPlan($id)
             'pestanas'  => ['perfil' => 'Mi perfil'],
             'foto'      => $foto,
             'fotoPublica' => $fotoPublica,
+            'apariencia'  => $apariencia,
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'empresa'   => null, 'fiscales' => [], 'comercio' => [], 'documentos' => [],
             'estadoDocs'=> ['estado' => 'aprobada', 'faltan' => [], 'aprobados' => 0, 'total' => 0],

@@ -12,6 +12,21 @@ use LibertyFin\Dominio\Dinero;
  */
 final class Widget
 {
+    /**
+     * Los colores ya probados: con texto blanco encima y en modo oscuro se
+     * leen bien. Los usan el color de la marca de una empresa (Ajustes) y
+     * el color de cada cuenta de soporte (Mi cuenta).
+     */
+    const COLORES = [
+        '#27ae60' => 'Verde',
+        '#1d6fa5' => 'Azul',
+        '#7c3aed' => 'Morado',
+        '#c2410c' => 'Naranja',
+        '#be123c' => 'Rojo',
+        '#0f766e' => 'Verde azulado',
+        '#2c3e50' => 'Gris pizarra',
+    ];
+
     /** Tarjeta de cifra con azulejo de icono, barra de avance y tendencia. */
     public static function cifra(array $o)
     {

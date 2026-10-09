@@ -230,6 +230,8 @@ final class Autenticar
             $_SESSION['lf_esquema'] = Migraciones::VERSION;
 
             $cfg = new \LibertyFin\Datos\ConfigRepo($db);
+            // El tema guardado en la cuenta es solo de soporte (ver abrirPlataforma).
+            unset($_SESSION['lf_tema'], $_SESSION['lf_marca_color']);
             $color = (string)$cfg->valorDe('marca.color', '');
             if (preg_match('/^#[0-9a-fA-F]{6}$/', $color)) $_SESSION['lf_marca_color'] = $color;
             $logo = (string)$cfg->valorDe('marca.logo', '');
@@ -307,6 +309,15 @@ final class Autenticar
         // Su foto vive en su propia tabla (ver Mi cuenta).
         unset($_SESSION['lf_foto']);
         if (!empty($u['foto'])) $_SESSION['lf_foto'] = $u['foto'];
+        // Su tema y su color, elegidos en Mi cuenta: van con la cuenta, no
+        // con el navegador. El color usa la misma variable que el de la
+        // marca de una empresa, que esta cuenta no tiene.
+        unset($_SESSION['lf_tema'], $_SESSION['lf_marca_color'], $_SESSION['lf_marca_logo']);
+        try {
+            $ap = $this->repo->apariencia((int)$u['id']);
+            if ($ap['tema'] !== '')  $_SESSION['lf_tema'] = $ap['tema'];
+            if ($ap['color'] !== '') $_SESSION['lf_marca_color'] = $ap['color'];
+        } catch (\Throwable $e) {}
 
 
         // Los interruptores globales se leen UNA vez al entrar y viven en

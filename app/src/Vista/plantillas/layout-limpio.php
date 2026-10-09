@@ -9,6 +9,8 @@
 (function(){
   try {
     var t = localStorage.getItem('lf-tema');
+    // 'auto': lo eligió una cuenta de soporte en Mi cuenta (ver layout.php).
+    if (t === 'auto') t = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
     if (t === 'dark' || t === 'light') {
       document.documentElement.setAttribute('data-theme', t);
       return;
