@@ -109,9 +109,13 @@ document.addEventListener('click', function(ev){
         <?php endforeach; ?>
       </div>
 
-      <?php if (!in_array($t['estado'], ['cerrado'], true)): ?>
-      <?php /* La caja de responder, fija al pie de la ventana. */ ?>
-      <div class="lf-chat-pie">
+      <?php /* La caja de responder, fija al pie de la ventana. Con el ticket
+               cerrado no se quita sino que se esconde: al reabrirlo desde
+               la columna de la derecha (sin recargar) vuelve a aparecer. */
+            $cerrado = $t['estado'] === 'cerrado'; ?>
+      <p class="lf-chat-nota lf-chat-cerrado" data-lf-si-cerrado <?= $cerrado ? '' : 'hidden' ?>>
+        Ticket cerrado. Para responder, cámbialo a otro estado.</p>
+      <div class="lf-chat-pie" data-lf-si-abierto <?= $cerrado ? 'hidden' : '' ?>>
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
               id="formResp" data-lf-enviar>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
@@ -141,7 +145,6 @@ document.addEventListener('click', function(ev){
           </div>
         </form>
       </div>
-      <?php endif; ?>
     </section>
   </div>
 
@@ -172,19 +175,22 @@ document.addEventListener('click', function(ev){
     <?php endif; ?>
 
     <section class="card">
-      <header class="card-header">Estado</header>
+      <?php /* Los cambios se guardan sin recargar (lf-chat.js); aquí se dice
+               "Guardando…" / "Guardado". */ ?>
+      <header class="card-header">Estado
+        <span class="lf-guardado" data-lf-guardado aria-live="polite"></span></header>
       <div class="card-body">
-        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar">
+        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar" data-lf-ticket-cambio>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <label class="form-label">Estado</label>
-          <select class="form-select" name="estado" onchange="this.form.submit()">
+          <select class="form-select" name="estado" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
             <?php foreach (T::ESTADOS as $k=>$v): ?>
               <option value="<?= $k ?>" <?= $t['estado']===$k?'selected':'' ?>><?= P::e($v) ?></option>
             <?php endforeach; ?>
           </select>
 
           <label class="form-label" style="margin-top:14px">Prioridad</label>
-          <select class="form-select" name="prioridad" onchange="this.form.submit()">
+          <select class="form-select" name="prioridad" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
             <?php foreach (T::PRIORIDADES as $k=>$v): ?>
               <option value="<?= $k ?>" <?= $t['prioridad']===$k?'selected':'' ?>>
                 <?= P::e($v[0]) ?> · responder en <?= $v[1] ?> h</option>
@@ -192,14 +198,14 @@ document.addEventListener('click', function(ev){
           </select>
 
           <label class="form-label" style="margin-top:14px">Categoría</label>
-          <select class="form-select" name="categoria" onchange="this.form.submit()">
+          <select class="form-select" name="categoria" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
             <?php foreach (T::CATEGORIAS as $k=>$v): ?>
               <option value="<?= $k ?>" <?= $t['categoria']===$k?'selected':'' ?>><?= P::e($v) ?></option>
             <?php endforeach; ?>
           </select>
         </form>
 
-        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar" style="margin-top:16px">
+        <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar" style="margin-top:16px" data-lf-ticket-cambio>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <?php if ($mio): ?>
             <p style="font-size:12.5px;color:var(--lf-tinta-3);margin-bottom:9px">

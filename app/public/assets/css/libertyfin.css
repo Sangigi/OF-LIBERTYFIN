@@ -3736,3 +3736,25 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 .lf-chatf header .bt svg,.lf-enviar-ico svg{pointer-events:none}
 /* La vista previa de la captura pegada en "Reportar un problema". */
 .lf-form .lf-adj-vista{max-width:440px}
+
+/* Usuarios · cuántos lugares del plan se usan. */
+.lf-alta-cupo{margin-left:auto;font-size:12px;font-weight:500;color:var(--lf-tinta-3);
+  background:var(--lf-vidrio);border:1px solid var(--lf-linea);border-radius:var(--lf-r-pill);
+  padding:3px 10px;white-space:nowrap}
+.lf-alta-cupo.lleno{color:var(--lf-amb);background:var(--lf-amb-soft);border-color:transparent}
+.card-header .lf-alta-cupo{align-self:center}
+.lf-alta-lleno{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 20px}
+.lf-alta-lleno-txt{display:flex;align-items:flex-start;gap:9px;flex:1;min-width:220px;
+  font-size:14px;line-height:1.45}
+.lf-alta-lleno-txt svg{color:var(--lf-amb);flex:none;margin-top:2px}
+
+/* Ticket (soporte) · "Guardando…" / "Guardado" junto a "Estado". */
+.lf-guardado{margin-left:auto;align-self:center;font-size:12px;font-weight:500;
+  color:var(--lf-tinta-4);opacity:0;transition:opacity .25s}
+.lf-guardado.guardando,.lf-guardado.listo{opacity:1}
+.lf-guardado.listo{color:var(--lf-brand-2)}
+.lf-guardado.listo::before{content:'✓ '}
+.lf-chat-pie[hidden],.lf-chat-cerrado[hidden]{display:none !important}
+.lf-chat-cerrado{flex:0 0 auto;margin:0;padding:12px 16px;border-top:1px solid var(--lf-linea);
+  font-size:13px;color:var(--lf-tinta-3);background:var(--lf-sup)}
+form[data-lf-ticket-cambio] select:disabled{opacity:.7}

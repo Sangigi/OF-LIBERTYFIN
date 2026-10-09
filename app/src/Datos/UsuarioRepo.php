@@ -123,6 +123,12 @@ final class UsuarioRepo extends Repo
                 (int)($d['sucursal_id'] ?? 0) ?: null];
     }
 
+    /** Los usuarios activos de la empresa: los que cuentan para el plan. */
+    public function activos()
+    {
+        return (int)$this->valor("SELECT COUNT(*) FROM usuarios WHERE COALESCE(activo,1) = 1");
+    }
+
     public function crear(array $d)
     {
         list($username, $nombre, $email, $rol, $suc) = $this->limpiar($d);

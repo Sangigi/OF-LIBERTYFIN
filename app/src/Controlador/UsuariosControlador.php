@@ -25,6 +25,8 @@ final class UsuariosControlador
             'titulo'     => 'Usuarios',
             'icono'      => 'cliente',
             'subtitulo'  => $_SESSION['empresa_nombre'] ?? '',
+            // Cuántos usuarios activos permite el plan y cuántos hay.
+            'cupo'       => $this->cupo($repo),
             'usuarios'   => $repo->todos_(),
             'sucursales' => $repo->sucursales(),
             'editando'   => $editar ? $repo->uno_($editar) : null,
@@ -55,6 +57,8 @@ final class UsuariosControlador
                     Auditoria::anota('usuario.editar', $antes['nombre'] ?? ('usuario ' . $id));
                 }
             } else {
+                // El plan incluye N usuarios activos: uno más no se da de alta.
+                $this->revisarCupo($repo);
                 $repo->crear($_POST);
                 $m = 'Usuario dado de alta.';
                 Auditoria::anota('usuario.crear', trim($_POST['nombre'] ?? ''),
@@ -99,7 +103,11 @@ final class UsuariosControlador
         $db = Conexion::de($_SESSION['empresa_db']);
         $this->soloAdmin(); $this->token();
         try {
-            $a = (new UsuarioRepo($db))->alternar(
+            $repo = new UsuarioRepo($db);
+            // Reactivar a alguien también ocupa un lugar del plan.
+            $u = $repo->uno_((int)($_POST['id'] ?? 0));
+            if ($u && empty($u['activo'])) $this->revisarCupo($repo);
+            $a = $repo->alternar(
                 (int)($_POST['id'] ?? 0), $_SESSION['usuario_id'] ?? 0);
             Auditoria::anota('usuario.alternar', 'usuario ' . (int)($_POST['id'] ?? 0),
                 $a ? 'inactivo' : 'activo', $a ? 'activo' : 'inactivo');
@@ -673,6 +681,42 @@ final class UsuariosControlador
             http_response_code(403);
             Plantilla::pagina('errores/404', ['titulo'=>'Sin permiso','icono'=>'alerta','subtitulo'=>'']);
             exit;
+        }
+    }
+
+    /**
+     * Usuarios activos contra los que incluye el plan. max = 0 es «sin
+     * tope» (periodo de prueba o plan que no está en el catálogo).
+     */
+    private function cupo(UsuarioRepo $repo)
+    {
+        $emp = (int)($_SESSION['empresa_id'] ?? 0);
+        try {
+            $pr = new PlanRepo(Conexion::de($GLOBALS['lf_bd_principal'] ?? ''));
+            return [
+                'activos' => $repo->activos(),
+                'max'     => $pr->usuariosPermitidos($emp),
+                'plan'    => $pr->nombrePlan($emp),
+            ];
+        } catch (\Throwable $e) {
+            // Sin poder leer el plan no se bloquea a nadie: la pantalla de
+            // usuarios no debe caerse por eso.
+            error_log('[LibertyFin] cupo de usuarios: ' . $e->getMessage());
+            return ['activos' => 0, 'max' => 0, 'plan' => ''];
+        }
+    }
+
+    /** Lanza el aviso si ya no cabe otro usuario activo en el plan. */
+    private function revisarCupo(UsuarioRepo $repo)
+    {
+        $c = $this->cupo($repo);
+        if ($c['max'] > 0 && $c['activos'] >= $c['max']) {
+            throw new \InvalidArgumentException(sprintf(
+                'Tu plan %s incluye %d usuario%s activo%s y ya %s. '
+                . 'Desactiva a alguien que ya no lo use o cambia de plan en Mi cuenta → Plan.',
+                $c['plan'] !== '' ? $c['plan'] : 'actual',
+                $c['max'], $c['max'] === 1 ? '' : 's', $c['max'] === 1 ? '' : 's',
+                $c['activos'] === 1 ? 'tienes 1' : 'tienes ' . $c['activos']));
         }
     }
 

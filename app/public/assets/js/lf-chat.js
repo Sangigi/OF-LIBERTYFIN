@@ -2216,6 +2216,89 @@
     }).then(function (m) { if (m === '') sesionGuardar('lf_push_al_dia', quien()); }, function () {});
   }
 
+  /* ══ 7 · Ticket (soporte): estado, prioridad, categoría y asignación
+     SIN RECARGAR. Siguen siendo formularios normales (si este archivo no
+     cargara, se envían como siempre); aquí se mandan por detrás y luego
+     se vuelve a pedir la página para cambiar SOLO la columna de la
+     derecha, con el historial y los datos al día. El chat no se toca:
+     sigue en el mismo lugar, con lo que estabas escribiendo. ══ */
+  function pintarGuardado(texto, clase) {
+    var s = document.querySelector('[data-lf-guardado]');
+    if (!s) return;
+    clearTimeout(s._lfT);
+    s.textContent = texto;
+    s.className = 'lf-guardado ' + clase;
+    if (clase === 'listo') s._lfT = setTimeout(function () { s.className = 'lf-guardado'; }, 2600);
+  }
+
+  function refrescarTicket() {
+    return fetch(location.pathname + location.search,
+                 { credentials: 'same-origin', headers: { 'X-LF-Parcial': '1' } })
+      .then(function (r) {
+        if (r.redirected && /\/login\/?(\?|$)/.test(String(r.url).replace(location.origin, ''))) {
+          aEntrar();
+          return '';
+        }
+        return r.ok ? r.text() : '';
+      })
+      .then(function (html) {
+        if (!html) return false;
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var nueva = doc.querySelector('.lf-split-chat > div:last-child'),
+            col = document.querySelector('.lf-split-chat > div:last-child');
+        if (!nueva || !col) return false;
+        col.innerHTML = nueva.innerHTML;
+        // Cerrado: la caja de responder se esconde; al reabrirlo, vuelve.
+        ['data-lf-si-abierto', 'data-lf-si-cerrado'].forEach(function (a) {
+          var n = document.querySelector('.lf-chat-ventana [' + a + ']'),
+              m = doc.querySelector('.lf-chat-ventana [' + a + ']');
+          if (n && m) n.hidden = m.hidden;
+        });
+        alCambiarTamano();
+        return true;
+      });
+  }
+
+  document.addEventListener('submit', function (ev) {
+    var form = ev.target;
+    if (!form.matches || !form.matches('form[data-lf-ticket-cambio]') || !window.fetch) return;
+    ev.preventDefault();
+    if (form._lfGuardando) return;
+    form._lfGuardando = true;
+
+    // Los datos se toman ANTES de deshabilitar: lo deshabilitado no viaja.
+    var datos = new FormData(form), b = ev.submitter;
+    if (b && b.name) datos.append(b.name, b.value);
+    [].forEach.call(form.elements, function (c) { c.disabled = true; });
+    pintarGuardado('Guardando…', 'guardando');
+
+    function fin() {
+      form._lfGuardando = false;
+      // Si la columna no se pudo cambiar, este formulario sigue ahí.
+      [].forEach.call(form.elements, function (c) { c.disabled = false; });
+    }
+    function fallo(texto) {
+      if (saliendo) return;
+      pintarGuardado('', '');
+      avisar('No se guardó el cambio', texto, null);
+      // Que los selectores vuelvan a decir lo que de verdad está guardado.
+      return refrescarTicket().then(null, function () {});
+    }
+
+    pedir(form.action, { method: 'POST', body: datos })
+      .then(function (j) {
+        if (!j) return fallo('No hubo respuesta del servidor. Revisa tu conexión e inténtalo de nuevo.');
+        if (!j.ok) return fallo(j.mensaje || 'Inténtalo de nuevo.');
+        return refrescarTicket().then(function () {
+          pintarGuardado(j.mensaje || 'Guardado.', 'listo');
+        });
+      })
+      .then(fin, function () {
+        fin();
+        fallo('No hubo respuesta del servidor. Revisa tu conexión e inténtalo de nuevo.');
+      });
+  });
+
   window.LFChat = { enlazar: enlazar, abrir: abrirChat, revisar: function () { revisarCliente(); } };
 
   function arrancar() { enlazar(document); clienteNovedades(); soporteNovedades(); pulsoSesion(); pushAlCargar(); }

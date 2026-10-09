@@ -25,9 +25,29 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 </div>
 <?php endif; ?>
 
+<?php
+// Lugares del plan: max = 0 es sin tope (prueba o plan fuera de catálogo).
+$cupo  = $cupo ?? ['activos' => 0, 'max' => 0, 'plan' => ''];
+$lleno = $cupo['max'] > 0 && $cupo['activos'] >= $cupo['max'];
+$cuenta = $cupo['max'] > 0
+    ? $cupo['activos'] . ' de ' . $cupo['max'] . ' usuario' . ($cupo['max'] === 1 ? '' : 's') . ' de tu plan'
+    : '';
+?>
+<?php if ($lleno && !$e): ?>
+<div class="lf-alta lf-alta-lleno">
+  <div class="lf-alta-lleno-txt">
+    <?= W::icono('alerta','16px') ?>
+    <span>Ya usas los <b><?= (int)$cupo['max'] ?></b> usuarios activos que incluye tu plan
+      <?= $cupo['plan'] !== '' ? '<b>' . P::e($cupo['plan']) . '</b>' : '' ?>.
+      Para dar de alta a alguien más, desactiva a quien ya no lo use o cambia de plan.</span>
+  </div>
+  <a class="btn btn-primary btn-sm" href="/cuenta?t=plan">Ver planes</a>
+</div>
+<?php else: ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>
   <summary><?= W::icono($e ? 'cliente' : 'mas','16px') ?>
-    <?= $e ? 'Editar a ' . P::e($e['nombre']) : 'Dar de alta un usuario' ?></summary>
+    <?= $e ? 'Editar a ' . P::e($e['nombre']) : 'Dar de alta un usuario' ?>
+    <?php if ($cuenta !== '' && !$e): ?><span class="lf-alta-cupo"><?= P::e($cuenta) ?></span><?php endif; ?></summary>
   <form method="post" action="/usuarios/guardar" class="lf-form">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
@@ -84,9 +104,11 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     <?php endif; ?>
   </form>
 </details>
+<?php endif; ?>
 
 <section class="card">
-  <header class="card-header">Equipo</header>
+  <header class="card-header">Equipo<?php if ($cuenta !== ''): ?>
+    <span class="lf-alta-cupo<?= $lleno ? ' lleno' : '' ?>"><?= P::e($cuenta) ?></span><?php endif; ?></header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
     <table class="table table-hover">
       <thead><tr>

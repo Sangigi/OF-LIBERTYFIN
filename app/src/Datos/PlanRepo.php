@@ -78,6 +78,41 @@ final class PlanRepo
                 'leyenda' => (string)($c['leyenda'] ?? '')];
     }
 
+    /**
+     * Cuántos usuarios ACTIVOS permite el plan de la empresa; 0 = sin tope.
+     *
+     * Se lee el plan de la base principal, no de la sesión: al aprobarse un
+     * pago el plan cambia, y la sesión sigue con el de cuando entró. Un plan
+     * que no está en config/planes.php (la prueba, por ejemplo) o sin
+     * `usuarios` no tiene tope.
+     */
+    public function usuariosPermitidos($empresaId)
+    {
+        try {
+            $st = $this->principal->prepare("SELECT plan FROM empresas WHERE id = ?");
+            $st->execute([(int)$empresaId]);
+            $clave = (string)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return 0;
+        }
+        $cat = self::catalogo();
+        return (int)($cat['planes'][$clave]['usuarios'] ?? 0);
+    }
+
+    /** El nombre del plan de la empresa, para los mensajes. */
+    public function nombrePlan($empresaId)
+    {
+        try {
+            $st = $this->principal->prepare("SELECT plan FROM empresas WHERE id = ?");
+            $st->execute([(int)$empresaId]);
+            $clave = (string)$st->fetchColumn();
+        } catch (\Throwable $e) {
+            return '';
+        }
+        $cat = self::catalogo();
+        return (string)($cat['planes'][$clave]['nombre'] ?? $clave);
+    }
+
     /** Se crea sola la primera vez. */
     private function asegurar()
     {
