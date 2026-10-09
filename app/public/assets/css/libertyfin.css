@@ -3823,3 +3823,76 @@ tr:has(a[data-lf-fila]){cursor:pointer}
 
 /* El botón del aviso ("Abrir chat") no se parte en dos renglones. */
 .lf-toast-chat .btn{flex:none;white-space:nowrap}
+
+/* ══════════════════════════════════════════════════════
+   EL CHAT DE SOPORTE EN EL CELULAR
+   Arriba, la barra, una fila de botones y la cabecera; abajo,
+   plantillas, una caja de dos renglones y otra fila de botones: a
+   los mensajes les quedaba la mitad de la pantalla. Ahora:
+     · la cabecera es la de una app de mensajes: ← con quién · Detalles
+       (la ficha y el correo pasan al panel de Detalles);
+     · la caja: [Nota interna | plantillas] y abajo
+       [😊][📎][ escribir…         ][➤], de un renglón que crece;
+     · en las burbujas, sin la etiqueta "Cliente" (va a la izquierda)
+       y, si es de hoy, solo la hora.
+   ══════════════════════════════════════════════════════ */
+/* "Nota interna" junto a las plantillas, en todas las pantallas: las dos
+   cosas deciden CÓMO se va a escribir. Marcada, se pinta de ámbar. */
+.lf-chat-herr{display:flex;align-items:center;gap:10px;margin-bottom:8px;min-width:0}
+.lf-chat-herr .lf-plantillas{flex:1 1 auto;min-width:0;margin-bottom:0}
+.lf-chat-herr .lf-resp-interno{flex:0 0 auto;padding:5px 11px;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r-pill);background:var(--lf-sup);transition:background .15s,border-color .15s,color .15s}
+.lf-chat-herr .lf-resp-interno:has(input:checked){background:var(--lf-amb-soft);
+  border-color:var(--lf-amb);color:var(--lf-amb);font-weight:600}
+.lf-chat-atras,.lf-chat-quien,.lf-solo-movil{display:none}
+
+@media(max-width:600px){
+  .lf-acciones-soporte{display:none!important}
+  .lf-solo-movil{display:block}
+
+  /* Cabecera: ← · con quién · Detalles */
+  .lf-chat-ventana > .card-header{gap:8px;padding:8px 10px}
+  .lf-chat-atras{display:grid;place-items:center;flex:0 0 auto;width:34px;height:34px;margin-left:-2px;
+    border-radius:50%;color:var(--lf-tinta-2);text-decoration:none;font-size:21px;line-height:1}
+  .lf-chat-atras:active{background:var(--lf-vidrio)}
+  .lf-chat-tit{flex:1 1 auto;min-width:0}
+  .lf-chat-tit > span:first-child{display:none}
+  .lf-chat-quien{display:block;min-width:0}
+  .lf-chat-quien b{display:block;font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lf-chat-quien small{display:block;margin-top:1px;font-size:11.5px;font-weight:400;color:var(--lf-tinta-4);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* Burbujas más limpias */
+  .lf-chat-lista .lf-tag-cliente{display:none}
+  .lf-chat-lista .lf-msj .fecha .dia.hoy,.lf-chatf .lf-msj .fecha .dia.hoy{display:none}
+
+  /* La caja de escribir, en rejilla:
+       [Nota interna | plantillas…]      (solo soporte)
+       [vista previa del adjunto]
+       [😊][📎][ escribir…   ][➤]                                  */
+  .lf-chat-pie form{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;
+    column-gap:6px;row-gap:8px;align-items:end}
+  .lf-chat-pie .lf-resp-pie{display:contents}
+  .lf-chat-pie .lf-chat-herr{order:1;grid-column:1/-1;margin:0;gap:6px}
+  .lf-chat-pie .lf-plantillas > span{display:none}
+  .lf-chat-pie .lf-resp-interno{padding:6px 10px}
+  .lf-chat-pie .lf-adj-vista{order:2;grid-column:1/-1;margin:0}
+  .lf-chat-pie .lf-emoji{order:3;grid-column:1}
+  .lf-chat-pie .lf-file{order:4;grid-column:2}
+  .lf-chat-pie textarea{order:5;grid-column:3;height:42px;min-height:42px}
+  .lf-chat-pie .lf-resp-pie .btn{order:6;grid-column:4;margin:0}
+  .lf-chat-pie .lf-chat-error{order:7;grid-column:1/-1;margin:0}
+  .lf-chat-pie .lf-emoji-bt,.lf-chat-pie .lf-file .bt{width:36px;height:42px;border-radius:12px}
+}
+/* Estado, prioridad y categoría del ticket: del ancho de su columna (sin
+   Bootstrap, cada uno se quedaba del largo de su texto). */
+form[data-lf-ticket-cambio] .form-select{width:100%}
+@media(max-width:600px){
+  /* Con el teclado abierto queda poca pantalla: la caja crece hasta ~5
+     renglones y de ahí se desplaza por dentro. */
+  .lf-chat-pie textarea{max-height:128px}
+}
+/* "Detalles" es solo del celular. Es un .btn, y .btn trae display con
+   !important: sin esto, en la computadora salía un botón que no hacía
+   nada (la columna de detalles ya está a la vista). */
+@media(min-width:941px){ .lf-ver-detalles{display:none!important} }

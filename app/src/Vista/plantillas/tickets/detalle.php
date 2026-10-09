@@ -16,7 +16,10 @@ $dur = $min < 60 ? round($min) . ' min' : round($min/60,1) . ' h';
 $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
 ?>
 
-<div class="lf-acciones-chat" style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
+<?php /* `lf-acciones-soporte`: en el celular esta fila no va. "Volver" pasa
+         a la flecha de la cabecera del chat, y la ficha y el correo, al
+         panel de Detalles: así el chat gana todo ese alto. */ ?>
+<div class="lf-acciones-chat lf-acciones-soporte" style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
   <a class="btn btn-secondary btn-sm" href="/tickets">Volver a la bandeja</a>
   <?php if ($t['empresa_id']): ?>
     <a class="btn btn-secondary btn-sm" href="/soporte/<?= (int)$t['empresa_id'] ?>">
@@ -65,10 +68,15 @@ document.addEventListener('click', function(ev){
              data-lf-form="#formResp"
              data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
       <header class="card-header">
-        <div><span>Conversación</span>
+        <?php /* Solo en el celular: volver, como en una app de mensajes. */ ?>
+        <a class="lf-chat-atras" href="/tickets" aria-label="Volver a la bandeja" title="Volver a la bandeja">&larr;</a>
+        <div class="lf-chat-tit"><span>Conversación</span>
           <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
             <?php $pub = 0; foreach ($mensajes as $x) if (empty($x['interno'])) $pub++; ?>
-            <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente · se actualiza sola</p></div>
+            <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente · se actualiza sola</p>
+          <?php /* En el celular, en vez de "Conversación": con quién. */ ?>
+          <span class="lf-chat-quien"><b><?= P::e($t['creado_nombre'] ?: 'Cliente') ?></b>
+            <small><?= P::e(implode(' · ', array_filter([$t['nombre_empresa'] ?? '', $t['folio']]))) ?></small></span></div>
         <?php /* Solo en el celular: abre la columna de la derecha. */ ?>
         <button type="button" class="btn btn-secondary btn-sm lf-ver-detalles" data-lf-detalles>Detalles</button>
       </header>
@@ -83,11 +91,11 @@ document.addEventListener('click', function(ev){
             <div class="cuerpo">
               <div class="cab">
                 <b><?= P::e($m['autor_nombre'] ?: 'Sistema') ?></b>
-                <?php if ($deCliente): ?><span class="badge bg-secondary">Cliente</span><?php endif; ?>
+                <?php if ($deCliente): ?><span class="badge bg-secondary lf-tag-cliente">Cliente</span><?php endif; ?>
                 <?php if ($m['interno']): ?>
                   <span class="badge bg-secondary">Nota interna</span>
                 <?php endif; ?>
-                <span class="fecha"><?= date('d/m/Y H:i', strtotime($m['creado_en'])) ?></span>
+                <?= T::fechaMsj($m['creado_en']) ?>
               </div>
               <p><?= nl2br(P::e($m['cuerpo'])) ?></p>
               <?php if ($m['adjunto'] && preg_match('/\.(png|jpe?g|webp|gif)$/i', $m['adjunto'])): ?>
@@ -112,22 +120,26 @@ document.addEventListener('click', function(ev){
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
               id="formResp" data-lf-enviar>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
-          <?php if ($plantillas): ?>
-            <div class="lf-plantillas">
-              <span>Plantillas:</span>
-              <?php foreach ($plantillas as $pl): ?>
-                <button type="button" class="lf-pill lf-plant"
-                        data-txt="<?= P::e($pl['cuerpo']) ?>"><?= P::e($pl['titulo']) ?></button>
-              <?php endforeach; ?>
-            </div>
-          <?php endif; ?>
-          <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="2" required
-                    placeholder="Qué encontraste y qué tiene que hacer"></textarea>
-          <div class="lf-resp-pie">
+          <?php /* Cómo se va a escribir: nota interna o no, y las plantillas.
+                   Juntas arriba de la caja, en una fila que se desliza. */ ?>
+          <div class="lf-chat-herr">
             <label class="lf-resp-interno"
                    title="Una nota interna no la ve el cliente y no cuenta como primera respuesta: para él nadie le ha contestado todavía.">
               <input type="checkbox" name="interno" value="1"> Nota interna
             </label>
+            <?php if ($plantillas): ?>
+              <div class="lf-plantillas">
+                <span>Plantillas:</span>
+                <?php foreach ($plantillas as $pl): ?>
+                  <button type="button" class="lf-pill lf-plant"
+                          data-txt="<?= P::e($pl['cuerpo']) ?>"><?= P::e($pl['titulo']) ?></button>
+                <?php endforeach; ?>
+              </div>
+            <?php endif; ?>
+          </div>
+          <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="2" required
+                    placeholder="Qué encontraste y qué tiene que hacer"></textarea>
+          <div class="lf-resp-pie">
             <span class="lf-file">
               <input type="file" name="adjunto" id="adjResp"
                      accept="image/png,image/jpeg,image/webp,application/pdf">
@@ -144,6 +156,20 @@ document.addEventListener('click', function(ev){
   <div>
     <?php /* Solo en el celular, donde esta columna es un panel aparte. */ ?>
     <button type="button" class="lf-cerrar-detalles" data-lf-detalles-cerrar aria-label="Cerrar los detalles">×</button>
+    <?php /* Solo en el celular: lo que en la computadora está arriba del chat. */
+    if ($t['empresa_id'] || $t['email_admin']): ?>
+    <section class="card lf-solo-movil">
+      <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+        <?php if ($t['empresa_id']): ?>
+          <a class="btn btn-secondary btn-sm" href="/soporte/<?= (int)$t['empresa_id'] ?>">
+            <?= W::icono('cliente','15px') ?>Ficha de <?= P::e($t['nombre_empresa']) ?></a>
+        <?php endif; ?>
+        <?php if ($t['email_admin']): ?>
+          <a class="btn btn-secondary btn-sm" href="mailto:<?= P::e($t['email_admin']) ?>">Escribirle por correo</a>
+        <?php endif; ?>
+      </div>
+    </section>
+    <?php endif; ?>
     <?php if ($ayuda): ?>
     <section class="card">
       <header class="card-header">

@@ -551,6 +551,19 @@ final class TicketRepo
         ];
     }
 
+    /**
+     * La fecha de un mensaje, para las vistas: "09/10/2026 10:24". El día va
+     * en su propio <span>: en el celular, si es de hoy, se ve solo la hora,
+     * como en cualquier chat (lo mismo hace lf-chat.js con los que llegan).
+     */
+    public static function fechaMsj($creadoEn)
+    {
+        $ts  = strtotime((string)$creadoEn);
+        $dia = date('d/m/Y', $ts);
+        return '<span class="fecha"><span class="dia' . ($dia === date('d/m/Y') ? ' hoy' : '') . '">'
+             . $dia . ' </span>' . date('H:i', $ts) . '</span>';
+    }
+
     /** 'plataforma' (soporte, validación, superadmin) o 'empresa' (el cliente). */
     private static function tipoAutor()
     {

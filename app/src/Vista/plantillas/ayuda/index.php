@@ -75,7 +75,7 @@ $comoVa = [
         <div class="cuerpo">
           <div class="cab">
             <b><?= $mio ? 'Tú' : P::e($m['autor_nombre'] ?: 'LibertyFin') ?></b>
-            <span class="fecha"><?= date('d/m/Y H:i', strtotime($m['creado_en'])) ?></span>
+            <?= T::fechaMsj($m['creado_en']) ?>
           </div>
           <p><?= nl2br(P::e($m['cuerpo'])) ?></p>
           <?php if ($m['adjunto'] && preg_match('/\.(png|jpe?g|webp|gif)$/i', $m['adjunto'])): ?>

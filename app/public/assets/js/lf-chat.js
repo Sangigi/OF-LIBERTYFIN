@@ -187,6 +187,18 @@
   function esImagen(url) { return /\.(png|jpe?g|webp|gif)(\?|$)/i.test(String(url || '')); }
   function peso(b) { return b < 1048576 ? Math.max(1, Math.round(b / 1024)) + ' KB' : (b / 1048576).toFixed(1) + ' MB'; }
 
+  /* "09/10/2026 10:24", con el día en su propio <span> (igual que
+     TicketRepo::fechaMsj): en el celular, si es de hoy, se ve solo la hora. */
+  function fechaMsj(f) {
+    var s = crear('span', 'fecha'), p = String(f || '').split(' ');
+    if (p.length !== 2) { s.textContent = f || ''; return s; }
+    var d = new Date(), dos = function (n) { return (n < 10 ? '0' : '') + n; };
+    var hoy = dos(d.getDate()) + '/' + dos(d.getMonth() + 1) + '/' + d.getFullYear();
+    s.appendChild(crear('span', 'dia' + (p[0] === hoy ? ' hoy' : ''), p[0] + ' '));
+    s.appendChild(document.createTextNode(p[1]));
+    return s;
+  }
+
   /* Un mensaje, con la misma forma que el que pinta el servidor. Una
      imagen adjunta se ve en miniatura; un PDF, como enlace. */
   function pintar(m, lado) {
@@ -206,8 +218,8 @@
     var cab = crear('div', 'cab');
     cab.appendChild(crear('b', '', m.autor));
     if (m.interno) cab.appendChild(crear('span', 'badge bg-secondary', 'Nota interna'));
-    if (lado === 'soporte' && m.tipo === 'empresa') cab.appendChild(crear('span', 'badge bg-secondary', 'Cliente'));
-    cab.appendChild(crear('span', 'fecha', m.fecha));
+    if (lado === 'soporte' && m.tipo === 'empresa') cab.appendChild(crear('span', 'badge bg-secondary lf-tag-cliente', 'Cliente'));
+    cab.appendChild(fechaMsj(m.fecha));
     cuerpo.appendChild(cab);
     cuerpo.appendChild(parrafo(m.cuerpo));
     if (m.adjunto) {
