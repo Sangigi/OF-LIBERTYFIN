@@ -29,7 +29,7 @@
       reportes sin resolver para cambiar de uno a otro sin salir.
 
    4. NOVEDADES DE SOPORTE. Para quien atiende tickets: una campana arriba
-      con los que esperan su respuesta, la cuenta en el menú y en el
+      con los mensajes de clientes que no ha leído, la cuenta en el menú y en el
       título de la pestaña, un aviso con sonido cuando un cliente escribe
       y, con la pestaña en segundo plano, un aviso del escritorio.
 
@@ -1194,9 +1194,11 @@
   }
 
   /* ══ 4 · Novedades de soporte ══
-     Los tickets que esperan respuesta de quien atiende: los suyos y los
-     que nadie ha tomado. Llegan por cinco lados, para que no se escape
-     ninguno:
+     Los mensajes de clientes que quien atiende NO ha leído, en sus
+     tickets y en los que nadie ha tomado. En cuanto abre el ticket deja
+     de salir (aunque no haya contestado todavía); si el cliente vuelve a
+     escribir, sale otra vez. Llegan por cinco lados, para que no se
+     escape ninguno:
 
        · la CAMPANA de arriba, con la lista (quién, de qué empresa, hace
          cuánto, si es nuevo o nadie lo ha tomado);
@@ -1232,16 +1234,26 @@
     alEnviar.push(function () { setTimeout(revisar, 800); });
     document.addEventListener('visibilitychange', function () { if (!document.hidden) revisar(); });
     // La barra de arriba se cambia al navegar: la campana nueva llega vacía.
-    document.addEventListener('lf:cargado', function () { pintarCampana(); });
+    // Y si se entró a un ticket, ese ya se leyó: fuera de la lista, y se
+    // pregunta de nuevo para tener la cuenta exacta.
+    document.addEventListener('lf:cargado', function () {
+      var m = /^\/tickets\/(\d+)$/.exec(location.pathname);
+      if (m) { yaLeido(m[1]); setTimeout(revisar, 600); }
+      pintarCampana();
+    });
+    var aqui = /^\/tickets\/(\d+)$/.exec(location.pathname);
+    if (aqui) yaLeido(aqui[1]);
     setTimeout(revisar, 900);
   }
 
   function recibirSoporte(j) {
+    // El ticket que tienes abierto ya lo estás leyendo: no cuenta, aunque
+    // el servidor todavía no haya alcanzado a marcarlo.
+    var antes = (j.tickets || []).length;
+    j.tickets = (j.tickets || []).filter(function (t) { return !viendo(t.id); });
+    j.esperando = Math.max(0, (+j.esperando || 0) - (antes - j.tickets.length));
     campana = j;
-    var n = +j.esperando || 0;
-    marcarEnlace('/tickets', n, '1 ticket espera tu respuesta', 'tickets esperan tu respuesta');
-    cuentaTitulo = n; pintarTitulo();
-    pintarCampana();
+    contarCampana();
 
     var primera = !leer('lf_sop_inicio');
     guardar('lf_sop_inicio', '1');
@@ -1263,6 +1275,26 @@
     if (document.hidden || !document.hasFocus()) escritorio(titulo, linea, t.id, abrir);
     if (!document.hidden) avisar(titulo, linea, abrir);
     sonar();
+  }
+
+  /* La cuenta de lo no leído: en el menú, en el título y en la campana. */
+  function contarCampana() {
+    var n = campana ? (+campana.esperando || 0) : 0;
+    marcarEnlace('/tickets', n, '1 ticket con mensajes sin leer', 'tickets con mensajes sin leer');
+    cuentaTitulo = n; pintarTitulo();
+    pintarCampana();
+  }
+
+  /* Ya lo abriste: sale de la lista al momento, sin esperar a la
+     siguiente revisión (el servidor lo marca como leído al abrirlo). */
+  function yaLeido(id) {
+    if (!campana || !campana.tickets) return;
+    var antes = campana.tickets.length;
+    campana.tickets = campana.tickets.filter(function (t) { return +t.id !== +id; });
+    if (campana.tickets.length < antes) {
+      campana.esperando = Math.max(0, (+campana.esperando || 0) - 1);
+      contarCampana();
+    }
   }
 
   /* "hace 3 min", con los segundos que mide la base. */
@@ -1314,7 +1346,7 @@
     pop.innerHTML = '';
 
     var cab = crear('header');
-    cab.appendChild(crear('b', '', 'Esperan tu respuesta'));
+    cab.appendChild(crear('b', '', 'Mensajes sin leer'));
     if (+j.esperando) cab.appendChild(crear('span', 'cuantos', String(j.esperando)));
     pop.appendChild(cab);
 
@@ -1322,8 +1354,8 @@
     if (!(j.tickets || []).length) {
       var nada = crear('div', 'nada');
       nada.appendChild(crear('span', 'ico', '✓'));
-      nada.appendChild(crear('b', '', 'Nada pendiente'));
-      nada.appendChild(crear('small', '', 'Todos los clientes tienen respuesta.'));
+      nada.appendChild(crear('b', '', 'Estás al día'));
+      nada.appendChild(crear('small', '', 'No hay mensajes de clientes sin leer.'));
       lista.appendChild(nada);
     }
     (j.tickets || []).forEach(function (t) {
@@ -1389,7 +1421,7 @@
     if (!pop) {
       pop = crear('div', 'lf-campana-pop');
       pop.setAttribute('role', 'dialog');
-      pop.setAttribute('aria-label', 'Tickets que esperan tu respuesta');
+      pop.setAttribute('aria-label', 'Mensajes de clientes sin leer');
       c.appendChild(pop);
     }
     pop.hidden = false;
@@ -1420,6 +1452,11 @@
     }
     // Un clic en un ticket de la lista navega y cierra; fuera, cierra.
     var dentro = e.target.closest && e.target.closest('.lf-campana-pop');
+    var it = dentro && e.target.closest('a.it');
+    if (it) {
+      var m = /\/tickets\/(\d+)/.exec(it.getAttribute('href') || '');
+      if (m) yaLeido(m[1]);
+    }
     if (!dentro || e.target.closest('a')) cerrarCampana();
   });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') cerrarCampana(); });

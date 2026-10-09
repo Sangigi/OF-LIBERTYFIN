@@ -252,7 +252,14 @@ final class TicketsControlador
      */
     private function leyendo(TicketRepo $repo, array $t, array $mensajes)
     {
-        if ((int)($t['asignado_a'] ?? 0) !== (int)($_SESSION['usuario_id'] ?? 0)) return;
+        // Lo que tiene enfrente, cualquiera de soporte, ya lo leyó: deja de
+        // salirle en la campana aunque todavía no conteste.
+        $yo = (int)($_SESSION['usuario_id'] ?? 0);
+        if ($mensajes) $repo->marcarLeido($t['id'], $yo, max(array_column($mensajes, 'id')));
+
+        // Y quien ATIENDE el ticket, además, está en la conversación: con
+        // eso se decide si hace falta mandarle correo.
+        if ((int)($t['asignado_a'] ?? 0) !== $yo) return;
         $repo->marcarActivo($t['id'], 'soporte');
         if ($mensajes) $repo->marcarVistoSoporte($t['id'], max(array_column($mensajes, 'id')));
     }

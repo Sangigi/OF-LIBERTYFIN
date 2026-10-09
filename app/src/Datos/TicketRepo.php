@@ -58,7 +58,7 @@ final class TicketRepo
      * Súbelo al cambiar lo que `asegurar()` crea o agrega: así cada sesión
      * vuelve a revisar una vez.
      */
-    const ESQUEMA = 4;
+    const ESQUEMA = 5;
 
     public function asegurar()
     {
@@ -114,6 +114,16 @@ final class TicketRepo
                 quien_nombre VARCHAR(160) NULL,
                 creado_en DATETIME NOT NULL,
                 KEY ix_te_ticket (ticket_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+        // Hasta qué mensaje leyó cada persona de soporte cada ticket: la
+        // campana avisa de lo que TÚ no has leído (ver marcarLeido).
+        $this->db->exec("
+            CREATE TABLE IF NOT EXISTS ticket_lecturas (
+                ticket_id INT NOT NULL,
+                usuario_id INT NOT NULL,
+                visto INT NOT NULL DEFAULT 0,
+                PRIMARY KEY (ticket_id, usuario_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
         // DE QUÉ TABLA ES EL AUTOR. `autor_id` solo no basta: soporte vive en
@@ -298,6 +308,24 @@ final class TicketRepo
     }
 
     /**
+     * Lo que ESTA persona de soporte ya leyó del ticket (para la campana).
+     *
+     * Va aparte de `visto_soporte`, que es de quien atiende el ticket y
+     * sirve para decidir el correo: aquí cada quien lleva lo suyo. Si un
+     * compañero abre un ticket sin asignar, a ti te sigue saliendo.
+     */
+    public function marcarLeido($ticketId, $usuarioId, $hastaId)
+    {
+        if (!$usuarioId || !$hastaId) return;
+        try {
+            $this->db->prepare("
+                INSERT INTO ticket_lecturas (ticket_id, usuario_id, visto) VALUES (?,?,?)
+                ON DUPLICATE KEY UPDATE visto = GREATEST(visto, VALUES(visto))
+            ")->execute([(int)$ticketId, (int)$usuarioId, (int)$hastaId]);
+        } catch (\Throwable $e) { /* sin la tabla todavía */ }
+    }
+
+    /**
      * ¿Hace falta avisarle por correo al CLIENTE de este mensaje de soporte?
      *
      * Solo una vez por tanda: si ya tenía un mensaje de soporte sin leer, el
@@ -372,10 +400,12 @@ final class TicketRepo
     }
 
     /**
-     * LO QUE ESPERA RESPUESTA DE SOPORTE: tickets abiertos o en curso cuyo
-     * último mensaje visible es del cliente. De ellos, los que atiende esta
-     * persona y los que nadie ha tomado (cualquiera de soporte puede).
-     * Los de otro agente no: no son suyos.
+     * LO NUEVO PARA SOPORTE: tickets abiertos o en curso cuyo último
+     * mensaje visible es del cliente y que esta persona NO ha leído. En
+     * cuanto abre el ticket deja de salir, aunque todavía no conteste; si
+     * el cliente vuelve a escribir, sale otra vez. De ellos, los que
+     * atiende esta persona y los que nadie ha tomado (cualquiera de
+     * soporte puede). Los de otro agente no: no son suyos.
      */
     public function novedadesSoporte($usuarioId)
     {
@@ -391,13 +421,15 @@ final class TicketRepo
                 INNER JOIN ( SELECT ticket_id, MAX(id) AS ultimo FROM ticket_mensajes
                              WHERE interno = 0 GROUP BY ticket_id ) u ON u.ticket_id = t.id
                 INNER JOIN ticket_mensajes m ON m.id = u.ultimo
+                LEFT JOIN ticket_lecturas l ON l.ticket_id = t.id AND l.usuario_id = ?
                 WHERE t.estado IN ('abierto', 'en_curso')
                   AND (m.autor_tipo = 'empresa'
                        OR (m.autor_tipo IS NULL AND m.autor_id = t.creado_por))
                   AND (t.asignado_a = ? OR t.asignado_a IS NULL)
+                  AND m.id > COALESCE(l.visto, 0)
                 ORDER BY m.id DESC
                 LIMIT 20");
-            $st->execute([(int)$usuarioId]);
+            $st->execute([(int)$usuarioId, (int)$usuarioId]);
             return $st->fetchAll();
         } catch (\Throwable $e) { return []; }
     }
