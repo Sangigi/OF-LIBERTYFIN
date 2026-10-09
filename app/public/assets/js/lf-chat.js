@@ -1406,7 +1406,9 @@
     son.appendChild(chk); son.appendChild(document.createTextNode(' Sonido'));
     op.appendChild(son);
 
-    if (PUSH && Notification.permission !== 'denied') {
+    if (!window.isSecureContext) {
+      op.appendChild(crear('small', 'bloq', 'Los avisos del escritorio necesitan HTTPS'));
+    } else if (PUSH && Notification.permission !== 'denied') {
       // Avisos del escritorio AUNQUE LibertyFin esté cerrado. Marcar la
       // casilla pide el permiso (si hace falta) y suscribe este navegador.
       var ep = crear('label', 'op');
@@ -1418,6 +1420,8 @@
       });
       ep.appendChild(cp); ep.appendChild(document.createTextNode(' Escritorio'));
       op.appendChild(ep);
+      // Si no se pudo activar, se dice por qué (no solo se desmarca).
+      if (falloPush && !pushActivo()) op.appendChild(crear('small', 'bloq err', falloPush));
     } else if (window.Notification) {
       if (Notification.permission === 'granted') {
         var esc = crear('label', 'op');
@@ -1609,19 +1613,41 @@
       });
   }
 
+  /* La dirección de suscripción va CODIFICADA (base64url): el filtro de
+     seguridad del hosting (ModSecurity) rechaza con "406 Not Acceptable"
+     cualquier campo que traiga "https://..." tal cual, y la petición ni
+     llegaba a LibertyFin. */
+  function codificar(u) {
+    return btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+
+  /* Devuelve '' si quedó guardada, o qué falló. */
   function avisarAlServidor(sub) {
     var fd = new FormData();
     fd.append('token', token());
-    fd.append('endpoint', sub.endpoint);
+    fd.append('ep', codificar(sub.endpoint));
     return pedir('/push/suscribir', { method: 'POST', body: fd }).then(function (j) {
-      if (j && j.ok) { guardar('lf_push', j.quien || quien()); return true; }
-      return false;
-    });
+      if (j && j.ok) { guardar('lf_push', j.quien || quien()); return ''; }
+      return (j && j.error) || 'El servidor rechazó la suscripción.';
+    }, function () { return 'No hubo conexión con el servidor.'; });
   }
 
-  /* Activar: siempre desde un clic. */
+  function motivo(e, texto) {
+    return texto + (e && e.message ? ' (' + e.message + ')' : '') + '.';
+  }
+
+  /* Lo último que falló al activar, para decirlo en la campana. */
+  var falloPush = '';
+
+  /* Activar: siempre desde un clic. Devuelve '' si quedaron activados, o
+     QUÉ falló, para decirlo en vez de desmarcar la casilla en silencio. */
   function activarPush() {
-    if (!PUSH) return Promise.resolve(false);
+    if (!window.isSecureContext) {
+      return Promise.resolve('Los avisos del escritorio necesitan que LibertyFin esté en HTTPS.');
+    }
+    if (!PUSH) {
+      return Promise.resolve('Este navegador no permite avisos con LibertyFin cerrado (en una ventana privada tampoco).');
+    }
     var permiso = Notification.permission === 'granted'
       ? Promise.resolve('granted')
       : new Promise(function (listo) {
@@ -1629,28 +1655,39 @@
           if (r && r.then) r.then(listo);
         });
     return permiso.then(function (p) {
-      if (p !== 'granted') return false;
-      return Promise.all([pedir('/push/llave'), registrarSW()]).then(function (r) {
-        if (!r[0] || !r[0].ok || !r[0].llave) return false;
-        return suscripcion(r[1], r[0].llave).then(avisarAlServidor);
+      if (p === 'denied') return 'Los bloqueaste en el navegador: permítelos desde el candado junto a la dirección y vuelve a intentar.';
+      if (p !== 'granted') return 'No diste el permiso. Vuelve a intentarlo y elige "Permitir".';
+      return Promise.all([
+        pedir('/push/llave').then(null, function () { return null; }),
+        registrarSW().then(null, function (e) { return { error: motivo(e, 'No se pudo instalar el servicio de avisos') }; })
+      ]).then(function (r) {
+        if (!r[0] || !r[0].ok || !r[0].llave) {
+          return 'El servidor no pudo preparar los avisos. Revisa el registro de PHP ([LibertyFin] push).';
+        }
+        if (r[1] && r[1].error) return r[1].error;
+        return suscripcion(r[1], r[0].llave).then(avisarAlServidor, function (e) {
+          return motivo(e, 'El servicio de avisos del navegador no respondió')
+            + (navigator.brave ? ' En Brave hay que activar "Usar servicios de Google para mensajería push".' : '');
+        });
       });
-    }).then(function (ok) { pintarOfertas(); return ok; },
-            function () { pintarOfertas(); return false; });
+    }).then(function (m) { falloPush = m || ''; pintarOfertas(); return m || ''; },
+            function (e) { falloPush = motivo(e, 'No se pudieron activar'); pintarOfertas(); return falloPush; });
   }
 
   function desactivarPush() {
     guardar('lf_push', '');
-    if (!PUSH) return Promise.resolve();
+    falloPush = '';
+    if (!PUSH) return Promise.resolve('');
     return navigator.serviceWorker.getRegistration('/').then(function (reg) {
       if (!reg) return null;
       return reg.pushManager.getSubscription().then(function (s) {
         if (!s) return null;
         var fd = new FormData();
         fd.append('token', token());
-        fd.append('endpoint', s.endpoint);
+        fd.append('ep', codificar(s.endpoint));
         return pedir('/push/quitar', { method: 'POST', body: fd }).then(function () { return s.unsubscribe(); });
       });
-    }).then(function () { pintarOfertas(); }, function () { pintarOfertas(); });
+    }).then(function () { pintarOfertas(); return ''; }, function () { pintarOfertas(); return ''; });
   }
 
   /* Los botones "Avisarme cuando respondan": solo si se puede y todavía
@@ -1666,17 +1703,10 @@
     e.preventDefault();
     e.stopPropagation();
     b.disabled = true;
-    activarPush().then(function (ok) {
+    activarPush().then(function (m) {
       b.disabled = false;
-      if (ok) {
-        avisar('Avisos activados',
-               'Te avisaremos cuando soporte responda, aunque cierres LibertyFin.', null);
-      } else {
-        avisar('No se activaron los avisos',
-               Notification.permission === 'denied'
-                 ? 'Los bloqueaste en el navegador: permítelos desde el candado junto a la dirección.'
-                 : 'Este navegador no los permite aquí.', null);
-      }
+      if (!m) avisar('Avisos activados', 'Te avisaremos cuando soporte responda, aunque cierres LibertyFin.', null);
+      else avisar('No se activaron los avisos', m, null);
     });
   });
 
@@ -1690,7 +1720,7 @@
     Promise.all([pedir('/push/llave'), registrarSW()]).then(function (r) {
       if (!r[0] || !r[0].ok || !r[0].llave) return false;
       return suscripcion(r[1], r[0].llave).then(avisarAlServidor);
-    }).then(function (ok) { if (ok) sesionGuardar('lf_push_al_dia', quien()); }, function () {});
+    }).then(function (m) { if (m === '') sesionGuardar('lf_push_al_dia', quien()); }, function () {});
   }
 
   window.LFChat = { enlazar: enlazar, abrir: abrirChat, revisar: function () { revisarCliente(); } };

@@ -79,8 +79,26 @@ final class Push
             $f = $db->query("SELECT clave, valor FROM lf_push_llaves")->fetchAll(\PDO::FETCH_KEY_PAIR);
             if (!empty($f['publica']) && !empty($f['privada'])) return $ll = $f;
 
-            $k = openssl_pkey_new(['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC]);
-            if (!$k || !openssl_pkey_export($k, $pem)) throw new \RuntimeException('OpenSSL no generó la llave');
+            // Algunos servidores (sobre todo Windows) no encuentran la
+            // configuración de OpenSSL y la llave no se genera: se prueba
+            // también con la que trae PHP.
+            $base = ['curve_name' => 'prime256v1', 'private_key_type' => OPENSSL_KEYTYPE_EC];
+            $intentos = [$base];
+            foreach ([getenv('OPENSSL_CONF'), dirname(PHP_BINARY) . '/extras/ssl/openssl.cnf',
+                      PHP_BINDIR . '/../extras/ssl/openssl.cnf'] as $cnf) {
+                if ($cnf && is_file($cnf)) $intentos[] = $base + ['config' => $cnf];
+            }
+            $pem = null;
+            foreach ($intentos as $op) {
+                $k = @openssl_pkey_new($op);
+                if ($k && @openssl_pkey_export($k, $pem, null, $op)) break;
+                $k = null; $pem = null;
+            }
+            if (!$k || !$pem) {
+                $err = '';
+                while ($m = openssl_error_string()) $err .= ' ' . $m;
+                throw new \RuntimeException('OpenSSL no generó la llave.' . $err);
+            }
             $d = openssl_pkey_get_details($k);
             $x = str_pad($d['ec']['x'] ?? '', 32, "\0", STR_PAD_LEFT);
             $y = str_pad($d['ec']['y'] ?? '', 32, "\0", STR_PAD_LEFT);
@@ -109,11 +127,16 @@ final class Push
 
     private static function huella($endpoint) { return hash('sha256', (string)$endpoint); }
 
+    /**
+     * Una dirección https de un servicio de avisos. No se usa
+     * FILTER_VALIDATE_URL: las de Chrome llevan ":" dentro de la ruta y
+     * alguna versión de PHP las rechazaba, y entonces no se podía activar.
+     */
     private static function endpointValido($endpoint)
     {
         $endpoint = (string)$endpoint;
-        return strlen($endpoint) < 1000 && strpos($endpoint, 'https://') === 0
-            && filter_var($endpoint, FILTER_VALIDATE_URL);
+        return strlen($endpoint) < 1000
+            && (bool)preg_match('#^https://[a-z0-9.\-]+(:\d+)?/\S+$#i', $endpoint);
     }
 
     /** Este navegador avisa a esta cuenta. Si avisaba a otra, deja de hacerlo. */

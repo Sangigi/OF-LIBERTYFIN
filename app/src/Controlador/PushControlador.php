@@ -21,19 +21,37 @@ final class PushControlador
     /** Este navegador avisa a la cuenta de la sesión. */
     public function suscribir()
     {
-        if (!$this->token()) $this->json(['ok' => false], 403);
+        if (!$this->token()) $this->json(['ok' => false, 'error' => 'El formulario venció: recarga la página.'], 403);
         $cuenta = SesionUnica::cuentaDeSesion();
-        $ok = Push::suscribir($cuenta, trim((string)($_POST['endpoint'] ?? '')), SesionUnica::navegador());
+        $ok = Push::suscribir($cuenta, self::endpoint(), SesionUnica::navegador());
         // `quien` le dice al navegador de quién quedó: si mañana entra otra
         // persona aquí, no se le reactivan solos los avisos de esta.
-        $this->json(['ok' => $ok, 'quien' => self::quien($cuenta)]);
+        $this->json(['ok' => $ok, 'quien' => self::quien($cuenta),
+                     'error' => $ok ? '' : 'No se pudo guardar la suscripción.']);
     }
 
     public function quitar()
     {
         if (!$this->token()) $this->json(['ok' => false], 403);
-        Push::quitar(trim((string)($_POST['endpoint'] ?? '')));
+        Push::quitar(self::endpoint());
         $this->json(['ok' => true]);
+    }
+
+    /**
+     * La dirección de suscripción, que llega CODIFICADA (base64url) en `ep`.
+     *
+     * Por qué no tal cual: el filtro de seguridad del hosting (ModSecurity)
+     * rechaza con "406 Not Acceptable" cualquier petición que mande una
+     * dirección "https://..." en un campo, porque se parece a un ataque de
+     * inclusión remota. Esa petición ni siquiera llegaba a PHP.
+     */
+    private static function endpoint()
+    {
+        $ep = (string)($_POST['ep'] ?? '');
+        if ($ep === '') return trim((string)($_POST['endpoint'] ?? ''));
+        $b = strtr($ep, '-_', '+/');
+        $b .= str_repeat('=', (4 - strlen($b) % 4) % 4);
+        return trim((string)base64_decode($b, true));
     }
 
     /**
@@ -44,7 +62,7 @@ final class PushControlador
      */
     public function pendiente()
     {
-        $a = Push::aviso(trim((string)($_POST['endpoint'] ?? '')));
+        $a = Push::aviso(self::endpoint());
         $this->json($a ? ['ok' => true, 'aviso' => $a] : ['ok' => false]);
     }
 

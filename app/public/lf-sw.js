@@ -21,6 +21,11 @@
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
 
+/* base64url: lo mismo que hace lf-chat.js al suscribirse. */
+function codificar(u) {
+  return btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
 function ventanas() {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 }
@@ -34,12 +39,14 @@ self.addEventListener('push', function (e) {
 
     return self.registration.pushManager.getSubscription().then(function (s) {
       if (!s) return null;
+      // La dirección va codificada: el filtro de seguridad del hosting
+      // rechaza (406) cualquier campo que traiga "https://..." tal cual.
       return fetch('/push/pendiente', {
         method: 'POST',
         credentials: 'omit',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'endpoint=' + encodeURIComponent(s.endpoint)
+        body: 'ep=' + encodeURIComponent(codificar(s.endpoint))
       }).then(function (r) { return r.json(); }).then(null, function () { return null; });
     }).then(function (j) {
       var a = (j && j.ok && j.aviso) || GENERICO;

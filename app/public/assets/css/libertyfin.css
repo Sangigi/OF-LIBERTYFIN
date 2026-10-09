@@ -3465,3 +3465,5 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
    tienen su propio `display`, que le ganaba al atributo `hidden`. */
 [data-lf-push][hidden]{display:none!important}
 .lf-chatf header .bt svg{width:16px;height:16px}
+/* Por qué no se activaron los avisos del escritorio. */
+.lf-campana-pop .bloq.err{flex:1 1 100%;color:var(--lf-rojo);line-height:1.45}
