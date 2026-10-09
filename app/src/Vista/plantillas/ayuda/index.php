@@ -23,7 +23,7 @@ $comoVa = [
 <?php endif; ?>
 
 <?php if ($abierto): $t = $abierto; ?>
-<div style="margin-bottom:18px;display:flex;gap:8px;flex-wrap:wrap">
+<div class="lf-acciones-chat" style="margin-bottom:18px;display:flex;gap:8px;flex-wrap:wrap">
   <a class="btn btn-secondary btn-sm" href="/ayuda">Volver a mis reportes</a>
   <?php if ($t['estado'] !== 'cerrado'): ?>
     <?php /* Para seguir la conversación en la esquina mientras se trabaja en otra pantalla. */ ?>
@@ -68,7 +68,8 @@ $comoVa = [
       // un mensaje de soporte salía como "Tú".
       $mio  = T::esMio($m);
       $foto = $fotos[(int)$m['id']] ?? ''; ?>
-      <div class="lf-msj<?= $mio ? ' mio' : '' ?>" data-id="<?= (int)$m['id'] ?>">
+      <?php /* `propio`: lo escribió quien mira (en el celular, burbuja a la derecha). */ ?>
+      <div class="lf-msj<?= $mio ? ' mio propio' : '' ?>" data-id="<?= (int)$m['id'] ?>">
         <span class="lf-av <?= $mio ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
               <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
         <div class="cuerpo">

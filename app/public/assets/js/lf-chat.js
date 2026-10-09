@@ -190,7 +190,12 @@
   /* Un mensaje, con la misma forma que el que pinta el servidor. Una
      imagen adjunta se ve en miniatura; un PDF, como enlace. */
   function pintar(m, lado) {
-    var caja = crear('div', 'lf-msj nuevo' + (m.interno ? ' interno' : '') + (m.mio ? ' mio' : ''));
+    // `propio`: de MI lado de la conversación (en el celular, la burbuja va
+    // a la derecha). Para el cliente, lo que escribió él; para soporte,
+    // todo lo que no escribió el cliente.
+    var propio = lado === 'cliente' ? !!m.mio : m.tipo !== 'empresa';
+    var caja = crear('div', 'lf-msj nuevo' + (m.interno ? ' interno' : '') + (m.mio ? ' mio' : '')
+                            + (propio ? ' propio' : ''));
     caja.setAttribute('data-id', m.id);
     var av = crear('span', 'lf-av' + ((m.interno || (lado === 'cliente' && m.mio)) ? ' gris' : '')
                           + (m.foto ? ' con-foto' : ''), m.inicial);

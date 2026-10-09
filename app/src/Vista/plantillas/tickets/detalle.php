@@ -15,7 +15,7 @@ $venc = $min > $horas * 60;
 $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
 ?>
 
-<div style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
+<div class="lf-acciones-chat" style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
   <a class="btn btn-secondary btn-sm" href="/tickets">Volver a la bandeja</a>
   <?php if ($t['empresa_id']): ?>
     <a class="btn btn-secondary btn-sm" href="/soporte/<?= (int)$t['empresa_id'] ?>">
@@ -83,7 +83,8 @@ document.addEventListener('click', function(ev){
         <?php foreach ($mensajes as $m):
           $foto = $fotos[(int)$m['id']] ?? '';
           $deCliente = ($m['autor_tipo'] ?? '') === 'empresa'; ?>
-          <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?>" data-id="<?= (int)$m['id'] ?>">
+          <?php /* `propio`: del lado de soporte (en el celular, burbuja a la derecha). */ ?>
+          <div class="lf-msj<?= $m['interno'] ? ' interno' : '' ?><?= $deCliente ? '' : ' propio' ?>" data-id="<?= (int)$m['id'] ?>">
             <span class="lf-av <?= $m['interno'] ? 'gris' : '' ?><?= $foto ? ' con-foto' : '' ?>"
                   <?= $foto ? 'style="background-image:url(\'' . P::e($foto) . '\')"' : '' ?>><?= P::e($ini($m['autor_nombre'])) ?></span>
             <div class="cuerpo">
