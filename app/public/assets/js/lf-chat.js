@@ -1613,24 +1613,37 @@
       });
   }
 
-  /* La dirección de suscripción va CODIFICADA (base64url): el filtro de
-     seguridad del hosting (ModSecurity) rechaza con "406 Not Acceptable"
-     cualquier campo que traiga "https://..." tal cual, y la petición ni
-     llegaba a LibertyFin. */
+  /* La dirección de suscripción va EN HEXADECIMAL. El filtro de seguridad
+     del hosting (ModSecurity) rechaza con "406 Not Acceptable" —y la
+     petición ni llega a LibertyFin— un campo con "https://..." tal cual, y
+     también el base64, por sus guiones (los toma por un comentario de
+     SQL). En hexadecimal solo hay 0-9 y a-f, como el token, que pasa. */
   function codificar(u) {
-    return btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    var h = '';
+    for (var i = 0; i < u.length; i++) {
+      var c = u.charCodeAt(i).toString(16);
+      h += (c.length < 2 ? '0' : '') + c;
+    }
+    return h;
+  }
+
+  /* Formulario simple (x-www-form-urlencoded): esos filtros revisan con
+     más reglas el de varias partes. */
+  function formulario(campos) {
+    return Object.keys(campos).map(function (k) {
+      return encodeURIComponent(k) + '=' + encodeURIComponent(campos[k]);
+    }).join('&');
   }
 
   /* Devuelve '' si quedó guardada, o qué falló, con el código HTTP: sin
      él no hay forma de saber si fue el filtro del hosting, un archivo sin
      subir o la base. */
   function avisarAlServidor(sub) {
-    var fd = new FormData();
-    fd.append('token', token());
-    fd.append('ep', codificar(sub.endpoint));
     return fetch('/push/suscribir', {
-      method: 'POST', body: fd, credentials: 'same-origin',
-      headers: { 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' }
+      method: 'POST', credentials: 'same-origin',
+      body: formulario({ token: token(), ep: codificar(sub.endpoint) }),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' }
     }).then(function (r) {
       return r.text().then(function (t) {
         var j = null;
@@ -1701,10 +1714,12 @@
       if (!reg) return null;
       return reg.pushManager.getSubscription().then(function (s) {
         if (!s) return null;
-        var fd = new FormData();
-        fd.append('token', token());
-        fd.append('ep', codificar(s.endpoint));
-        return pedir('/push/quitar', { method: 'POST', body: fd }).then(function () { return s.unsubscribe(); });
+        return fetch('/push/quitar', {
+          method: 'POST', credentials: 'same-origin',
+          body: formulario({ token: token(), ep: codificar(s.endpoint) }),
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded',
+                     'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function () { return s.unsubscribe(); }, function () { return s.unsubscribe(); });
       });
     }).then(function () { pintarOfertas(); return ''; }, function () { pintarOfertas(); return ''; });
   }

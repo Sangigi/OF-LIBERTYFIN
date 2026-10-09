@@ -21,9 +21,16 @@
 self.addEventListener('install', function () { self.skipWaiting(); });
 self.addEventListener('activate', function (e) { e.waitUntil(self.clients.claim()); });
 
-/* base64url: lo mismo que hace lf-chat.js al suscribirse. */
+/* En hexadecimal, lo mismo que hace lf-chat.js al suscribirse: el filtro
+   de seguridad del hosting rechaza (406) "https://..." tal cual y también
+   los guiones del base64. */
 function codificar(u) {
-  return btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  var h = '';
+  for (var i = 0; i < u.length; i++) {
+    var c = u.charCodeAt(i).toString(16);
+    h += (c.length < 2 ? '0' : '') + c;
+  }
+  return h;
 }
 
 function ventanas() {

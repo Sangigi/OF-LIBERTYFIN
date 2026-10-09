@@ -38,17 +38,21 @@ final class PushControlador
     }
 
     /**
-     * La dirección de suscripción, que llega CODIFICADA (base64url) en `ep`.
+     * La dirección de suscripción, que llega CODIFICADA EN HEXADECIMAL en `ep`.
      *
-     * Por qué no tal cual: el filtro de seguridad del hosting (ModSecurity)
-     * rechaza con "406 Not Acceptable" cualquier petición que mande una
-     * dirección "https://..." en un campo, porque se parece a un ataque de
-     * inclusión remota. Esa petición ni siquiera llegaba a PHP.
+     * Por qué así: el filtro de seguridad del hosting (ModSecurity) rechaza
+     * con "406 Not Acceptable" y la petición ni llega a PHP:
+     *   · tal cual, por traer "https://..." (parece inclusión remota);
+     *   · en base64, por los guiones ("--...-" lo toma por un comentario
+     *     de SQL).
+     * En hexadecimal solo hay 0-9 y a-f, igual que el token del formulario,
+     * que siempre pasa. Se acepta también base64 por si acaso.
      */
     private static function endpoint()
     {
-        $ep = (string)($_POST['ep'] ?? '');
+        $ep = trim((string)($_POST['ep'] ?? ''));
         if ($ep === '') return trim((string)($_POST['endpoint'] ?? ''));
+        if (strlen($ep) % 2 === 0 && ctype_xdigit($ep)) return trim((string)hex2bin($ep));
         $b = strtr($ep, '-_', '+/');
         $b .= str_repeat('=', (4 - strlen($b) % 4) % 4);
         return trim((string)base64_decode($b, true));
