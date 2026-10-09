@@ -27,7 +27,7 @@ use LibertyFin\Dominio\Dinero as D;
       <?php foreach ($d['filas'] as $f): ?>
         <tr>
           <td data-label="Venta">
-            <a href="/ventas/<?= (int)$f['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a data-lf-fila href="/ventas/<?= (int)$f['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($f['cliente'] ?: 'Público general') ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
               <?= P::e($f['codigo_venta']) ?> · <?= date('d M Y', strtotime($f['fecha'])) ?></span>

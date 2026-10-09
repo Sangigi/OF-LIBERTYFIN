@@ -72,7 +72,7 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros, $soloPeriodo) 
             <td data-label="Cliente">
               <?php /* `data-modal`: se abre encima y al cerrar sigues en la lista,
                        con tu filtro y tu scroll. Ver el layout. */ ?>
-              <a href="/ventas/<?= (int)$v['id'] ?>" data-modal
+              <a data-lf-fila href="/ventas/<?= (int)$v['id'] ?>" data-modal
                  style="font-weight:600;color:var(--lf-tinta)">
                 <?= P::e($v['cliente'] ?: 'Público general') ?></a>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">

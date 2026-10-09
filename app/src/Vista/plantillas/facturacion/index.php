@@ -83,7 +83,7 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
         $sinCliente = empty($v['cliente']); ?>
         <tr>
           <td data-label="Cliente">
-            <a href="/ventas/<?= (int)$v['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a data-lf-fila href="/ventas/<?= (int)$v['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($v['cliente'] ?: 'Público general') ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
               <?= P::e($v['codigo_venta']) ?> · <?= date('d M', strtotime($v['fecha'])) ?></span>

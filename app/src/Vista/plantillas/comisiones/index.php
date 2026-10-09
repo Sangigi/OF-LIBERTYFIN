@@ -89,7 +89,7 @@ $qs = function ($x = []) use ($desde, $hasta) {
       <?php foreach ($sin_dueno as $s): ?>
         <tr>
           <td data-label="Venta">
-            <a href="/ventas/<?= (int)$s['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a data-lf-fila href="/ventas/<?= (int)$s['venta_id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($s['cliente'] ?: 'Público general') ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
               <?= P::e($s['codigo_venta']) ?> · <?= date('d M', strtotime($s['fecha'])) ?></span>

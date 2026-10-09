@@ -138,7 +138,7 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
           $min  = (int)$t['min_respuesta']; ?>
           <tr>
             <td data-label="Ticket">
-              <a href="/tickets/<?= (int)$t['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+              <a data-lf-fila href="/tickets/<?= (int)$t['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
                 <?= P::e($t['asunto']) ?></a>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11px;font-family:var(--lf-mono)">
                 <?= P::e($t['folio']) ?> ·

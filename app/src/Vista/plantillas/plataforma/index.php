@@ -173,7 +173,7 @@ $yo = (int)($_SESSION['usuario_id'] ?? 0);
       <?php foreach ($empresas as $em): ?>
         <tr style="<?= $em['activo'] ? '' : 'opacity:.55' ?>">
           <td data-label="Empresa">
-            <a href="/soporte/<?= (int)$em['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a data-lf-fila href="/soporte/<?= (int)$em['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($em['nombre_empresa']) ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px;font-family:var(--lf-mono)">
               <?= P::e($em['nombre_base_datos']) ?></span></td>

@@ -3792,3 +3792,7 @@ form[data-lf-ticket-cambio] select:disabled{opacity:.7}
   .lf-segmento label{padding:6px 10px}
   .lf-apariencia .et{min-width:0;flex-basis:100%}
 }
+
+/* La fila entera abre su detalle (ver layout.php, `data-lf-fila`). */
+tr:has(a[data-lf-fila]){cursor:pointer}
+.table > tbody > tr:has(a[data-lf-fila]):hover > td{background:var(--lf-brand-glow)}

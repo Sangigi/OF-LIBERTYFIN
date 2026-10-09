@@ -660,6 +660,40 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
 })();
 
 /* ══════════════════════════════════════════════════════
+   LA FILA ENTERA ABRE
+   Para ver una venta había que atinarle al nombre. En las
+   listas que abren un detalle, el enlace principal lleva
+   `data-lf-fila`, y tocar cualquier parte de su fila hace
+   lo mismo que tocarlo a él: su panel encima, navegar sin
+   recargar, todo igual. Lo demás de la fila —Timbrar, el
+   teléfono, la empresa— sigue haciendo lo suyo, y
+   seleccionar texto para copiarlo no abre nada.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  var PROPIO = 'a, button, input, select, textarea, label, summary, [role=button], [contenteditable], [data-sin-fila]';
+
+  function filaDe(el) {
+    var tr = el.closest('tr');
+    var a = tr && tr.querySelector('a[data-lf-fila]');
+    return a ? { tr: tr, a: a } : null;
+  }
+  function seleccionando(tr) {
+    var s = window.getSelection ? window.getSelection() : null;
+    return !!(s && !s.isCollapsed && String(s).trim() && tr.contains(s.anchorNode));
+  }
+
+  document.addEventListener('click', function (e) {
+    if (e.defaultPrevented || e.button !== 0 || !e.target.closest) return;
+    if (e.target.closest(PROPIO)) return;
+    var f = filaDe(e.target);
+    if (!f || seleccionando(f.tr)) return;
+    // Ctrl / ⌘ / Shift: a otra pestaña, como haría el enlace.
+    if (e.ctrlKey || e.metaKey || e.shiftKey) { window.open(f.a.href, '_blank'); return; }
+    f.a.click();
+  });
+})();
+
+/* ══════════════════════════════════════════════════════
    VENTANA LIBRE
    El panel tapa la pantalla: sirve para mirar una cosa,
    no para trabajar con dos a la vez. La ventana libre se

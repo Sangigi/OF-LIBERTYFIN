@@ -70,7 +70,7 @@ $r = $resumen;
         $atras = $pu && $pu['esquema'] < $ultima; ?>
         <tr style="<?= $e['activo'] ? '' : 'opacity:.55' ?>">
           <td data-label="Empresa">
-            <a href="/soporte/<?= (int)$e['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
+            <a data-lf-fila href="/soporte/<?= (int)$e['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
               <?= P::e($e['nombre_empresa']) ?></a>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px;font-family:var(--lf-mono)">
               <?= P::e($e['nombre_base_datos']) ?></span>
