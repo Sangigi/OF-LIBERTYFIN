@@ -805,8 +805,13 @@ final class UsuariosControlador
     public function guiaVista()
     {
         try {
-            $db = Conexion::de($_SESSION['empresa_db']);
-            (new UsuarioRepo($db))->marcarGuia($_SESSION['usuario_id'] ?? 0);
+            // Soporte no tiene empresa: la marca va en su propia cuenta.
+            if (!empty($_SESSION['plataforma'])) {
+                $this->cuentasPlataforma()->marcarGuiaPlataforma($_SESSION['usuario_id'] ?? 0);
+            } else {
+                $db = Conexion::de($_SESSION['empresa_db']);
+                (new UsuarioRepo($db))->marcarGuia($_SESSION['usuario_id'] ?? 0);
+            }
         } catch (\Throwable $e) { /* que no se marque es molesto, no grave */ }
         http_response_code(204);
         exit;

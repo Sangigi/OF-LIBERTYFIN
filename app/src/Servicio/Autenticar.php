@@ -318,6 +318,10 @@ final class Autenticar
             if ($ap['tema'] !== '')  $_SESSION['lf_tema'] = $ap['tema'];
             if ($ap['color'] !== '') $_SESSION['lf_marca_color'] = $ap['color'];
         } catch (\Throwable $e) {}
+        // La guía de soporte, una vez por cuenta (ver parciales/guia.php).
+        try {
+            if (!$this->repo->vioGuiaPlataforma((int)$u['id'])) $_SESSION['lf_mostrar_guia'] = true;
+        } catch (\Throwable $e) {}
 
 
         // Los interruptores globales se leen UNA vez al entrar y viven en

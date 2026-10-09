@@ -331,6 +331,52 @@ final class AutenticacionRepo
         return true;
     }
 
+    /**
+     * GUÍA DE PRIMER USO de una cuenta de plataforma. En una empresa vive en
+     * `usuarios.guia_vista_en` (UsuarioRepo); estas cuentas no tienen esa
+     * tabla, así que va en la suya. La columna se agrega sola y nace vacía:
+     * cada cuenta de soporte la ve una vez.
+     */
+    private function asegurarGuia()
+    {
+        static $listo = false;
+        if ($listo) return true;
+        try {
+            $st = $this->principal->query("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'usuarios_plataforma'
+                  AND COLUMN_NAME = 'guia_vista_en'");
+            if (!(int)$st->fetchColumn()) {
+                $this->principal->exec("ALTER TABLE usuarios_plataforma
+                                        ADD COLUMN guia_vista_en DATETIME NULL DEFAULT NULL");
+            }
+            return $listo = true;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] guía de plataforma: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** ¿Ya la vio? Si no se puede saber, se da por vista: mejor no insistir. */
+    public function vioGuiaPlataforma($id)
+    {
+        if (!$this->asegurarGuia()) return true;
+        try {
+            $st = $this->principal->prepare("SELECT guia_vista_en FROM usuarios_plataforma WHERE id = ?");
+            $st->execute([(int)$id]);
+            return $st->fetchColumn() !== null;
+        } catch (\Throwable $e) { return true; }
+    }
+
+    public function marcarGuiaPlataforma($id)
+    {
+        if (!$this->asegurarGuia()) return false;
+        $this->principal->prepare("
+            UPDATE usuarios_plataforma SET guia_vista_en = NOW()
+            WHERE id = ? AND guia_vista_en IS NULL")->execute([(int)$id]);
+        return true;
+    }
+
     /** Las mismas reglas que en una empresa: ver UsuarioRepo::cambiarClave. */
     public function cambiarClavePlataforma($id, $actual, $nueva)
     {

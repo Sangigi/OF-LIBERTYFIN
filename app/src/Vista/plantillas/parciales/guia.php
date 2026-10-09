@@ -83,10 +83,74 @@ $pasos = [
    'titulo' => 'Claro u oscuro',
    'texto'  => 'Se queda guardado para la próxima vez que entres.'],
 
-  ['ruta' => '/cuenta', 'icono' => 'cuenta', 'siempre' => true, 'clave' => true,
+  ['ruta' => '/cuenta', 'icono' => 'cuenta', 'siempre' => true,
+   'ir' => '/cuenta?t=fiscales', 'boton' => 'Ir a configurar',
    'titulo' => 'Ahora sí: configura tu cuenta',
    'texto'  => 'Ya viste lo que puedes hacer. Falta un paso para cobrar de verdad: '
              . 'tus datos fiscales y tus documentos.'],
+];
+
+/*
+ * SOPORTE (cuentas de plataforma). No tienen empresa: nada de Caja, Ventas
+ * ni datos fiscales. Su menú es otro, y su guía también. Igual que la de
+ * empresa, cada paso se filtra contra los permisos del rol: un validador no
+ * ve Informes ni Mantenimiento, y Cuentas es solo del superadministrador.
+ */
+if (!empty($_SESSION['plataforma'])) $pasos = [
+  ['id' => null, 'ruta' => null, 'icono' => 'bienvenida',
+   'titulo' => 'Bienvenido al equipo de soporte',
+   'texto'  => 'En menos de un minuto te mostramos dónde está cada cosa. '
+             . 'Puedes salirte cuando quieras y volver a verla desde Mi cuenta.'],
+
+  ['ruta' => '/', 'p' => 'ver.soporte', 'icono' => 'cola',
+   'titulo' => 'Lo que está esperando',
+   'texto'  => 'Tu panel junta lo pendiente: tickets sin dueño, documentos por revisar '
+             . 'y empresas por dar de alta. Es lo que hay que vaciar antes de irte.'],
+
+  ['ruta' => '/tickets', 'p' => 'ver.tickets', 'icono' => 'tickets',
+   'titulo' => 'Tickets',
+   'texto'  => 'Lo urgente sale primero; toca la fila para abrirlo y asígnatelo para que '
+             . 'se sepa quién lo lleva. El chat se actualiza solo, puedes pegar capturas '
+             . 'con Ctrl+V y una nota interna no la ve el cliente.'],
+
+  ['id' => 'campana', 'ruta' => null, 'p' => 'ver.tickets', 'icono' => 'campana',
+   'titulo' => 'La campana',
+   'texto'  => 'Te avisa cuando un cliente escribe, estés en la sección que estés. '
+             . 'Ábrela y marca «Escritorio» para enterarte aunque cierres LibertyFin.'],
+
+  ['ruta' => '/soporte', 'p' => 'ver.empresas', 'icono' => 'empresas',
+   'titulo' => 'Empresas',
+   'texto'  => 'La ficha de cada cliente: su plan, lo que tiene encendido, sus usuarios '
+             . 'y qué puede estar causando su problema.'],
+
+  ['ruta' => '/conocimiento', 'p' => 'ver.conocimiento', 'icono' => 'conocimiento',
+   'titulo' => 'Conocimiento',
+   'texto'  => 'Artículos, errores conocidos y plantillas de respuesta. Las plantillas '
+             . 'salen al contestar un ticket, y los errores de su categoría, al lado.'],
+
+  ['ruta' => '/informes', 'p' => 'ver.informes', 'icono' => 'informes',
+   'titulo' => 'Informes',
+   'texto'  => 'De qué se queja la gente y cómo va el equipo. Se cuenta lo resuelto, '
+             . 'no lo asignado.'],
+
+  ['ruta' => '/mantenimiento', 'p' => 'ver.mantenimiento', 'icono' => 'mantenimiento',
+   'titulo' => 'Mantenimiento',
+   'texto'  => 'Altas de empresas, pagos de plan y documentos por revisar, y la salud '
+             . 'del sistema: bases, correo e integraciones.'],
+
+  ['ruta' => '/plataforma', 'p' => 'usuarios.plataforma', 'icono' => 'cuentas',
+   'titulo' => 'Cuentas del equipo',
+   'texto'  => 'Quién entra a soporte y con qué rol. Solo el superadministrador las da de alta.'],
+
+  ['id' => 'tema', 'ruta' => null, 'icono' => 'tema', 'siempre' => true,
+   'titulo' => 'Claro u oscuro',
+   'texto'  => 'Se guarda en tu cuenta: lo verás igual en cualquier equipo donde entres.'],
+
+  ['ruta' => '/cuenta', 'icono' => 'perfil', 'siempre' => true,
+   'ir' => '/cuenta', 'boton' => 'Ir a mi perfil',
+   'titulo' => 'Tu perfil',
+   'texto'  => 'Tu foto (y si el cliente la ve en los tickets), tu contraseña y la '
+             . 'apariencia: tema y color.'],
 ];
 
 $mios = [];
@@ -119,7 +183,9 @@ foreach ($pasos as $p) {
   var PASOS = <?= json_encode(array_map(function ($p) {
       return ['ruta' => $p['ruta'] ?? null, 'id' => $p['id'] ?? null,
               'icono' => $p['icono'], 'titulo' => $p['titulo'],
-              'texto' => $p['texto'], 'clave' => !empty($p['clave'])];
+              'texto' => $p['texto'],
+              // El último paso puede llevar a algún lado al terminar.
+              'ir' => $p['ir'] ?? null, 'boton' => $p['boton'] ?? null];
   }, $mios), JSON_UNESCAPED_UNICODE) ?>;
 
   // Bocetos de cada sección. Son SVG con currentColor y var(--lf-brand),
@@ -198,7 +264,51 @@ foreach ($pasos as $p) {
       r(12,6,256,20,.05) + r(24,12,104,7,.22) + c(250,16,7,.85,V)
       + r(12,30,256,20,.05) + r(24,36,88,7,.22) + c(250,40,7,.85,V)
       + r(12,54,256,20,.05) + r(24,60,112,7,.22) + c(250,64,7,.85,'#c58a14')
-      + r(12,78,256,20,.05) + r(24,84,76,7,.22) + c(250,88,7,.12)); }
+      + r(12,78,256,20,.05) + r(24,84,76,7,.22) + c(250,88,7,.12)); },
+
+    // ── Soporte ──
+    cola: function(){ return svg(
+      r(12,10,256,24,.06) + r(22,16,12,12,.85,V,4) + r(44,18,96,7,.4) + r(232,16,26,12,.85,V,6)
+      + r(12,40,256,24,.06) + r(22,46,12,12,.55,'#c58a14',4) + r(44,48,80,7,.22) + r(232,46,26,12,.3,null,6)
+      + r(12,70,256,24,.06) + r(22,76,12,12,.3,null,4) + r(44,78,110,7,.22) + r(232,76,26,12,.3,null,6)); },
+    tickets: function(){ return svg(
+      r(12,8,100,88,.05) + r(20,16,84,16,.5,V,4) + r(20,38,84,16,.12,null,4) + r(20,60,84,16,.12,null,4)
+      + r(124,8,144,88,.05)
+      + r(134,18,84,14,.16,null,7) + r(176,40,82,14,.8,V,7) + r(134,62,70,14,.16,null,7)
+      + r(134,82,124,8,.1,null,4)); },
+    campana: function(){ return svg(
+      '<path d="M140 22c-13 0-22 10-22 23v15l-7 10h58l-7-10V45c0-13-9-23-22-23z" fill="none" '
+      + 'stroke="currentColor" stroke-width="3" opacity=".35" stroke-linejoin="round"/>'
+      + '<path d="M133 76a7 7 0 0 0 14 0" fill="none" stroke="currentColor" stroke-width="3" '
+      + 'opacity=".35" stroke-linecap="round"/>'
+      + c(160,28,9,.95,V)
+      + r(12,58,82,30,.07,null,6) + c(28,73,7,.85,V) + r(40,68,44,5,.3) + r(40,77,30,4,.14)
+      + r(186,58,82,30,.07,null,6) + r(194,66,50,5,.4) + r(194,76,36,4,.16)); },
+    empresas: function(){ return svg(
+      r(12,8,256,88,.05) + r(24,20,40,40,.85,V,10) + r(76,24,110,8,.45) + r(76,38,70,5,.18)
+      + r(24,72,60,6,.18) + r(96,72,60,6,.18) + r(168,72,60,6,.18)
+      + r(206,22,44,14,.85,V,7) + c(243,29,5,1,'var(--lf-sup)')); },
+    conocimiento: function(){ return svg(
+      r(12,8,80,88,.06) + r(20,18,64,6,.4) + r(20,30,52,4,.16) + r(20,40,58,4,.16) + r(20,80,30,8,.55,'#c58a14',4)
+      + r(100,8,80,88,.06) + r(108,18,64,6,.4) + r(108,30,52,4,.16) + r(108,40,58,4,.16) + r(108,80,30,8,.85,V,4)
+      + r(188,8,80,88,.06) + r(196,18,64,6,.4) + r(196,30,52,4,.16) + r(196,40,58,4,.16) + r(196,80,30,8,.3,null,4)); },
+    informes: function(){ return svg(
+      r(12,10,124,84,.05) + r(22,22,96,8,.85,V,4) + r(22,38,72,8,.45,V,4) + r(22,54,50,8,.28,V,4)
+      + r(22,70,30,8,.16,V,4)
+      + r(146,10,122,84,.05) + c(162,28,7,.85,V) + r(174,25,50,6,.3) + r(240,25,18,6,.5)
+      + c(162,50,7,.2) + r(174,47,44,6,.22) + r(240,47,18,6,.3)
+      + c(162,72,7,.2) + r(174,69,56,6,.22) + r(240,69,18,6,.3)); },
+    mantenimiento: function(){ return svg(
+      r(12,8,256,20,.05) + c(26,18,5,.85,V) + r(38,15,110,6,.25) + r(226,14,32,8,.3,null,4)
+      + r(12,32,256,20,.05) + c(26,42,5,.85,V) + r(38,39,90,6,.25) + r(226,38,32,8,.3,null,4)
+      + r(12,56,256,20,.05) + c(26,66,5,.85,'#c58a14') + r(38,63,124,6,.25) + r(226,62,32,8,.6,'#c58a14',4)
+      + r(12,80,256,20,.05) + c(26,90,5,.85,V) + r(38,87,76,6,.25) + r(226,86,32,8,.3,null,4)); },
+    cuentas: function(){ return ILUS.ajustes(); },
+    perfil: function(){ return svg(
+      r(12,8,256,88,.05) + c(46,40,20,.85,V) + r(78,28,90,8,.4) + r(78,42,60,5,.18)
+      + r(26,70,96,16,.1,null,8) + r(29,73,30,10,.9,'var(--lf-sup)',5)
+      + c(150,78,6,.9,'#27ae60') + c(166,78,6,.9,'#1d6fa5') + c(182,78,6,.9,'#7c3aed')
+      + c(198,78,6,.9,'#c2410c') + c(214,78,6,.9,'#be123c')); }
   };
 
   var g = document.getElementById('lfGuia');
@@ -209,6 +319,7 @@ foreach ($pasos as $p) {
 
   function ancla(p){
     if (p.id === 'tema') return document.getElementById('lfTema');
+    if (p.id === 'campana') return document.querySelector('[data-lf-campana] .lf-campana-bt');
     if (!p.ruta) return null;
     return document.querySelector('.lf-nav a[href="' + p.ruta + '"]');
   }
@@ -221,7 +332,7 @@ foreach ($pasos as $p) {
     document.getElementById('lfGuiaIlu').innerHTML = (ILUS[p.icono] || ILUS.bienvenida)();
     document.getElementById('lfGuiaAtras').hidden = i === 0;
     document.getElementById('lfGuiaSig').textContent = (i === PASOS.length-1)
-      ? (p.clave ? 'Ir a configurar' : 'Terminar') : 'Siguiente';
+      ? (p.boton || 'Terminar') : 'Siguiente';
 
     var el = ancla(p);
     if (!el) {
@@ -272,7 +383,7 @@ foreach ($pasos as $p) {
   document.getElementById('lfGuiaAtras').addEventListener('click', function(){ if (i>0){ i--; pinta(); } });
   document.getElementById('lfGuiaSig').addEventListener('click', function(){
     if (i < PASOS.length-1) { i++; pinta(); }
-    else cerrar(PASOS[i].clave ? '/cuenta?t=fiscales' : null);
+    else cerrar(PASOS[i].ir || null);
   });
   document.addEventListener('keydown', function(e){
     if (g.hidden) return;
