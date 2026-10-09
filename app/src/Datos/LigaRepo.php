@@ -72,7 +72,7 @@ final class LigaRepo extends Repo
             $d['imagen'] ?? null, $d['formato'] ?? null,
             $d['vence'] ?? null, !empty($d['pruebas']) ? 1 : 0,
             $d['usuario_id'] ?? null, $d['usuario_nombre'] ?? null,
-            $d['usuario_email'] ?? null,
+            $d['usuario_correo'] ?? null,
         ]);
         return (int)$this->db->lastInsertId();
     }
