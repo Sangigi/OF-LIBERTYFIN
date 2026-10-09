@@ -3566,3 +3566,14 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 .lf-toast-chat.largo{align-items:flex-start}
 .lf-toast-chat.largo small{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.45;margin-top:3px}
 [data-lf-push-probar][hidden]{display:none!important}
+
+/* La tabla de emojis, abierta, vive en <body> y fija a la pantalla (la
+   coloca lf-chat.js junto al botón): dentro del chat la recortaba su
+   contenedor y en pantallas chicas se perdía. Se adapta al ancho y, si la
+   pantalla es muy baja, se desplaza por dentro. */
+.lf-emoji-pop{position:fixed;left:8px;top:8px;bottom:auto;z-index:470;
+  width:min(292px,calc(100vw - 16px));max-height:min(300px,calc(100vh - 16px));overflow-y:auto;
+  grid-template-columns:repeat(auto-fill,minmax(34px,1fr));justify-items:center;transform-origin:50% 100%}
+.lf-chatf .lf-emoji-pop{grid-template-columns:repeat(auto-fill,minmax(34px,1fr))}
+.lf-emoji-pop.abierto{display:grid;animation:lf-emoji-abre .24s var(--lf-suave) both}
+@media (prefers-reduced-motion:reduce){ .lf-emoji-pop.abierto{animation:none} }

@@ -289,13 +289,39 @@
   var emojiAbierto = null;
   function cerrarEmojis() {
     if (!emojiAbierto) return;
-    emojiAbierto.classList.remove('abierto');
-    emojiAbierto.querySelector('.lf-emoji-bt').setAttribute('aria-expanded', 'false');
+    var caja = emojiAbierto, pop = caja._lfPop;
+    caja.classList.remove('abierto');
+    caja.querySelector('.lf-emoji-bt').setAttribute('aria-expanded', 'false');
+    // Vuelve a su lugar (abierta vive en <body>; ver selectorEmojis).
+    if (pop) { pop.classList.remove('abierto'); caja.appendChild(pop); }
     emojiAbierto = null;
   }
   document.addEventListener('click', function (e) {
-    if (emojiAbierto && !emojiAbierto.contains(e.target)) cerrarEmojis();
+    if (!emojiAbierto) return;
+    var pop = emojiAbierto._lfPop;
+    if (!emojiAbierto.contains(e.target) && !(pop && pop.contains(e.target))) cerrarEmojis();
   });
+  /* Abierta va pegada al botón. Si cambia el tamaño (en el celular, al
+     abrirse o cerrarse el teclado) se vuelve a acomodar; si se cambia de
+     página, se cierra en vez de quedar flotando. */
+  function colocarEmojis() {
+    if (!emojiAbierto) return;
+    var bt = emojiAbierto.querySelector('.lf-emoji-bt'), pop = emojiAbierto._lfPop;
+    if (!bt || !pop || !bt.isConnected) { cerrarEmojis(); return; }
+    var r = bt.getBoundingClientRect();
+    var vw = document.documentElement.clientWidth;
+    var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+    var pw = pop.offsetWidth, ph = pop.offsetHeight;
+    // Encima del botón si cabe; si no, debajo. Siempre dentro de la pantalla.
+    var left = Math.min(Math.max(8, r.left), vw - pw - 8);
+    var top = r.top - ph - 8;
+    if (top < 8) top = Math.min(r.bottom + 8, vh - ph - 8);
+    pop.style.left = Math.max(8, left) + 'px';
+    pop.style.top = Math.max(8, top) + 'px';
+  }
+  window.addEventListener('resize', colocarEmojis);
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', colocarEmojis);
+  document.addEventListener('lf:cargado', function () { cerrarEmojis(); });
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && emojiAbierto) {
       var ta = emojiAbierto._lfTa;
@@ -338,15 +364,16 @@
       caja.classList.add('abierto');
       bt.setAttribute('aria-expanded', 'true');
       emojiAbierto = caja;
-      // Que no se salga de la pantalla (en el celular el botón puede
-      // quedar a media fila): se recorre lo que haga falta.
-      pop.style.left = '';
-      var r = pop.getBoundingClientRect(), ancho = document.documentElement.clientWidth;
-      var mover = 0;
-      if (r.right > ancho - 8) mover = (ancho - 8) - r.right;
-      if (r.left + mover < 8) mover = 8 - r.left;
-      if (mover) pop.style.left = mover + 'px';
+      /* ABIERTA SE VA A <body>, FIJA A LA PANTALLA. Dentro del chat la
+         recortaba su contenedor (la ventana y el chat flotante esconden lo
+         que se sale): en una pantalla chica quedaba cortada o fuera de
+         vista. Se pone encima del botón si cabe, debajo si no, y siempre
+         dentro de la pantalla. */
+      document.body.appendChild(pop);
+      pop.classList.add('abierto');
+      colocarEmojis();
     });
+    caja._lfPop = pop;
     caja.appendChild(bt);
     caja.appendChild(pop);
     return caja;

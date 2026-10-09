@@ -801,6 +801,11 @@ final class TicketRepo
         }
         if (!empty($filtros['prioridad'])) { $w[] = 't.prioridad = ?'; $p[] = $filtros['prioridad']; }
         if (!empty($filtros['empresa']))   { $w[] = 't.empresa_id = ?'; $p[] = (int)$filtros['empresa']; }
+        // Solo los que abrió esta persona (lo que ve el cliente en Ayuda).
+        if (!empty($filtros['creador'])) {
+            $w[] = "t.creado_por = ? AND (t.creado_tipo IS NULL OR t.creado_tipo IN ('', 'empresa'))";
+            $p[] = (int)$filtros['creador'];
+        }
         if (!empty($filtros['asignado']))  { $w[] = 't.asignado_a = ?'; $p[] = (int)$filtros['asignado']; }
         if (!empty($filtros['q'])) {
             $w[] = '(t.asunto LIKE ? OR t.folio LIKE ? OR e.nombre_empresa LIKE ?)';

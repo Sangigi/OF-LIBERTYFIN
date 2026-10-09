@@ -42,15 +42,17 @@ final class AyudaControlador
             $repo->marcarVistoCliente($ver, max(array_column($mensajes, 'id')));
         }
 
+        // Solo los reportes que abrió esta persona, no los de toda la empresa.
+        $mios = ['empresa' => $emp, 'creador' => (int)($_SESSION['usuario_id'] ?? 0)];
         Plantilla::pagina('ayuda/index', [
             'titulo'     => 'Ayuda',
             'icono'      => 'alerta',
             'subtitulo'  => $_SESSION['empresa_nombre'] ?? '',
-            'tickets'    => $emp ? $repo->bandeja(['empresa' => $emp], $porPag,
+            'tickets'    => ($emp && $mios['creador']) ? $repo->bandeja($mios, $porPag,
                                                   ($pagina-1)*$porPag) : [],
             'pagina'     => $pagina,
-            'paginas'    => $emp ? max(1, (int)ceil(
-                                count($repo->bandeja(['empresa'=>$emp], 500)) / $porPag)) : 1,
+            'paginas'    => ($emp && $mios['creador']) ? max(1, (int)ceil(
+                                count($repo->bandeja($mios, 500)) / $porPag)) : 1,
             'abierto'    => $abierto,
             'mensajes'   => $mensajes,
             // La de soporte, solo si esa persona eligió mostrarla.
@@ -65,11 +67,19 @@ final class AyudaControlador
      * Sin esta comprobación, cambiar el número en la URL dejaría leer
      * las conversaciones de otros clientes.
      */
+    /**
+     * El ticket, solo si lo abrió QUIEN PREGUNTA (y es de su empresa).
+     *
+     * Antes bastaba con que fuera de la misma empresa: cualquier usuario
+     * veía los reportes de todos sus compañeros, con sus mensajes y
+     * capturas. Cada quien ve los suyos. Todo lo del chat del cliente pasa
+     * por aquí (ver, mensajes, responder, adjuntar, "escribiendo").
+     */
     private function miTicket(TicketRepo $repo, $id, $empresaId)
     {
         if (!$id || !$empresaId) return null;
         $t = $repo->uno($id);
-        return ($t && (int)$t['empresa_id'] === $empresaId) ? $t : null;
+        return ($t && (int)$t['empresa_id'] === $empresaId && $this->esCreador($t)) ? $t : null;
     }
 
     /**
