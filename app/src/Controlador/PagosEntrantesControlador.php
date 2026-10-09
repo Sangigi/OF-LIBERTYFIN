@@ -492,11 +492,79 @@ final class PagosEntrantesControlador
                 ->aprobarPorPago($l['referencia'], null);   // null = automático
 
             if ($aprobado) {
+                $nombrePlan = (string)($aprobado['nombre_plan'] ?? $aprobado['plan'] ?? '');
+
                 error_log(sprintf(
                     '[LibertyFin] webhook: plan %s aprobado · empresa %d · vence %s',
-                    $aprobado['plan'] ?? '?',
-                    (int)$aprobado['empresa_id'],
+                    $nombrePlan !== '' ? $nombrePlan : '?',
+                    (int)($aprobado['empresa_id'] ?? 0),
                     $aprobado['vence_nuevo'] ?? '?'
+                ));
+
+                // ─────────────────────────────────────────────────
+                // AVISO DE PAGO CONFIRMADO
+                //
+                // El destinatario es el correo del usuario que CREÓ la
+                // liga, guardado en `ligas.usuario_correo` cuando el
+                // admin estaba logueado en la pestaña Plan. Aquí no hay
+                // sesión —el proveedor pega sin cookies—, así que la
+                // única forma de tener ese correo es haberlo persistido
+                // al crear la liga (ver UsuariosControlador::generarLigaPlan).
+                //
+                // Es el correo correcto y no el del expediente de la
+                // empresa por una razón: quien contrató el plan es quien
+                // tiene que enterarse de que quedó activo. El correo del
+                // expediente puede ser del contador o del titular, que ni
+                // saben que se pidió un plan nuevo.
+                //
+                // Fallback: si la liga es vieja y no trae `usuario_correo`,
+                // se intenta `email_admin` del retorno de aprobarPorPago.
+                // Si tampoco, se apunta en el log y ya.
+                //
+                // Envuelto en su propio try/catch: el pago YA quedó
+                // aprobado. Un SMTP caído no puede hacer que le
+                // contestemos 500 al proveedor por un correo que no salió.
+                // ─────────────────────────────────────────────────
+                $destino = (string)($l['usuario_correo'] ?? '');
+                if ($destino === '') {
+                    $destino = (string)($aprobado['email_admin'] ?? '');
+                }
+                $nombre  = (string)($l['usuario_nombre']
+                                    ?? $aprobado['nombre_contacto'] ?? '');
+                $vence   = !empty($aprobado['vence_nuevo'])
+                           ? date('d/m/Y', strtotime($aprobado['vence_nuevo']))
+                           : '';
+
+                $enviado = false;
+                $motivo  = '';
+                if ($destino === '') {
+                    $motivo = 'sin correo en la liga ni en el pago del plan';
+                } else {
+                    try {
+                        $enviado = \LibertyFin\Servicio\Avisos::pagoPlanRevisado(
+                            $destino, $nombre, $nombrePlan, true, $vence,
+                            (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                                . ($_SERVER['HTTP_HOST'] ?? '') . '/cuenta?t=plan');
+                        if (!$enviado) {
+                            $motivo = \LibertyFin\Servicio\Avisos::activos()
+                                ? 'el envío devolvió false'
+                                : 'SMTP no configurado';
+                        }
+                    } catch (\Throwable $e) {
+                        $motivo = 'excepción: ' . $e->getMessage();
+                    }
+                }
+
+                // Una sola línea, siempre, con el desenlace del correo.
+                // Cuando alguien pregunte "¿le llegó?", se busca la
+                // referencia en el log y se sabe de inmediato.
+                error_log(sprintf(
+                    '[LibertyFin] aviso pago plan webhook ref=%s plan="%s" para=%s — %s%s',
+                    (string)($l['referencia'] ?? ''),
+                    $nombrePlan,
+                    $destino !== '' ? $destino : '(sin correo)',
+                    $enviado ? 'correo ENVIADO' : 'correo NO enviado',
+                    $enviado ? '' : ' (' . ($motivo ?: 'motivo desconocido') . ')'
                 ));
             }
         } catch (\Throwable $e) {
