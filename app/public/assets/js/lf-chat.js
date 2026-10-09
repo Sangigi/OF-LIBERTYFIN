@@ -1621,14 +1621,33 @@
     return btoa(u).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   }
 
-  /* Devuelve '' si quedó guardada, o qué falló. */
+  /* Devuelve '' si quedó guardada, o qué falló, con el código HTTP: sin
+     él no hay forma de saber si fue el filtro del hosting, un archivo sin
+     subir o la base. */
   function avisarAlServidor(sub) {
     var fd = new FormData();
     fd.append('token', token());
     fd.append('ep', codificar(sub.endpoint));
-    return pedir('/push/suscribir', { method: 'POST', body: fd }).then(function (j) {
+    return fetch('/push/suscribir', {
+      method: 'POST', body: fd, credentials: 'same-origin',
+      headers: { 'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest' }
+    }).then(function (r) {
+      return r.text().then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) {}
+        return { estado: r.status, j: j };
+      });
+    }).then(function (x) {
+      var j = x.j;
+      if (j && j.sesion_cerrada) { aEntrar(); return 'Tu sesión se cerró.'; }
       if (j && j.ok) { guardar('lf_push', j.quien || quien()); return ''; }
-      return (j && j.error) || 'El servidor rechazó la suscripción.';
+      if (j && j.error) return j.error;
+      if (j) return 'El servidor no guardó la suscripción. Revisa que esté subida la versión nueva de '
+                  + 'src/Controlador/PushControlador.php y src/Servicio/Push.php.';
+      if (x.estado === 406 || x.estado === 403) {
+        return 'El filtro de seguridad del hosting bloqueó la petición (HTTP ' + x.estado + ').';
+      }
+      return 'El servidor no contestó como se esperaba (HTTP ' + x.estado + ').';
     }, function () { return 'No hubo conexión con el servidor.'; });
   }
 
