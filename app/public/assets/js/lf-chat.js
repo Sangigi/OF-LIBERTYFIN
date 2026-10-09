@@ -1316,7 +1316,10 @@
     var x = boton('bt', '×', 'Cerrar');
     var p = panel;
     p._lfMin = min;
-    min.addEventListener('click', function () { p.classList.toggle('min'); pintarMin(p); });
+    // stopPropagation: el ícono se cambia aquí mismo, y el clic llegaba a
+    // la barra con el ícono viejo ya fuera del botón; la barra creía que
+    // se tocó fuera de un botón y volvía a abrir el chat al instante.
+    min.addEventListener('click', function (e) { e.stopPropagation(); p.classList.toggle('min'); pintarMin(p); });
     x.addEventListener('click', cerrarChat);
     cab.addEventListener('click', function (e) {
       if (p.classList.contains('min') && !e.target.closest('.bt')) { p.classList.remove('min'); pintarMin(p); }

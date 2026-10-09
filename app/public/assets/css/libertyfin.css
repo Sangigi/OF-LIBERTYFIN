@@ -3730,3 +3730,7 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
   .lf-chat-pie .lf-resp-pie .btn.lf-enviar-ico,.lf-chatf .pie .btn.lf-enviar-ico{width:42px;height:42px}
   .lf-enviar-ico svg{width:19px;height:19px}
 }
+/* Los íconos de los botones del chat no reciben el clic: lo recibe el
+   botón. Así, aunque el ícono se cambie al tocarlo, el clic sigue siendo
+   "en el botón". */
+.lf-chatf header .bt svg,.lf-enviar-ico svg{pointer-events:none}
