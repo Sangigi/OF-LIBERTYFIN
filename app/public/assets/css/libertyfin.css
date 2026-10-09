@@ -3796,3 +3796,24 @@ form[data-lf-ticket-cambio] select:disabled{opacity:.7}
 /* La fila entera abre su detalle (ver layout.php, `data-lf-fila`). */
 tr:has(a[data-lf-fila]){cursor:pointer}
 .table > tbody > tr:has(a[data-lf-fila]):hover > td{background:var(--lf-brand-glow)}
+
+/* Formularios en renglón (`lf-campos`): cada campo va en su <div>, y el
+   <div> decide el ancho. Aquí no se carga Bootstrap, así que .form-control
+   no trae width:100%: el campo se quedaba con su ancho natural (~190 px)
+   y, en una caja más angosta, se metía debajo del campo o del botón de
+   al lado (Banco/Referencia/Registrar, "Le tocarían"/Asignar). */
+.lf-campos > div > .form-control,.lf-campos > div > .form-select{width:100%;min-width:0}
+.lf-campos > .btn{flex:none}
+
+/* Cifras (`lf-stats`) SIN HUECOS. Con columnas fijas, cuatro tarjetas en
+   un espacio para tres dejaban la cuarta sola abajo y un hueco a su lado
+   (el detalle de una venta abierto encima). Ahora cada renglón se llena,
+   y con exactamente cuatro van las cuatro en un renglón o dos y dos,
+   nunca tres y una. */
+.lf-stats{display:flex;flex-wrap:wrap}
+.lf-stats > *{flex:1 1 214px;min-width:0}
+.lf-stats:has(> :nth-child(4):last-child) > *{
+  flex-basis:calc((904px - 100%) * 999);max-width:calc(50% - 8px)}
+@media(max-width:560px){
+  .lf-stats > *{flex-basis:calc(50% - 6px)}
+}

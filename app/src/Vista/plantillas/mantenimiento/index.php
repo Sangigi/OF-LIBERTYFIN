@@ -496,7 +496,7 @@ document.querySelectorAll('.lf-rechazar').forEach(function(b){
           </p>
         <?php else: ?>
           <form method="post" action="/mantenimiento/correo"
-                style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">
+                class="lf-campos" style="display:flex;gap:9px;flex-wrap:wrap;align-items:flex-end">
             <input type="hidden" name="token" value="<?= P::e($token) ?>">
             <div style="flex:1;min-width:190px">
               <label class="form-label">Mandar una prueba a</label>

@@ -143,7 +143,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
       <?php if ($saldo > 0.01 && $v['estado'] !== 'cancelada'): ?>
       <div style="border-top:1px solid var(--lf-linea);padding:16px 20px;background:var(--lf-vidrio)">
         <form method="post" action="/ventas/<?= (int)$v['id'] ?>/pagar"
-              style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+              class="lf-campos" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <div style="flex:1;min-width:130px">
             <label class="form-label">Abono</label>
@@ -278,7 +278,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
             Esta venta no deja base comisionable: los gastos se comen la utilidad.</p>
         <?php else: ?>
         <form method="post" action="/ventas/<?= (int)$v['id'] ?>/comision"
-              style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+              class="lf-campos" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <?php if ($varios): ?>
           <div style="flex:1 1 100%">

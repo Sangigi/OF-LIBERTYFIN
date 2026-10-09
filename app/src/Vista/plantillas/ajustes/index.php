@@ -287,7 +287,7 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
   <summary><?= W::icono('mas','16px') ?>
     <?= $ec ? 'Editar a ' . P::e($ec['nombre']) : ($ea ? 'Editar el área ' . P::e($ea['nombre']) : 'Agregar colaborador o área') ?></summary>
   <div style="padding:18px 20px;display:flex;gap:26px;flex-wrap:wrap">
-    <form method="post" action="/ajustes/guardar" style="flex:2;min-width:300px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <form method="post" action="/ajustes/guardar" class="lf-campos" style="flex:2;min-width:300px;display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <input type="hidden" name="que" value="colaborador">
       <?php if ($ec): ?><input type="hidden" name="id" value="<?= (int)$ec['id'] ?>"><?php endif; ?>
@@ -304,7 +304,7 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
       <button class="btn btn-primary" type="submit"><?= $ec?'Guardar':'Agregar' ?></button>
     </form>
 
-    <form method="post" action="/ajustes/guardar" style="flex:1;min-width:230px;display:flex;gap:10px;align-items:flex-end;
+    <form method="post" action="/ajustes/guardar" class="lf-campos" style="flex:1;min-width:230px;display:flex;gap:10px;align-items:flex-end;
           border-left:1px solid var(--lf-linea);padding-left:24px">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <input type="hidden" name="que" value="area">
