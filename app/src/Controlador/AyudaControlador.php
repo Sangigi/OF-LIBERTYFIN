@@ -320,8 +320,13 @@ final class AyudaControlador
         // Los reportes de esta persona sin solucionar: los que se alternan
         // dentro del chat. El primero es el que abre la burbuja.
         $act  = array_map(function ($a) {
+            $txt = trim(preg_replace('/\s+/u', ' ', (string)($a['ultimo'] ?? '')));
             return ['id' => (int)$a['id'], 'folio' => $a['folio'], 'asunto' => $a['asunto'],
-                    'estado' => $a['estado'], 'sin_leer' => (int)$a['sin_leer']];
+                    'estado' => $a['estado'], 'sin_leer' => (int)$a['sin_leer'],
+                    // El último mensaje, para la lista del chat flotante.
+                    'ultimo' => mb_strlen($txt) > 70 ? mb_substr($txt, 0, 67) . '…' : $txt,
+                    'de_soporte' => ($a['ultimo_tipo'] ?? '') === 'plataforma',
+                    'hace'   => $a['hace'] !== null ? max(0, (int)$a['hace']) : null];
         }, $repo->activosCliente($emp, $yo));
         $this->json([
             'ok'       => true,

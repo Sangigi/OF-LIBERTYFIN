@@ -3577,3 +3577,41 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 .lf-chatf .lf-emoji-pop{grid-template-columns:repeat(auto-fill,minmax(34px,1fr))}
 .lf-emoji-pop.abierto{display:grid;animation:lf-emoji-abre .24s var(--lf-suave) both}
 @media (prefers-reduced-motion:reduce){ .lf-emoji-pop.abierto{animation:none} }
+
+/* ══════════════════════════════════════════════════════
+   CHAT FLOTANTE · LA LISTA DE REPORTES
+   La burbuja abre la lista de reportes abiertos (como una app de
+   mensajes); cada uno abre su chat, y "←" regresa a la lista.
+   ══════════════════════════════════════════════════════ */
+.lf-chatf header .atras{font-size:17px}
+.lf-chatf.en-lista header .atras,.lf-chatf.en-lista header .ir{display:none}
+.lf-chatf-reportes{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px;background:var(--lf-fondo, var(--lf-sup));animation:lf-aparece .25s ease backwards}
+.lf-chatf-reportes .rep{display:flex;align-items:flex-start;gap:10px;width:100%;padding:10px;
+  border:0;border-radius:12px;background:none;font:inherit;color:inherit;text-align:left;cursor:pointer;
+  transition:background .15s ease}
+.lf-chatf-reportes .rep:hover,.lf-chatf-reportes .rep:focus-visible{background:var(--lf-vidrio);outline:none}
+.lf-chatf-reportes .rep + .rep{margin-top:2px}
+.lf-chatf-reportes .ico{flex:0 0 auto;display:grid;place-items:center;width:38px;height:38px;border-radius:12px;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-chatf-reportes .ico svg{width:19px;height:19px}
+.lf-chatf-reportes .tx{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.lf-chatf-reportes .tx b{font-size:13px;font-weight:700;color:var(--lf-tinta);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-chatf-reportes .tx small{font-size:11px;color:var(--lf-tinta-4)}
+.lf-chatf-reportes .ult{font-size:12px;color:var(--lf-tinta-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-chatf-reportes .rep.sin-leer .ult{color:var(--lf-tinta);font-weight:600}
+.lf-chatf-reportes .meta{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.lf-chatf-reportes .meta small{font-size:10.5px;color:var(--lf-tinta-4);white-space:nowrap}
+.lf-chatf-reportes .meta .lf-noti-num{margin:0}
+.lf-chatf-reportes .nada{display:flex;flex-direction:column;align-items:center;gap:6px;
+  padding:40px 18px;text-align:center}
+.lf-chatf-reportes .nada .ico{width:46px;height:46px;border-radius:50%;margin-bottom:6px}
+.lf-chatf-reportes .nada b{font-size:13.5px;color:var(--lf-tinta)}
+.lf-chatf-reportes .nada small{font-size:12px;color:var(--lf-tinta-4)}
+.lf-chatf-pie-lista{flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:10px 12px 12px;border-top:1px solid var(--lf-linea);background:var(--lf-sup)}
+.lf-chatf-pie-lista .todos{font-size:12px;font-weight:600;color:var(--lf-brand-2);text-decoration:none}
+.lf-chatf-pie-lista .todos:hover{text-decoration:underline}
+.lf-chatf.min .lf-chatf-reportes,.lf-chatf.min .lf-chatf-pie-lista{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){ .lf-chatf-reportes{animation:none} }

@@ -24,9 +24,10 @@
       pregunta si soporte le contestó algo que no ha visto: el menú "Ayuda"
       lleva la cuenta y sale un aviso dentro de la plataforma.
 
-   3. CHAT FLOTANTE (cliente). Con la respuesta de soporte se le abre un
-      chat en la esquina, esté en la pantalla que esté. Arriba lleva sus
-      reportes sin resolver para cambiar de uno a otro sin salir.
+   3. CHAT FLOTANTE (cliente). Una burbuja siempre a la mano: abre la
+      lista de sus reportes abiertos y, de ahí, el chat de cada uno ("←"
+      regresa a la lista). Con la respuesta de soporte se le abre solo,
+      esté en la pantalla que esté.
 
    4. NOVEDADES DE SOPORTE. Para quien atiende tickets: una campana arriba
       con los mensajes de clientes que no ha leído, la cuenta en el menú y en el
@@ -1153,12 +1154,25 @@
     + '<path d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L5 20l1.1-3.6C4.5 15 3.5 13.2 3.5 11.1 3.5 6.8 7.1 3.5 12 3.5z"/>'
     + '<path d="M8.6 11.2h.01M12 11.2h.01M15.4 11.2h.01" stroke-width="2.6"/></svg>';
 
-  /* ══ 2 y 3 · Novedades y chat flotante (el cliente) ══ */
+  /* ══ 2 y 3 · Novedades y chat flotante (el cliente) ══
+     Como una app de mensajes:
+       · la BURBUJA siempre está (para quien puede reportar problemas);
+       · al tocarla, la LISTA de sus reportes abiertos: el último mensaje,
+         hace cuánto y cuántos no ha leído. Elige uno y se abre su chat;
+       · en el chat, "←" regresa a la lista para elegir otro;
+       · sin reportes abiertos, la lista ofrece reportar un problema.
+     Con un solo reporte, o con una respuesta de soporte sin leer, la
+     burbuja entra directo a ese chat. Y cuando soporte contesta, el chat
+     se abre solo en ese reporte. */
   var panel = null;
-  var burbuja = null, ultimoActivo = null, pendiente = null, sinLeerAhora = 0;
-  var activos = [];          // sus reportes sin resolver, para cambiar entre ellos
+  var burbuja = null, pendiente = null, sinLeerAhora = 0, clienteListo = false;
+  var activos = [];          // sus reportes sin resolver (la lista)
   var borradores = {};       // lo que iba escribiendo en cada uno
   var revisarCliente = function () {};
+
+  var ESTADO_CLIENTE = {
+    abierto: 'Recibido', en_curso: 'En atención', esperando: 'Espera tu respuesta'
+  };
 
   function enPaginaDe(id) {
     if (location.pathname !== '/ayuda') return false;
@@ -1166,14 +1180,16 @@
     return !!m && +m[1] === +id;
   }
 
-  /* ── La burbuja: vuelve a abrir el chat después de cerrarlo ──
-     Se ve mientras el chat está cerrado y hay un reporte vivo. Lleva la
-     cuenta de lo que soporte escribió y no se ha leído, y al pasar el
-     cursor se abre en una pastilla que dice qué es. */
+  /* En la página de un reporte (la ventana de chat) la burbuja sobra. */
+  function hayVentana() { return !!document.querySelector('.lf-chat-ventana'); }
+
+  /* ── La burbuja ──
+     Siempre a la mano. Lleva la cuenta de lo que soporte escribió y no se
+     ha leído, y al pasar el cursor se abre en una pastilla que dice qué es. */
   function pintarBurbuja(sinLeer) {
     if (typeof sinLeer === 'number') sinLeerAhora = sinLeer;
-    var hay = !!(pendiente || ultimoActivo);
-    if (!burbuja && hay) {
+    if (!clienteListo) return;      // hasta saber qué tiene (primera consulta)
+    if (!burbuja) {
       burbuja = crear('button', 'lf-chat-burbuja oculta');
       burbuja.type = 'button';
       burbuja.setAttribute('aria-label', 'Abrir el chat con soporte');
@@ -1182,18 +1198,14 @@
       burbuja.appendChild(ico);
       burbuja.appendChild(crear('span', 'lbl', 'Soporte'));
       burbuja.appendChild(crear('span', 'lf-noti-num'));
-      burbuja.addEventListener('click', function () {
-        var t = pendiente || ultimoActivo;
-        if (t) abrirChat(t);
-      });
+      burbuja.addEventListener('click', alTocarBurbuja);
       document.body.appendChild(burbuja);
       // Un cuadro después, para que la entrada se anime.
       requestAnimationFrame(function () { requestAnimationFrame(function () { pintarBurbuja(); }); });
       return;
     }
-    if (!burbuja) return;
     // Se esconde (con animación) mientras el chat está abierto.
-    burbuja.classList.toggle('oculta', !hay || !!panel);
+    burbuja.classList.toggle('oculta', !!panel || hayVentana());
     burbuja.classList.toggle('con-nuevos', sinLeerAhora > 0);
     var num = burbuja.querySelector('.lf-noti-num');
     var texto = sinLeerAhora > 9 ? '9+' : String(sinLeerAhora || '');
@@ -1205,29 +1217,12 @@
     num.hidden = !sinLeerAhora;
   }
 
-  /* Las pestañas de arriba del chat: sus reportes sin resolver. Solo
-     salen si hay más de uno al cual cambiar. */
-  function pintarPestanas() {
-    if (!panel) return;
-    var tira = panel.querySelector('.lf-chatf-tickets');
-    var actual = +panel.getAttribute('data-ticket');
-    var lista = activos.slice();
-    if (lista.length && !lista.some(function (a) { return a.id === actual; })) {
-      lista.unshift({ id: actual, folio: panel._lfFolio || '', asunto: panel._lfAsunto || '', sin_leer: 0 });
-    }
-    tira.hidden = lista.length < 2;
-    tira.innerHTML = '';
-    lista.forEach(function (a) {
-      var b = boton('pes' + (a.id === actual ? ' on' : ''), null, a.asunto || a.folio);
-      b.setAttribute('aria-current', a.id === actual ? 'true' : 'false');
-      b.appendChild(crear('b', '', a.folio || ('#' + a.id)));
-      b.appendChild(crear('span', 'as', a.asunto || ''));
-      if (a.sin_leer && a.id !== actual) b.appendChild(crear('span', 'lf-noti-num', a.sin_leer > 9 ? '9+' : a.sin_leer));
-      b.addEventListener('click', function () { if (a.id !== actual) abrirChat(a); });
-      tira.appendChild(b);
-    });
-    var on = tira.querySelector('.on');
-    if (on && on.scrollIntoView && !tira.hidden) on.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  /* Respuesta sin leer: directo a ese chat. Un solo reporte: directo a él.
+     Varios, o ninguno: la lista. */
+  function alTocarBurbuja() {
+    if (pendiente) { abrirChat(pendiente); return; }
+    if (activos.length === 1) { abrirChat(activos[0]); return; }
+    abrirLista();
   }
 
   function cerrarChat() {
@@ -1249,6 +1244,10 @@
     panel.setAttribute('data-lf-flota', '');
 
     var cab = crear('header');
+    // "←": de un chat a la lista de reportes.
+    var atras = boton('bt atras', '←', 'Ver todos tus reportes');
+    atras.addEventListener('click', function (e) { e.stopPropagation(); abrirLista(); });
+    cab.appendChild(atras);
     var tit = crear('div', 'tit');
     tit.appendChild(crear('b', '', 'Soporte LibertyFin'));
     tit.appendChild(crear('small'));
@@ -1272,14 +1271,75 @@
     cab.appendChild(irA); cab.appendChild(min); cab.appendChild(x);
     panel.appendChild(cab);
 
-    var tira = crear('div', 'lf-chatf-tickets');
-    tira.setAttribute('role', 'tablist');
-    tira.setAttribute('aria-label', 'Tus reportes abiertos');
-    tira.hidden = true;
-    panel.appendChild(tira);
-
     document.body.appendChild(panel);
     pintarOfertas();
+  }
+
+  /* Deja el panel sin contenido (para mostrar otro chat o la lista): deja
+     de escuchar la conversación que hubiera. */
+  function vaciarPanel() {
+    if (panel._lfChat) panel._lfChat.parar();
+    panel._lfChat = null;
+    [].forEach.call(panel.querySelectorAll(
+      '.lista, form, [data-lf-cerrado], .lf-chatf-reportes, .lf-chatf-pie-lista, .lf-ir-abajo'),
+      function (n) { n.remove(); });
+    ['data-ticket', 'data-lf-chat', 'data-lf-escribe'].forEach(function (a) { panel.removeAttribute(a); });
+    panel.classList.remove('min');
+  }
+
+  /* ── La lista de reportes ── */
+  function abrirLista() {
+    if (!panel) crearPanel(); else vaciarPanel();
+    panel.classList.add('en-lista');
+    sesionGuardar('lf_chat_abierto', JSON.stringify({ lista: true }));
+    panel.querySelector('header small').textContent = 'Tus reportes';
+
+    panel.appendChild(crear('div', 'lf-chatf-reportes'));
+    var pie = crear('div', 'lf-chatf-pie-lista');
+    var todos = crear('a', 'todos', 'Ver todos mis reportes');
+    todos.href = '/ayuda'; todos.setAttribute('data-parcial', '');
+    var nuevo = crear('a', 'btn btn-primary btn-sm', 'Reportar un problema');
+    nuevo.href = '/ayuda'; nuevo.setAttribute('data-parcial', '');
+    pie.appendChild(todos); pie.appendChild(nuevo);
+    panel.appendChild(pie);
+
+    pintarLista();
+    pintarBurbuja();
+    revisarCliente();        // y se trae lo más reciente
+  }
+
+  function pintarLista() {
+    if (!panel || !panel.classList.contains('en-lista')) return;
+    var cont = panel.querySelector('.lf-chatf-reportes');
+    if (!cont) return;
+    cont.innerHTML = '';
+    // Antes de la primera respuesta del servidor no se sabe si hay o no.
+    if (!clienteListo) { cont.appendChild(crear('p', 'lf-chat-vacio', 'Cargando tus reportes…')); return; }
+    if (!activos.length) {
+      var nada = crear('div', 'nada');
+      var ic = crear('span', 'ico'); ic.innerHTML = ICONO_CHAT;
+      nada.appendChild(ic);
+      nada.appendChild(crear('b', '', 'No tienes reportes abiertos'));
+      nada.appendChild(crear('small', '', 'Si algo no funciona, cuéntanos y te ayudamos.'));
+      cont.appendChild(nada);
+      return;
+    }
+    activos.forEach(function (a) {
+      var b = boton('rep' + (a.sin_leer ? ' sin-leer' : ''), null, 'Abrir el chat de ' + (a.folio || 'este reporte'));
+      var ic = crear('span', 'ico'); ic.innerHTML = ICONO_CHAT;
+      b.appendChild(ic);
+      var tx = crear('span', 'tx');
+      tx.appendChild(crear('b', '', a.asunto || a.folio));
+      tx.appendChild(crear('small', '', a.folio + ' · ' + (ESTADO_CLIENTE[a.estado] || a.estado)));
+      if (a.ultimo) tx.appendChild(crear('span', 'ult', (a.de_soporte ? 'Soporte: ' : 'Tú: ') + a.ultimo));
+      b.appendChild(tx);
+      var meta = crear('span', 'meta');
+      if (a.hace !== null && a.hace !== undefined) meta.appendChild(crear('small', '', hace(a.hace)));
+      if (a.sin_leer) meta.appendChild(crear('span', 'lf-noti-num', a.sin_leer > 9 ? '9+' : String(a.sin_leer)));
+      b.appendChild(meta);
+      b.addEventListener('click', function () { abrirChat(a); });
+      cont.appendChild(b);
+    });
   }
 
   /* El cuerpo del chat para un reporte: la lista y el formulario. Al
@@ -1317,34 +1377,26 @@
     return { lista: lista, form: form, ta: ta };
   }
 
+  /* ── El chat de un reporte ── */
   function abrirChat(t) {
-    if (panel && +panel.getAttribute('data-ticket') === +t.id) {
+    if (panel && !panel.classList.contains('en-lista') && +panel.getAttribute('data-ticket') === +t.id) {
       panel.classList.remove('min');
       var ta0 = panel.querySelector('textarea'); if (ta0) ta0.focus();
       return;
     }
-    if (!panel) crearPanel();
-    else {
-      // Cambiar de reporte: se deja de escuchar el anterior.
-      if (panel._lfChat) panel._lfChat.parar();
-      panel._lfChat = null;
-      [].forEach.call(panel.querySelectorAll('.lista, form, [data-lf-cerrado]'), function (n) { n.remove(); });
-      panel.classList.remove('min');
-    }
+    if (!panel) crearPanel(); else vaciarPanel();
+    panel.classList.remove('en-lista');
     sesionGuardar('lf_chat_abierto', JSON.stringify({ id: t.id, folio: t.folio || '', asunto: t.asunto || '' }));
 
     panel.setAttribute('data-ticket', t.id);
     panel.setAttribute('data-lf-chat', '/ayuda/' + (+t.id) + '/mensajes');
     panel.setAttribute('data-lf-escribe', '/ayuda/' + (+t.id) + '/escribiendo');
-    panel._lfFolio = t.folio || '';
-    panel._lfAsunto = t.asunto || '';
     panel.querySelector('header small').textContent = (t.folio ? t.folio + ' · ' : '') + (t.asunto || '');
     panel.querySelector('header .ir').href = '/ayuda?ver=' + (+t.id);
 
     var c = armarCuerpo(t);
     panel.appendChild(c.lista);
     panel.appendChild(c.form);
-    pintarPestanas();
     pintarBurbuja();            // la burbuja se va mientras el chat está abierto
     conversacion(panel);
     c.ta.focus({ preventScroll: true });
@@ -1359,10 +1411,10 @@
         if (!j || !j.ok) return;
         marcarEnlace('/ayuda', j.sin_leer, '1 respuesta de soporte sin leer', 'respuestas de soporte sin leer');
         activos = j.activos || [];
-        ultimoActivo = j.activo || null;
         pendiente = (j.tickets && j.tickets[0]) || null;
+        clienteListo = true;
         pintarBurbuja(j.sin_leer);
-        pintarPestanas();
+        pintarLista();
         if (!j.tickets || !j.tickets.length) return;
         var t = j.tickets[0];
         // En la página de ese ticket, o con su chat abierto, la
@@ -1374,18 +1426,25 @@
         guardar(clave, t.mensaje_id);
         avisar(t.autor + ' te respondió', t.folio + ' · ' + t.extracto, function () { abrirChat(t); });
         // Si ya tiene otro reporte abierto en el chat, no se le cambia de
-        // golpe: el aviso y la pestaña marcada bastan.
+        // golpe: el aviso y la cuenta en la lista bastan.
         if (!panel) abrirChat(t);
       }, function () {});
     }
     revisarCliente = revisar;
     alEnviar.push(function () { setTimeout(revisar, 800); });
+    // Al cambiar de página: en la de un reporte la burbuja se esconde.
+    document.addEventListener('lf:cargado', function () { pintarBurbuja(); });
 
-    // Si estaba abierto antes de recargar, se vuelve a abrir.
+    // Si estaba abierto antes de recargar (un chat o la lista), se vuelve a abrir.
     var antes = sesionLeer('lf_chat_abierto');
-    if (antes) { try { abrirChat(JSON.parse(antes)); } catch (e) {} }
+    if (antes) {
+      try {
+        var a = JSON.parse(antes);
+        if (a && a.lista) abrirLista(); else if (a && a.id) abrirChat(a);
+      } catch (e) {}
+    }
 
-    setTimeout(revisar, 1200);
+    setTimeout(revisar, 600);
     setInterval(revisar, CADA_NOVEDADES);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) revisar(); });
   }

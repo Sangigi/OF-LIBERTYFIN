@@ -442,16 +442,23 @@ final class TicketRepo
     public function activosCliente($empresaId, $usuarioId)
     {
         try {
+            // Con el último mensaje visible (qué dice, de quién y hace
+            // cuánto): la lista del chat flotante es como la de una app de
+            // mensajes.
             $st = $this->db->prepare("
                 SELECT t.id, t.folio, t.asunto, t.estado,
                        (SELECT COUNT(*) FROM ticket_mensajes m
                         WHERE m.ticket_id = t.id AND m.interno = 0 AND m.autor_tipo = 'plataforma'
-                          AND m.id > t.visto_cliente) AS sin_leer
+                          AND m.id > t.visto_cliente) AS sin_leer,
+                       u.cuerpo AS ultimo, u.autor_tipo AS ultimo_tipo,
+                       TIMESTAMPDIFF(SECOND, u.creado_en, NOW()) AS hace
                 FROM tickets t
+                LEFT JOIN ticket_mensajes u ON u.id = (SELECT MAX(x.id) FROM ticket_mensajes x
+                                                       WHERE x.ticket_id = t.id AND x.interno = 0)
                 WHERE t.empresa_id = ? AND t.creado_por = ?
                   AND (t.creado_tipo = 'empresa' OR t.creado_tipo IS NULL)
                   AND t.estado NOT IN ('resuelto', 'cerrado')
-                ORDER BY (SELECT MAX(mm.id) FROM ticket_mensajes mm WHERE mm.ticket_id = t.id) DESC, t.id DESC
+                ORDER BY COALESCE(u.id, 0) DESC, t.id DESC
                 LIMIT 15");
             $st->execute([(int)$empresaId, (int)$usuarioId]);
             return $st->fetchAll();
