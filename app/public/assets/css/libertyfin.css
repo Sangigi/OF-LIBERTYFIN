@@ -3467,3 +3467,45 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-chatf header .bt svg{width:16px;height:16px}
 /* Por qué no se activaron los avisos del escritorio. */
 .lf-campana-pop .bloq.err{flex:1 1 100%;color:var(--lf-rojo);line-height:1.45}
+
+/* ══════════════════════════════════════════════════════
+   LA CONVERSACIÓN COMO VENTANA DE CHAT
+   (el ticket de soporte y el reporte del cliente)
+   Alto fijo: la lista de mensajes se desplaza por DENTRO y la caja de
+   escribir queda pegada abajo, a la mano aunque se suba a leer lo
+   anterior. Se abre en el último mensaje (lf-chat.js).
+   ══════════════════════════════════════════════════════ */
+.lf-chat-ventana{position:relative;display:flex;flex-direction:column;overflow:hidden;
+  height:calc(100vh - 170px);min-height:440px}
+@supports (height:100dvh){ .lf-chat-ventana{height:calc(100dvh - 170px)} }
+.lf-chat-ventana > .card-header{flex:0 0 auto}
+.lf-chat-ventana > .lf-chat-lista{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;
+  padding-top:6px;padding-bottom:10px}
+.lf-chat-nota{flex:0 0 auto;padding:9px 18px;border-top:1px solid var(--lf-linea)}
+.lf-chat-nota p{margin:0;font-size:12px;line-height:1.5}
+.lf-chat-pie{flex:0 0 auto;padding:12px 16px 14px;border-top:1px solid var(--lf-linea);background:var(--lf-sup)}
+.lf-chat-pie textarea{min-height:46px;max-height:180px;resize:none;overflow-y:auto}
+.lf-chat-pie .lf-resp-pie{margin-top:8px}
+/* Escribiendo una nota interna, la caja se pinta de ámbar: que no se
+   confunda con algo que va a leer el cliente. */
+.lf-chat-pie form:has(input[name=interno]:checked) textarea{background:var(--lf-amb-soft);border-color:var(--lf-amb)}
+/* Las plantillas de soporte, en una sola fila que se desliza. */
+.lf-plantillas{display:flex;align-items:center;gap:7px;margin-bottom:8px;padding-bottom:2px;
+  overflow-x:auto;scrollbar-width:thin}
+.lf-plantillas > span{flex:0 0 auto;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-plantillas .lf-pill{flex:0 0 auto;white-space:nowrap}
+@media(max-width:940px){
+  /* Arriba la barra y los botones; abajo la barra del pulgar. */
+  .lf-chat-ventana{height:calc(100vh - 230px);min-height:380px}
+  @supports (height:100dvh){ .lf-chat-ventana{height:calc(100dvh - 230px)} }
+  .lf-chat-pie{padding:10px 12px 12px}
+}
+
+/* "↓ Mensajes nuevos": llegó algo mientras se leía más arriba. */
+.lf-ir-abajo{position:absolute;left:50%;z-index:6;padding:7px 15px;border:0;border-radius:999px;
+  background:var(--lf-brand);color:#fff;font:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  box-shadow:0 8px 20px -6px color-mix(in srgb,var(--lf-brand) 70%,transparent);
+  opacity:0;pointer-events:none;transform:translate(-50%,8px);
+  transition:opacity .2s ease,transform .3s var(--lf-suave)}
+.lf-ir-abajo.ver{opacity:1;pointer-events:auto;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){ .lf-ir-abajo{transition:none} }

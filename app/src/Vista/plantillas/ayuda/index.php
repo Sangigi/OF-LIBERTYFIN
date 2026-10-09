@@ -40,8 +40,10 @@ $comoVa = [
 </div>
 
 <?php /* La conversación es un chat en vivo: lo nuevo aparece solo y se
-         contesta sin recargar (ver assets/js/lf-chat.js). */ ?>
-<section class="card" data-lf-chat="/ayuda/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="cliente"
+         contesta sin recargar (ver assets/js/lf-chat.js). Es una VENTANA
+         DE CHAT: se abre en el último mensaje, la lista se desplaza por
+         dentro y la caja de escribir queda fija abajo. */ ?>
+<section class="card lf-chat-ventana" data-lf-chat="/ayuda/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="cliente"
          data-lf-escribe="/ayuda/<?= (int)$t['id'] ?>/escribiendo"
          data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
   <header class="card-header">
@@ -94,21 +96,20 @@ $comoVa = [
     'cerrado'   => 'Este reporte está cerrado. Si vuelve a pasar, abre uno nuevo.',
   ][$t['estado']] ?? ''; ?>
   <?php if ($queSigue): ?>
-    <div class="card-body" style="border-top:1px solid var(--lf-linea);
-         background:<?= $t['estado']==='esperando' ? 'var(--lf-amb-soft)' : 'var(--lf-vidrio)' ?>">
-      <p style="font-size:12.5px;line-height:1.6;margin:0;
-         color:<?= $t['estado']==='esperando' ? 'var(--lf-amb)' : 'var(--lf-tinta-3)' ?>">
+    <div class="lf-chat-nota" style="background:<?= $t['estado']==='esperando' ? 'var(--lf-amb-soft)' : 'var(--lf-vidrio)' ?>">
+      <p style="color:<?= $t['estado']==='esperando' ? 'var(--lf-amb)' : 'var(--lf-tinta-3)' ?>">
         <b>¿Qué sigue?</b> <?= P::e($queSigue) ?></p>
     </div>
   <?php endif; ?>
 
   <?php if ($t['estado'] !== 'cerrado'): ?>
-  <div class="card-body" style="border-top:1px solid var(--lf-linea)">
+  <?php /* La caja de escribir, fija al pie de la ventana. */ ?>
+  <div class="lf-chat-pie">
     <form method="post" action="/ayuda/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
           data-lf-enviar>
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
-      <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
-                placeholder="Agrega algo al reporte"></textarea>
+      <textarea class="form-control lf-desc" name="cuerpo" rows="2" required
+                placeholder="Escribe tu mensaje…"></textarea>
       <div class="lf-resp-pie">
         <span class="lf-file">
           <input type="file" name="adjunto" id="adjResp"

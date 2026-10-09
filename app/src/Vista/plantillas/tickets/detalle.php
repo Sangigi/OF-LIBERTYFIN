@@ -51,6 +51,8 @@ document.addEventListener('click', function(ev){
   // Se AGREGA, no se reemplaza: quien ya escribió media respuesta no
   // debería perderla por tocar una plantilla.
   c.value = (c.value.trim() ? c.value.trim() + '\n\n' : '') + b.dataset.txt;
+  // Que la caja crezca con el texto (ver lf-chat.js).
+  c.dispatchEvent(new Event('input', { bubbles: true }));
   c.focus();
 });
 </script>
@@ -58,8 +60,11 @@ document.addEventListener('click', function(ev){
 <div class="lf-split">
   <div>
     <?php /* Chat en vivo: lo que escriba el cliente aparece solo, y la
-             respuesta se envía sin recargar (ver assets/js/lf-chat.js). */ ?>
-    <section class="card" data-lf-chat="/tickets/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="soporte"
+             respuesta se envía sin recargar (ver assets/js/lf-chat.js).
+             Es una VENTANA DE CHAT: se abre en el último mensaje, la lista
+             se desplaza por dentro y la caja de responder queda fija abajo,
+             a la mano aunque se suba a leer lo anterior. */ ?>
+    <section class="card lf-chat-ventana" data-lf-chat="/tickets/<?= (int)$t['id'] ?>/mensajes" data-lf-lado="soporte"
              data-lf-escribe="/tickets/<?= (int)$t['id'] ?>/escribiendo"
              data-lf-form="#formResp"
              data-lf-ultimo="<?= $mensajes ? max(array_column($mensajes, 'id')) : 0 ?>">
@@ -97,28 +102,27 @@ document.addEventListener('click', function(ev){
           </div>
         <?php endforeach; ?>
       </div>
-    </section>
 
-    <?php if (!in_array($t['estado'], ['cerrado'], true)): ?>
-    <section class="card">
-      <header class="card-header">Responder</header>
-      <div class="card-body">
+      <?php if (!in_array($t['estado'], ['cerrado'], true)): ?>
+      <?php /* La caja de responder, fija al pie de la ventana. */ ?>
+      <div class="lf-chat-pie">
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/responder" enctype="multipart/form-data"
               id="formResp" data-lf-enviar>
           <input type="hidden" name="token" value="<?= P::e($token) ?>">
           <?php if ($plantillas): ?>
-            <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:11px;align-items:center">
-              <span style="font-size:11.5px;color:var(--lf-tinta-4)">Plantillas:</span>
+            <div class="lf-plantillas">
+              <span>Plantillas:</span>
               <?php foreach ($plantillas as $pl): ?>
                 <button type="button" class="lf-pill lf-plant"
                         data-txt="<?= P::e($pl['cuerpo']) ?>"><?= P::e($pl['titulo']) ?></button>
               <?php endforeach; ?>
             </div>
           <?php endif; ?>
-          <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="4" required
+          <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="2" required
                     placeholder="Qué encontraste y qué tiene que hacer"></textarea>
           <div class="lf-resp-pie">
-            <label class="lf-resp-interno">
+            <label class="lf-resp-interno"
+                   title="Una nota interna no la ve el cliente y no cuenta como primera respuesta: para él nadie le ha contestado todavía.">
               <input type="checkbox" name="interno" value="1"> Nota interna
             </label>
             <span class="lf-file">
@@ -129,14 +133,10 @@ document.addEventListener('click', function(ev){
             </span>
             <button class="btn btn-primary" type="submit">Enviar</button>
           </div>
-          <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:11px;line-height:1.5">
-            Una <b>nota interna</b> no la ve el cliente y no cuenta como primera
-            respuesta: para él nadie le ha contestado todavía.
-          </p>
         </form>
       </div>
+      <?php endif; ?>
     </section>
-    <?php endif; ?>
   </div>
 
   <div>

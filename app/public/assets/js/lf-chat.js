@@ -540,6 +540,18 @@
 
     if (ta && pie) pie.insertBefore(selectorEmojis(ta), pie.querySelector('.lf-file') || pie.firstChild);
 
+    // La caja crece mientras se escribe (hasta un tope) y vuelve a su
+    // tamaño al enviar: como en cualquier chat.
+    if (ta) {
+      var tope = form.closest('.lf-chatf') ? 120 : 180;
+      form._lfCrecer = function () {
+        ta.style.height = 'auto';
+        if (ta.value) ta.style.height = Math.min(ta.scrollHeight + 2, tope) + 'px';
+        else ta.style.height = '';
+      };
+      ta.addEventListener('input', form._lfCrecer);
+    }
+
     var vista = crear('div', 'lf-adj-vista');
     vista.hidden = true;
     if (pie) pie.parentNode.insertBefore(vista, pie); else form.appendChild(vista);
@@ -606,6 +618,42 @@
 
     function viva() { return document.body.contains(raiz); }
 
+    /* ── Como en un chat: se abre en el último mensaje ──
+       La lista se desplaza por dentro (la ventana de chat; ver CSS
+       .lf-chat-ventana). Si quien lee está al final, lo nuevo lo baja
+       solo; si subió a leer lo anterior, no se le mueve: aparece
+       "↓ Mensajes nuevos" para bajar cuando quiera. */
+    function alFinal() { return lista.scrollHeight - lista.scrollTop - lista.clientHeight < 80; }
+    var pegado = true, nuevosSinVer = 0, botonNuevos = null;
+
+    function avisarNuevos(n) {
+      nuevosSinVer += n;
+      if (!botonNuevos) {
+        botonNuevos = boton('lf-ir-abajo', null, 'Ir a los mensajes nuevos');
+        botonNuevos.addEventListener('click', function () { bajar(lista, true); ocultarNuevos(); });
+        raiz.appendChild(botonNuevos);
+      }
+      botonNuevos.textContent = '↓ ' + (nuevosSinVer === 1 ? '1 mensaje nuevo' : nuevosSinVer + ' mensajes nuevos');
+      // Justo encima de donde termina la lista (arriba de la caja de escribir).
+      var abajoDe = raiz.getBoundingClientRect().bottom - lista.getBoundingClientRect().bottom;
+      botonNuevos.style.bottom = Math.max(10, abajoDe + 12) + 'px';
+      botonNuevos.classList.add('ver');
+    }
+    function ocultarNuevos() {
+      nuevosSinVer = 0;
+      if (botonNuevos) botonNuevos.classList.remove('ver');
+    }
+
+    lista.addEventListener('scroll', function () {
+      pegado = alFinal();
+      if (pegado) ocultarNuevos();
+    }, { passive: true });
+    // Una imagen que termina de cargar cambia el alto: si estaba al final,
+    // se queda al final (si no, abriría a medio camino).
+    lista.addEventListener('load', function (e) {
+      if (e.target && e.target.tagName === 'IMG' && pegado) bajar(lista, false);
+    }, true);
+
     /* Mientras se teclea, se le avisa al otro lado (como mucho cada
        2.5 s). Una nota interna no: el cliente no debe saber que se
        escribe algo que no va a ver. */
@@ -644,7 +692,9 @@
     function recibir(j) {
       var cambio = false;
       var nuevos = (j.mensajes || []).filter(function (m) { return m.id > ultimo; });
-      var abajo = flota || lista.scrollHeight - lista.scrollTop - lista.clientHeight < 80;
+      // ¿Estaba al final? Entonces lo nuevo se le muestra bajando. Si subió
+      // a leer lo anterior, no se le mueve: sale el botón de "nuevos".
+      var abajo = alFinal();
       if (nuevos.length) {
         cambio = true;
         var vacio = raiz.querySelector('[data-lf-vacio]');
@@ -680,6 +730,10 @@
       if (esc !== conoce) { conoce = esc; cambio = true; }
       indicador(lista, esc || null);
       if (abajo && (nuevos.length || esc)) bajar(lista, true);
+      else if (!abajo) {
+        var deOtros = nuevos.filter(function (m) { return !m.mio; }).length;
+        if (deOtros) avisarNuevos(deOtros);
+      }
       if (j.cerrado && form && !form.hidden) {
         cambio = true;
         form.hidden = true;
@@ -871,6 +925,7 @@
 
         // El formulario queda listo para el siguiente, sin esperar.
         if (ta) ta.value = '';
+        if (form._lfCrecer) form._lfCrecer();
         avisado = 0;
         form._lfAdj = null;
         if (inp && inp.value) { form._lfSilencio = true; inp.value = ''; inp.dispatchEvent(new Event('change', { bubbles: true })); form._lfSilencio = false; }
@@ -897,7 +952,9 @@
       }
     }
 
-    if (flota) bajar(lista, false);
+    // Se abre en el último mensaje, como cualquier chat.
+    bajar(lista, false);
+    pegado = true;
     document.addEventListener('visibilitychange', alVolver);
     ciclo();
     raiz._lfChat = { parar: parar };
