@@ -545,59 +545,6 @@ final class UsuariosControlador
                         error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
                     }
 
-                    // ─────────────────────────────────────────────
-                    // AVISO DE PAGO CONFIRMADO
-                    //
-                    // Este cobro se aprobó solo: nadie de LibertyFin
-                    // tocó nada, lo confirmó el proveedor y aquí se
-                    // cierra. Sin este correo la empresa se entera
-                    // únicamente si vuelve a entrar a la pestaña Plan
-                    // — y como ya pagó, no tiene motivo para volver.
-                    // El aviso es lo único que le dice que su plan ya
-                    // está activo y hasta cuándo.
-                    //
-                    // ─────────────────────────────────────────────
-                    if ($aprobado) {
-                        $destino   = (string)($_SESSION['usuario_correo'] ?? '');
-                        $nombrePlan = (string)($aprobado['nombre_plan'] ?? '');
-                        $vence     = !empty($aprobado['vence_nuevo'])
-                                     ? date('d/m/Y', strtotime($aprobado['vence_nuevo']))
-                                     : '';
-                        $enviado   = false;
-                        $motivo    = '';
-                        try {
-                            $enviado = \LibertyFin\Servicio\Avisos::pagoPlanRevisado(
-                                $destino,
-                                $_SESSION['usuario_nombre'] ?? '',
-                                $nombrePlan,
-                                true,
-                                $vence,
-                                (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
-                                    . ($_SERVER['HTTP_HOST'] ?? '') . '/cuenta?t=plan');
-                            if (!$enviado) {
-                                $motivo = \LibertyFin\Servicio\Avisos::activos()
-                                    ? 'el envío devolvió false'
-                                    : 'SMTP no configurado';
-                            }
-                        } catch (\Throwable $e) {
-                            $motivo = 'excepción: ' . $e->getMessage();
-                        }
-
-                        // Una sola línea, siempre, con el desenlace del
-                        // correo. Sin esto, cuando alguien pregunte "¿le
-                        // llegó?", la única forma de saberlo sería
-                        // rebuscar en la bandeja del destinatario.
-                        error_log(sprintf(
-                            '[LibertyFin] aviso pago plan liga=%d ref=%s plan="%s" para=%s — %s%s',
-                            (int)$l['id'],
-                            (string)($l['referencia'] ?? ''),
-                            $nombrePlan,
-                            $destino !== '' ? $destino : '(sin correo en sesión)',
-                            $enviado ? 'correo ENVIADO' : 'correo NO enviado',
-                            $enviado ? '' : ' (' . ($motivo ?: 'motivo desconocido') . ')'
-                        ));
-                    }
-
                     // Sin pago_id: ese campo apunta al abono de una venta y
                     // aquí no hay venta, hay un pago de plan (ya aprobado
                     // arriba). Omitirlo es un error fatal en PHP 8.
