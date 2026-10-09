@@ -55,16 +55,6 @@ use LibertyFin\Servicio\RegistrarPago;
  *   2. Idempotencia. El proveedor reintenta. El mismo número de
  *      transacción no puede abonar dos veces.
  *   3. Los montos viajan en CENTAVOS, como entero.
- *
- * PAGOS DE PLAN
- *
- * Desde que existe la pestaña Plan, hay ligas que NO cuelgan de una
- * venta: cuelgan de un `pagos_plan` (base principal). Esas llegan aquí
- * igual —el proveedor no distingue— y se reconocen porque traen
- * `venta_id` en NULL. Cuando el aviso confirma el cobro, además de
- * marcar la liga hay que aprobar el pago del plan: `pagos_plan` no se
- * entera solo, y sin eso el plan se queda en `por_pagar` aunque el
- * dinero ya haya entrado. De eso se encarga `aprobarPlanSiAplica()`.
  */
 final class PagosEntrantesControlador
 {
@@ -180,17 +170,11 @@ final class PagosEntrantesControlador
         // tiempo, y si no se revisara esto la venta quedaría abonada dos
         // veces con un solo pago del cliente.
         if ($ya = $repo->yaEntro($l['referencia'], $transaccion)) {
-            // Antes de responder OK hay que asegurarse de que el pago del
-            // plan también quedó aprobado en la vuelta anterior. Si por lo
-            // que sea la liga quedó `pagada` pero `pagos_plan` no, esta
-            // es la última oportunidad de reconciliarlo.
-            $this->aprobarPlanSiAplica($l);
             $this->pagoJson(self::OK, (string)$ya['autorizacion'],
                 'Operación exitosa', $transaccion,
                 $ya['pagado_en'] ? date('Y-m-d', strtotime($ya['pagado_en'])) : '');
         }
         if ($l['estado'] === 'pagada') {
-            $this->aprobarPlanSiAplica($l);
             $this->pagoJson(self::SIN_ADEUDO, '', 'Referencia sin adeudo', $transaccion);
         }
         if (!empty($l['vence']) && strtotime($l['vence']) < strtotime('today')) {
@@ -216,17 +200,11 @@ final class PagosEntrantesControlador
         try {
             $repo->anotarAviso($l['id'], $transaccion, $autorizacion, $monto);
 
-            // ─────────────────────────────────────────────────────
-            // LA REVISIÓN ES PARA VENTAS, NO PARA PLANES.
-            //
-            // En una venta el dinero ya entró y alguien revisa antes de
-            // abonarla. En un pago de plan no hay venta que abonar: el
-            // plan se activa solo. Si aquí se mandara a `por_aprobar`,
-            // nadie lo aprobaría —el panel de ligas es de ventas, y el
-            // de planes mira `pagos_plan`, no la liga— y el plan se
-            // quedaría en `por_pagar` igual que antes del arreglo.
-            // ─────────────────────────────────────────────────────
-            if (!empty($l['venta_id']) && (new ConfigRepo($db))->exigeAprobacion()) {
+            // Si el negocio pidió revisar los pagos, aquí se detiene. Para
+            // el proveedor el cobro SÍ quedó autorizado —si no, le
+            // devolvería el dinero al cliente—; lo que espera es el
+            // abono, que entra cuando alguien lo apruebe.
+            if ((new ConfigRepo($db))->exigeAprobacion()) {
                 $repo->marcarRevisada($l['id'], 'por_aprobar');
                 $this->pagoJson(self::OK, $autorizacion, 'Operación exitosa', $transaccion);
             }
@@ -243,19 +221,6 @@ final class PagosEntrantesControlador
                 $pagoId = $res['pago_id'] ?? null;
             }
             $repo->marcarPagada($l['id'], $pagoId);
-
-            // ─────────────────────────────────────────────────────
-            // SI ERA UN PAGO DE PLAN, APROBARLO TAMBIÉN.
-            //
-            // La liga ya quedó `pagada`, pero `pagos_plan` vive en la
-            // base principal y no se entera solo. Sin esta llamada, SPEI
-            // y tienda dejaban la liga en `pagada` y el plan en
-            // `por_pagar` indefinidamente.
-            //
-            // `aprobarPorPago` es idempotente: si ya estaba aprobado,
-            // devuelve null y no hace nada. El proveedor puede reintentar.
-            // ─────────────────────────────────────────────────────
-            $this->aprobarPlanSiAplica($l);
 
             Auditoria::anota('pago.registrar',
                 $this->rotulo($l) . ' ' . $l['referencia'], 'esperando',
@@ -391,10 +356,6 @@ final class PagosEntrantesControlador
             $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
         }
         if ($l['estado'] === 'pagada') {
-            // Ya marcada en una vuelta anterior: reconciliar el plan
-            // aquí también, por si el aviso se reintentó después de un
-            // fallo de red a mitad del handler.
-            $this->aprobarPlanSiAplica($l);
             $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
         }
 
@@ -411,9 +372,7 @@ final class PagosEntrantesControlador
             $repo->anotarAviso($l['id'], (string)($d['foliocpagos'] ?? ''),
                 (string)($d['auth'] ?? ''), $monto);
 
-            // Mismo criterio que en autorizar(): la revisión es para
-            // ventas. Un pago de plan se aprueba solo.
-            if (!empty($l['venta_id']) && (new ConfigRepo($db))->exigeAprobacion()) {
+            if ((new ConfigRepo($db))->exigeAprobacion()) {
                 $repo->marcarRevisada($l['id'], 'por_aprobar');
                 $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
             }
@@ -430,13 +389,6 @@ final class PagosEntrantesControlador
                 $pagoId = $res['pago_id'] ?? null;
             }
             $repo->marcarPagada($l['id'], $pagoId);
-
-            // ─────────────────────────────────────────────────────
-            // SI ERA UN PAGO DE PLAN, APROBARLO TAMBIÉN.
-            // La liga ya quedó `pagada`; el plan no se entera solo.
-            // ─────────────────────────────────────────────────────
-            $this->aprobarPlanSiAplica($l);
-
             Auditoria::anota('pago.registrar', 'liga cobrada · ' . $l['referencia'],
                 'esperando', Dinero::pesos($monto), $db);
         } catch (\Throwable $e) {
@@ -451,58 +403,6 @@ final class PagosEntrantesControlador
     // ════════════════════════════════════════════════════════════
     //  LO COMPARTIDO
     // ════════════════════════════════════════════════════════════
-
-    /**
-     * Si esta liga es de un pago de plan, apruébalo.
-     *
-     * ────────────────────────────────────────────────────────────
-     * POR QUÉ EXISTE ESTE MÉTODO
-     *
-     * Las ligas de venta traen `venta_id`; las de plan lo traen en
-     * NULL (así las creó UsuariosControlador::generarLigaPlan). Cuando
-     * el aviso del proveedor confirma que entró el dinero, además de
-     * marcar la liga hay que aprobar el pago del plan: `pagos_plan`
-     * vive en la base principal y no se entera solo de que ya entró
-     * el cobro.
-     *
-     * Sin esto, SPEI y tienda dejaban la liga en `pagada` y el plan en
-     * `por_pagar` para siempre, porque el único camino que llamaba a
-     * `aprobarPorPago` era el modal de la pestaña Plan —y el modal de
-     * SPEI ni siquiera consulta—.
-     *
-     * `aprobarPorPago` es idempotente: si el pago ya estaba aprobado,
-     * o la fila ya no está en `por_pagar`/`en_revision`, devuelve null
-     * y no hace nada. El proveedor reintenta; con esto no suma meses
-     * de más.
-     *
-     * Va en try/catch y NO propaga: al proveedor hay que contestarle
-     * que recibimos el aviso aunque la aprobación del plan falle. Un
-     * 500 aquí haría que reintente un cobro que la liga ya tiene como
-     * pagado.
-     * ────────────────────────────────────────────────────────────
-     */
-    private function aprobarPlanSiAplica(array $l)
-    {
-        if (!empty($l['venta_id']))   return;   // era una venta, no un plan
-        if (empty($l['referencia']))  return;
-
-        try {
-            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
-            $aprobado  = (new \LibertyFin\Datos\PlanRepo($principal))
-                ->aprobarPorPago($l['referencia'], null);   // null = automático
-
-            if ($aprobado) {
-                error_log(sprintf(
-                    '[LibertyFin] webhook: plan %s aprobado · empresa %d · vence %s',
-                    $aprobado['plan'] ?? '?',
-                    (int)$aprobado['empresa_id'],
-                    $aprobado['vence_nuevo'] ?? '?'
-                ));
-            }
-        } catch (\Throwable $e) {
-            error_log('[LibertyFin] webhook → aprobar plan: ' . $e->getMessage());
-        }
-    }
 
     /**
      * El secreto de la URL.
@@ -541,59 +441,59 @@ final class PagosEntrantesControlador
      *
      * @return array|null  [PDO, fila del cobro]
      */
-    private function ubicar($referencia)
-    {
-        $referencia = preg_replace('/\D/', '', (string)$referencia);
-        if ($referencia === '') return null;
+private function ubicar($referencia)
+{
+    $referencia = preg_replace('/\D/', '', (string)$referencia);
+    if ($referencia === '') return null;
 
-        $principal = null;
-        try {
-            $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
-        } catch (\Throwable $e) {
-            error_log('[LibertyFin] sin base principal para ubicar cobros');
-        }
-
-        if ($principal) {
-            // 1) Ruta conocida → empresa_db (camino rápido)
-            $ruta = (new RutaLigaRepo($principal))->buscar($referencia);
-            if ($ruta && !empty($ruta['empresa_db'])) {
-                try {
-                    $db = Conexion::de($ruta['empresa_db']);
-                    $l  = (new LigaRepo($db))->porCualquiera($referencia);
-                    if ($l) return [$db, $l];
-                } catch (\Throwable $e) {
-                    error_log('[LibertyFin] abrir ' . $ruta['empresa_db'] . ': ' . $e->getMessage());
-                }
-            }
-
-            // 2) NUEVO: la liga puede vivir en la PROPIA base principal
-            //    (empresas sin base dedicada, cobros antiguos, mono-inquilino).
-            try {
-                $l = (new LigaRepo($principal))->porCualquiera($referencia);
-                if ($l) return [$principal, $l];
-            } catch (\Throwable $e) {
-                error_log('[LibertyFin] liga en principal ' . $referencia . ': ' . $e->getMessage());
-            }
-        }
-
-        if (!$principal) return null;
-
-        // 3) Último recurso: recorrer bases de empresas (caro, pero exhaustivo)
-        foreach ((new RutaLigaRepo($principal))->basesDeEmpresas() as $base) {
-            try {
-                $db = Conexion::de($base);
-                $l  = (new LigaRepo($db))->porCualquiera($referencia);
-                if ($l) {
-                    (new RutaLigaRepo($principal))->apuntar(
-                        $l['referencia'], $base, null, $l['metodo']);
-                    return [$db, $l];
-                }
-            } catch (\Throwable $e) {
-                continue;
-            }
-        }
-        return null;
+    $principal = null;
+    try {
+        $principal = Conexion::de($GLOBALS['lf_bd_principal'] ?? '');
+    } catch (\Throwable $e) {
+        error_log('[LibertyFin] sin base principal para ubicar cobros');
     }
+
+    if ($principal) {
+        // 1) Ruta conocida → empresa_db (camino rápido)
+        $ruta = (new RutaLigaRepo($principal))->buscar($referencia);
+        if ($ruta && !empty($ruta['empresa_db'])) {
+            try {
+                $db = Conexion::de($ruta['empresa_db']);
+                $l  = (new LigaRepo($db))->porCualquiera($referencia);
+                if ($l) return [$db, $l];
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] abrir ' . $ruta['empresa_db'] . ': ' . $e->getMessage());
+            }
+        }
+
+        // 2) NUEVO: la liga puede vivir en la PROPIA base principal
+        //    (empresas sin base dedicada, cobros antiguos, mono-inquilino).
+        try {
+            $l = (new LigaRepo($principal))->porCualquiera($referencia);
+            if ($l) return [$principal, $l];
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] liga en principal ' . $referencia . ': ' . $e->getMessage());
+        }
+    }
+
+    if (!$principal) return null;
+
+    // 3) Último recurso: recorrer bases de empresas (caro, pero exhaustivo)
+    foreach ((new RutaLigaRepo($principal))->basesDeEmpresas() as $base) {
+        try {
+            $db = Conexion::de($base);
+            $l  = (new LigaRepo($db))->porCualquiera($referencia);
+            if ($l) {
+                (new RutaLigaRepo($principal))->apuntar(
+                    $l['referencia'], $base, null, $l['metodo']);
+                return [$db, $l];
+            }
+        } catch (\Throwable $e) {
+            continue;
+        }
+    }
+    return null;
+}
 
     /**
      * Lo que de verdad se debe.
