@@ -796,7 +796,6 @@ public function estadoPlan($id)
     {
         return new \LibertyFin\Datos\AutenticacionRepo(Conexion::de($GLOBALS['lf_bd_principal'] ?? ''));
     }
-
     /** Mi cuenta para un rol de plataforma: solo perfil y contraseña. */
     private function miCuentaPlataforma()
     {
