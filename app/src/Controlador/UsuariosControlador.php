@@ -384,7 +384,7 @@ final class UsuariosControlador
             'referencia'  => $semilla,
             'id'          => $semilla,
             'cliente'     => $_SESSION['empresa_nombre'] ?? 'Empresa',
-            'correo'      => $_SESSION['usuario_correo'] ?? '',
+            'correo'      => $_SESSION['usuario_email'] ?? '',
         ]);
         if (!$g) {
             error_log('[LibertyFin] plan liga: ' . $api->error());
@@ -449,7 +449,7 @@ final class UsuariosControlador
                 'pruebas'        => $g['pruebas']  ?? false,
                 'usuario_id'     => $_SESSION['usuario_id']     ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
-                'usuario_correo' => $_SESSION['usuario_correo'] ?? null,
+                'usuario_correo' => $_SESSION['usuario_email'] ?? null,
             ]);
 
             // Sin esto, el aviso del proveedor ("ya pagó") llega sin
