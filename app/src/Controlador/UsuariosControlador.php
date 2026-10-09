@@ -526,46 +526,39 @@ final class UsuariosControlador
                 $api = new \LibertyFin\Servicio\LigaPago($cfg);
                 $r = $api->estado($l['referencia'], $l['metodo']);
 
-if ($r && !empty($r['pagado'])) {
-    $aprobado = null;
-    try {
-        $aprobado = (new PlanRepo($principal))
-            ->aprobarPorPago($l['referencia'], $_SESSION['usuario_id'] ?? null);
-    } catch (\Throwable $e) {
-        error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
-    }
+                if ($r && !empty($r['pagado'])) {
+                    // ─────────────────────────────────────────────
+                    // AQUÍ ESTÁ LA DIFERENCIA CON CAJA
+                    //
+                    // En Caja el pago se abona a una venta
+                    // (RegistrarPago::abonar). Aquí no hay venta: hay
+                    // un pago de plan en `pagos_plan` que debe pasar a
+                    // `aprobado` y mover el plan y el vencimiento de la
+                    // empresa. Todo en la base principal, que es donde
+                    // viven los planes y los pagos de plan.
+                    // ─────────────────────────────────────────────
+                    $aprobado = null;
+                    try {
+                        $aprobado = (new PlanRepo($principal))
+                            ->aprobarPorPago($l['referencia'], $_SESSION['usuario_id'] ?? null);
+                    } catch (\Throwable $e) {
+                        error_log('[LibertyFin] aprobar plan por liga: ' . $e->getMessage());
+                    }
 
-    // Sin pago_id: ese campo apunta al abono de una venta y
-    // aquí no hay venta, hay un pago de plan (ya aprobado
-    // arriba). Omitirlo es un error fatal en PHP 8.
-    $ligaRepo->marcarPagada($l['id'], null);
-    // ─────────────────────────────────────────────────────
-    if ($aprobado && !empty($aprobado['email_admin'])) {
-        $para     = $aprobado['email_admin'];
-        $contacto = $aprobado['nombre_contacto'] ?? '';
-        $planNom  = $aprobado['nombre_plan'] ?? '';
-        $vence    = !empty($aprobado['vence_nuevo'])
-            ? date('d/m/Y', strtotime($aprobado['vence_nuevo']))
-            : '';
-        $liga     = (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
-                    . ($_SERVER['HTTP_HOST'] ?? '') . '/cuenta?t=plan';
-
-        \LibertyFin\Servicio\Avisos::despues(function () use ($para, $contacto, $planNom, $vence, $liga) {
-            \LibertyFin\Servicio\Avisos::pagoPlanRevisado(
-                $para, $contacto, $planNom, /* aprobado */ true, $vence, $liga);
-        });
-    }
-
-    $this->json([
-        'ok'      => true,
-        'pagado'  => true,
-        'estado'  => 'pagada',
-        'plan'    => $aprobado ? [
-            'nombre' => $aprobado['nombre_plan'] ?? '',
-            'vence'  => $aprobado['vence_nuevo'] ?? null,
-        ] : null,
-    ]);
-}
+                    // Sin pago_id: ese campo apunta al abono de una venta y
+                    // aquí no hay venta, hay un pago de plan (ya aprobado
+                    // arriba). Omitirlo es un error fatal en PHP 8.
+                    $ligaRepo->marcarPagada($l['id'], null);
+                    $this->json([
+                        'ok'      => true,
+                        'pagado'  => true,
+                        'estado'  => 'pagada',
+                        'plan'    => $aprobado ? [
+                            'nombre' => $aprobado['nombre_plan'] ?? '',
+                            'vence'  => $aprobado['vence_nuevo'] ?? null,
+                        ] : null,
+                    ]);
+                }
 
                 // No pagó todavía: se sella la consulta para no repetirla
                 // antes de diez segundos.
