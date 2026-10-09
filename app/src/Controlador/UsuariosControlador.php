@@ -449,6 +449,7 @@ final class UsuariosControlador
                 'pruebas'        => $g['pruebas']  ?? false,
                 'usuario_id'     => $_SESSION['usuario_id']     ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
+                'usuario_correo' => $_SESSION['usuario_correo'] ?? null,
             ]);
 
             // Sin esto, el aviso del proveedor ("ya pagó") llega sin

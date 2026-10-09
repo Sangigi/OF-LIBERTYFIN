@@ -43,6 +43,7 @@ final class LigaRepo extends Repo
                     pruebas TINYINT(1) NOT NULL DEFAULT 0,
                     usuario_id INT NULL,
                     usuario_nombre VARCHAR(160) NULL,
+                    usuario_correo VARCHAR(160) NULL,
                     revisado_en DATETIME NULL,
                     creado_en DATETIME NOT NULL,
                     UNIQUE KEY ix_lp_ref (referencia),
@@ -62,8 +63,8 @@ final class LigaRepo extends Repo
             INSERT INTO lf_ligas_pago
                 (referencia, venta_id, cliente_nombre, monto, metodo, descripcion,
                  liga, clabe, barras, imagen, formato, estado, vence, pruebas,
-                 usuario_id, usuario_nombre, creado_en)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?, NOW())
+                 usuario_id, usuario_nombre, usuario_correo, creado_en)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?,?, NOW())
         ")->execute([
             $d['referencia'], $d['venta_id'] ?? null, $d['cliente'] ?? null,
             $d['monto'], $d['metodo'], mb_substr((string)($d['descripcion'] ?? ''), 0, 80),
@@ -71,6 +72,7 @@ final class LigaRepo extends Repo
             $d['imagen'] ?? null, $d['formato'] ?? null,
             $d['vence'] ?? null, !empty($d['pruebas']) ? 1 : 0,
             $d['usuario_id'] ?? null, $d['usuario_nombre'] ?? null,
+            $d['usuario_correo'] ?? null,
         ]);
         return (int)$this->db->lastInsertId();
     }
