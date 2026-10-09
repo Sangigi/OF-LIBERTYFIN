@@ -573,8 +573,8 @@
 
     if (ta && pie) pie.insertBefore(selectorEmojis(ta), pie.querySelector('.lf-file') || pie.firstChild);
 
-    // Enviar: el avión de papel. En el celular solo el ícono; en la
-    // computadora, el ícono y la palabra.
+    // Enviar: solo el avión de papel. La palabra queda para lectores de
+    // pantalla (aria-label) y para el globito al pasar el cursor.
     var env = form.querySelector('[type=submit]');
     if (env && !env.classList.contains('lf-enviar-ico')) {
       var palabra = env.textContent.trim() || 'Enviar';
@@ -1013,16 +1013,16 @@
         cola.push(item);
         siguiente();
       });
-      /* En el chat flotante Enter envía y Shift+Enter hace salto de línea. */
-      if (form.hasAttribute('data-lf-enter')) {
-        form.addEventListener('keydown', function (e) {
-          if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target.tagName === 'TEXTAREA') {
-            e.preventDefault();
-            if (form.requestSubmit) form.requestSubmit();
-            else form.dispatchEvent(new Event('submit', { cancelable: true }));
-          }
-        });
-      }
+      /* ENTER ENVÍA y Shift+Enter hace salto de línea, en todos los chats.
+         En el teléfono no: su teclado no tiene Shift+Enter, así que Enter
+         es el salto de línea (como en WhatsApp) y se envía con el avión. */
+      form.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing || e.target.tagName !== 'TEXTAREA') return;
+        if (window.matchMedia && window.matchMedia('(hover: none) and (pointer: coarse)').matches) return;
+        e.preventDefault();
+        if (form.requestSubmit) form.requestSubmit();
+        else form.dispatchEvent(new Event('submit', { cancelable: true }));
+      });
     }
 
     // Se abre en el último mensaje, como cualquier chat.

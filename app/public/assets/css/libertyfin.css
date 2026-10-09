@@ -3719,3 +3719,14 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
 @media(max-width:600px) and (prefers-reduced-motion:reduce){
   .lf-chatf,.lf-chatf.sale{animation:none}
 }
+
+/* Enviar: SOLO el avión de papel, en todas las pantallas; un cuadro de
+   esquinas suaves junto a la caja de escribir. */
+.lf-enviar-ico .txt{display:none}
+.lf-chat-pie .lf-resp-pie .btn.lf-enviar-ico,.lf-chatf .pie .btn.lf-enviar-ico{
+  width:40px;height:40px;padding:0;border-radius:12px;flex:0 0 auto;margin-left:auto}
+.lf-enviar-ico svg{width:18px;height:18px;margin:0 1px 0 -1px}
+@media(max-width:600px){
+  .lf-chat-pie .lf-resp-pie .btn.lf-enviar-ico,.lf-chatf .pie .btn.lf-enviar-ico{width:42px;height:42px}
+  .lf-enviar-ico svg{width:19px;height:19px}
+}
