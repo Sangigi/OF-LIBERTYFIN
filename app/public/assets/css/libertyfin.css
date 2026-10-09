@@ -3696,3 +3696,26 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
   .lf-chatf textarea{border-radius:21px;padding:10px 14px}
   .lf-chatf .pie .btn{margin-left:auto;border-radius:999px;padding:7px 16px}
 }
+
+/* Enviar con el avión de papel (lo pone lf-chat.js). En la computadora,
+   ícono y palabra; en el celular, solo el ícono, en un cuadro de esquinas
+   suaves (no una píldora). */
+.lf-enviar-ico{display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.lf-enviar-ico svg{width:16px;height:16px;flex:0 0 auto}
+@media(max-width:600px){
+  .lf-chat-pie .lf-resp-pie .btn.lf-enviar-ico,.lf-chatf .pie .btn.lf-enviar-ico{
+    width:42px;height:42px;padding:0;border-radius:12px;flex:0 0 auto}
+  .lf-enviar-ico .txt{display:none}
+  .lf-enviar-ico svg{width:19px;height:19px;margin:0 1px 0 -1px}
+
+  /* El chat flotante entra DESDE ABAJO, como una hoja, y se va igual
+     (antes crecía desde la esquina, y a pantalla completa se veía como si
+     empezara arriba). */
+  .lf-chatf{animation:lf-hoja-sube .34s var(--lf-suave) both}
+  .lf-chatf.sale{animation:lf-hoja-baja .26s cubic-bezier(.4,0,1,1) both}
+}
+@keyframes lf-hoja-sube{from{transform:translateY(100%)}to{transform:none}}
+@keyframes lf-hoja-baja{to{transform:translateY(100%)}}
+@media(max-width:600px) and (prefers-reduced-motion:reduce){
+  .lf-chatf,.lf-chatf.sale{animation:none}
+}

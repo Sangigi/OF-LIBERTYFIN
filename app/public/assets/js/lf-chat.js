@@ -573,6 +573,18 @@
 
     if (ta && pie) pie.insertBefore(selectorEmojis(ta), pie.querySelector('.lf-file') || pie.firstChild);
 
+    // Enviar: el avión de papel. En el celular solo el ícono; en la
+    // computadora, el ícono y la palabra.
+    var env = form.querySelector('[type=submit]');
+    if (env && !env.classList.contains('lf-enviar-ico')) {
+      var palabra = env.textContent.trim() || 'Enviar';
+      env.classList.add('lf-enviar-ico');
+      env.innerHTML = ICONO_ENVIAR;
+      env.appendChild(crear('span', 'txt', palabra));
+      env.title = palabra;
+      env.setAttribute('aria-label', palabra);
+    }
+
     // La caja crece mientras se escribe (hasta un tope) y vuelve a su
     // tamaño al enviar: como en cualquier chat.
     if (ta) {
@@ -648,6 +660,7 @@
     var ultimo = +raiz.getAttribute('data-lf-ultimo') || 0;
     var activo = true, reloj = null, ctrl = null, fallos = 0, rapidas = 0;
     var conoce = '', avisado = 0, cola = [], enviando = false;
+    var yaCargo = false;   // la primera tanda se pinta sin animación (ver recibir)
 
     function viva() { return document.body.contains(raiz); }
 
@@ -728,12 +741,18 @@
       // ¿Estaba al final? Entonces lo nuevo se le muestra bajando. Si subió
       // a leer lo anterior, no se le mueve: sale el botón de "nuevos".
       var abajo = alFinal();
+      // LA PRIMERA TANDA (al abrir el chat) aparece ya en el último
+      // mensaje: sin la entrada de cada mensaje y sin bajar deslizándose
+      // desde el primero, que se veía como si el chat empezara arriba.
+      var primera = !yaCargo;
+      yaCargo = true;
       if (nuevos.length) {
         cambio = true;
         var vacio = raiz.querySelector('[data-lf-vacio]');
         if (vacio) vacio.hidden = true;
         nuevos.forEach(function (m) {
           var nodo = pintar(m, lado);
+          if (primera) nodo.classList.remove('nuevo');
           var p = m.mio ? pendienteDe(m) : null;
           if (p) {
             // El "Enviando…" se vuelve el mensaje de verdad, sin saltar.
@@ -762,7 +781,8 @@
       var esc = j.escribiendo || '';
       if (esc !== conoce) { conoce = esc; cambio = true; }
       indicador(lista, esc || null);
-      if (abajo && (nuevos.length || esc)) bajar(lista, true);
+      if (primera && nuevos.length) { bajar(lista, false); pegado = true; }
+      else if (abajo && (nuevos.length || esc)) bajar(lista, true);
       else if (!abajo) {
         var deOtros = nuevos.filter(function (m) { return !m.mio; }).length;
         if (deOtros) avisarNuevos(deOtros);
@@ -1174,6 +1194,25 @@
     + '<path d="M12 3.5c4.9 0 8.5 3.3 8.5 7.6s-3.6 7.6-8.5 7.6c-1 0-2-.1-2.9-.4L5 20l1.1-3.6C4.5 15 3.5 13.2 3.5 11.1 3.5 6.8 7.1 3.5 12 3.5z"/>'
     + '<path d="M8.6 11.2h.01M12 11.2h.01M15.4 11.2h.01" stroke-width="2.6"/></svg>';
 
+  /* Minimizar (una raya) y, ya minimizado, volver a la ventana completa
+     (un cuadrado): como los botones de una ventana. */
+  var ICONO_MIN = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+    + 'stroke-width="2.2" stroke-linecap="round"><path d="M6 12h12"/></svg>';
+  var ICONO_COMPLETO = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+    + 'stroke-width="2" stroke-linejoin="round"><rect x="5.5" y="5.5" width="13" height="13" rx="2.5"/></svg>';
+  /* Enviar: el avión de papel de las apps de mensajes. */
+  var ICONO_ENVIAR = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+    + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M21.5 2.5 10.6 13.4"/><path d="M21.5 2.5 14.6 21.5l-4-8.1-8.1-4z"/></svg>';
+
+  function pintarMin(p) {
+    if (!p || !p._lfMin) return;
+    var minimizado = p.classList.contains('min');
+    p._lfMin.innerHTML = minimizado ? ICONO_COMPLETO : ICONO_MIN;
+    p._lfMin.title = minimizado ? 'Abrir en ventana completa' : 'Minimizar';
+    p._lfMin.setAttribute('aria-label', p._lfMin.title);
+  }
+
   /* ══ 2 y 3 · Novedades y chat flotante (el cliente) ══
      Como una app de mensajes:
        · la BURBUJA siempre está (para quien puede reportar problemas);
@@ -1273,13 +1312,14 @@
     tit.appendChild(crear('small'));
     cab.appendChild(tit);
     var irA = crear('a', 'bt ir', '↗'); irA.title = 'Ver el reporte completo';
-    var min = boton('bt', '–', 'Minimizar');
+    var min = boton('bt min', null, 'Minimizar');
     var x = boton('bt', '×', 'Cerrar');
     var p = panel;
-    min.addEventListener('click', function () { p.classList.toggle('min'); });
+    p._lfMin = min;
+    min.addEventListener('click', function () { p.classList.toggle('min'); pintarMin(p); });
     x.addEventListener('click', cerrarChat);
     cab.addEventListener('click', function (e) {
-      if (p.classList.contains('min') && !e.target.closest('.bt')) p.classList.remove('min');
+      if (p.classList.contains('min') && !e.target.closest('.bt')) { p.classList.remove('min'); pintarMin(p); }
     });
     // Avisos de escritorio aunque cierre LibertyFin (se ve solo si se puede
     // y todavía no están activados; ver pintarOfertas).
@@ -1292,6 +1332,7 @@
     panel.appendChild(cab);
 
     document.body.appendChild(panel);
+    pintarMin(panel);
     pintarOfertas();
   }
 
@@ -1305,6 +1346,7 @@
       function (n) { n.remove(); });
     ['data-ticket', 'data-lf-chat', 'data-lf-escribe'].forEach(function (a) { panel.removeAttribute(a); });
     panel.classList.remove('min');
+    pintarMin(panel);
   }
 
   /* ── La lista de reportes ── */
@@ -1401,6 +1443,7 @@
   function abrirChat(t) {
     if (panel && !panel.classList.contains('en-lista') && +panel.getAttribute('data-ticket') === +t.id) {
       panel.classList.remove('min');
+      pintarMin(panel);
       var ta0 = panel.querySelector('textarea'); if (ta0) ta0.focus();
       return;
     }
