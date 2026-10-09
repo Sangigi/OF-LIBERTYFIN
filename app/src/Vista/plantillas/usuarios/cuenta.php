@@ -272,14 +272,86 @@ if (!empty($catalogo)):
   <div class="card-body">
     <?php if ($lr['metodo'] === 'tarjeta' && !empty($lr['liga'])): ?>
       <p style="font-size:13px;color:var(--lf-tinta-3);margin:0 0 12px;line-height:1.55">
-        Pasa la tarjeta con este enlace. El cargo se procesa al momento
+        Pasa la tarjeta aquí mismo. El cargo se procesa al momento
         y tu plan se activa solo.</p>
+
+      <?php /* La página del proveedor embebida. Algunos procesadores mandan
+               X-Frame-Options: DENY y el iframe queda en blanco: por eso el
+               botón de "Abrir en otra pestaña" sigue ahí como respaldo. */ ?>
+      <div class="lf-pago-marco" id="lfPagoMarco">
+        <iframe src="<?= P::e($lr['liga']) ?>"
+                title="Página de pago"
+                loading="lazy"
+                referrerpolicy="no-referrer"
+                allow="payment"
+                style="width:100%;height:640px;border:0;display:block;background:#fff"></iframe>
+        <noscript>
+          <p style="font-size:12.5px;padding:14px;color:var(--lf-tinta-3)">
+            Activa JavaScript o abre la página en otra pestaña con el botón de abajo.</p>
+        </noscript>
+      </div>
+
+      <?php /* Si el iframe no carga (proveedor que prohíbe embeber), caemos
+               al botón. Se detecta con onload/onerror del propio iframe. */ ?>
+      <div id="lfPagoRespaldo" hidden
+           style="padding:14px 16px;border-radius:var(--lf-r);background:var(--lf-brand-soft);
+                  color:var(--lf-brand-2);font-size:12.5px;line-height:1.55;margin-bottom:12px">
+        <b style="display:block;margin-bottom:4px">Abre la página de pago en otra pestaña</b>
+        El procesador no permite mostrarse aquí dentro. Usa el botón de abajo.
+      </div>
+
       <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <a class="btn btn-primary" href="<?= P::e($lr['liga']) ?>" target="_blank"
-           rel="noopener"><?= W::icono('cobro','16px') ?>Abrir la página de pago</a>
+        <a class="btn btn-primary" id="lfPagoAbrir" href="<?= P::e($lr['liga']) ?>"
+           target="_blank" rel="noopener">
+          <?= W::icono('cobro','16px') ?>Abrir la página de pago</a>
         <button type="button" class="btn btn-secondary" data-copiar="<?= P::e($lr['liga']) ?>">
           <?= W::icono('venta','16px') ?>Copiar la liga</button>
+        <button type="button" class="btn btn-secondary" id="lfPagoRecargar">
+          <?= W::icono('serv','16px') ?>Recargar</button>
       </div>
+
+      <script>
+      /* El iframe puede fallar por dos motivos:
+           1) el proveedor manda X-Frame-Options / CSP frame-ancestors y el
+              navegador lo bloquea → el iframe dispara onload con un documento
+              vacío, o directamente nunca carga;
+           2) la liga caducó.
+         Como no podemos leer el contenido del iframe (es de otro origen), no
+         hay forma 100% fiable de saber si falló. Hacemos una comprobación
+         best-effort: si tras 6 s seguimos sin poder acceder a contentWindow
+         (cross-origin normal) damos por bueno el embed; si onload no llegó
+         en ese tiempo, mostramos el respaldo. */
+      (function () {
+        var marco    = document.getElementById('lfPagoMarco');
+        var respaldo = document.getElementById('lfPagoRespaldo');
+        var ifr      = marco && marco.querySelector('iframe');
+        if (!ifr) return;
+
+        var cargado = false, avisado = false;
+        ifr.addEventListener('load', function () { cargado = true; });
+        ifr.addEventListener('error', function () { mostrarRespaldo(); });
+
+        setTimeout(function () {
+          if (!cargado) mostrarRespaldo();
+        }, 6000);
+
+        function mostrarRespaldo() {
+          if (avisado) return;
+          avisado = true;
+          respaldo.hidden = false;
+          marco.style.display = 'none';
+        }
+
+        var rec = document.getElementById('lfPagoRecargar');
+        if (rec) rec.addEventListener('click', function () {
+          respaldo.hidden = true;
+          marco.style.display = '';
+          cargado = false; avisado = false;
+          ifr.src = ifr.src;
+          setTimeout(function () { if (!cargado) mostrarRespaldo(); }, 6000);
+        });
+      })();
+      </script>
 
     <?php elseif ($lr['metodo'] === 'spei' && !empty($lr['clabe'])): ?>
       <p style="font-size:13px;color:var(--lf-tinta-3);margin:0 0 12px;line-height:1.55">
