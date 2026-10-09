@@ -1853,8 +1853,14 @@
         }
         if (r[1] && r[1].error) return r[1].error;
         return suscripcion(r[1], r[0].llave).then(avisarAlServidor, function (e) {
-          return motivo(e, 'El servicio de avisos del navegador no respondió')
-            + (navigator.brave ? ' En Brave hay que activar "Usar servicios de Google para mensajería push".' : '');
+          // Brave trae apagados de fábrica los avisos push: se dice cómo
+          // encenderlos en vez de solo "no respondió".
+          if (navigator.brave) {
+            return 'Brave trae apagados estos avisos. Abre brave://settings/privacy, activa '
+              + '"Usar los servicios de Google para la mensajería push", cierra y vuelve a abrir Brave, '
+              + 'y vuelve a intentarlo.';
+          }
+          return motivo(e, 'El servicio de avisos del navegador no respondió');
         });
       });
     }).then(function (m) { falloPush = m || ''; pintarOfertas(); return m || ''; },
