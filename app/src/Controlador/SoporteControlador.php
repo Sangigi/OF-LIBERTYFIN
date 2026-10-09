@@ -152,6 +152,8 @@ final class SoporteControlador
         $plat = new PlataformaRepo($principal);
         $tk   = new TicketRepo($principal);
         $yo   = (int)($_SESSION['usuario_id'] ?? 0);
+        // Los que llevan días esperando o resueltos vencen solos (ver TicketRepo).
+        $tk->vencerSolos();
 
         $activos = $tk->bandeja(['estado' => 'activos'], 200);
         $sinAsignar = array_values(array_filter($activos, function ($t) {

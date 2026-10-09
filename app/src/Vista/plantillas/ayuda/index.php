@@ -96,8 +96,10 @@ $comoVa = [
   $queSigue = [
     'abierto'   => 'Lo recibimos. Alguien lo va a leer y te contestamos aquí mismo.',
     'en_curso'  => 'Estamos trabajando en ello. Te escribimos en cuanto haya algo.',
-    'esperando' => 'Necesitamos que nos contestes para poder seguir.',
-    'resuelto'  => 'Lo dimos por resuelto. Si sigue pasando, escríbenos aquí y lo reabrimos.',
+    'esperando' => 'Necesitamos que nos contestes para poder seguir. Si en ' . T::DIAS_ESPERANDO
+                 . ' días no sabemos de ti, lo damos por resuelto.',
+    'resuelto'  => 'Lo dimos por resuelto. Si sigue pasando, escríbenos aquí y lo reabrimos. '
+                 . 'Si no, se cierra solo en ' . T::DIAS_RESUELTO . ' días.',
     'cerrado'   => 'Este reporte está cerrado. Si vuelve a pasar, abre uno nuevo.',
   ][$t['estado']] ?? ''; ?>
   <?php if ($queSigue): ?>

@@ -21,6 +21,8 @@ final class TicketsControlador
     public function index()
     {
         $repo = new TicketRepo($this->principal());
+        // Los que llevan días esperando o resueltos vencen solos (ver TicketRepo).
+        $repo->vencerSolos();
 
         $filtros = [
             'estado'    => Peticion::opcion('estado',
@@ -56,6 +58,7 @@ final class TicketsControlador
     public function ver($id)
     {
         $repo = new TicketRepo($this->principal());
+        $repo->vencerSolos();
         $t = $repo->uno($id);
         if (!$t) {
             http_response_code(404);

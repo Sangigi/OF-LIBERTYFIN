@@ -24,6 +24,8 @@ final class AyudaControlador
     public function index()
     {
         $repo = new TicketRepo($this->principal());
+        // Que el cliente vea el estado al día antes de escribir.
+        $repo->vencerSolos();
         $emp  = (int)($_SESSION['empresa_id'] ?? 0);
 
         $ver    = Peticion::entero('ver');

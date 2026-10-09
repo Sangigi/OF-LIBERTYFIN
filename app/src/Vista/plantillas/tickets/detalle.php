@@ -196,6 +196,10 @@ document.addEventListener('click', function(ev){
               <option value="<?= $k ?>" <?= $t['categoria']===$k?'selected':'' ?>><?= P::e($v) ?></option>
             <?php endforeach; ?>
           </select>
+          <?php /* Para que nadie se sorprenda de que un ticket cambió solo. */ ?>
+          <p style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5;margin:10px 0 0">
+            <b>Esperando al cliente</b> pasa solo a Resuelto si no contesta en <?= T::DIAS_ESPERANDO ?> días.
+            <b>Resuelto</b> se cierra solo a los <?= T::DIAS_RESUELTO ?> días; si el cliente escribe antes, se reabre.</p>
         </form>
 
         <form method="post" action="/tickets/<?= (int)$t['id'] ?>/cambiar" style="margin-top:16px" data-lf-ticket-cambio>

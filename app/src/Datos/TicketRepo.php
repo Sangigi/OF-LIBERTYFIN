@@ -662,6 +662,15 @@ final class TicketRepo
 
     public function responder($ticketId, $cuerpo, $interno, $adjunto, $usuarioId, $usuarioNombre)
     {
+        // Cerrado es cerrado también aquí, no solo en la pantalla del
+        // cliente (que esconde la caja): si vuelve a pasar, va uno nuevo.
+        if (self::tipoAutor() !== 'plataforma') {
+            $st = $this->db->prepare("SELECT estado FROM tickets WHERE id = ?");
+            $st->execute([(int)$ticketId]);
+            if ($st->fetchColumn() === 'cerrado') {
+                throw new \InvalidArgumentException('Este reporte está cerrado. Si vuelve a pasar, abre uno nuevo.');
+            }
+        }
         $cuerpo = trim((string)$cuerpo);
         // Una captura pegada puede ir sola, sin texto. Se le pone uno para
         // que la lista, el aviso y el correo no muestren un mensaje vacío.
@@ -698,8 +707,11 @@ final class TicketRepo
             $this->cambiar($ticketId, 'estado', 'en_curso', $usuarioId, $usuarioNombre);
         }
         // Si soporte esperaba al cliente y el cliente contestó, vuelve a
-        // ser turno de soporte.
-        if (!$deSoporte && $t['estado'] === 'esperando') {
+        // ser turno de soporte. Y si lo habíamos dado por RESUELTO y el
+        // cliente escribe, se REABRE: es lo que le prometemos en su
+        // pantalla. Antes se quedaba en Resuelto, fuera de la bandeja de
+        // activos y de la campana, y el mensaje se podía perder.
+        if (!$deSoporte && in_array($t['estado'], ['esperando', 'resuelto'], true)) {
             $this->cambiar($ticketId, 'estado', 'en_curso', $usuarioId, $usuarioNombre);
         }
         // Quien escribe está en la conversación.
@@ -747,6 +759,84 @@ final class TicketRepo
         $this->evento($ticketId, 'asignado', $t['asignado_nombre'], $aNombre,
                       $usuarioId, $usuarioNombre);
         return true;
+    }
+
+    // ── Vencen solos ────────────────────────────────────────────
+
+    /**
+     * Sin esto un ticket no se cerraba nunca: se quedaba en Esperando o en
+     * Resuelto para siempre, y el cliente podía seguir escribiendo en él.
+     *
+     *   Esperando al cliente → Resuelto, a los DIAS_ESPERANDO días sin
+     *     actividad. Se le deja dicho en el chat; si escribe, se reabre.
+     *   Resuelto → Cerrado, a los DIAS_RESUELTO días sin actividad. Ese ya
+     *     no se reabre: si vuelve a pasar, va un reporte nuevo.
+     *
+     * "Sin actividad" cuenta desde lo último que pasó: el cambio de estado
+     * o un mensaje que el cliente ve. Si soporte le escribe un recordatorio,
+     * el plazo vuelve a empezar.
+     */
+    const DIAS_ESPERANDO = 3;
+    const DIAS_RESUELTO  = 7;
+
+    /**
+     * No hay tareas programadas en el hosting: corre de paso al abrir el
+     * panel, la bandeja o un ticket, como mucho una vez cada diez minutos
+     * por sesión. Cada ticket se "toma" con un UPDATE condicionado, así
+     * que dos sesiones a la vez no lo cambian (ni lo avisan) dos veces.
+     */
+    public function vencerSolos()
+    {
+        if (time() - (int)($_SESSION['lf_tk_vencer'] ?? 0) < 600) return;
+        $_SESSION['lf_tk_vencer'] = time();
+        $this->asegurar();
+        try {
+            $ultimoMsj = "COALESCE((SELECT MAX(m.creado_en) FROM ticket_mensajes m
+                                    WHERE m.ticket_id = t.id AND m.interno = 0), t.creado_en)";
+
+            $st = $this->db->query("
+                SELECT t.id FROM tickets t
+                WHERE t.estado = 'esperando'
+                  AND GREATEST(
+                        COALESCE((SELECT MAX(e.creado_en) FROM ticket_eventos e
+                                  WHERE e.ticket_id = t.id AND e.que = 'estado'), t.creado_en),
+                        {$ultimoMsj}
+                      ) < NOW() - INTERVAL " . (int)self::DIAS_ESPERANDO . " DAY
+                LIMIT 50");
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+                $tomar = $this->db->prepare("
+                    UPDATE tickets SET estado = 'resuelto', resuelto_en = NOW()
+                    WHERE id = ? AND estado = 'esperando'");
+                $tomar->execute([(int)$id]);
+                if ($tomar->rowCount() !== 1) continue;
+                $this->evento($id, 'estado', 'esperando', 'resuelto', null, 'Automático');
+                $this->db->prepare("
+                    INSERT INTO ticket_mensajes (ticket_id, cuerpo, interno, adjunto,
+                                                 autor_id, autor_nombre, autor_tipo, creado_en)
+                    VALUES (?, ?, 0, NULL, NULL, 'Soporte LibertyFin', 'plataforma', NOW())")
+                    ->execute([(int)$id,
+                        'Lo marcamos como resuelto porque no tuvimos respuesta en '
+                        . self::DIAS_ESPERANDO . ' días. Si sigue pasando, escríbenos aquí y lo reabrimos.']);
+            }
+
+            $st = $this->db->query("
+                SELECT t.id FROM tickets t
+                WHERE t.estado = 'resuelto'
+                  AND GREATEST(COALESCE(t.resuelto_en, t.creado_en), {$ultimoMsj})
+                      < NOW() - INTERVAL " . (int)self::DIAS_RESUELTO . " DAY
+                LIMIT 100");
+            foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $id) {
+                $tomar = $this->db->prepare("
+                    UPDATE tickets SET estado = 'cerrado', cerrado_en = NOW()
+                    WHERE id = ? AND estado = 'resuelto'");
+                $tomar->execute([(int)$id]);
+                if ($tomar->rowCount() === 1) {
+                    $this->evento($id, 'estado', 'resuelto', 'cerrado', null, 'Automático');
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] tickets que vencen solos: ' . $e->getMessage());
+        }
     }
 
     private function evento($ticketId, $que, $antes, $despues, $quienId, $quienNombre)
