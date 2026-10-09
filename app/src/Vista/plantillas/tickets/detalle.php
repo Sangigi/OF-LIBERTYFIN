@@ -7,11 +7,12 @@ if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(1
 $token = $_SESSION['lf_token'];
 $yo = (int)($_SESSION['usuario_id'] ?? 0);
 $mio = (int)$t['asignado_a'] === $yo && $yo > 0;
-$horas = T::PRIORIDADES[$t['prioridad']][1] ?? 24;
+// Cuánto tardó la primera respuesta, o cuánto lleva esperando. Es solo
+// un dato: ya no hay tiempo comprometido contra el cual medirlo.
 $min = $t['primera_respuesta_en']
      ? (strtotime($t['primera_respuesta_en']) - strtotime($t['creado_en'])) / 60
      : (time() - strtotime($t['creado_en'])) / 60;
-$venc = $min > $horas * 60;
+$dur = $min < 60 ? round($min) . ' min' : round($min/60,1) . ' h';
 $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
 ?>
 
@@ -32,14 +33,6 @@ $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?:
 </div>
 <?php endif; ?>
 
-<?php if (!$t['primera_respuesta_en'] && $venc): ?>
-<div class="alert alert-danger" style="margin-bottom:18px">
-  <?= W::icono('reloj','18px') ?>
-  <span><b>Sin responder y fuera de tiempo.</b> El compromiso para prioridad
-    <?= P::e(T::PRIORIDADES[$t['prioridad']][0]) ?> son <?= $horas ?> horas, y van
-    <?= round($min/60,1) ?>.</span>
-</div>
-<?php endif; ?>
 
 <script>
 document.addEventListener('click', function(ev){
@@ -193,7 +186,7 @@ document.addEventListener('click', function(ev){
           <select class="form-select" name="prioridad" onchange="this.form.requestSubmit ? this.form.requestSubmit() : this.form.submit()">
             <?php foreach (T::PRIORIDADES as $k=>$v): ?>
               <option value="<?= $k ?>" <?= $t['prioridad']===$k?'selected':'' ?>>
-                <?= P::e($v[0]) ?> · responder en <?= $v[1] ?> h</option>
+                <?= P::e($v[0]) ?></option>
             <?php endforeach; ?>
           </select>
 
@@ -233,7 +226,8 @@ document.addEventListener('click', function(ev){
           'Lo abrió'  => $t['creado_nombre'] ?: '—',
           'Abierto'   => date('d/m/Y H:i', strtotime($t['creado_en'])),
           'Respuesta' => $t['primera_respuesta_en']
-                         ? date('d/m/Y H:i', strtotime($t['primera_respuesta_en'])) : 'sin responder',
+                         ? date('d/m/Y H:i', strtotime($t['primera_respuesta_en'])) . ' · en ' . $dur
+                         : 'sin responder · lleva ' . $dur,
           'Resuelto'  => $t['resuelto_en'] ? date('d/m/Y H:i', strtotime($t['resuelto_en'])) : '—',
         ] as $k => $v): ?>
           <div style="display:flex;justify-content:space-between;gap:12px;padding:6px 0">
@@ -241,17 +235,6 @@ document.addEventListener('click', function(ev){
             <b style="font-weight:600;text-align:right;overflow-wrap:anywhere"><?= P::e($v) ?></b>
           </div>
         <?php endforeach; ?>
-        <div style="margin-top:10px;padding:10px 12px;border-radius:var(--lf-r);font-size:12px;
-             background:<?= $venc?'var(--lf-amb-soft)':'var(--lf-brand-soft)' ?>;
-             color:<?= $venc?'var(--lf-amb)':'var(--lf-brand-2)' ?>">
-          <?php if ($t['primera_respuesta_en']): ?>
-            Se respondió en <?= $min < 60 ? round($min) . ' min' : round($min/60,1) . ' h' ?>
-            (comprometido: <?= $horas ?> h)
-          <?php else: ?>
-            Llevan <?= $min < 60 ? round($min) . ' min' : round($min/60,1) . ' h' ?> esperando
-            respuesta de <?= $horas ?> h
-          <?php endif; ?>
-        </div>
       </div>
     </section>
 

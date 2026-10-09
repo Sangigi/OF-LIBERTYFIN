@@ -74,7 +74,7 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
       <select class="form-select" name="prioridad">
         <?php foreach (T::PRIORIDADES as $k=>$v): ?>
           <option value="<?= $k ?>" <?= $k==='normal'?'selected':'' ?>>
-            <?= P::e($v[0]) ?> · <?= $v[1] ?> h</option><?php endforeach; ?>
+            <?= P::e($v[0]) ?></option><?php endforeach; ?>
       </select></div>
     <div style="width:100%"><label class="form-label">Qué pasó y qué esperaba</label>
       <textarea class="form-control lf-desc" name="cuerpo" rows="3" required
@@ -87,10 +87,6 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
         <span class="n" data-vacio="Ningún archivo elegido">Ningún archivo elegido</span>
       </span></div>
     <button class="btn btn-primary" type="submit">Crear ticket</button>
-    <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.5">
-      El tiempo comprometido se mide contra la <b>primera respuesta</b>, no contra la
-      solución. Prometer una solución en dos horas es prometer algo que no se controla.
-    </p>
   </form>
 </details>
 
@@ -139,7 +135,6 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
             No hay tickets con esos filtros.</td></tr>
         <?php endif; ?>
         <?php foreach ($tickets as $t):
-          $venc = T::vencido($t);
           $min  = (int)$t['min_respuesta']; ?>
           <tr>
             <td data-label="Ticket">
@@ -160,12 +155,12 @@ $qs = function ($cambios = []) use ($filtros, $mios) {
             <td data-label="Estado" style="font-size:12.5px">
               <?= P::e(T::ESTADOS[$t['estado']] ?? $t['estado']) ?></td>
             <td data-label="Tiempo">
-              <?php if ($t['primera_respuesta_en']): ?>
-                <span class="badge <?= $venc ? 'bg-warning' : 'bg-success' ?>">
+              <?php /* Cuánto tardó la primera respuesta; sin tiempo comprometido. */
+                    if ($t['primera_respuesta_en']): ?>
+                <span class="badge bg-success">
                   <?= $min < 60 ? $min . ' min' : round($min/60,1) . ' h' ?></span>
               <?php else: ?>
-                <span class="badge <?= $venc ? 'bg-danger' : 'bg-secondary' ?>">
-                  <?= $venc ? 'vencido' : 'sin responder' ?></span>
+                <span class="badge bg-secondary">sin responder</span>
               <?php endif; ?>
             </td>
             <td data-label="Quién" style="font-size:12px">

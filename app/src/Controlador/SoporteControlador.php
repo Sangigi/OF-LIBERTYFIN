@@ -154,9 +154,6 @@ final class SoporteControlador
         $yo   = (int)($_SESSION['usuario_id'] ?? 0);
 
         $activos = $tk->bandeja(['estado' => 'activos'], 200);
-        $vencidos = array_values(array_filter($activos, function ($t) {
-            return TicketRepo::vencido($t) && empty($t['primera_respuesta_en']);
-        }));
         $sinAsignar = array_values(array_filter($activos, function ($t) {
             return empty($t['asignado_a']);
         }));
@@ -177,7 +174,6 @@ final class SoporteControlador
             'resumen'    => $plat->resumen(),
             'cifras'     => $tk->cifras(),
             'activos'    => $activos,
-            'vencidos'   => $vencidos,
             'sinAsignar' => $sinAsignar,
             'mios'       => $mios,
             'categorias' => $tk->porCategoria(),

@@ -10,7 +10,6 @@ $colorP = ['critica'=>'bg-danger','alta'=>'bg-warning','normal'=>'bg-secondary',
 // Lo que está esperando a alguien, en un solo lugar. Es lo que un turno
 // de soporte tiene que vaciar antes de irse.
 $cola = array_filter([
-  $vencidos   ? ['Tickets fuera de tiempo', count($vencidos), '/tickets?estado=activos', 'r'] : null,
   $sinAsignar ? ['Tickets sin dueño',       count($sinAsignar), '/tickets?estado=abierto', 'a'] : null,
   $docs       ? ['Documentos por revisar',  $docs,            '/mantenimiento', 'a'] : null,
   $altas      ? ['Empresas por dar de alta',$altas,           '/mantenimiento', ''] : null,
@@ -44,7 +43,7 @@ $cola = array_filter([
 <?php else: ?>
 <div class="alert alert-success" style="margin-bottom:18px">
   <?= W::icono('cobro','18px') ?>
-  <span><b>Nada pendiente.</b> No hay tickets fuera de tiempo, sin dueño, ni
+  <span><b>Nada pendiente.</b> No hay tickets sin dueño, ni
     documentos o altas esperando.</span>
 </div>
 <?php endif; ?>
@@ -94,10 +93,9 @@ $cola = array_filter([
         <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:28px">
           No hay tickets activos.</p>
       <?php endif; ?>
-      <?php foreach ($lista as $t):
-        $venc = T::vencido($t) && empty($t['primera_respuesta_en']); ?>
+      <?php foreach ($lista as $t): ?>
         <a class="lf-row" href="/tickets/<?= (int)$t['id'] ?>">
-          <span class="lf-av <?= $venc ? '' : 'gris' ?>" style="flex-shrink:0">
+          <span class="lf-av gris" style="flex-shrink:0">
             <?= P::e(mb_strtoupper(mb_substr(T::PRIORIDADES[$t['prioridad']][0] ?? '?', 0, 1))) ?></span>
           <span style="flex:1;min-width:0">
             <b style="display:block;font-size:13px"><?= P::e($t['asunto']) ?></b>
@@ -105,12 +103,8 @@ $cola = array_filter([
               <?= P::e($t['nombre_empresa'] ?: 'sin empresa') ?> ·
               <?= P::e($t['folio']) ?></small>
           </span>
-          <?php if ($venc): ?>
-            <span class="badge bg-danger">vencido</span>
-          <?php else: ?>
-            <span class="badge <?= $colorP[$t['prioridad']] ?? 'bg-secondary' ?>">
-              <?= P::e(T::PRIORIDADES[$t['prioridad']][0] ?? '') ?></span>
-          <?php endif; ?>
+          <span class="badge <?= $colorP[$t['prioridad']] ?? 'bg-secondary' ?>">
+            <?= P::e(T::PRIORIDADES[$t['prioridad']][0] ?? '') ?></span>
         </a>
       <?php endforeach; ?>
     </div>

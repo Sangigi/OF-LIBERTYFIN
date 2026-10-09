@@ -87,11 +87,7 @@ $r = $resumen; $cf = $cifras;
           <?php endif; ?>
           <?php foreach ($agentes as $a): ?>
             <tr>
-              <td data-label="Agente"><b style="font-weight:600"><?= P::e($a['nombre']) ?></b>
-                <?php if ($a['vencidos']): ?>
-                  <span style="display:block;color:var(--lf-rojo);font-size:11px">
-                    <?= (int)$a['vencidos'] ?> fuera de tiempo</span>
-                <?php endif; ?></td>
+              <td data-label="Agente"><b style="font-weight:600"><?= P::e($a['nombre']) ?></b></td>
               <td data-label="Resueltos" class="text-end lf-mono"><?= (int)$a['resueltos'] ?></td>
               <td data-label="Abiertos" class="text-end lf-mono"><?= (int)$a['activos'] ?></td>
               <td data-label="Respuesta" class="text-end lf-mono" style="font-size:12px">

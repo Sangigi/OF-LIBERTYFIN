@@ -77,11 +77,10 @@ final class InformesControlador
         foreach ($todos as $t) {
             $k = $t['asignado_nombre'] ?: '(sin asignar)';
             if (!isset($r[$k])) $r[$k] = ['nombre' => $k, 'activos' => 0, 'resueltos' => 0,
-                                          'min' => [], 'vencidos' => 0];
+                                          'min' => []];
             if (in_array($t['estado'], ['resuelto','cerrado'], true)) $r[$k]['resueltos']++;
             else $r[$k]['activos']++;
             if ($t['primera_respuesta_en']) $r[$k]['min'][] = (int)$t['min_respuesta'];
-            elseif (TicketRepo::vencido($t)) $r[$k]['vencidos']++;
         }
         foreach ($r as &$a) {
             $a['promedio'] = $a['min'] ? array_sum($a['min']) / count($a['min']) : null;

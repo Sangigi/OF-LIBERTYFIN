@@ -30,17 +30,14 @@ final class TicketRepo
     ];
 
     /**
-     * Prioridad y su tiempo de respuesta comprometido, en horas.
-     *
-     * El SLA se mide contra la PRIMERA respuesta, no contra la solución.
-     * Prometer una solución en cuatro horas es prometer algo que no se
-     * controla; responder en cuatro sí.
+     * Prioridad: [nombre, cuándo usarla]. Ordena la bandeja (lo urgente
+     * primero); ya no lleva un tiempo de respuesta comprometido.
      */
     const PRIORIDADES = [
-        'critica' => ['Crítica', 2,  'No puede cobrar ni facturar'],
-        'alta'    => ['Alta',    8,  'Una función clave no sirve'],
-        'normal'  => ['Normal',  24, 'Molesta pero hay cómo seguir'],
-        'baja'    => ['Baja',    72, 'Duda o mejora'],
+        'critica' => ['Crítica', 'No puede cobrar ni facturar'],
+        'alta'    => ['Alta',    'Una función clave no sirve'],
+        'normal'  => ['Normal',  'Molesta pero hay cómo seguir'],
+        'baja'    => ['Baja',    'Duda o mejora'],
     ];
 
     const CATEGORIAS = [
@@ -793,9 +790,8 @@ final class TicketRepo
     /**
      * La bandeja.
      *
-     * `vencido` compara contra la PRIMERA respuesta si ya la hubo, y
-     * contra ahora si todavía no: un ticket de hace tres días que se
-     * contestó en una hora cumplió, aunque siga abierto.
+     * `min_respuesta`: cuánto tardó la PRIMERA respuesta si ya la hubo, y
+     * cuánto lleva esperando si todavía no.
      */
     public function bandeja($filtros = [], $limite = 40, $desfase = 0)
     {
@@ -832,13 +828,6 @@ final class TicketRepo
             LIMIT " . (int)$limite . " OFFSET " . (int)$desfase);
         $st->execute($p);
         return $st->fetchAll();
-    }
-
-    /** ¿Se pasó del tiempo comprometido? */
-    public static function vencido(array $t)
-    {
-        $horas = self::PRIORIDADES[$t['prioridad']][1] ?? 24;
-        return (int)$t['min_respuesta'] > $horas * 60;
     }
 
     public function cifras()

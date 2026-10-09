@@ -108,9 +108,8 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
             <?php endforeach; ?>
           </div>
         </div>
-        <p class="nota">Solo cambia cómo lo ves tú, en cualquier equipo donde entres.
+        <p class="nota">Se guarda al elegir. Solo cambia cómo lo ves tú, en cualquier equipo donde entres.
           <?= $apariencia['color'] === '' ? 'Sin color elegido se usa el verde de LibertyFin.' : '' ?></p>
-        <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
       </form>
     </div>
   </section>
@@ -119,9 +118,6 @@ $textoDoc = ['sin_enviar'=>'Faltan documentos','en_revision'=>'En revisión',
     var f = document.getElementById('lfApariencia');
     if (!f) return;
     var raiz = document.documentElement;
-    // Con JavaScript se guarda al elegir: el botón sobra.
-    var b = f.querySelector('.lf-sin-js');
-    if (b) b.style.display = 'none';
     function marcar() {
       [].forEach.call(f.querySelectorAll('.lf-segmento label, .lf-color'), function (m) {
         var r = m.querySelector('input');
