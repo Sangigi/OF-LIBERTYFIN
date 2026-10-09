@@ -3820,3 +3820,6 @@ tr:has(a[data-lf-fila]){cursor:pointer}
 @media(max-width:560px){
   .lf-stats > *{flex-basis:calc(50% - 6px)}
 }
+
+/* El botón del aviso ("Abrir chat") no se parte en dos renglones. */
+.lf-toast-chat .btn{flex:none;white-space:nowrap}

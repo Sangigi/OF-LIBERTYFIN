@@ -1241,8 +1241,9 @@
     document.body.appendChild(a); a.click(); a.remove();
   }
 
-  /* El aviso dentro de la plataforma. */
-  function avisar(titulo, linea, alVer) {
+  /* El aviso dentro de la plataforma. `boton`: el texto del botón de
+     acción ("Ver" si no se dice otro). */
+  function avisar(titulo, linea, alVer, boton_) {
     despedir(document.querySelector('.lf-toast-chat'), 200);
     var caja = crear('div', 'lf-toast-chat');
     caja.setAttribute('role', 'status');
@@ -1256,7 +1257,7 @@
     // Sin `alVer` es solo informativo: sin botón "Ver", con el texto
     // completo (no en una línea cortada) y más tiempo para leerlo.
     if (alVer) {
-      var ver = boton('btn btn-primary btn-sm', 'Ver');
+      var ver = boton('btn btn-primary btn-sm', boton_ || 'Ver');
       ver.addEventListener('click', function () { despedir(caja, 200); alVer(); });
       caja.appendChild(ver);
     } else {
@@ -1572,10 +1573,11 @@
         var clave = 'lf_chat_avisado_' + t.id;
         if ((+leer(clave) || 0) >= t.mensaje_id) return;
         guardar(clave, t.mensaje_id);
-        avisar(t.autor + ' te respondió', t.folio + ' · ' + t.extracto, function () { abrirChat(t); });
-        // Si ya tiene otro reporte abierto en el chat, no se le cambia de
-        // golpe: el aviso y la cuenta en la lista bastan.
-        if (!panel) abrirChat(t);
+        // Primero el aviso; el chat lo abre la persona cuando quiera. Abrirlo
+        // solo la interrumpía a media tarea (a media venta en Caja, por
+        // ejemplo). Si cierra el aviso, la burbuja sigue con la cuenta.
+        avisar(t.autor + ' te respondió', t.folio + ' · ' + t.extracto,
+               function () { abrirChat(t); }, 'Abrir chat');
       }, function () {});
     }
     revisarCliente = revisar;
