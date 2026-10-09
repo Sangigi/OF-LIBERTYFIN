@@ -1036,8 +1036,88 @@
 
   function enlazar(ambito) {
     [].forEach.call((ambito || document).querySelectorAll('[data-lf-chat]'), conversacion);
+    prepararPegado(ambito || document);
     ajustarVentanas();
   }
+
+  /* ── Pegar una captura en un formulario normal ([data-lf-pegar]) ──
+     "Reportar un problema": Ctrl+V con una captura (o arrastrarla) la
+     adjunta y la enseña. Ese formulario se envía como siempre (recarga la
+     página), así que la imagen se mete en su <input type=file> para que
+     viaje con él. Como en el chat, la que pesa mucho se achica antes. */
+  function prepararPegado(ambito) {
+    if (!window.DataTransfer) return;
+    [].forEach.call((ambito || document).querySelectorAll('form[data-lf-pegar]'), function (form) {
+      if (form._lfPegar) return;
+      var inp = form.querySelector('input[type=file]');
+      if (!inp) return;
+      form._lfPegar = true;
+
+      var vista = crear('div', 'lf-adj-vista');
+      vista.hidden = true;
+      var ancla = inp.closest('.lf-file') || inp;
+      ancla.parentNode.insertBefore(vista, ancla.nextSibling);
+      form._lfVista = vista;
+
+      function poner(blob, deDonde) {
+        if (!TIPOS.test(blob.type)) {
+          avisoEn(form, 'Solo se pueden adjuntar imágenes (JPG, PNG, WebP) o PDF.');
+          return;
+        }
+        var err = form.querySelector('[data-lf-error]'); if (err) err.hidden = true;
+        aligerar(blob, function (b) {
+          if (b.size > MAX_ARCHIVO) { avisoEn(form, 'El archivo pesa ' + peso(b.size) + '; el máximo es 10 MB.'); return; }
+          var ext = b.type === 'application/pdf' ? 'pdf' : b.type === 'image/jpeg' ? 'jpg' : b.type.split('/')[1];
+          var nombre = (deDonde === 'pegado' ? 'captura-' + fechaArchivo() : (blob.name || 'archivo').replace(/\.[^.]+$/, '')) + '.' + ext;
+          var dt = new DataTransfer();
+          try { dt.items.add(new File([b], nombre, { type: b.type })); } catch (e) { return; }
+          inp._lfListo = true;            // ya está preparado: no volver a achicarlo
+          inp.files = dt.files;
+          inp.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+      }
+
+      // Elegido con el botón: se achica si pesa; luego, la vista previa.
+      inp.addEventListener('change', function () {
+        var f = inp.files && inp.files[0];
+        if (f && !inp._lfListo && /^image\/(png|jpeg|webp)$/.test(f.type) && f.size > LIGERO) {
+          poner(f, 'elegido');
+          return;
+        }
+        inp._lfListo = false;
+        vistaPrevia(form, f || null, f ? f.name : '');
+      });
+
+      // Ctrl+V. Si lo copiado también trae texto, se pega el texto.
+      form.addEventListener('paste', function (e) {
+        var cd = e.clipboardData;
+        if (!cd || !cd.items || (cd.getData && cd.getData('text/plain'))) return;
+        for (var i = 0; i < cd.items.length; i++) {
+          var it = cd.items[i];
+          if (it.kind === 'file' && /^image\//.test(it.type)) {
+            var f = it.getAsFile();
+            if (f) { e.preventDefault(); poner(f, 'pegado'); return; }
+          }
+        }
+      });
+
+      // Arrastrar una imagen encima.
+      var arrastres = 0;
+      function conArchivos(e) { return e.dataTransfer && [].indexOf.call(e.dataTransfer.types || [], 'Files') !== -1; }
+      form.addEventListener('dragenter', function (e) { if (!conArchivos(e)) return; arrastres++; form.classList.add('lf-soltar'); });
+      form.addEventListener('dragleave', function () { if (--arrastres <= 0) { arrastres = 0; form.classList.remove('lf-soltar'); } });
+      form.addEventListener('dragover',  function (e) { if (conArchivos(e)) e.preventDefault(); });
+      form.addEventListener('drop', function (e) {
+        if (!conArchivos(e)) return;
+        e.preventDefault();
+        arrastres = 0; form.classList.remove('lf-soltar');
+        var f = e.dataTransfer.files && e.dataTransfer.files[0];
+        if (f) poner(f, 'arrastrado');
+      });
+    });
+  }
+  // La página de Ayuda puede llegar sin recargar (y sin chat que la enlace).
+  document.addEventListener('lf:cargado', function () { prepararPegado(document); });
 
   /* ── La ventana de chat ocupa JUSTO lo que queda de pantalla ──
      Como en WhatsApp: la página no se mueve, solo la lista de mensajes.

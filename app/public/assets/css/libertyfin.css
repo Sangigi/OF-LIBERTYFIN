@@ -3734,3 +3734,5 @@ html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
    botón. Así, aunque el ícono se cambie al tocarlo, el clic sigue siendo
    "en el botón". */
 .lf-chatf header .bt svg,.lf-enviar-ico svg{pointer-events:none}
+/* La vista previa de la captura pegada en "Reportar un problema". */
+.lf-form .lf-adj-vista{max-width:440px}

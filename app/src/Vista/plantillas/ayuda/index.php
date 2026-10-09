@@ -134,7 +134,9 @@ $comoVa = [
 
 <details class="lf-alta" open>
   <summary><?= W::icono('mas','16px') ?>Reportar un problema</summary>
-  <form method="post" action="/ayuda/crear" class="lf-form" enctype="multipart/form-data">
+  <?php /* `data-lf-pegar`: una captura se puede pegar con Ctrl+V (o arrastrar)
+           y se adjunta sola (ver lf-chat.js). */ ?>
+  <form method="post" action="/ayuda/crear" class="lf-form" enctype="multipart/form-data" data-lf-pegar>
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <div style="flex:2;min-width:250px"><label class="form-label">¿Qué pasa?</label>
       <input class="form-control" name="asunto" required
@@ -153,10 +155,11 @@ $comoVa = [
         <input type="file" name="adjunto" id="adjReporte"
                accept="image/png,image/jpeg,image/webp,application/pdf">
         <label class="bt" for="adjReporte">Adjuntar captura o archivo</label>
-        <span class="n" data-vacio="Ningún archivo elegido">Ningún archivo elegido</span>
+        <span class="n" data-vacio="o pega una captura con Ctrl+V">o pega una captura con Ctrl+V</span>
       </span>
       <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 0 0">
-        Una captura de pantalla de lo que ves ahorra muchas preguntas. Imagen o PDF.</p></div>
+        Una captura de pantalla de lo que ves ahorra muchas preguntas. Cópiala y pégala aquí
+        con <b>Ctrl+V</b>, o arrástrala. Imagen o PDF.</p></div>
     <button class="btn btn-primary" type="submit">Enviar reporte</button>
     <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.55">
       Entre más concreto, más rápido se resuelve. "No funciona" obliga a preguntarte
