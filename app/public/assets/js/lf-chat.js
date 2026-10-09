@@ -801,6 +801,21 @@
         if (ctrl === mio) ctrl = null;
         if (!activo) return;
         if (!j) { parar(); return; }          // la sesión venció: no insistir
+        // El servidor no lo entrega: no es de quien pregunta (o ya no
+        // existe). No se insiste ni se queda en "Cargando…": se dice.
+        if (j.ok === false && !j.sesion_cerrada) {
+          parar();
+          var cargando = raiz.querySelector('[data-lf-vacio]');
+          if (cargando) cargando.hidden = true;
+          if (!raiz.querySelector('[data-lf-cerrado]')) {
+            var aviso = crear('p', 'lf-chat-cerrado', j.error || 'No puedes ver este reporte.');
+            aviso.setAttribute('data-lf-cerrado', '');
+            lista.appendChild(aviso);
+          }
+          if (form) form.hidden = true;
+          if (flota) sesionGuardar('lf_chat_abierto', null);
+          return;
+        }
         fallos = 0;
         var cambio = j.ok ? recibir(j) : false;
         // Si algo entre medio corta la espera y contesta al instante sin
@@ -1291,7 +1306,7 @@
   function abrirLista() {
     if (!panel) crearPanel(); else vaciarPanel();
     panel.classList.add('en-lista');
-    sesionGuardar('lf_chat_abierto', JSON.stringify({ lista: true }));
+    sesionGuardar('lf_chat_abierto', JSON.stringify({ lista: true, quien: quien() }));
     panel.querySelector('header small').textContent = 'Tus reportes';
 
     panel.appendChild(crear('div', 'lf-chatf-reportes'));
@@ -1386,7 +1401,9 @@
     }
     if (!panel) crearPanel(); else vaciarPanel();
     panel.classList.remove('en-lista');
-    sesionGuardar('lf_chat_abierto', JSON.stringify({ id: t.id, folio: t.folio || '', asunto: t.asunto || '' }));
+    // Con la marca de la cuenta: si en esta pestaña entra otra persona, no
+    // se le intenta reabrir el reporte de la anterior.
+    sesionGuardar('lf_chat_abierto', JSON.stringify({ id: t.id, folio: t.folio || '', asunto: t.asunto || '', quien: quien() }));
 
     panel.setAttribute('data-ticket', t.id);
     panel.setAttribute('data-lf-chat', '/ayuda/' + (+t.id) + '/mensajes');
@@ -1440,7 +1457,10 @@
     if (antes) {
       try {
         var a = JSON.parse(antes);
-        if (a && a.lista) abrirLista(); else if (a && a.id) abrirChat(a);
+        // Solo si lo dejó abierto ESTA persona (la marca de su cuenta).
+        if (!a || !a.quien || a.quien !== quien()) sesionGuardar('lf_chat_abierto', null);
+        else if (a.lista) abrirLista();
+        else if (a.id) abrirChat(a);
       } catch (e) {}
     }
 
