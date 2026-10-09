@@ -2433,6 +2433,9 @@ form[data-guardar] .m{transition:border-color .15s,background .15s}
    tarjeta flotando dentro de otra. */
 .lf-vistazo .cuerpo > .lf-rejilla,
 .lf-vistazo .cuerpo > div{margin:0}
+/* ...pero ENTRE bloques sí, el mismo que en la página: sin esto las
+   cifras de arriba quedaban pegadas a Cobranza y Concepto. */
+.lf-vistazo .cuerpo > :not(:first-child){margin-top:20px}
 .lf-vistazo .cuerpo .card{box-shadow:none}
 body.lf-vistazo-abierto{overflow:hidden}
 /* La fila que se puede mirar sin salir de la lista */
