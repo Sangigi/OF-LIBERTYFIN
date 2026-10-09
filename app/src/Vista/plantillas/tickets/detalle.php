@@ -57,7 +57,10 @@ document.addEventListener('click', function(ev){
 });
 </script>
 
-<div class="lf-split">
+<?php /* `lf-split-chat`: las dos columnas miden lo que queda de pantalla y la
+         página no se desplaza; en el celular la columna de la derecha es un
+         panel que se abre con "Detalles" (ver lf-chat.js y el CSS). */ ?>
+<div class="lf-split lf-split-chat">
   <div>
     <?php /* Chat en vivo: lo que escriba el cliente aparece solo, y la
              respuesta se envía sin recargar (ver assets/js/lf-chat.js).
@@ -73,6 +76,8 @@ document.addEventListener('click', function(ev){
           <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
             <?php $pub = 0; foreach ($mensajes as $x) if (empty($x['interno'])) $pub++; ?>
             <?= count($mensajes) ?> mensajes · <?= $pub ?> los ve el cliente · se actualiza sola</p></div>
+        <?php /* Solo en el celular: abre la columna de la derecha. */ ?>
+        <button type="button" class="btn btn-secondary btn-sm lf-ver-detalles" data-lf-detalles>Detalles</button>
       </header>
       <div class="card-body lf-chat-lista" data-lf-lista>
         <?php foreach ($mensajes as $m):
@@ -140,6 +145,8 @@ document.addEventListener('click', function(ev){
   </div>
 
   <div>
+    <?php /* Solo en el celular, donde esta columna es un panel aparte. */ ?>
+    <button type="button" class="lf-cerrar-detalles" data-lf-detalles-cerrar aria-label="Cerrar los detalles">×</button>
     <?php if ($ayuda): ?>
     <section class="card">
       <header class="card-header">

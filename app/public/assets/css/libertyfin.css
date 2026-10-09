@@ -3527,3 +3527,37 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
   scrollbar-width:thin}
 .lf-lado-chat > .card{flex:0 0 auto}
 .lf-lado-chat > .card:last-child{flex:1 0 auto;margin-bottom:0}
+
+/* ── La ventana de chat le gana a "columnas de igual altura" ──
+   `.lf-split > div > .card:last-child{flex:1}` hacía que la tarjeta del
+   chat ignorara su alto y creciera con todos los mensajes: la página
+   entera se desplazaba. Y en el celular otra regla le quitaba el modo de
+   columna. Aquí manda la ventana: su alto lo pone lf-chat.js. */
+.lf-split > div > .card.lf-chat-ventana,
+.lf-split > div > .card.lf-chat-ventana:last-child{flex:0 0 auto;display:flex;flex-direction:column}
+.lf-split-chat{margin-bottom:0;align-items:start}
+.lf-chat-ventana > .card-header{display:flex;align-items:center;justify-content:space-between;gap:10px}
+
+/* Con una ventana de chat, la página NO se desplaza: solo la lista de
+   mensajes (y, al lado, la columna de detalles por su cuenta). */
+html.lf-fijo,html.lf-fijo body{overflow:hidden;overscroll-behavior:none}
+
+/* "Detalles": en el celular la columna de la derecha es un panel. */
+.lf-ver-detalles,.lf-cerrar-detalles{display:none}
+@media(max-width:940px){
+  .lf-split-chat > div:last-child{position:fixed;top:0;right:0;bottom:0;z-index:460;
+    width:min(92vw,400px);height:auto;overflow-y:auto;overscroll-behavior:contain;
+    padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px));background:var(--lf-panel);
+    border-left:1px solid var(--lf-linea);box-shadow:-18px 0 40px rgba(0,0,0,.25);
+    transform:translateX(105%);transition:transform .32s var(--lf-suave)}
+  .lf-split-chat.ver-detalles > div:last-child{transform:none}
+  .lf-split-chat.ver-detalles::after{content:'';position:fixed;inset:0;z-index:455;background:rgba(10,14,12,.45)}
+  .lf-split-chat > div:last-child > .card{height:auto}
+  .lf-ver-detalles{display:inline-flex;flex-shrink:0}
+  .lf-cerrar-detalles{display:grid;place-items:center;align-self:flex-end;width:34px;height:34px;flex-shrink:0;
+    border:1px solid var(--lf-linea);border-radius:50%;background:var(--lf-sup);color:var(--lf-tinta-2);
+    font-size:20px;line-height:1;cursor:pointer}
+}
+@media(max-width:940px) and (prefers-reduced-motion:reduce){
+  .lf-split-chat > div:last-child{transition:none}
+}

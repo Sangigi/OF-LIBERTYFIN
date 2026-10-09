@@ -978,10 +978,41 @@
      el tamaño, al girar el teléfono o al abrir el teclado. En soporte la
      columna de al lado (estado, prioridad…) se desplaza por su cuenta en
      vez de alargar la página. */
-  var ALTO_MINIMO = 340;
+  // Bajo, a propósito: con la página fija, una ventana más alta que la
+  // pantalla dejaría la caja de escribir fuera de alcance.
+  var ALTO_MINIMO = 240;
   function ajustarVentanas() {
-    [].forEach.call(document.querySelectorAll('.lf-chat-ventana'), ajustarVentana);
+    var vs = document.querySelectorAll('.lf-chat-ventana');
+    var html = document.documentElement;
+    // Con una ventana de chat, la página NO se desplaza (CSS html.lf-fijo):
+    // solo la lista de mensajes. Se sube al principio antes de fijarla.
+    if (vs.length) {
+      if (!html.classList.contains('lf-fijo')) {
+        if (window.pageYOffset) window.scrollTo(0, 0);
+        document.body.classList.remove('lf-dedo-oculta');
+      }
+      html.classList.add('lf-fijo');
+    } else {
+      html.classList.remove('lf-fijo');
+    }
+    [].forEach.call(vs, ajustarVentana);
   }
+
+  /* "Detalles": en el celular la columna de la derecha del ticket es un
+     panel que entra desde el lado; se cierra con la ×, tocando fuera o
+     con Escape. */
+  document.addEventListener('click', function (e) {
+    if (!e.target.closest) return;
+    var split = e.target.closest('.lf-split-chat') || document.querySelector('.lf-split-chat');
+    if (!split) return;
+    if (e.target.closest('[data-lf-detalles]')) { split.classList.add('ver-detalles'); return; }
+    if (e.target.closest('[data-lf-detalles-cerrar]') || e.target === split) split.classList.remove('ver-detalles');
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    var split = document.querySelector('.lf-split-chat.ver-detalles');
+    if (split) split.classList.remove('ver-detalles');
+  });
   function ajustarVentana(v) {
     if (!v.isConnected) return;
     var vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
@@ -996,7 +1027,9 @@
     var dosColumnas = !!(split && getComputedStyle(split).gridTemplateColumns.split(' ').length > 1);
     // En el celular la columna de al lado queda DEBAJO del chat: se llega
     // a ella bajando la página, como antes.
-    var apilado = !!(lado && !dosColumnas);
+    // (En el ticket de soporte, en el celular, la columna es un panel
+    // aparte —fijo, fuera del flujo—: no queda debajo.)
+    var apilado = !!(lado && !dosColumnas && getComputedStyle(lado).position !== 'fixed');
 
     var alto = Math.max(ALTO_MINIMO, Math.floor(vh - arriba - barra - 14));
     v.style.height = alto + 'px';
