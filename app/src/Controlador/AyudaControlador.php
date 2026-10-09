@@ -102,8 +102,17 @@ final class AyudaControlador
                 $adjunto = \LibertyFin\Servicio\Archivos::documento($_FILES['adjunto'], 'ticket');
             }
 
-            $r = (new TicketRepo($this->principal()))->crear(
+            $repoT = new TicketRepo($this->principal());
+            $r = $repoT->crear(
                 $datos, $_SESSION['usuario_id'] ?? 0, $_SESSION['usuario_nombre'] ?? '', $adjunto);
+            // Aviso de escritorio a soporte (a quien lo tenga activado),
+            // después de contestar: el cliente no espera a eso.
+            $nuevoT = $repoT->uno($r['id']);
+            if ($nuevoT) {
+                \LibertyFin\Servicio\Avisos::despues(function () use ($nuevoT) {
+                    \LibertyFin\Servicio\Push::aSoporte($nuevoT, true);
+                });
+            }
             $this->a('Listo, tu reporte quedó con el folio ' . $r['folio']
                 . '. Te avisamos por correo en cuanto lo veamos.', 'ok');
         } catch (\InvalidArgumentException $e) {
@@ -156,6 +165,13 @@ final class AyudaControlador
                             $t['nombre_empresa'] ?? '', $url);
                     });
                 }
+            }
+            // Y el aviso de escritorio (a quien lo tenga activado), salvo
+            // que quien lo atiende esté dentro de esta conversación.
+            if ($nuevo && !$repo->enLinea($id, 'soporte')) {
+                \LibertyFin\Servicio\Avisos::despues(function () use ($t) {
+                    \LibertyFin\Servicio\Push::aSoporte($t);
+                });
             }
             // El chat recibe el id del mensaje para cambiar el "enviando…"
             // por el mensaje de verdad.

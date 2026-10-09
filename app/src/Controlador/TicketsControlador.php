@@ -148,6 +148,15 @@ final class TicketsControlador
                     $aviso = ' Se le avisa por correo.';
                 }
             }
+            // Y el aviso de escritorio, a quien abrió el reporte (si lo
+            // activó), salvo que tenga el chat abierto. Nunca por una nota
+            // interna: el cliente ni la ve.
+            if (empty($_POST['interno']) && $nuevo && !$repo->enLinea($id, 'cliente')) {
+                $tp = $repo->uno($id);
+                if ($tp) {
+                    Avisos::despues(function () use ($tp) { \LibertyFin\Servicio\Push::aCliente($tp); });
+                }
+            }
             if (($_SERVER['HTTP_X_LF_JSON'] ?? '') === '1') {
                 $this->json(['ok' => true, 'mensaje' => 'Respuesta agregada.' . $aviso, 'id' => (int)$nuevo]);
             }

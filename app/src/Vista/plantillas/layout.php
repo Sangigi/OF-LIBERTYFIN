@@ -57,11 +57,15 @@ if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(1
 $lfAyuda = !empty($_SESSION['empresa_db']) && \LibertyFin\Dominio\Permisos::puede('abrir.ticket');
 // Y quien atiende tickets (soporte) recibe los suyos: qué espera su respuesta.
 $lfSoporte = \LibertyFin\Dominio\Permisos::puede('ver.tickets');
+// De quién es esta página, en una marca corta (sin decir cuál cuenta): los
+// avisos de escritorio se reactivan solos solo para la misma persona.
+$lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\SesionUnica::cuentaDeSesion());
 ?>
 <script src="/assets/js/lf-chat.js?v=<?= is_file($chatJs) ? filemtime($chatJs) : '1' ?>" defer></script>
 </head>
 <body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>"
-      data-lf-soporte="<?= $lfSoporte ? '1' : '0' ?>" data-lf-yo="<?= P::e($_SESSION['usuario_nombre'] ?? '') ?>">
+      data-lf-soporte="<?= $lfSoporte ? '1' : '0' ?>" data-lf-yo="<?= P::e($_SESSION['usuario_nombre'] ?? '') ?>"
+      data-lf-quien="<?= P::e($lfQuien) ?>">
 <div class="lf-app">
   <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
   <div class="lf-main">

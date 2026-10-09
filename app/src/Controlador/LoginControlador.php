@@ -102,6 +102,9 @@ final class LoginControlador
     {
         // La cuenta queda libre: entrar desde otro lado ya no pregunta.
         \LibertyFin\Servicio\SesionUnica::cerrar();
+        // Y este navegador deja de recibir avisos de escritorio: quien sale
+        // de una computadora prestada no debe seguir viendo sus tickets.
+        \LibertyFin\Servicio\Push::soltarNavegador(\LibertyFin\Servicio\SesionUnica::navegador());
         Autenticar::salir();
         session_start();
         $_SESSION['lf_error'] = 'Sesión cerrada.';

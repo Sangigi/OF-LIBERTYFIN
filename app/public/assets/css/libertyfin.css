@@ -3459,3 +3459,9 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 .lf-sesion-abierta .lf-nota{margin:0 0 18px;font-size:12.5px;line-height:1.5;
   color:color-mix(in srgb,#fff 80%,transparent)}
 .lf-sesion-abierta .lf-cancelar{text-align:center;margin:14px 0 0}
+
+/* "Avisarme cuando respondan" (avisos aunque LibertyFin esté cerrado):
+   escondido hasta que el navegador confirma que se puede. Los botones
+   tienen su propio `display`, que le ganaba al atributo `hidden`. */
+[data-lf-push][hidden]{display:none!important}
+.lf-chatf header .bt svg{width:16px;height:16px}

@@ -950,11 +950,15 @@
     txt.appendChild(crear('b', '', titulo));
     txt.appendChild(crear('small', '', linea));
     caja.appendChild(txt);
-    var ver = boton('btn btn-primary btn-sm', 'Ver');
-    ver.addEventListener('click', function () { despedir(caja, 200); alVer(); });
+    // Sin `alVer` es solo informativo: sin botón "Ver".
+    if (alVer) {
+      var ver = boton('btn btn-primary btn-sm', 'Ver');
+      ver.addEventListener('click', function () { despedir(caja, 200); alVer(); });
+      caja.appendChild(ver);
+    }
     var x = boton('x', '×', 'Cerrar aviso');
     x.addEventListener('click', function () { despedir(caja, 200); });
-    caja.appendChild(ver); caja.appendChild(x);
+    caja.appendChild(x);
     document.body.appendChild(caja);
     setTimeout(function () { despedir(caja, 320); }, 9000);
   }
@@ -1073,6 +1077,13 @@
     cab.addEventListener('click', function (e) {
       if (p.classList.contains('min') && !e.target.closest('.bt')) p.classList.remove('min');
     });
+    // Avisos de escritorio aunque cierre LibertyFin (se ve solo si se puede
+    // y todavía no están activados; ver pintarOfertas).
+    var pushBt = boton('bt push', null, 'Avisarme cuando respondan, aunque cierre LibertyFin');
+    pushBt.setAttribute('data-lf-push', '');
+    pushBt.innerHTML = ICONO_CAMPANA;
+    pushBt.hidden = true;
+    cab.appendChild(pushBt);
     cab.appendChild(irA); cab.appendChild(min); cab.appendChild(x);
     panel.appendChild(cab);
 
@@ -1083,6 +1094,7 @@
     panel.appendChild(tira);
 
     document.body.appendChild(panel);
+    pintarOfertas();
   }
 
   /* El cuerpo del chat para un reporte: la lista y el formulario. Al
@@ -1274,7 +1286,8 @@
     var abrir = function () { ir('/tickets/' + t.id); };
     if (document.hidden || !document.hasFocus()) escritorio(titulo, linea, t.id, abrir);
     if (!document.hidden) avisar(titulo, linea, abrir);
-    sonar();
+    // En segundo plano y con avisos por fuera, el del sistema ya suena.
+    if (!(document.hidden && pushActivo())) sonar();
   }
 
   /* La cuenta de lo no leído: en el menú, en el título y en la campana. */
@@ -1393,7 +1406,19 @@
     son.appendChild(chk); son.appendChild(document.createTextNode(' Sonido'));
     op.appendChild(son);
 
-    if (window.Notification) {
+    if (PUSH && Notification.permission !== 'denied') {
+      // Avisos del escritorio AUNQUE LibertyFin esté cerrado. Marcar la
+      // casilla pide el permiso (si hace falta) y suscribe este navegador.
+      var ep = crear('label', 'op');
+      ep.title = 'Avisos en el escritorio aunque cierres LibertyFin';
+      var cp = crear('input'); cp.type = 'checkbox'; cp.checked = pushActivo();
+      cp.addEventListener('change', function () {
+        cp.disabled = true;
+        (cp.checked ? activarPush() : desactivarPush()).then(function () { llenarCampana(pop); });
+      });
+      ep.appendChild(cp); ep.appendChild(document.createTextNode(' Escritorio'));
+      op.appendChild(ep);
+    } else if (window.Notification) {
       if (Notification.permission === 'granted') {
         var esc = crear('label', 'op');
         var ce = crear('input'); ce.type = 'checkbox'; ce.checked = leer('lf_sop_escritorio') !== '0';
@@ -1497,6 +1522,9 @@
      Solo si la pestaña no está a la vista (si lo está, basta el de la
      plataforma) y si se permitió. Al darle clic, abre el ticket. */
   function escritorio(titulo, linea, id, abrir) {
+    // Con los avisos por fuera activados, ese aviso ya lo muestra
+    // lf-sw.js: dos del mismo mensaje sobran.
+    if (pushActivo()) return;
     if (!window.Notification || Notification.permission !== 'granted') return;
     if (leer('lf_sop_escritorio') === '0') return;
     try {
@@ -1534,9 +1562,140 @@
     window.addEventListener('focus', revisar);
   }
 
+  /* ══ 6 · Avisos aunque LibertyFin esté cerrado (Web Push) ══
+     Quien los activa (soporte con la casilla "Escritorio" de la campana;
+     el cliente con "Avisarme cuando respondan") deja este navegador
+     suscrito: public/lf-sw.js muestra los avisos aunque no haya ninguna
+     pestaña abierta (ver src/Servicio/Push.php).
+
+     Se activan SOLO con un clic: el navegador solo pregunta el permiso
+     así, y nadie debe encontrarse avisos que no pidió. Quedan anotados
+     con la marca de la cuenta (`data-lf-quien`): si después entra otra
+     persona en este navegador, no se le reactivan solos. */
+  var PUSH = !!(window.isSecureContext && window.Notification && window.Promise
+                && 'serviceWorker' in navigator && 'PushManager' in window);
+  var ICONO_CAMPANA = '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '
+    + 'stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+    + '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg>';
+
+  function quien() { return document.body.getAttribute('data-lf-quien') || ''; }
+  function pushActivo() {
+    return PUSH && Notification.permission === 'granted' && !!quien() && leer('lf_push') === quien();
+  }
+
+  function bytesDe(b64) {
+    var s = String(b64).replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), out = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+
+  function registrarSW() {
+    return navigator.serviceWorker.register('/lf-sw.js', { scope: '/', updateViaCache: 'none' })
+      .then(function () { return navigator.serviceWorker.ready; });
+  }
+
+  /* La suscripción de este navegador. Si quedó una vieja hecha con otra
+     llave, se quita y se hace de nuevo. */
+  function suscripcion(reg, llave) {
+    var opciones = { userVisibleOnly: true, applicationServerKey: bytesDe(llave) };
+    return reg.pushManager.getSubscription()
+      .then(function (s) { return s || reg.pushManager.subscribe(opciones); })
+      .then(null, function () {
+        return reg.pushManager.getSubscription()
+          .then(function (s) { return s ? s.unsubscribe() : null; })
+          .then(function () { return reg.pushManager.subscribe(opciones); });
+      });
+  }
+
+  function avisarAlServidor(sub) {
+    var fd = new FormData();
+    fd.append('token', token());
+    fd.append('endpoint', sub.endpoint);
+    return pedir('/push/suscribir', { method: 'POST', body: fd }).then(function (j) {
+      if (j && j.ok) { guardar('lf_push', j.quien || quien()); return true; }
+      return false;
+    });
+  }
+
+  /* Activar: siempre desde un clic. */
+  function activarPush() {
+    if (!PUSH) return Promise.resolve(false);
+    var permiso = Notification.permission === 'granted'
+      ? Promise.resolve('granted')
+      : new Promise(function (listo) {
+          var r = Notification.requestPermission(listo);
+          if (r && r.then) r.then(listo);
+        });
+    return permiso.then(function (p) {
+      if (p !== 'granted') return false;
+      return Promise.all([pedir('/push/llave'), registrarSW()]).then(function (r) {
+        if (!r[0] || !r[0].ok || !r[0].llave) return false;
+        return suscripcion(r[1], r[0].llave).then(avisarAlServidor);
+      });
+    }).then(function (ok) { pintarOfertas(); return ok; },
+            function () { pintarOfertas(); return false; });
+  }
+
+  function desactivarPush() {
+    guardar('lf_push', '');
+    if (!PUSH) return Promise.resolve();
+    return navigator.serviceWorker.getRegistration('/').then(function (reg) {
+      if (!reg) return null;
+      return reg.pushManager.getSubscription().then(function (s) {
+        if (!s) return null;
+        var fd = new FormData();
+        fd.append('token', token());
+        fd.append('endpoint', s.endpoint);
+        return pedir('/push/quitar', { method: 'POST', body: fd }).then(function () { return s.unsubscribe(); });
+      });
+    }).then(function () { pintarOfertas(); }, function () { pintarOfertas(); });
+  }
+
+  /* Los botones "Avisarme cuando respondan": solo si se puede y todavía
+     no están activados. */
+  function pintarOfertas() {
+    var ocultar = !PUSH || pushActivo() || Notification.permission === 'denied';
+    [].forEach.call(document.querySelectorAll('[data-lf-push]'), function (b) { b.hidden = ocultar; });
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-lf-push]');
+    if (!b) return;
+    e.preventDefault();
+    e.stopPropagation();
+    b.disabled = true;
+    activarPush().then(function (ok) {
+      b.disabled = false;
+      if (ok) {
+        avisar('Avisos activados',
+               'Te avisaremos cuando soporte responda, aunque cierres LibertyFin.', null);
+      } else {
+        avisar('No se activaron los avisos',
+               Notification.permission === 'denied'
+                 ? 'Los bloqueaste en el navegador: permítelos desde el candado junto a la dirección.'
+                 : 'Este navegador no los permite aquí.', null);
+      }
+    });
+  });
+
+  /* Al cargar: si ESTA persona ya los tenía activados, se renueva el
+     enlace con el servidor (una vez por pestaña), sin preguntar nada. Así
+     vuelven solos después de "Salir" y entrar de nuevo. */
+  function pushAlCargar() {
+    pintarOfertas();
+    document.addEventListener('lf:cargado', pintarOfertas);
+    if (!pushActivo() || sesionLeer('lf_push_al_dia') === quien()) return;
+    Promise.all([pedir('/push/llave'), registrarSW()]).then(function (r) {
+      if (!r[0] || !r[0].ok || !r[0].llave) return false;
+      return suscripcion(r[1], r[0].llave).then(avisarAlServidor);
+    }).then(function (ok) { if (ok) sesionGuardar('lf_push_al_dia', quien()); }, function () {});
+  }
+
   window.LFChat = { enlazar: enlazar, abrir: abrirChat, revisar: function () { revisarCliente(); } };
 
-  function arrancar() { enlazar(document); clienteNovedades(); soporteNovedades(); pulsoSesion(); }
+  function arrancar() { enlazar(document); clienteNovedades(); soporteNovedades(); pulsoSesion(); pushAlCargar(); }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arrancar);
   else arrancar();
 })();

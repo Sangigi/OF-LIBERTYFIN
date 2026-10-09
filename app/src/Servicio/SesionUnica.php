@@ -67,7 +67,7 @@ final class SesionUnica
         return $tipo === 'p' ? 'p:' . (int)$usuarioId : 'e:' . (int)$empresaId . ':' . (int)$usuarioId;
     }
 
-    private static function cuentaDeSesion()
+    public static function cuentaDeSesion()
     {
         $u = (int)($_SESSION['usuario_id'] ?? 0);
         if (!$u) return null;
@@ -101,7 +101,7 @@ final class SesionUnica
      * entrar desde el mismo navegador (la sesión venció, se borró la
      * cookie de sesión) no pregunta por "otro dispositivo" que es este.
      */
-    private static function navegador()
+    public static function navegador()
     {
         $d = (string)($_COOKIE['lf_disp'] ?? '');
         if (!preg_match('/^[a-f0-9]{32}$/', $d)) {
@@ -153,6 +153,9 @@ final class SesionUnica
         }
         $_SESSION['lf_sesion_cuenta']   = $cuenta;
         $_SESSION['lf_sesion_token']    = $token;
+        // Si en este navegador había avisos de escritorio de OTRA persona,
+        // se quitan: quien entra no hereda los avisos de quien se fue.
+        Push::soltarNavegador(self::navegador(), $cuenta);
     }
 
     /**

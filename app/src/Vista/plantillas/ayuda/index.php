@@ -30,6 +30,12 @@ $comoVa = [
     <button type="button" class="btn btn-secondary btn-sm"
             data-lf-abrir-chat="<?= P::e(json_encode(['id' => (int)$t['id'], 'folio' => $t['folio'], 'asunto' => $t['asunto']], JSON_UNESCAPED_UNICODE)) ?>">
       Abrir en chat flotante</button>
+    <?php /* Avisos de escritorio aunque cierre LibertyFin. Lo muestra
+             lf-chat.js solo si el navegador los permite y no están ya
+             activados. */ ?>
+    <button type="button" class="btn btn-secondary btn-sm" data-lf-push hidden
+            title="Te avisamos en el escritorio cuando soporte responda, aunque cierres LibertyFin">
+      Avisarme cuando respondan</button>
   <?php endif; ?>
 </div>
 

@@ -56,6 +56,11 @@ $r->post('/login', ['LibertyFin\Controlador\LoginControlador', 'entrar']);
 $r->post('/login/confirmar', ['LibertyFin\Controlador\LoginControlador', 'confirmar']);
 // ¿Sigue abierta esta sesión? Lo pregunta cada página sola (ver SesionUnica).
 $r->get('/sesion/pulso',      ['LibertyFin\Controlador\LoginControlador', 'pulso']);
+// Avisos de escritorio aunque LibertyFin esté cerrado (ver Servicio\Push).
+$r->get('/push/llave',         ['LibertyFin\Controlador\PushControlador', 'llave']);
+$r->post('/push/suscribir',    ['LibertyFin\Controlador\PushControlador', 'suscribir']);
+$r->post('/push/quitar',       ['LibertyFin\Controlador\PushControlador', 'quitar']);
+$r->post('/push/pendiente',    ['LibertyFin\Controlador\PushControlador', 'pendiente']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);
 // El registro solo existe si hay credenciales de cPanel: sin ellas no se
@@ -331,6 +336,9 @@ $permisos = [
 ];
 
 $publicas = ['/login', '/login/confirmar', '/salir', '/registro', '/ayuda-acceso',
+    // La llama el navegador al despertar por un aviso, aunque no haya
+    // sesión: se identifica con su propia suscripción (ver PushControlador).
+    '/push/pendiente',
     // Los avisos del proveedor de pago. No pueden pedir sesión: quien
     // llama es un servidor de Paga de Todo, no una persona con cookie.
     // Su puerta es el secreto de la URL, que revisa el controlador.
