@@ -298,24 +298,6 @@ final class TicketRepo
         } catch (\Throwable $e) { /* sin la columna todavía */ }
     }
 
-    /**
-     * ¿Ese lado tiene la conversación abierta ahora mismo (su chat
-     * preguntó hace menos de 90 s)? Entonces no hace falta avisarle por
-     * fuera: lo está viendo.
-     */
-    public function enLinea($ticketId, $lado)
-    {
-        if (!in_array($lado, ['cliente', 'soporte'], true)) return false;
-        try {
-            $st = $this->db->prepare("
-                SELECT {$lado}_activo_en IS NOT NULL
-                       AND TIMESTAMPDIFF(SECOND, {$lado}_activo_en, NOW()) <= 90
-                FROM tickets WHERE id = ?");
-            $st->execute([(int)$ticketId]);
-            return (bool)$st->fetchColumn();
-        } catch (\Throwable $e) { return false; }
-    }
-
     /** Quien atiende el ticket ya leyó hasta este mensaje. Nunca retrocede. */
     public function marcarVistoSoporte($ticketId, $hastaId)
     {

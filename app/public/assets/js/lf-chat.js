@@ -760,7 +760,12 @@
       if (!viva()) { parar(); return; }
       if (ctrl) return;                       // ya hay una en curso
       var oculto = document.hidden;
-      var q = 'desde=' + ultimo + (oculto ? '' : '&esperar=1&escribe=' + encodeURIComponent(conoce));
+      // Con la pestaña en segundo plano se dice `oculta`: así no cuenta como
+      // "en la conversación" ni como leído (y sí llegan correo y avisos).
+      // A la vista, `visto` dice hasta dónde tiene en pantalla.
+      var q = 'desde=' + ultimo + (oculto
+        ? '&oculta=1'
+        : '&esperar=1&escribe=' + encodeURIComponent(conoce) + '&visto=' + ultimo);
       var mio = window.AbortController ? new AbortController() : {};
       ctrl = mio;
       var t0 = Date.now();
@@ -995,10 +1000,12 @@
 
     var alto = Math.max(ALTO_MINIMO, Math.floor(vh - arriba - barra - 14));
     v.style.height = alto + 'px';
+    // La columna de al lado mide LO MISMO que el chat: dos paneles parejos
+    // de arriba abajo. Se desplaza por dentro si no le cabe todo, y su
+    // última tarjeta se estira para llenarla (CSS .lf-lado-chat).
     if (lado) {
-      lado.style.maxHeight = dosColumnas ? alto + 'px' : '';
-      lado.style.overflowY = dosColumnas ? 'auto' : '';
-      lado.style.overscrollBehavior = dosColumnas ? 'contain' : '';
+      lado.classList.toggle('lf-lado-chat', dosColumnas);
+      lado.style.height = dosColumnas ? alto + 'px' : '';
     }
     // Lo que todavía sobre de página (márgenes, rellenos) se le quita a la
     // ventana: que no quede nada que desplazar.
@@ -1007,7 +1014,7 @@
       if (sobra > 0) {
         alto = Math.max(ALTO_MINIMO, alto - Math.ceil(sobra));
         v.style.height = alto + 'px';
-        if (lado && dosColumnas) lado.style.maxHeight = alto + 'px';
+        if (lado && dosColumnas) lado.style.height = alto + 'px';
       }
     }
     if (alFin) lista.scrollTop = lista.scrollHeight;

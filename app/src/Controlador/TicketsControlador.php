@@ -149,9 +149,10 @@ final class TicketsControlador
                 }
             }
             // Y el aviso de escritorio, a quien abrió el reporte (si lo
-            // activó), salvo que tenga el chat abierto. Nunca por una nota
+            // activó). Se manda siempre: si tiene LibertyFin a la vista, su
+            // navegador no lo muestra (lf-sw.js). Nunca por una nota
             // interna: el cliente ni la ve.
-            if (empty($_POST['interno']) && $nuevo && !$repo->enLinea($id, 'cliente')) {
+            if (empty($_POST['interno']) && $nuevo) {
                 $tp = $repo->uno($id);
                 if ($tp) {
                     Avisos::despues(function () use ($tp) { \LibertyFin\Servicio\Push::aCliente($tp); });
@@ -209,14 +210,22 @@ final class TicketsControlador
         $t = $repo->uno($id);
         if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no existe.'], 404);
         $desde = Peticion::entero('desde');
-        $this->leyendo($repo, $t, []);
+        // Solo cuenta como "en la conversación" y como leído si la pestaña
+        // está A LA VISTA (`oculta` lo dice el chat): una en segundo plano
+        // sigue preguntando sin que nadie la lea.
+        $viendo = Peticion::entero('oculta') !== 1;
+        if ($viendo) $this->leyendo($repo, $t, []);
         // En vivo: espera hasta 20 s a que haya algo nuevo (ver AyudaControlador::esperar).
         if (Peticion::entero('esperar') === 1) {
             AyudaControlador::esperar($repo, $id, $desde, true, 'cliente', Peticion::texto('escribe'), 'El cliente');
         }
         $nuevos = $repo->mensajesDesde($id, $desde, true);
         $fotos  = $nuevos ? $repo->fotos($nuevos, $t['nombre_base_datos'] ?? null, false) : [];
-        $this->leyendo($repo, $t, $nuevos);
+        // Leído: lo que se acaba de entregar y lo que ya tenía en pantalla
+        // (`visto`, al volver a la pestaña), nunca más allá del último.
+        if ($viendo) {
+            $this->leyendo($repo, $t, $nuevos, min(Peticion::entero('visto'), $repo->ultimoId($id, true)));
+        }
         $esc    = $repo->escribiendoAhora($id);
         $this->json([
             'ok'       => true,
@@ -259,18 +268,19 @@ final class TicketsControlador
      * hace falta correo) y leyó lo que se le muestra. Si lo mira otro de
      * soporte no cuenta: el aviso es para quien lo atiende.
      */
-    private function leyendo(TicketRepo $repo, array $t, array $mensajes)
+    private function leyendo(TicketRepo $repo, array $t, array $mensajes, $hasta = 0)
     {
+        $tope = max((int)$hasta, $mensajes ? max(array_column($mensajes, 'id')) : 0);
         // Lo que tiene enfrente, cualquiera de soporte, ya lo leyó: deja de
         // salirle en la campana aunque todavía no conteste.
         $yo = (int)($_SESSION['usuario_id'] ?? 0);
-        if ($mensajes) $repo->marcarLeido($t['id'], $yo, max(array_column($mensajes, 'id')));
+        if ($tope) $repo->marcarLeido($t['id'], $yo, $tope);
 
         // Y quien ATIENDE el ticket, además, está en la conversación: con
         // eso se decide si hace falta mandarle correo.
         if ((int)($t['asignado_a'] ?? 0) !== $yo) return;
         $repo->marcarActivo($t['id'], 'soporte');
-        if ($mensajes) $repo->marcarVistoSoporte($t['id'], max(array_column($mensajes, 'id')));
+        if ($tope) $repo->marcarVistoSoporte($t['id'], $tope);
     }
 
     /**

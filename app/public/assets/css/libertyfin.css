@@ -3519,3 +3519,11 @@ td.lf-col-ant small{display:block;font-size:10.5px;color:var(--lf-tinta-4);font-
 /* Y menos aire debajo de la ventana: que llegue casi al borde, como una app. */
 .lf-cont:has(.lf-chat-ventana){padding-bottom:16px}
 .lf-chat-ventana{margin-bottom:0}
+
+/* La columna de al lado del chat de soporte: del mismo alto que la
+   ventana (lo pone lf-chat.js), con su propio desplazamiento, y la última
+   tarjeta estirada hasta abajo para que las dos columnas queden parejas. */
+.lf-lado-chat{display:flex;flex-direction:column;overflow-y:auto;overscroll-behavior:contain;
+  scrollbar-width:thin}
+.lf-lado-chat > .card{flex:0 0 auto}
+.lf-lado-chat > .card:last-child{flex:1 0 auto;margin-bottom:0}

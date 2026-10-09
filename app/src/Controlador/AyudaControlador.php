@@ -166,9 +166,12 @@ final class AyudaControlador
                     });
                 }
             }
-            // Y el aviso de escritorio (a quien lo tenga activado), salvo
-            // que quien lo atiende esté dentro de esta conversación.
-            if ($nuevo && !$repo->enLinea($id, 'soporte')) {
+            // Y el aviso de escritorio (a quien lo tenga activado). Se manda
+            // SIEMPRE: si la persona tiene LibertyFin a la vista, su
+            // navegador no lo muestra (lf-sw.js), y eso se sabe al instante.
+            // Decidirlo aquí con "estuvo en el chat hace menos de 90 s" lo
+            // frenaba justo después de salir del chat.
+            if ($nuevo) {
                 \LibertyFin\Servicio\Avisos::despues(function () use ($t) {
                     \LibertyFin\Servicio\Push::aSoporte($t);
                 });
@@ -202,7 +205,12 @@ final class AyudaControlador
         if (!$t) $this->json(['ok' => false, 'error' => 'Ese ticket no es tuyo.'], 404);
         $creador = $this->esCreador($t);
         // Quien abrió el ticket tiene el chat abierto: no hace falta correo.
-        if ($creador) $repo->marcarActivo($id, 'cliente');
+        // Pero SOLO si la pestaña está a la vista (`oculta` lo dice el
+        // chat). Una pestaña en segundo plano sigue preguntando sin que
+        // nadie la lea: si contara, no se avisaría aunque la persona se
+        // hubiera ido, y sus mensajes quedarían como leídos sin verlos.
+        $viendo = $creador && Peticion::entero('oculta') !== 1;
+        if ($viendo) $repo->marcarActivo($id, 'cliente');
 
         $desde = Peticion::entero('desde');
         // EN VIVO: con `esperar=1` la respuesta no sale hasta que haya algo
@@ -215,8 +223,13 @@ final class AyudaControlador
 
         $nuevos = $repo->mensajesDesde($id, $desde, false);
         $fotos  = $nuevos ? $repo->fotos($nuevos, $_SESSION['empresa_db'] ?? null, true) : [];
-        if ($nuevos && $creador) {
-            $repo->marcarVistoCliente($id, max(array_column($nuevos, 'id')));
+        // Leído: lo que se le acaba de entregar y lo que ya tenía en
+        // pantalla (`visto`, al volver a la pestaña), nunca más allá del
+        // último mensaje que existe.
+        if ($viendo) {
+            $hasta = max($nuevos ? max(array_column($nuevos, 'id')) : 0,
+                         min(Peticion::entero('visto'), $repo->ultimoId($id, false)));
+            if ($hasta) $repo->marcarVistoCliente($id, $hasta);
         }
         $esc = $repo->escribiendoAhora($id);
         $this->json([
