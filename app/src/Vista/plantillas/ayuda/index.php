@@ -116,7 +116,7 @@ $comoVa = [
           data-lf-enviar>
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <textarea class="form-control lf-desc" name="cuerpo" rows="2" required
-                placeholder="Escribe tu mensaje…"></textarea>
+                placeholder="Mensaje"></textarea>
       <div class="lf-resp-pie">
         <span class="lf-file">
           <input type="file" name="adjunto" id="adjResp"

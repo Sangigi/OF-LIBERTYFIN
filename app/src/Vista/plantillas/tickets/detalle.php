@@ -138,7 +138,7 @@ document.addEventListener('click', function(ev){
             <?php endif; ?>
           </div>
           <textarea class="form-control lf-desc" name="cuerpo" id="cuerpoResp" rows="2" required
-                    placeholder="Qué encontraste y qué tiene que hacer"></textarea>
+                    placeholder="Mensaje"></textarea>
           <div class="lf-resp-pie">
             <span class="lf-file">
               <input type="file" name="adjunto" id="adjResp"

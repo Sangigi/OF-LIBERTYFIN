@@ -1517,7 +1517,7 @@
     form.setAttribute('data-lf-enter', '');
     var tk = crear('input'); tk.type = 'hidden'; tk.name = 'token'; tk.value = token();
     var ta = crear('textarea'); ta.name = 'cuerpo'; ta.rows = 2;
-    ta.placeholder = 'Escribe tu respuesta… (puedes pegar una captura)';
+    ta.placeholder = 'Mensaje';
     ta.value = borradores[t.id] || '';
     ta.addEventListener('input', function () { borradores[t.id] = ta.value; });
     var pie = crear('div', 'pie');
