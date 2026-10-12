@@ -17,11 +17,8 @@ $acciones = [
   'reloj'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
   'baja'    => [['/gastos?nuevo=1', 'mas', 'Nuevo gasto', 'primary']],
   'serv'    => [['/servicios?nuevo=1', 'mas', 'Nuevo producto', 'primary']],
-  // Reportes exporta un .xlsx (el CSV se reemplazó: mandaba "$1,234.00" como
-  // texto). Lleva el periodo que se está viendo.
-  'pct'     => [['/reportes/excel?' . http_build_query(array_filter([
-                   'desde' => $_GET['desde'] ?? '', 'hasta' => $_GET['hasta'] ?? ''])),
-                 'baja', 'Descargar Excel', 'secondary']],
+  // Reportes no lleva botón aquí: su Excel está en «Reportes del periodo»,
+  // junto a «Imprimir…». Había tres botones que bajaban el mismo archivo.
 ];
 // Un rol de plataforma no vende ni da de alta clientes: esas acciones
 // operarían sobre la empresa de la sesión, que no es la suya.

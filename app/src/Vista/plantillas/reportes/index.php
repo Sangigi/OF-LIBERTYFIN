@@ -25,8 +25,9 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
-  <?php /* Aquí había un "Descargar detalle" que bajaba el mismo archivo que
-           "Descargar Excel" de arriba y "Excel completo" de los reportes. */ ?>
+  <?php /* El Excel está en «Reportes del periodo» («Excel completo»), junto
+           a «Imprimir…». Aquí y en la barra de arriba había otros dos botones
+           que bajaban el mismo archivo. */ ?>
 </form>
 
 <div class="lf-sintesis">
