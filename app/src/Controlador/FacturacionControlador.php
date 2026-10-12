@@ -109,10 +109,29 @@ final class FacturacionControlador
         }
 
         // ── Credenciales del PAC ────────────────────────────────────────
-        $fac   = Integraciones::de('facturapi');
-        $clave = trim((string) ($fac['api_key'] ?? ''));
+        // El archivo usa `llave` (producción) y `llave_prueba` (sandbox),
+        // más un apagador maestro `activo`. Si está apagado, no es un error
+        // de configuración del cliente — es que la integración no se ha
+        // activado, así que el mensaje lo dice tal cual.
+        $fac = Integraciones::de('facturapi');
+        if (empty($fac['activo'])) {
+            $this->aviso('La facturación con Facturapi está apagada. Actívala en '
+                       . 'config/integraciones.php (`activo => true`).', 'error');
+        }
+        $sandbox = !empty($fac['sandbox']);
+        $clave = $sandbox
+            ? trim((string) ($fac['llave_prueba'] ?? ''))
+            : trim((string) ($fac['llave'] ?? ''));
+        // Si el archivo solo tiene la llave de producción cargada y sandbox
+        // está prendido, se cae a esa — así no hay que llenar dos campos
+        // cuando el dueño solo tiene una cuenta de pruebas.
+        if ($clave === '' && $sandbox) {
+            $clave = trim((string) ($fac['llave'] ?? ''));
+        }
         if ($clave === '') {
-            $this->aviso('No hay credenciales de Facturapi configuradas.', 'error');
+            $nombre = $sandbox ? 'llave_prueba (o llave)' : 'llave';
+            $this->aviso("No hay credenciales de Facturapi configuradas. "
+                       . "Llena `$nombre` en config/integraciones.php.", 'error');
         }
 
         // ── Datos fiscales del emisor ───────────────────────────────────
@@ -188,7 +207,7 @@ final class FacturacionControlador
         ];
 
         // ── Envío al PAC ────────────────────────────────────────────────
-        $cli = new Facturapi($clave);
+        $cli = new Facturapi($clave, (string) ($fac['organizacion'] ?? ''));
         $res = $cli->crearFactura($payload);
 
         if ($res['error'] !== '') {
@@ -236,7 +255,11 @@ final class FacturacionControlador
                     . "{$venta['cliente_id']}: " . $e->getMessage());
         }
 
-        $this->aviso('Venta facturada. UUID: ' . ($d['uuid'] ?? 'pendiente'), 'ok');
+        $this->aviso(
+            'Venta facturada' . ($sandbox ? ' (PRUEBAS, sin validez fiscal)' : '')
+            . '. UUID: ' . ($d['uuid'] ?? 'pendiente'),
+            'ok'
+        );
     }
 
     /**
