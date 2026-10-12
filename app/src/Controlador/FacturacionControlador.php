@@ -131,7 +131,7 @@ final class FacturacionControlador
                        . 'El CFDI necesita el RFC de quien recibe.', 'error');
         }
         if (!empty($venta['factura_uuid'])) {
-            $this->aviso('Esta venta ya fue facturada (UUID ' . $venta['factura_uuid'] . ').', 'error');
+            $this->aviso('Esta venta ya fue facturada.', 'error');
         }
 
         $docs = (new CuentaRepo($db))->estadoDocumentacion();
