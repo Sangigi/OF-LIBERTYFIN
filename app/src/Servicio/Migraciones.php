@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 16;
+    const VERSION = 15;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
