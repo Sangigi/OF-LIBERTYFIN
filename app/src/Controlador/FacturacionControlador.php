@@ -105,8 +105,9 @@ final class FacturacionControlador
      * de saldo ya exigió cobro completo, no hay rama PPD.
      *
      * Cada partida de `venta_detalles` viaja como un concepto independiente
-     * del CFDI, con su cantidad y precio unitario reales. El total del CFDI
-     * se recalcula desde esas partidas para que cuadre consigo mismo.
+     * del CFDI. El concepto se manda con cantidad = 1 y precio = importe
+     * total de la partida, para que en el CFDI "precio unitario" e
+     * "importe" muestren el total del producto y no el precio por pieza.
      */
     public function timbrar($id)
     {
@@ -201,9 +202,10 @@ final class FacturacionControlador
         $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
 
         // ── Partidas reales de la venta ─────────────────────────────────
-        // Cada línea de venta_detalles viaja como un concepto independiente
-        // del CFDI, con su cantidad y precio unitario. El total se recalcula
-        // desde aquí para que el CFDI cuadre consigo mismo.
+        // Cada línea de venta_detalles viaja como un concepto independiente.
+        // Se manda cantidad = 1 y precio = importe de la partida para que
+        // "precio unitario" e "importe" en el CFDI muestren el total del
+        // producto, no el precio por pieza.
         $lineas = $repo->lineas($id);
         if (!$lineas) {
             $this->aviso('La venta no tiene partidas capturadas. No hay qué facturar.', 'error');
@@ -218,40 +220,48 @@ final class FacturacionControlador
             $cant = (float) ($l['cantidad'] ?? 1);
             if ($cant <= 0) { $cant = 1; }
 
-            // Precio unitario: intenta las variantes comunes antes de
-            // derivarlo del subtotal. El schema no es uniforme, así que
-            // no lo asumimos.
+            // Precio unitario de la partida: probamos las variantes comunes
+            // antes de derivarlo del subtotal. El schema no es uniforme.
             if (isset($l['precio_unitario'])) {
-                $precio = (float) $l['precio_unitario'];
+                $precioUnit = (float) $l['precio_unitario'];
             } elseif (isset($l['precio'])) {
-                $precio = (float) $l['precio'];
+                $precioUnit = (float) $l['precio'];
             } elseif (isset($l['precio_venta'])) {
-                $precio = (float) $l['precio_venta'];
+                $precioUnit = (float) $l['precio_venta'];
             } else {
-                $precio = (float) ($l['subtotal'] ?? 0) / $cant;
+                $precioUnit = (float) ($l['subtotal'] ?? 0) / $cant;
             }
+
+            // Importe total de la partida = precio unitario × cantidad.
+            $importe = $precioUnit * $cant;
 
             // Facturapi aplica IVA ENCIMA del `price`. Si el precio de la
             // venta ya lo trae, lo descontamos para no timbrar doble.
             if ($ivaIncluido) {
-                $precio = round($precio / 1.16, 2);
+                $importe = $importe / 1.16;
+            }
+            $importe = round($importe, 2);
+
+            // Descripción: la de la partida si existe; si no, el nombre del
+            // producto del catálogo; si no, un genérico. Se antepone la
+            // cantidad para no perder esa información al mandar qty=1.
+            $desc = $l['descripcion'] ?? $l['concepto'] ?? $l['producto'] ?? 'Servicios prestados';
+            $desc = trim((string) $desc);
+            if ($cant > 1) {
+                $desc = rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.') . ' x ' . $desc;
             }
 
-            // Descripción: preferimos la capturada en la partida; si no,
-            // el nombre del producto del catálogo; si no, un genérico.
-            $desc = $l['descripcion'] ?? $l['concepto'] ?? $l['producto'] ?? 'Servicios prestados';
-
             $items[] = [
-                'quantity' => $cant,
+                'quantity' => 1,                    // 👈 siempre 1
                 'product'  => [
-                    'description' => trim((string) $desc),
+                    'description' => $desc,
                     'product_key' => (string) ($l['clave_prodserv'] ?? '84111506'),
                     'unit_key'    => (string) ($l['clave_unidad']  ?? 'E48'), // E48 = Unidad de servicio
-                    'price'       => $precio,
+                    'price'       => $importe,      // 👈 precio = importe de la partida
                     'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
                 ],
             ];
-            $subtotal += $precio * $cant;
+            $subtotal += $importe;
         }
 
         // Totales derivados de las partidas: así el CFDI cuadra consigo mismo.
@@ -304,7 +314,7 @@ final class FacturacionControlador
             'factura_folio'          => (string) ($d['folio_number'] ?? ''),
             'urlfacturacion'         => (string) ($d['verification_url'] ?? ''),
             'factura_fecha_timbrado' => (string) ($d['created_at'] ?? date('Y-m-d H:i:s')),
-            'factura_subtotal'       => $total,
+            'factura_subtotal'       => $subtotal,
             'factura_iva'            => $iva,
             'factura_total'          => $total,
             'factura_rfc_receptor'   => $payload['customer']['tax_id'],
