@@ -22,6 +22,13 @@ use LibertyFin\Vista\Plantilla;
  */
 final class FacturacionControlador
 {
+    /**
+     * Matriz de compatibilidad del catálogo c_UsoCFDI.
+     *
+     * S01 y CP01 se dejan fuera por diseño: S01 aplica a cualquier
+     * régimen, y CP01 va en comprobantes tipo P — que este controlador
+     * no emite.
+     */
     private const USOS_VALIDOS = [
         'G01' => ['601','603','606','612','620','621','622','623','624','625','626'],
         'G02' => ['601','603','606','612','620','621','622','623','624','625','626'],
@@ -93,11 +100,9 @@ final class FacturacionControlador
     /**
      * Timbra una venta contra Facturapi.
      *
-     * Cada partida de `venta_detalles` viaja como un concepto independiente.
-     * El importe de cada concepto es el TOTAL de esa línea (lo que pagó el
-     * cliente, con IVA incluido si el negocio cobra así). Se manda el IVA
-     * en 0% para que Facturapi no sume nada encima y el CFDI muestre tal
-     * cual el precio unitario y el importe que el usuario quiere.
+     * La venta tiene que estar cobrada al 100% y tener cliente con RFC/CP.
+     * El CFDI se emite como PUE (Pago en Una Exhibición): como el candado
+     * de saldo ya exigió cobro completo, no hay rama PPD.
      */
     public function timbrar($id)
     {
@@ -111,6 +116,9 @@ final class FacturacionControlador
             $this->aviso('Venta no encontrada.', 'error');
         }
 
+        // Uso CFDI forzado desde la URL: ?uso=D10. Se usa cuando el
+        // cliente 605 ya sabe qué deducción personal va a aplicar. Si no
+        // viene o es inválido para su régimen, se ignora.
         $usoOverride = strtoupper(trim((string) Peticion::texto('uso', '')));
 
         // ── Mismos candados que la vista anuncia ────────────────────────
@@ -179,6 +187,8 @@ final class FacturacionControlador
             (string) ($r['regimen'] ?? ''),
             (string) $r['rfc']
         );
+        // Si el override fue rechazado (porque no aplica al régimen), se
+        // avisa igual: el cajero creyó que iba a salir con ese uso y no.
         if ($usoOverride !== '' && $usoCfdi !== $usoOverride) {
             $ajusteUso = "el uso $usoOverride no aplica con el régimen "
                        . trim((string) $r['regimen']) . "; se usó $usoCfdi";
@@ -186,73 +196,14 @@ final class FacturacionControlador
 
         $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
 
-        // ── Partidas reales de la venta ─────────────────────────────────
-        // Cada partida viaja como un concepto. El `price` que mandamos es
-        // el TOTAL de la línea (lo que el cliente pagó por ese producto),
-        // NO el subtotal sin IVA. Y la tasa de IVA va en 0% para que
-        // Facturapi no le sume nada encima.
-        $lineas = $repo->lineas($id);
-        if (!$lineas) {
-            $this->aviso('La venta no tiene partidas capturadas. No hay qué facturar.', 'error');
+        // ── Importes ────────────────────────────────────────────────────
+        $total = (float) $venta['total'];
+        if (($venta['iva_modo'] ?? 'incluido') === 'incluido') {
+            $subtotal = round($total / 1.16, 2);
+        } else {
+            $subtotal = (float) $venta['subtotal'];
         }
-
-        $ivaIncluido = (($venta['iva_modo'] ?? 'incluido') === 'incluido');
-
-        $items    = [];
-        $subtotal = 0.0;
-
-        foreach ($lineas as $l) {
-            $cant = (float) ($l['cantidad'] ?? 1);
-            if ($cant <= 0) { $cant = 1; }
-
-            // Importe de la línea: queremos el TOTAL, no el subtotal.
-            //   1) Si el schema ya trae `total` por partida, lo usamos.
-            //   2) Si no, calculamos: base × 1.16 (si IVA incluido) o base.
-            if (isset($l['total']) && (float) $l['total'] > 0) {
-                $importeLinea = (float) $l['total'];
-            } else {
-                if (isset($l['subtotal'])) {
-                    $base = (float) $l['subtotal'];
-                } else {
-                    $pu = 0.0;
-                    foreach (['precio_unitario','precio','precio_venta'] as $k) {
-                        if (isset($l[$k])) { $pu = (float) $l[$k]; break; }
-                    }
-                    $base = $pu * $cant;
-                }
-                $importeLinea = $ivaIncluido ? $base * 1.16 : $base;
-            }
-            $importeLinea = round($importeLinea, 2);
-
-            // Descripción. Si la cantidad es > 1, la anteponemos al texto
-            // porque en el CFDI vamos a mandar quantity = 1.
-            $desc = $l['descripcion'] ?? $l['concepto'] ?? $l['producto'] ?? 'Servicios prestados';
-            $desc = trim((string) $desc);
-            if ($cant > 1) {
-                $desc = rtrim(rtrim(number_format($cant, 2, '.', ''), '0'), '.') . ' x ' . $desc;
-            }
-
-            $items[] = [
-                'quantity' => 1,
-                'product'  => [
-                    'description' => $desc,
-                    'product_key' => (string) ($l['clave_prodserv'] ?? '84111506'),
-                    'unit_key'    => (string) ($l['clave_unidad']  ?? 'E48'),
-                    'price'       => $importeLinea,
-                    // IVA 0%: el importe YA trae el impuesto incluido.
-                    // Si Facturapi sumara 16% encima, el CFDI no cuadraría
-                    // con lo que el cliente pagó.
-                    'taxes'       => [['type' => 'IVA', 'rate' => 0]],
-                ],
-            ];
-            $subtotal += $importeLinea;
-        }
-
-        // Totales: como todo viene con IVA incluido y la tasa es 0%,
-        // el subtotal y el total del CFDI son el mismo número.
-        $subtotal = round($subtotal, 2);
-        $iva      = 0.0;
-        $total    = $subtotal;
+        $iva = round($total - $subtotal, 2);
 
         $cpReceptor = trim((string) $r['cp']);
 
@@ -271,7 +222,15 @@ final class FacturacionControlador
                 'address'    => $address,
                 'email'      => !empty($r['email']) ? $r['email'] : null,
             ],
-            'items'          => $items,
+            'items' => [[
+                'quantity' => 1,
+                'product'  => [
+                    'description' => trim((string) ($venta['descripcion'] ?: 'Servicios prestados')),
+                    'product_key' => '84111506',   // Servicios de facturación
+                    'price'       => $total,
+                    'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
+                ],
+            ]],
             'use'            => $usoCfdi,
             'payment_form'   => $this->formaPagoSat((string) ($venta['metodo_pago'] ?? '')),
             'payment_method' => 'PUE',
@@ -334,6 +293,15 @@ final class FacturacionControlador
         );
     }
 
+        /**
+     * Descarga el XML o PDF de una venta ya facturada.
+     *
+     * Solo admin: el CFDI tiene los datos fiscales completos del receptor
+     * y no hay razón para que un cajero se los baje. Si más adelante
+     * quieres que el cajero también pueda, se cambia el `if` del rol.
+     *
+     * El `tipo` viene por URL: ?tipo=pdf (default) o ?tipo=xml.
+     */
     public function descargarCfdi($id)
     {
         $id = (int) $id;
@@ -359,6 +327,7 @@ final class FacturacionControlador
             exit('La venta está marcada como facturada pero no tiene ID del PAC guardado.');
         }
 
+        // ── Tipo de archivo ─────────────────────────────────────────────
         $tipo = strtolower(trim((string) ($_GET['tipo'] ?? 'pdf')));
         if (!in_array($tipo, ['xml', 'pdf'], true)) {
             http_response_code(400);
@@ -366,6 +335,7 @@ final class FacturacionControlador
             exit('El tipo debe ser xml o pdf.');
         }
 
+        // ── Credenciales del PAC ────────────────────────────────────────
         $fac = Integraciones::de('facturapi');
         $sandbox = !empty($fac['sandbox']);
         $clave = $sandbox
@@ -380,6 +350,7 @@ final class FacturacionControlador
             exit('Facturapi sin credenciales configuradas.');
         }
 
+        // ── Descarga ────────────────────────────────────────────────────
         $cli = new Facturapi($clave, (string) ($fac['organizacion'] ?? ''));
         $res = $cli->descargarFactura($facturapiId, $tipo);
 
@@ -396,11 +367,15 @@ final class FacturacionControlador
                 $res['http'] >= 400 && $res['http'] < 600 ? $res['http'] : 502
             );
             header('Content-Type: text/plain; charset=UTF-8');
+            // Si el PAC devolvió JSON con mensaje, mostrarlo; si no, el código.
             $msg = $res['json']['message']
                  ?? "El PAC rechazó la descarga (HTTP {$res['http']}).";
             exit($msg);
         }
 
+        // ── Streaming al navegador ──────────────────────────────────────
+        // El filename usa el UUID (no el ID de Facturapi) porque es lo que
+        // el cliente reconoce y lo que va en el expediente fiscal.
         $mime     = $tipo === 'pdf' ? 'application/pdf' : 'application/xml; charset=UTF-8';
         $filename = 'cfdi-' . $venta['factura_uuid'] . '.' . $tipo;
 
@@ -412,17 +387,34 @@ final class FacturacionControlador
         exit;
     }
 
+    /**
+     * Devuelve un uso CFDI válido para el régimen del receptor.
+     *
+     * No confía en el dato capturado: si la pareja régimen+uso no está
+     * en el catálogo, cae a un valor que sí lo está en vez de mandarla
+     * al SAT y comerse el rechazo. Devuelve [uso_final, motivo_o_null].
+     *
+     * Reglas duras por régimen:
+     *   · 616 (público en general) solo admite S01.
+     *   · 605 (sueldos) solo admite D01-D10 o S01. Default S01: no se le
+     *     adivina al cliente qué deducción personal va a aplicar.
+     *   · D01-D10 son exclusivos de persona física.
+     *   · G/I aplican a todos los demás regímenes del catálogo.
+     */
     private function usoValido(string $uso, string $regimen, string $rfc): array
     {
         $uso     = strtoupper(trim($uso));
         $regimen = trim($regimen);
         $rfc     = strtoupper(trim($rfc));
 
+        // RFC genérico -> régimen 616 -> S01, sin discusión.
         if ($rfc === 'XAXX010101000' || $rfc === 'XEXX010101000' || $regimen === '616') {
             $motivo = ($uso !== '' && $uso !== 'S01') ? 'régimen 616 exige S01' : null;
             return ['S01', $motivo];
         }
 
+        // ── 605 Sueldos y Salarios e Ingresos Asimilados ────────────────
+        // El SAT no admite G/I. Solo D01-D10 o S01. Default S01.
         if ($regimen === '605') {
             if (preg_match('/^D(0[1-9]|10)$/', $uso)) {
                 return [$uso, null];
@@ -433,6 +425,7 @@ final class FacturacionControlador
             return ['S01', $motivo];
         }
 
+        // Sin uso capturado: G03, que aplica a todos los regímenes de abajo.
         if ($uso === '') {
             return ['G03', 'el cliente no tenía uso CFDI capturado'];
         }
@@ -450,6 +443,9 @@ final class FacturacionControlador
         return [$uso, null];
     }
 
+    /**
+     * Catálogo c_FormaPago del SAT, desde el enum `ventas.metodo_pago`.
+     */
     private function formaPagoSat(string $metodoVenta): string
     {
         return match (strtolower(trim($metodoVenta))) {
