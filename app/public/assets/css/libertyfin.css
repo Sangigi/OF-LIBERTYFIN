@@ -3910,3 +3910,20 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
     padding:10px 12px;background:var(--lf-vidrio)}
   .lf-tabla-areas tfoot td{background:none;border-top:0}
 }
+
+/* ══════════════════════════════════════════════════════
+   TABLAS: LO QUE BOOTSTRAP DABA Y AQUÍ NO ESTABA
+   Las vistas usan clases de Bootstrap (.table, .text-end), pero
+   Bootstrap no se carga: la tabla medía lo que su contenido y dejaba
+   un hueco a la derecha de la tarjeta, y .text-end no alineaba nada a
+   la derecha (solo ponía cifras tabulares). Los montos quedaban
+   pegados a la izquierda, debajo de un encabezado también a la
+   izquierda, y en Reportes · Por área cada cifra terminaba donde le
+   tocaba según lo largo de su línea chica.
+   ══════════════════════════════════════════════════════ */
+.table{width:100%}
+.text-end,td.text-end,th.text-end,
+.table > thead > tr > th.text-end{text-align:right}
+/* El renglón de totales, con el mismo aire que los demás (sin esto el
+   "Total" y sus cifras quedaban corridos respecto a las columnas). */
+.table > tfoot > tr > td,.table > tfoot > tr > th{padding:13px 14px;font-size:13px;vertical-align:middle}
