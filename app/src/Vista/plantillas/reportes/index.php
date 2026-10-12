@@ -60,7 +60,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
   <header class="card-header">
     <div><span>De dónde a dónde</span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-        Parte del dinero que entró, no de lo facturado</p></div>
+        Parte del dinero que entró, no de lo vendido</p></div>
   </header>
   <div class="card-body">
     <?php /* Dos columnas: a la izquierda el desglose, angosto, con cada
@@ -99,12 +99,17 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
       </tbody>
     </table>
     <div class="lf-dd-notas">
-      <p>Se facturaron <b><?= D::pesos($r['vendido']) ?></b> y quedan
-      <b style="color:var(--lf-amb)"><?= D::pesos($r['por_cobrar']) ?></b> sin cobrar.
-      Eso no aparece aquí a propósito: facturar no es cobrar, y sumarlo como
-      ingreso fue lo que hacía que el sistema mostrara cifras que no existían.</p>
+      <?php /* Decía "Se facturaron": era la suma de las ventas del periodo,
+               no de las facturas (no toda venta lleva CFDI), y como lo
+               cobrado trae dinero de ventas anteriores, las cifras no
+               parecían cuadrar. Ahora se parte en lo cobrado y lo que falta,
+               que suman exacto. */ ?>
+      <p>Las ventas del periodo suman <b><?= D::pesos($r['vendido']) ?></b>: de eso
+      ya se cobraron <b><?= D::pesos(max(0, $r['vendido'] - $r['por_cobrar'])) ?></b> y faltan
+      <b style="color:var(--lf-amb)"><?= D::pesos($r['por_cobrar']) ?></b>.
+      Lo que falta no cuenta aquí hasta que entre: vender no es cobrar.</p>
       <?php if ($r['iva'] > 0): ?>
-      <p>De lo facturado, <b><?= D::pesos($r['iva']) ?></b> son IVA: no es ingreso, es del SAT.</p>
+      <p>De esas ventas, <b><?= D::pesos($r['iva']) ?></b> son IVA: no es ingreso, es del SAT.</p>
       <?php endif; ?>
       <?php /* Lo que entró por ventas de meses anteriores. Ya está dentro de
                "Cobrado"; se dice aparte porque las tablas por fecha de venta
@@ -298,7 +303,10 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
         Devengado en el periodo</p></div>
   </header>
-  <div style="padding:0 10px 8px">
+  <?php /* En rejilla, hasta tres por renglón: a todo lo ancho, el nombre
+           quedaba en una orilla y el monto en la otra, con un hueco enorme
+           en medio. */ ?>
+  <div class="lf-colabs">
     <?php foreach ($colaboradores as $c): $sd = $c['nombre'] === 'POR ASIGNAR'; ?>
       <div class="lf-row" style="<?= $sd?'opacity:.72':'' ?>">
         <span class="lf-av <?= $sd?'gris':'' ?>"><?= $sd?'?':P::e($ini($c['nombre'])) ?></span>
