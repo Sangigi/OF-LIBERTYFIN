@@ -93,7 +93,6 @@ final class FacturacionControlador
             'totalV'     => $totalV,
             'desde'      => $desde, 'hasta' => $hasta,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
-            'esAdmin'    => (($_SESSION['rol'] ?? $_SESSION['lf_rol'] ?? '') === 'admin'),
         ]);
         unset($_SESSION['lf_aviso']);
     }
@@ -306,14 +305,6 @@ final class FacturacionControlador
     public function descargarCfdi($id)
     {
         $id = (int) $id;
-
-        // ── Rol: solo admin ─────────────────────────────────────────────
-        $rol = (string) ($_SESSION['rol'] ?? $_SESSION['lf_rol'] ?? '');
-        if ($rol !== 'admin') {
-            http_response_code(403);
-            header('Content-Type: text/plain; charset=UTF-8');
-            exit('No tienes permiso para descargar facturas.');
-        }
 
         $db   = Conexion::de($_SESSION['empresa_db']);
         $repo = new VentaRepo($db);

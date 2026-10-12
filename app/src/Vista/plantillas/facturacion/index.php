@@ -105,22 +105,14 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
           </td>
           <td style="text-align:right">
             <?php if ($facturada): ?>
-              <?php if (!empty($esAdmin)): ?>
-                <div style="display:flex;gap:6px;justify-content:flex-end">
-                  <a class="btn btn-secondary btn-sm"
-                     href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=pdf"
-                     title="Descargar PDF">PDF</a>
-                  <a class="btn btn-secondary btn-sm"
-                     href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=xml"
-                     title="Descargar XML">XML</a>
-                </div>
-              <?php else: ?>
-                <a class="btn btn-secondary btn-sm" disabled
-                   href="#" onclick="return false"
-                   title="Venta ya facturada (UUID <?= P::e($v['factura_uuid']) ?>)">
-                  Timbrar
-                </a>
-              <?php endif; ?>
+              <div style="display:flex;gap:6px;justify-content:flex-end">
+                <a class="btn btn-secondary btn-sm"
+                   href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=pdf"
+                   title="Descargar PDF">PDF</a>
+                <a class="btn btn-secondary btn-sm"
+                   href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=xml"
+                   title="Descargar XML">XML</a>
+              </div>
             <?php elseif ($listo && $liquidada && !$sinCliente): ?>
               <a class="btn btn-secondary btn-sm"
                  href="/facturacion/<?= (int)$v['id'] ?>/timbrar">Timbrar</a>
