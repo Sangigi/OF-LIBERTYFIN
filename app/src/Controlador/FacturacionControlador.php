@@ -227,7 +227,7 @@ final class FacturacionControlador
                 'product'  => [
                     'description' => trim((string) ($venta['descripcion'] ?: 'Servicios prestados')),
                     'product_key' => '84111506',   // Servicios de facturación
-                    'price'       => $subtotal,
+                    'price'       => $total,
                     'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
                 ],
             ]],
