@@ -667,10 +667,22 @@ final class Reportes
             }
             $grupos[$g][] = $f;
         }
-        // De mayor a menor dinero: lo que mas pesa, arriba.
-        uasort($grupos, function ($a, $b) {
-            return array_sum(array_column($b, 'cobrado_periodo'))
-               <=> array_sum(array_column($a, 'cobrado_periodo'));
+        // De mayor a menor dinero POR ÁREA COMPLETA: lo que más pesa, arriba.
+        // Y las partes de un área, juntas y en orden (físicas, morales, sin
+        // clasificar). Antes cada tabla se ordenaba sola por su dinero y otra
+        // área se metía entre "Personas físicas" y "Personas morales".
+        $areaDe = function ($k) { return explode(' · ', $k)[0]; };
+        $parteDe = function ($k) { $p = explode(' · ', $k); return $p[1] ?? ''; };
+        $dineroArea = [];
+        foreach ($grupos as $k => $gf) {
+            $dineroArea[$areaDe($k)] = ($dineroArea[$areaDe($k)] ?? 0)
+                                     + array_sum(array_column($gf, 'cobrado_periodo'));
+        }
+        $ordenParte = ['Personas fisicas' => 1, 'Personas morales' => 2, 'Sin clasificar' => 3];
+        uksort($grupos, function ($x, $y) use ($areaDe, $parteDe, $dineroArea, $ordenParte) {
+            $ax = $areaDe($x); $ay = $areaDe($y);
+            if ($ax !== $ay) return ($dineroArea[$ay] <=> $dineroArea[$ax]) ?: strcmp($ax, $ay);
+            return ($ordenParte[$parteDe($x)] ?? 9) <=> ($ordenParte[$parteDe($y)] ?? 9);
         });
 
         // "Origen" y "Cobrado en el periodo": cada área trae también las
