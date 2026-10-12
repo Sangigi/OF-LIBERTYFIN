@@ -304,7 +304,7 @@ final class FacturacionControlador
             'factura_folio'          => (string) ($d['folio_number'] ?? ''),
             'urlfacturacion'         => (string) ($d['verification_url'] ?? ''),
             'factura_fecha_timbrado' => (string) ($d['created_at'] ?? date('Y-m-d H:i:s')),
-            'factura_subtotal'       => $subtotal,
+            'factura_subtotal'       => $total,
             'factura_iva'            => $iva,
             'factura_total'          => $total,
             'factura_rfc_receptor'   => $payload['customer']['tax_id'],
