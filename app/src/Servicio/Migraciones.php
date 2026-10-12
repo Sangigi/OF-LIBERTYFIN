@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 14;
+    const VERSION = 15;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -510,6 +510,73 @@ final class Migraciones
         }
     }
 
+    /**
+     * 15 · Los datos fiscales del comprobante.
+     *
+     * `factura_uuid` y `factura_folio` ya existían: guardaban "esto se
+     * timbró, y con qué folio". Pero un CFDI no es solo el UUID. Si esa
+     * venta hay que reimprimirla, cancelarla o mandarla por correo, el
+     * sistema necesita poder reconstruir el comprobante sin volver a
+     * preguntarle al PAC: para quién fue, con qué uso de CFDI, con qué
+     * método y forma de pago, y por cuánto.
+     *
+     * Se guardan los importes (subtotal, IVA, total) y NO se recalculan
+     * al vuelo a propósito: un CFDI emitido en 2024 con IVA del 16% debe
+     * seguir diciendo eso aunque hoy la venta se vea distinto. Lo
+     * timbrado es un hecho, no una derivación.
+     *
+     * `facturada` es un booleano con DEFAULT 0 para que las ventas
+     * históricas queden marcadas como no facturadas sin ambigüedad, y
+     * para poder listar "las que faltan por facturar" con un índice
+     * barato. Los demás campos van NULL: un NULL en uso_cfdi significa
+     * "se timbró pero no sabemos con qué", que es distinto de cadena
+     * vacía y no hay que confundir.
+     *
+     * Todos los `AFTER` van encadenados sobre `factura_folio`, que es la
+     * columna que ya existía en el esquema. Si esa no estuviera, el
+     * ALTER falla y se anota, pero no detiene el resto: por eso cada
+     * columna se envuelve por separado.
+     */
+    private static function v15(PDO $db)
+    {
+        if (!self::hayTabla($db, 'ventas')) return;
+
+        $columnas = [
+            'facturada'                => "TINYINT(1) NOT NULL DEFAULT 0 AFTER factura_folio",
+            'factura_fecha_timbrado'   => "DATETIME NULL AFTER facturada",
+            'factura_rfc_receptor'     => "VARCHAR(20) NULL",
+            'factura_razon_social'     => "VARCHAR(255) NULL",
+            'factura_uso_cfdi'         => "VARCHAR(5) NULL",
+            'factura_metodo_pago'      => "VARCHAR(3) NULL",   // PUE / PPD
+            'factura_forma_pago'       => "VARCHAR(2) NULL",   // 01/02/03/04/28/99
+            'factura_cp_receptor'      => "VARCHAR(10) NULL",
+            'factura_email_receptor'   => "VARCHAR(100) NULL",
+            'factura_subtotal'         => "DECIMAL(10,2) NULL",
+            'factura_iva'              => "DECIMAL(10,2) NULL",
+            'factura_total'            => "DECIMAL(10,2) NULL",
+        ];
+
+        foreach ($columnas as $columna => $definicion) {
+            if (self::hayColumna($db, 'ventas', $columna)) continue;
+            try {
+                $db->exec("ALTER TABLE ventas ADD COLUMN `$columna` $definicion");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 15 · columna ' . $columna . ': ' . $e->getMessage());
+            }
+        }
+
+        // El índice sobre factura_uuid acelera la búsqueda por UUID al
+        // reimprimir o cancelar. No es UNIQUE: las ventas sin facturar
+        // lo dejan en NULL y varias NULL conviven sin problema.
+        if (!self::hayIndice($db, 'ventas', 'idx_ventas_factura_uuid')) {
+            try {
+                $db->exec("ALTER TABLE ventas ADD INDEX idx_ventas_factura_uuid (factura_uuid)");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 15 · índice factura_uuid: ' . $e->getMessage());
+            }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -526,5 +593,6 @@ final class Migraciones
         12 => 'Subfolios de cobro y servicios agregados a una venta existente',
         13 => 'Detalle de las operaciones en lote en la bitácora',
         14 => 'Banco del pago con tarjeta o SPEI',
+        15 => 'Datos fiscales del comprobante (receptor, uso CFDI, método/forma de pago, importes)',
     ];
 }
