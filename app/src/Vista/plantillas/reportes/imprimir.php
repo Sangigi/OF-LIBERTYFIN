@@ -130,9 +130,8 @@ $alineado = function ($tipo) {
       <?php endif; ?>
     </table>
 
-    <?php if ($rep['nota']): ?>
-      <p class="nota"><?= P::e($rep['nota']) ?></p>
-    <?php endif; ?>
+    <?php /* La hoja impresa va sin la nota que explica cada reporte: se
+             imprime para entregarse, y la explicación se queda en pantalla. */ ?>
     <p class="pie">
       Generado el <?= date('d/m/Y \a \l\a\s H:i') ?> ·
       <?= count($rep['filas']) ?> <?= count($rep['filas'])==1 ? 'renglón' : 'renglones' ?>
