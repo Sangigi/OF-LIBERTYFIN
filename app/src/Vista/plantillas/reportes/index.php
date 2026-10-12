@@ -4,7 +4,15 @@ use LibertyFin\Vista\Widget as W;
 use LibertyFin\Dominio\Dinero as D;
 
 $margen = $r['cobrado'] > 0 ? round($r['queda'] / $r['cobrado'] * 100, 1) : 0;
-$salidas = $r['operacion'] + $r['generales'] + $r['comisiones'];
+$salidas = $r['operacion'] + $r['generales'] + $r['comisiones'] + $r['iva_cobrado'];
+// En qué se fue lo que no quedó: solo lo que de verdad tuvo algo.
+$seFue = array_keys(array_filter([
+    'gastos de operación' => $r['operacion'], 'gastos generales' => $r['generales'],
+    'comisiones' => $r['comisiones'], 'IVA' => $r['iva_cobrado'],
+], function ($v) { return $v > 0; }));
+$seFueTxt = count($seFue) > 1
+    ? implode(', ', array_slice($seFue, 0, -1)) . (end($seFue) === 'IVA' ? ' e ' : ' y ') . end($seFue)
+    : (string)reset($seFue);
 $qs = http_build_query(['desde'=>$desde,'hasta'=>$hasta]);
 $ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
     return mb_strtoupper(mb_substr($p[0],0,1) . (isset($p[1]) ? mb_substr($p[1],0,1) : '')); };
@@ -30,7 +38,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
       <span class="lf-tag"><i></i>Resultado del periodo</span>
       <h2>Entraron <em><?= D::pesos($r['cobrado']) ?></em> y
         quedaron <em><?= D::pesos($r['queda']) ?></em>.</h2>
-      <p>Lo demás se fue en gastos de operación, gastos generales y comisiones.
+      <p><?php if ($seFueTxt !== ''): ?>Lo demás se fue en <?= P::e($seFueTxt) ?>.<?php endif; ?>
          El margen del periodo es del <?= $margen ?>%.</p>
     </div>
     <?php W::marcador(max(0, min(100, $margen)), 'margen'); ?>
@@ -58,12 +66,16 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
     <table class="table" style="margin-bottom:0">
       <tbody>
         <?php
-        $lineas = [
+        // Gastos generales solo si hay: una empresa que no los registra veía
+        // siempre un renglón en $0.00. El IVA cobrado se resta porque no es de
+        // la empresa (ver ReporteRepo::resultado()).
+        $lineas = array_values(array_filter([
           ['Cobrado',              $r['cobrado'],      '',  'el dinero que de verdad entró'],
           ['Gastos de operación', -$r['operacion'],    'a', 'cuelgan de una venta y bajan la comisión'],
-          ['Gastos generales',    -$r['generales'],    'a', 'renta, nómina, servicios'],
+          $r['generales'] > 0 ? ['Gastos generales', -$r['generales'], 'a', 'renta, nómina, servicios'] : null,
           ['Comisiones',          -$r['comisiones'],   'a', 'devengadas por lo cobrado'],
-        ];
+          ['IVA',                 -$r['iva_cobrado'],  'a', 'el que viene incluido en lo cobrado'],
+        ]));
         foreach ($lineas as $l): list($n,$v,$t,$nota) = $l; ?>
           <tr>
             <td style="width:44%"><b style="font-weight:600"><?= P::e($n) ?></b>
@@ -165,6 +177,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
     <table class="table table-hover lf-tabla-areas">
       <thead><tr><th>Área</th><th class="text-end">Cobrado</th>
         <th class="text-end">Gastos</th><th class="text-end">Comisiones</th>
+        <th class="text-end">IVA cobrado</th>
         <th class="text-end">Queda</th><th class="text-end">Margen</th></tr></thead>
       <tbody>
       <?php
@@ -199,6 +212,8 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
           <td data-label="Comisiones" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
             <span class="lf-ant-val"><b><?= D::pesos($a['comisiones_total']) ?></b>
               <?php if ($cAnt > 0): ?><small class="ant"><?= D::pesos($cAnt) ?> de cobros anteriores</small><?php endif; ?></span></td>
+          <td data-label="IVA cobrado" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
+            <?= (float)$a['iva'] > 0 ? D::pesos($a['iva']) : '–' ?></td>
           <td data-label="Queda" class="text-end lf-mono" style="font-weight:700;
               color:<?= $q>=0?'var(--lf-tinta)':'var(--lf-rojo)' ?>"><?= D::pesos($q) ?></td>
           <td data-label="Margen" class="text-end">
@@ -209,19 +224,21 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
       <?php /* El total sale del resultado de arriba, no de sumar la columna: un
                cobro de una venta con dos áreas cuenta en las dos filas y cada
                área redondea su parte. Los gastos generales no son de ningún área. */
-        $tq = round($r['cobrado'] - $r['operacion'] - $r['comisiones'], 2); $tmg = $margenDe($tq, $r['cobrado']); ?>
+        $tq = round($r['cobrado'] - $r['operacion'] - $r['comisiones'] - $r['iva_cobrado'], 2);
+        $tmg = $margenDe($tq, $r['cobrado']); ?>
       <tfoot><tr>
         <td data-label="Área"><b>Total</b></td>
         <td data-label="Cobrado" class="text-end lf-mono"><b><?= D::pesos($r['cobrado']) ?></b></td>
         <td data-label="Gastos" class="text-end lf-mono"><?= D::pesos($r['operacion']) ?></td>
         <td data-label="Comisiones" class="text-end lf-mono"><?= D::pesos($r['comisiones']) ?></td>
+        <td data-label="IVA cobrado" class="text-end lf-mono"><?= D::pesos($r['iva_cobrado']) ?></td>
         <td data-label="Queda" class="text-end lf-mono"><b><?= D::pesos($tq) ?></b></td>
         <td data-label="Margen" class="text-end"><span class="badge <?= $claseMg($tmg) ?>"><?= $tmg ?>%</span></td>
       </tr></tfoot>
     </table>
   </div>
   <div class="card-footer">
-    El margen es lo que queda después de gastos y comisiones. Un área con mucho
+    El margen es lo que queda después de gastos, comisiones e IVA. Un área con mucho
     cobrado y margen bajo está trabajando para pagar comisiones.
     <?php if ($hayAnt): ?>
       <br>«Ventas anteriores» son anticipos, abonos y liquidaciones de ventas

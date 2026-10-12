@@ -127,6 +127,14 @@ final class ReporteRepo extends Repo
                           AND (pl.fecha_pago < p.fecha_pago
                                OR (pl.fecha_pago = p.fecha_pago AND pl.id <= p.id)))) <= 0.005";
 
+    /**
+     * La parte de IVA de un pago (`p`) de una venta (`v`): el pago por la
+     * proporción de IVA de su venta, redondeado al centavo POR PAGO. Una sola
+     * definición para el resumen, el detalle y por área: así suman lo mismo.
+     */
+    const IVA_DEL_PAGO = "CASE WHEN v.total > 0
+                               THEN ROUND(p.monto * COALESCE(v.iva,0) / v.total, 2) ELSE 0 END";
+
     private function rango($desde, $hasta)
     {
         return [$desde . ' 00:00:00',
@@ -178,6 +186,18 @@ final class ReporteRepo extends Repo
             SELECT COALESCE(SUM(iva),0) FROM ventas
             WHERE estado <> 'cancelada' AND fecha >= ? AND fecha < ?", [$a, $b]);
 
+        // EL IVA QUE VINO DENTRO DE LO COBRADO. No es de la empresa: se le
+        // paga al SAT. Antes "Queda" lo contaba como propio (las comisiones
+        // ya se calculaban sin IVA). Va por la fecha del cobro, como el
+        // dinero: cada pago trae la parte de IVA de su venta, redondeada por
+        // pago, así cada tabla suma lo mismo (ver IVA_DEL_PAGO).
+        $ivaCobrado = (float)$this->valor("
+            SELECT COALESCE(SUM(" . self::IVA_DEL_PAGO . "),0)
+            FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+              AND p.fecha_pago >= ? AND p.fecha_pago < ?", [$a, $b]);
+
         // LO QUE ENTRÓ POR VENTAS DE ANTES DEL PERIODO.
         //
         // Ya está dentro de `cobrado`: un abono de octubre sobre una venta de
@@ -214,10 +234,11 @@ final class ReporteRepo extends Repo
             'vendido'    => $vendido,
             'por_cobrar' => round($porCobrar, 2),
             'iva'        => $iva,
+            'iva_cobrado'=> round($ivaCobrado, 2),
             'operacion'  => $operacion,
             'generales'  => $generales,
             'comisiones' => $comisiones,
-            'queda'      => round($cobrado - $operacion - $generales - $comisiones, 2),
+            'queda'      => round($cobrado - $operacion - $generales - $comisiones - $ivaCobrado, 2),
         ];
     }
 
@@ -416,14 +437,46 @@ final class ReporteRepo extends Repo
         // solo de las ventas nuevas: Legales salía con 60% cuando, contando
         // los $4,500 que entraron de agosto y sus $3,930 de comisión, le
         // quedó el 27%. Así las áreas suman lo mismo que "Queda".
+        // Y el IVA que vino en lo cobrado (de ventas nuevas y anteriores): no
+        // es del área, se le paga al SAT. Ver resultado().
+        $iva = [];
+        foreach ($this->ivaPorArea($desde, $hasta) as $x) $iva[$clave($x['area'])] = (float)$x['iva'];
         foreach ($filas as &$f) {
             $f['cobrado_total']    = round((float)$f['cobrado'] + (float)$f['de_anteriores'], 2);
             $f['comisiones_total'] = round((float)$f['comisiones'] + (float)$f['comisiones_ant'], 2);
-            $f['queda'] = round($f['cobrado_total'] - (float)$f['gastos'] - $f['comisiones_total'], 2);
+            $f['iva']   = round($iva[$clave($f['area'])] ?? 0, 2);
+            $f['queda'] = round($f['cobrado_total'] - (float)$f['gastos'] - $f['comisiones_total'] - $f['iva'], 2);
         }
         unset($f);
         usort($filas, function ($x, $y) { return $y['cobrado_total'] <=> $x['cobrado_total']; });
         return $filas;
+    }
+
+    /**
+     * El IVA de los cobros del periodo (de cualquier venta), por área, con el
+     * mismo reparto que lo cobrado (PESO). Ver IVA_DEL_PAGO.
+     */
+    private function ivaPorArea($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $peso = self::PESO;
+        return $this->todos("
+            SELECT area, ROUND(SUM(iva), 2) AS iva
+            FROM (
+                SELECT COALESCE(NULLIF(cat.nombre,''), NULLIF(v.area_nombre,''), 'Sin área') AS area,
+                       (" . self::IVA_DEL_PAGO . ") * ({$peso}) AS iva
+                FROM venta_pagos p
+                INNER JOIN ventas v        ON v.id = p.venta_id
+                LEFT JOIN venta_detalles d ON d.venta_id = v.id
+                LEFT JOIN productos pr     ON pr.id = d.producto_id
+                LEFT JOIN categorias cat   ON cat.id = pr.categoria_id
+                LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                            FROM venta_detalles GROUP BY venta_id ) tot
+                       ON tot.venta_id = v.id
+                WHERE p.cancelado = 0 AND v.estado <> 'cancelada' AND COALESCE(v.iva,0) <> 0
+                  AND p.fecha_pago >= ? AND p.fecha_pago < ?
+            ) x
+            GROUP BY area", [$a, $b]);
     }
 
     /** Las ventas del periodo por área (sin lo de ventas anteriores). */
@@ -620,6 +673,9 @@ final class ReporteRepo extends Repo
                    -- La que generaron los cobros DEL PERIODO: la que cuenta
                    -- en «Queda», como el dinero (ver resultado()).
                    COALESCE(cmp.comision,0) AS comision_periodo,
+                   -- El IVA que vino en lo cobrado en el periodo (no es de
+                   -- la empresa). Ver IVA_DEL_PAGO.
+                   COALESCE(ivp.iva,0) AS iva_periodo,
                    COALESCE(pp.monto,0) AS cobrado_periodo,
                    COALESCE(pp.n,0)     AS cobros_periodo,
                    pg.ultimo,
@@ -640,9 +696,13 @@ final class ReporteRepo extends Repo
             LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
                         WHERE fecha_pago >= ? AND fecha_pago < ?
                         GROUP BY venta_id ) cmp ON cmp.venta_id = v.id
+            LEFT JOIN ( SELECT p.venta_id, SUM(" . self::IVA_DEL_PAGO . ") iva
+                        FROM venta_pagos p INNER JOIN ventas v ON v.id = p.venta_id
+                        WHERE p.cancelado = 0 AND p.fecha_pago >= ? AND p.fecha_pago < ?
+                        GROUP BY p.venta_id ) ivp ON ivp.venta_id = v.id
             WHERE v.estado <> 'cancelada'
               AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
-            ORDER BY (v.fecha < ?), v.fecha", [$a, $b, $a, $b, $a, $b, $a, $a]);
+            ORDER BY (v.fecha < ?), v.fecha", [$a, $b, $a, $b, $a, $b, $a, $b, $a, $a]);
         return $this->marcarAnteriores($filas, $a, $b);
     }
 
@@ -980,6 +1040,8 @@ final class ReporteRepo extends Repo
                    ROUND(COALESCE(pp.monto,0) * (d.subtotal / NULLIF(tot.suma,0)), 2) AS cobrado_periodo,
                    ROUND(COALESCE(cpp.comision,0)
                          + COALESCE(csp.comision * (d.subtotal / NULLIF(tot.suma,0)), 0), 2) AS comision_periodo,
+                   -- La parte de esta línea del IVA cobrado en el periodo.
+                   ROUND(COALESCE(ivp.iva,0) * (d.subtotal / NULLIF(tot.suma,0)), 2) AS iva_periodo,
                    v.total - COALESCE(pg.cobrado,0)        AS saldo_venta,
                    pg.ultimo,
                    v.metodo_pago                           AS metodo,
@@ -1001,10 +1063,14 @@ final class ReporteRepo extends Repo
                         WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                         GROUP BY venta_id ) g ON g.venta_id = v.id
             {$cpro}
+            LEFT JOIN ( SELECT p.venta_id, SUM(" . self::IVA_DEL_PAGO . ") iva
+                        FROM venta_pagos p INNER JOIN ventas v ON v.id = p.venta_id
+                        WHERE p.cancelado = 0 AND p.fecha_pago >= ? AND p.fecha_pago < ?
+                        GROUP BY p.venta_id ) ivp ON ivp.venta_id = v.id
             WHERE v.estado <> 'cancelada'
               AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
             ORDER BY area_servicio, tipo_persona, v.fecha DESC, v.codigo_venta",
-            [$a, $b, $a, $b, $a]);
+            [$a, $b, $a, $b, $a, $b, $a]);
         return $this->marcarAnteriores($filas, $a, $b);
     }
 
