@@ -40,6 +40,7 @@ $deEmpresa = [
   ['ruta' => '/gastos',     'icono' => 'baja',    'texto' => 'Gastos',        'p' => 'ver.gastos',
    'sec' => 'gastos'],
   ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Productos', 'p' => 'ver.servicios'],
+  ['ruta' => '/importar',   'icono' => 'bolsa',   'texto' => 'Importar',      'p' => 'importar.ventas'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
   ['ruta' => '/facturacion','icono' => 'serv',    'texto' => 'Facturación',   'p' => 'ver.facturacion',

@@ -101,6 +101,11 @@ if (\LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '')) 
     $r->get('/',    ['LibertyFin\Controlador\PanelControlador',  'index']);
 }
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
+// Traer a LibertyFin la hoja de ventas que se llevaba en Excel.
+$r->get ('/importar',          ['LibertyFin\Controlador\ImportarControlador', 'index']);
+$r->post('/importar/analizar', ['LibertyFin\Controlador\ImportarControlador', 'analizar']);
+$r->post('/importar/aplicar',  ['LibertyFin\Controlador\ImportarControlador', 'aplicar']);
+$r->get ('/importar/cancelar', ['LibertyFin\Controlador\ImportarControlador', 'cancelar']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
 $r->get('/ventas/{id}/ticket',        ['LibertyFin\Controlador\VentasControlador', 'ticket']);
 $r->post('/ventas/{id}/pagar',        ['LibertyFin\Controlador\VentasControlador', 'pagar']);
@@ -236,6 +241,10 @@ $r->post('/corte/cerrar',['LibertyFin\Controlador\CorteControlador', 'cerrar']);
 $permisos = [
   // La raíz no lleva permiso: cada rol va a su propio panel.
   '/ventas'                 => 'ver.ventas',
+  '/importar'               => 'importar.ventas',
+  '/importar/analizar'      => 'importar.ventas',
+  '/importar/aplicar'       => 'importar.ventas',
+  '/importar/cancelar'      => 'importar.ventas',
   '/ventas/{id}'            => 'ver.ventas',
   '/ventas/{id}/ticket'     => 'ver.ventas',
   '/ventas/{id}/pagar'      => 'abonar',

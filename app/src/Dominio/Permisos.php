@@ -92,6 +92,9 @@ final class Permisos
         // ── Secciones de EMPRESA ──
         'ver.panel'        => ['admin','cajero','inventario'],
         'ver.ventas'       => ['admin','cajero'],
+        // Importar escribe ventas, cobros y comisiones de golpe:
+        // es cosa de quien responde por los números, no de caja.
+        'importar.ventas'  => ['admin'],
         'ver.clientes'     => ['admin','cajero'],
         'ver.cobranza'     => ['admin'],
         'ver.servicios'    => ['admin','cajero','inventario'],
