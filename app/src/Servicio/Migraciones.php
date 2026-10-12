@@ -578,46 +578,59 @@ final class Migraciones
     }
 
     /**
-     * 16 · El historial de «Recalcular comisiones», para poder deshacerlo.
+     * 16 · El domicilio y los datos fiscales del cliente.
      *
-     *   comision_recalculos        cada vez que se presionó el botón: quién,
-     *                              cuándo, cuántas ventas revisó y cambió, y
-     *                              si se deshizo.
-     *   comision_recalculo_ventas  cada venta que cambió: cómo estaban sus
-     *                              renglones de pago_comisiones antes
-     *                              (filas_antes) y la huella de cómo quedó,
-     *                              para no deshacer encima de algo nuevo.
+     * Al principio `clientes` solo guardaba un `direccion` de texto libre:
+     * servía para imprimir en el ticket, nada más. Cuando llegó el
+     * timbrado, el CFDI exige la dirección DESGLOSADA (calle, colonia,
+     * municipio, estado, CP, país) y el régimen fiscal del receptor. Los
+     * primeros esquemas no los tienen y sus ventas no se pueden facturar.
      *
-     * Antes las creaba RecalcularComisiones la primera vez que se usaba el
-     * botón: solo existían en las empresas que ya lo habían presionado y no
-     * aparecían aquí. En las que ya las tienen, IF NOT EXISTS no las toca.
+     * `razon_social` va aparte de `nombre` a propósito. `nombre` es como
+     * le decimos al cliente en el mostrador ("Juan", "Doña Mary"); la
+     * razón social es como aparece en el SAT ("JUAN PÉREZ HERNÁNDEZ" o
+     * "COMERCIALIZADORA DEL VALLE SA DE CV"). Casi siempre son distintos,
+     * y confundirlos produce CFDI rechazados.
+     *
+     * `pais` lleva DEFAULT 'México' porque en la práctica todas las
+     * empresas del sistema son mexicanas y un NULL obligaría a teclearlo
+     * cada vez. Si algún día hay un cliente extranjero, se cambia.
+     *
+     * Todo va NULL salvo el país: un cliente capturado antes de esta
+     * migración no tiene domicilio fiscal capturado, y eso se distingue
+     * de "tiene dirección vacía" — que sería un dato falso. Al facturar
+     * el sistema debe pedir los datos, no inventarlos.
      */
     private static function v16(PDO $db)
     {
-        $db->exec("
-            CREATE TABLE IF NOT EXISTS comision_recalculos (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                creado_en DATETIME NOT NULL,
-                usuario_id INT NULL,
-                usuario_nombre VARCHAR(160) NULL,
-                ventas_revisadas INT NOT NULL DEFAULT 0,
-                ventas_cambiadas INT NOT NULL DEFAULT 0,
-                deshecho_en DATETIME NULL,
-                deshecho_por VARCHAR(160) NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $db->exec("
-            CREATE TABLE IF NOT EXISTS comision_recalculo_ventas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                recalculo_id INT NOT NULL,
-                venta_id INT NOT NULL,
-                antes DECIMAL(12,2) NOT NULL DEFAULT 0,
-                despues DECIMAL(12,2) NOT NULL DEFAULT 0,
-                meses TEXT NULL,
-                huella CHAR(32) NOT NULL,
-                filas_antes MEDIUMTEXT NOT NULL,
-                deshecha TINYINT(1) NOT NULL DEFAULT 0,
-                KEY ix_crv_recalculo (recalculo_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        if (!self::hayTabla($db, 'clientes')) return;
+
+        $columnas = [
+            // Nombre fiscal, va pegado a `nombre` porque son el mismo dato
+            // visto desde dos lados: mostrador vs. SAT.
+            'razon_social'         => "VARCHAR(255) NULL AFTER nombre",
+            // Domicilio desglosado, como lo pide el CFDI 4.0.
+            'calle_numero'         => "VARCHAR(200) NULL",
+            'numero_interior'      => "VARCHAR(200) NULL",
+            'colonia'              => "VARCHAR(200) NULL",
+            'delegacion_municipio' => "VARCHAR(200) NULL",
+            'ciudad'               => "VARCHAR(100) NULL",
+            'estado_direccion'     => "VARCHAR(100) NULL",
+            'pais'                 => "VARCHAR(100) NULL DEFAULT 'México'",
+            'codigo_postal'        => "VARCHAR(10) NULL",
+            // Datos fiscales del receptor.
+            'regimen_fiscal'       => "VARCHAR(10) NULL",   // catálogo SAT c_RegimenFiscal
+            'uso_cfdi'             => "VARCHAR(5) NULL",    // catálogo SAT c_UsoCFDI
+        ];
+
+        foreach ($columnas as $columna => $definicion) {
+            if (self::hayColumna($db, 'clientes', $columna)) continue;
+            try {
+                $db->exec("ALTER TABLE clientes ADD COLUMN `$columna` $definicion");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 16 · clientes.' . $columna . ': ' . $e->getMessage());
+            }
+        }
     }
 
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
@@ -637,6 +650,6 @@ final class Migraciones
         13 => 'Detalle de las operaciones en lote en la bitácora',
         14 => 'Banco del pago con tarjeta o SPEI',
         15 => 'Datos fiscales del comprobante (receptor, uso CFDI, método/forma de pago, importes)',
-        16 => 'Historial de «Recalcular comisiones», para poder deshacerlo',
+        16 => 'Domicilio y datos fiscales del cliente (razón social, CP, régimen, uso CFDI)',
     ];
 }
