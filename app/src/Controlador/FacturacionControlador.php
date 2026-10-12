@@ -23,6 +23,42 @@ use LibertyFin\Vista\Plantilla;
  */
 final class FacturacionControlador
 {
+    /**
+     * Matriz de compatibilidad del catálogo c_UsoCFDI.
+     *
+     * El SAT no acepta cualquier pareja régimen+uso: G03 no existe para
+     * 616, D01-D10 solo son para físicas, y así. Validarlo aquí permite
+     * decirle al usuario "el cliente está mal capturado" en vez de dejar
+     * que el PAC devuelva un rechazo sobre el que nadie sabe qué corregir.
+     *
+     * S01 y CP01 se dejan fuera de la validación por diseño: S01 (sin
+     * efectos fiscales) aplica a cualquier régimen, y CP01 va en
+     * comprobantes tipo P — que este controlador no emite.
+     */
+    private const USOS_VALIDOS = [
+        'G01' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'G02' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'G03' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I01' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I02' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I03' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I04' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I05' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I06' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I07' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'I08' => ['601','603','606','612','620','621','622','623','624','625','626'],
+        'D01' => ['605','606','607','608','611','612','614','615','625'],
+        'D02' => ['605','606','607','608','611','612','614','615','625'],
+        'D03' => ['605','606','607','608','611','612','614','615','625'],
+        'D04' => ['605','606','607','608','611','612','614','615','625'],
+        'D05' => ['605','606','607','608','611','612','614','615','625'],
+        'D06' => ['605','606','607','608','611','612','614','615','625'],
+        'D07' => ['605','606','607','608','611','612','614','615','625'],
+        'D08' => ['605','606','607','608','611','612','614','615','625'],
+        'D09' => ['605','606','607','608','611','612','614','615','625'],
+        'D10' => ['605','606','607','608','611','612','614','615','625'],
+    ];
+
     public function index()
     {
         $db   = Conexion::de($_SESSION['empresa_db']);
@@ -160,6 +196,20 @@ final class FacturacionControlador
             $this->aviso('El cliente no tiene código postal fiscal. El CFDI 4.0 lo exige.', 'error');
         }
 
+        // ── Uso CFDI compatible con el régimen ──────────────────────────
+        // Se resuelve ANTES de armar el payload: si el cliente trae una
+        // pareja inválida (lo más común: G03 con régimen 616), el PAC
+        // rechaza con "La clave del campo UsoCFDI debe corresponder con el
+        // tipo de persona...", que no le dice nada al usuario. Aquí se
+        // sustituye por un valor válido y se reporta en el aviso final.
+        [$usoCfdi, $ajusteUso] = $this->usoValido(
+            (string) ($r['uso_cfdi'] ?? ''),
+            (string) ($r['regimen'] ?? ''),
+            (string) $r['rfc']
+        );
+
+        $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
+
         // ── Importes ────────────────────────────────────────────────────
         // `ventas.iva_modo` dice si `total` ya trae IVA (default 'incluido').
         // El despeje se hace sobre el total para que el CFDI cuadre exacto
@@ -188,7 +238,7 @@ final class FacturacionControlador
             'customer' => [
                 'legal_name' => strtoupper(trim((string) ($r['razon_social'] ?: $venta['cliente']))),
                 'tax_id'     => strtoupper(trim((string) $r['rfc'])),
-                'tax_system' => trim((string) ($r['regimen'] ?: '616')),
+                'tax_system' => $regimenReceptor,
                 'address'    => $address,
                 'email'      => !empty($r['email']) ? $r['email'] : null,
             ],
@@ -201,7 +251,7 @@ final class FacturacionControlador
                     'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
                 ],
             ]],
-            'use'            => trim((string) ($r['uso_cfdi'] ?: 'G03')),
+            'use'            => $usoCfdi,
             'payment_form'   => $this->formaPagoSat((string) ($venta['metodo_pago'] ?? '')),
             'payment_method' => 'PUE',  // el candado de saldo garantiza cobro completo
         ];
@@ -233,7 +283,7 @@ final class FacturacionControlador
             'factura_total'          => $total,
             'factura_rfc_receptor'   => $payload['customer']['tax_id'],
             'factura_razon_social'   => $payload['customer']['legal_name'],
-            'factura_uso_cfdi'       => $payload['use'],
+            'factura_uso_cfdi'       => $usoCfdi,
             'factura_metodo_pago'    => 'PUE',
             'factura_forma_pago'     => $payload['payment_form'],
             'factura_cp_receptor'    => $cpReceptor,
@@ -241,13 +291,15 @@ final class FacturacionControlador
         ]);
 
         // Guardar de vuelta los fiscales capturados, para pre-rellenar la
-        // próxima. No es crítico: si falla, el timbrado ya ocurrió.
+        // próxima. No es crítico: si falla, el timbrado ya ocurrió. Se
+        // guarda el uso que de verdad viajó al PAC, no el que traía el
+        // cliente — así la próxima vez ya sale corregido.
         try {
             $repo->guardarFiscalesCliente((int) $venta['cliente_id'], [
                 'rfc'          => $payload['customer']['tax_id'],
                 'razon_social' => $payload['customer']['legal_name'],
                 'regimen'      => $payload['customer']['tax_system'],
-                'uso_cfdi'     => $payload['use'],
+                'uso_cfdi'     => $usoCfdi,
                 'cp'           => $cpReceptor,
             ]);
         } catch (\Throwable $e) {
@@ -255,11 +307,66 @@ final class FacturacionControlador
                     . "{$venta['cliente_id']}: " . $e->getMessage());
         }
 
+        // Si el uso CFDI se tuvo que ajustar, se avisa para que el dato del
+        // cliente se corrija en su ficha — pero el timbrado ya se hizo.
+        $extra = $ajusteUso !== null
+            ? " Se ajustó el uso CFDI ($ajusteUso). Corrige el régimen/uso del cliente."
+            : '';
         $this->aviso(
             'Venta facturada' . ($sandbox ? ' (PRUEBAS, sin validez fiscal)' : '')
-            . '. UUID: ' . ($d['uuid'] ?? 'pendiente'),
+            . '. UUID: ' . ($d['uuid'] ?? 'pendiente') . $extra,
             'ok'
         );
+    }
+
+    /**
+     * Devuelve un uso CFDI válido para el régimen del receptor.
+     *
+     * No confía en el dato capturado: si la pareja régimen+uso no está en
+     * el catálogo, cae a un valor que sí lo está en vez de mandarla al SAT
+     * y comerse el rechazo. Devuelve [uso_final, motivo_del_ajuste_o_null].
+     *
+     *   · 616 (sin obligaciones fiscales, típico de público en general)
+     *     solo admite S01. Cualquier otro uso revienta.
+     *   · 605 (sueldos) no admite G03 — solo D01-D10.
+     *   · D01-D10 son exclusivos de persona física.
+     */
+    private function usoValido(string $uso, string $regimen, string $rfc): array
+    {
+        $uso     = strtoupper(trim($uso));
+        $regimen = trim($regimen);
+        $rfc     = strtoupper(trim($rfc));
+
+        // RFC genérico -> régimen 616 -> S01, sin discusión. El SAT no
+        // permite otra cosa para el público en general.
+        if ($rfc === 'XAXX010101000' || $rfc === 'XEXX010101000' || $regimen === '616') {
+            $motivo = ($uso !== '' && $uso !== 'S01') ? 'régimen 616 exige S01' : null;
+            return ['S01', $motivo];
+        }
+
+        // Sin uso capturado: el default seguro es G03, que aplica a
+        // cualquier régimen de los que sí lo admiten.
+        if ($uso === '') {
+            return ['G03', 'el cliente no tenía uso CFDI capturado'];
+        }
+
+        $validos = self::USOS_VALIDOS[$uso] ?? null;
+        if ($validos === null) {
+            // Uso desconocido o reservado (CP01 en tipo I, por ejemplo).
+            // No lo adivinamos: cae a G03 si el régimen lo admite.
+            return in_array($regimen, self::USOS_VALIDOS['G03'], true)
+                ? ['G03', "el uso $uso no aplica a este tipo de comprobante"]
+                : ['S01', "el uso $uso no es válido para el régimen $regimen"];
+        }
+        if (!in_array($regimen, $validos, true)) {
+            // La pareja no existe. Para 605 el uso correcto es D01-D10;
+            // para el resto, G03 si se puede; si no, S01.
+            $alt = ($regimen === '605' && str_starts_with($uso, 'G'))
+                ? 'D01'
+                : (in_array($regimen, self::USOS_VALIDOS['G03'], true) ? 'G03' : 'S01');
+            return [$alt, "el uso $uso no es válido con el régimen $regimen"];
+        }
+        return [$uso, null];
     }
 
     /**
