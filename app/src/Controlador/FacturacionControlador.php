@@ -103,6 +103,10 @@ final class FacturacionControlador
      * La venta tiene que estar cobrada al 100% y tener cliente con RFC/CP.
      * El CFDI se emite como PUE (Pago en Una Exhibición): como el candado
      * de saldo ya exigió cobro completo, no hay rama PPD.
+     *
+     * Cada partida de `venta_detalles` viaja como un concepto independiente
+     * del CFDI, con su cantidad y precio unitario reales. El total del CFDI
+     * se recalcula desde esas partidas para que cuadre consigo mismo.
      */
     public function timbrar($id)
     {
@@ -196,14 +200,64 @@ final class FacturacionControlador
 
         $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
 
-        // ── Importes ────────────────────────────────────────────────────
-        $total = (float) $venta['total'];
-        if (($venta['iva_modo'] ?? 'incluido') === 'incluido') {
-            $subtotal = round($total / 1.16, 2);
-        } else {
-            $subtotal = (float) $venta['subtotal'];
+        // ── Partidas reales de la venta ─────────────────────────────────
+        // Cada línea de venta_detalles viaja como un concepto independiente
+        // del CFDI, con su cantidad y precio unitario. El total se recalcula
+        // desde aquí para que el CFDI cuadre consigo mismo.
+        $lineas = $repo->lineas($id);
+        if (!$lineas) {
+            $this->aviso('La venta no tiene partidas capturadas. No hay qué facturar.', 'error');
         }
-        $iva = round($total - $subtotal, 2);
+
+        $ivaIncluido = (($venta['iva_modo'] ?? 'incluido') === 'incluido');
+
+        $items    = [];
+        $subtotal = 0.0;
+
+        foreach ($lineas as $l) {
+            $cant = (float) ($l['cantidad'] ?? 1);
+            if ($cant <= 0) { $cant = 1; }
+
+            // Precio unitario: intenta las variantes comunes antes de
+            // derivarlo del subtotal. El schema no es uniforme, así que
+            // no lo asumimos.
+            if (isset($l['precio_unitario'])) {
+                $precio = (float) $l['precio_unitario'];
+            } elseif (isset($l['precio'])) {
+                $precio = (float) $l['precio'];
+            } elseif (isset($l['precio_venta'])) {
+                $precio = (float) $l['precio_venta'];
+            } else {
+                $precio = (float) ($l['subtotal'] ?? 0) / $cant;
+            }
+
+            // Facturapi aplica IVA ENCIMA del `price`. Si el precio de la
+            // venta ya lo trae, lo descontamos para no timbrar doble.
+            if ($ivaIncluido) {
+                $precio = round($precio / 1.16, 2);
+            }
+
+            // Descripción: preferimos la capturada en la partida; si no,
+            // el nombre del producto del catálogo; si no, un genérico.
+            $desc = $l['descripcion'] ?? $l['concepto'] ?? $l['producto'] ?? 'Servicios prestados';
+
+            $items[] = [
+                'quantity' => $cant,
+                'product'  => [
+                    'description' => trim((string) $desc),
+                    'product_key' => (string) ($l['clave_prodserv'] ?? '84111506'),
+                    'unit_key'    => (string) ($l['clave_unidad']  ?? 'E48'), // E48 = Unidad de servicio
+                    'price'       => $precio,
+                    'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
+                ],
+            ];
+            $subtotal += $precio * $cant;
+        }
+
+        // Totales derivados de las partidas: así el CFDI cuadra consigo mismo.
+        $subtotal = round($subtotal, 2);
+        $iva      = round($subtotal * 0.16, 2);
+        $total    = round($subtotal + $iva, 2);
 
         $cpReceptor = trim((string) $r['cp']);
 
@@ -222,15 +276,7 @@ final class FacturacionControlador
                 'address'    => $address,
                 'email'      => !empty($r['email']) ? $r['email'] : null,
             ],
-            'items' => [[
-                'quantity' => 1,
-                'product'  => [
-                    'description' => trim((string) ($venta['descripcion'] ?: 'Servicios prestados')),
-                    'product_key' => '84111506',   // Servicios de facturación
-                    'price'       => $total,
-                    'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
-                ],
-            ]],
+            'items'          => $items,               // 👈 una entrada por partida
             'use'            => $usoCfdi,
             'payment_form'   => $this->formaPagoSat((string) ($venta['metodo_pago'] ?? '')),
             'payment_method' => 'PUE',
@@ -293,7 +339,7 @@ final class FacturacionControlador
         );
     }
 
-        /**
+    /**
      * Descarga el XML o PDF de una venta ya facturada.
      *
      * Solo admin: el CFDI tiene los datos fiscales completos del receptor
