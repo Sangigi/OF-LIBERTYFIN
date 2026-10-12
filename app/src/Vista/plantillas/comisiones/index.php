@@ -92,7 +92,20 @@ if (!empty($recalculo) && !$recalculo['deshecho_en'] && $recalculo['ventas']):
               <span style="display:inline-block;margin-right:8px;white-space:nowrap;
                     color:<?= $dif > 0 ? 'var(--lf-amb)' : 'var(--lf-brand-2)' ?>">
                 <?= P::e($mesCorto($ym)) ?> <?= $dif > 0 ? '+' : '−' ?><?= D::pesos(abs($dif)) ?></span>
-            <?php endforeach; ?></td>
+            <?php endforeach; ?>
+            <?php /* Entre quiénes: se dice siempre que cambie, aunque el mes no. */
+            if (!empty($x['personas'])): ?>
+              <span style="display:block;margin-top:3px;color:var(--lf-tinta-3)">
+                <?= implode(' · ', array_map(function ($n, $d) {
+                      return P::e($n ?: 'Sin nombre') . ' ' . ($d > 0 ? '+' : '−') . D::pesos(abs($d));
+                    }, array_keys($x['personas']), $x['personas'])) ?></span>
+            <?php elseif (!$x['meses'] && $x['pagos']): ?>
+              <span style="color:var(--lf-tinta-3)">Mismo total y mismo mes: solo se reacomodó entre
+                <?= (int)$x['pagos'] ?> pagos de la venta. No cambia ningún reporte.</span>
+            <?php elseif (!$x['meses']): ?>
+              <span style="color:var(--lf-tinta-3)">Mismos montos; solo se rehicieron sus registros.
+                No cambia ningún reporte.</span>
+            <?php endif; ?></td>
         </tr>
       <?php endforeach; ?>
       </tbody>

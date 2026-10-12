@@ -193,7 +193,7 @@ final class RecalcularComisiones
         } catch (\Throwable $e) { return null; }
         if (!$r) return null;
         $st = $this->db->prepare("
-            SELECT cv.venta_id, cv.antes, cv.despues, cv.meses, cv.deshecha,
+            SELECT cv.venta_id, cv.antes, cv.despues, cv.meses, cv.deshecha, cv.huella, cv.filas_antes,
                    v.codigo_venta AS folio, COALESCE(c.nombre, 'Público general') AS cliente
             FROM comision_recalculo_ventas cv
             INNER JOIN ventas v   ON v.id = cv.venta_id
@@ -202,9 +202,31 @@ final class RecalcularComisiones
             ORDER BY ABS(cv.despues - cv.antes) DESC, cv.venta_id");
         $st->execute([(int)$r['id']]);
         $r['ventas'] = $st->fetchAll();
-        foreach ($r['ventas'] as &$x) $x['meses'] = json_decode((string)$x['meses'], true) ?: [];
+        foreach ($r['ventas'] as &$x) {
+            $x['meses'] = json_decode((string)$x['meses'], true) ?: [];
+            // QUÉ CAMBIÓ DENTRO DE LA VENTA, cuando el total y los meses quedan
+            // igual: entre qué personas o entre qué pagos se reacomodó. Se
+            // compara lo guardado con lo de hoy, solo si la venta sigue como
+            // la dejó el recálculo (si no, "hoy" ya trae otros cambios).
+            $antes = json_decode((string)$x['filas_antes'], true) ?: [];
+            $ahora = $this->filas($x['venta_id']);
+            $x['al_dia']   = self::huella($ahora) === $x['huella'];
+            $x['personas'] = $x['al_dia'] ? self::diferencias($antes, $ahora, 'colaborador_nombre') : [];
+            $x['pagos']    = $x['al_dia'] ? count(self::diferencias($antes, $ahora, 'pago_id')) : 0;
+            unset($x['filas_antes'], $x['huella']);
+        }
         unset($x);
         return $r;
+    }
+
+    /** Cuánto cambió cada valor de `$campo` (persona, pago…): [valor => diferencia]. */
+    private static function diferencias(array $antes, array $despues, $campo)
+    {
+        $d = [];
+        foreach ($antes as $f)   { $k = (string)($f[$campo] ?? ''); $d[$k] = ($d[$k] ?? 0) - (float)$f['monto']; }
+        foreach ($despues as $f) { $k = (string)($f[$campo] ?? ''); $d[$k] = ($d[$k] ?? 0) + (float)$f['monto']; }
+        return array_filter(array_map(function ($x) { return round($x, 2); }, $d),
+                            function ($x) { return abs($x) >= 0.005; });
     }
 
     private function filas($ventaId)

@@ -191,9 +191,14 @@ final class Reportes
                      ['Cobros anteriores', Libro::NUMERO, 11],
                      ['De ventas anteriores', Libro::MONEDA, 16]],
                     $filas,
-                    $this->sumar($f, ['veces','facturado'],
-                        function ($t) use ($ant) { return ['TOTAL', (int)$t['veces'], $t['facturado'],
-                            (int)$ant['cobros'], (float)$ant['monto']]; }));
+                    // El TOTAL sale del resumen, no de sumar la columna: cada
+                    // producto redondea su parte de la venta y la suma podía
+                    // diferir en un centavo de lo vendido.
+                    $this->sumar($f, ['veces'],
+                        function ($t) use ($ant, $r, $desde, $hasta) {
+                            $res = $r->resultado($desde, $hasta);
+                            return ['TOTAL', (int)$t['veces'], $res['vendido'],
+                                (int)$ant['cobros'], $res['de_anteriores']]; }));
 
             case 'cliente':
                 // Igual: sus compras del periodo y lo que pagó de compras de

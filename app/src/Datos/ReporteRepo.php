@@ -507,19 +507,39 @@ final class ReporteRepo extends Repo
             GROUP BY area ORDER BY cobrado DESC", [$a, $b, $a, $b]);
     }
 
-    public function porServicio($desde, $hasta, $tope = 12)
+    /**
+     * Lo vendido por producto. `$tope` = 0: todos (el reporte); con número,
+     * los que más venden (la gráfica de la pantalla).
+     *
+     * SE REPARTE `v.total`, COMO EN porAreaVentas(). Antes se sumaba el
+     * precio de cada renglón, y ese precio no siempre es lo mismo: con IVA
+     * incluido el renglón ya lo trae y con IVA agregado no (se suma aparte en
+     * la venta), y los descuentos de la venta no están en sus renglones. En
+     * septiembre de 2026 daba $255.85 menos que las ventas: el IVA de una
+     * venta con IVA agregado. Además se perdían las ventas sin renglones o
+     * con un renglón sin producto (ahora van en "Sin producto"), y el
+     * reporte salía cortado a los 12 que más vendían. El renglón decide solo
+     * la PROPORCIÓN; así el reporte suma lo mismo que las ventas.
+     */
+    public function porServicio($desde, $hasta, $tope = 0)
     {
         list($a, $b) = $this->rango($desde, $hasta);
+        $peso = self::PESO;
         return $this->todos("
-            SELECT p.id AS producto_id, p.nombre, p.codigo,
-                   COUNT(*) AS veces,
-                   SUM(vd.subtotal) AS facturado
-            FROM venta_detalles vd
-            INNER JOIN ventas v    ON v.id = vd.venta_id
-            INNER JOIN productos p ON p.id = vd.producto_id
+            SELECT COALESCE(p.id, 0)                 AS producto_id,
+                   COALESCE(p.nombre, 'Sin producto') AS nombre,
+                   COALESCE(p.codigo, '')            AS codigo,
+                   COUNT(*)                          AS veces,
+                   ROUND(SUM(v.total * ({$peso})), 2) AS facturado
+            FROM ventas v
+            LEFT JOIN venta_detalles d ON d.venta_id = v.id
+            LEFT JOIN productos p      ON p.id = d.producto_id
+            LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                        FROM venta_detalles GROUP BY venta_id ) tot
+                   ON tot.venta_id = v.id
             WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
-            GROUP BY p.id, p.nombre, p.codigo
-            ORDER BY facturado DESC LIMIT " . (int)$tope, [$a, $b]);
+            GROUP BY COALESCE(p.id, 0), COALESCE(p.nombre, 'Sin producto'), COALESCE(p.codigo, '')
+            ORDER BY facturado DESC" . ((int)$tope > 0 ? " LIMIT " . (int)$tope : ''), [$a, $b]);
     }
 
     public function porMetodo($desde, $hasta)
@@ -789,20 +809,25 @@ final class ReporteRepo extends Repo
     public function servicioAnteriores($desde, $hasta)
     {
         list($a, $b) = $this->rango($desde, $hasta);
-        $peso = "CASE WHEN tot.suma = 0 THEN 1.0 / tot.n ELSE d.subtotal / tot.suma END";
+        // Como porServicio(): las ventas sin renglones o con un renglón sin
+        // producto van en "Sin producto" en vez de perderse, así esta columna
+        // suma lo mismo que "De lo que entró…" (deAnteriores()).
+        $peso = self::PESO;
         $filas = $this->todos("
-            SELECT p.id AS producto_id, p.nombre, p.codigo,
+            SELECT COALESCE(p.id, 0)                 AS producto_id,
+                   COALESCE(p.nombre, 'Sin producto') AS nombre,
+                   COALESCE(p.codigo, '')            AS codigo,
                    COUNT(DISTINCT pa.id)                    AS cobros,
                    ROUND(SUM(pa.monto * ({$peso})), 2)      AS monto
             FROM venta_pagos pa
-            INNER JOIN ventas v         ON v.id = pa.venta_id
-            INNER JOIN venta_detalles d ON d.venta_id = v.id
-            INNER JOIN productos p      ON p.id = d.producto_id
-            INNER JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
-                         FROM venta_detalles GROUP BY venta_id ) tot ON tot.venta_id = v.id
+            INNER JOIN ventas v        ON v.id = pa.venta_id
+            LEFT JOIN venta_detalles d ON d.venta_id = v.id
+            LEFT JOIN productos p      ON p.id = d.producto_id
+            LEFT JOIN ( SELECT venta_id, SUM(subtotal) suma, COUNT(*) n
+                        FROM venta_detalles GROUP BY venta_id ) tot ON tot.venta_id = v.id
             WHERE pa.cancelado = 0 AND v.estado <> 'cancelada'
               AND pa.fecha_pago >= ? AND pa.fecha_pago < ? AND v.fecha < ?
-            GROUP BY p.id, p.nombre, p.codigo
+            GROUP BY COALESCE(p.id, 0), COALESCE(p.nombre, 'Sin producto'), COALESCE(p.codigo, '')
             ORDER BY monto DESC", [$a, $b, $a]);
         // Un cobro de una venta con dos productos cuenta en los dos renglones:
         // el total de cobros se cuenta aparte, sin repetir.
@@ -811,8 +836,7 @@ final class ReporteRepo extends Repo
             FROM venta_pagos pa
             INNER JOIN ventas v ON v.id = pa.venta_id
             WHERE pa.cancelado = 0 AND v.estado <> 'cancelada'
-              AND pa.fecha_pago >= ? AND pa.fecha_pago < ? AND v.fecha < ?
-              AND EXISTS (SELECT 1 FROM venta_detalles dx WHERE dx.venta_id = v.id)",
+              AND pa.fecha_pago >= ? AND pa.fecha_pago < ? AND v.fecha < ?",
             [$a, $b, $a]) ?: ['cobros' => 0];
         $r = [];
         foreach ($filas as $f) $r[(int)$f['producto_id']] = $f;
