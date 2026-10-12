@@ -59,4 +59,19 @@ final class Facturapi
     {
         return $this->peticion('invoices', 'POST', $payload);
     }
+
+        /**
+     * Descarga el XML o PDF de una factura ya timbrada.
+     *
+     * Facturapi responde con un 302 al binario real; el FOLLOWLOCATION
+     * que ya está puesto en peticion() lo sigue solo. El `body` que
+     * devuelve es el binario, no JSON.
+     *
+     * @return array{body:string, json:?array, http:int, error:string}
+     */
+    public function descargarFactura(string $facturapiId, string $tipo): array
+    {
+        $tipo = $tipo === 'xml' ? 'xml' : 'pdf';
+        return $this->peticion("invoices/{$facturapiId}/{$tipo}", 'GET');
+    }
 }

@@ -93,6 +93,7 @@ final class FacturacionControlador
             'totalV'     => $totalV,
             'desde'      => $desde, 'hasta' => $hasta,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
+            'esAdmin'    => (($_SESSION['rol'] ?? $_SESSION['lf_rol'] ?? '') === 'admin'),
         ]);
         unset($_SESSION['lf_aviso']);
     }
@@ -291,6 +292,108 @@ final class FacturacionControlador
             . '. UUID: ' . ($d['uuid'] ?? 'pendiente') . $extra,
             'ok'
         );
+    }
+
+        /**
+     * Descarga el XML o PDF de una venta ya facturada.
+     *
+     * Solo admin: el CFDI tiene los datos fiscales completos del receptor
+     * y no hay razón para que un cajero se los baje. Si más adelante
+     * quieres que el cajero también pueda, se cambia el `if` del rol.
+     *
+     * El `tipo` viene por URL: ?tipo=pdf (default) o ?tipo=xml.
+     */
+    public function descargarCfdi($id)
+    {
+        $id = (int) $id;
+
+        // ── Rol: solo admin ─────────────────────────────────────────────
+        $rol = (string) ($_SESSION['rol'] ?? $_SESSION['lf_rol'] ?? '');
+        if ($rol !== 'admin') {
+            http_response_code(403);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('No tienes permiso para descargar facturas.');
+        }
+
+        $db   = Conexion::de($_SESSION['empresa_db']);
+        $repo = new VentaRepo($db);
+
+        $venta = $repo->detalle($id);
+        if (!$venta) {
+            http_response_code(404);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('Venta no encontrada.');
+        }
+        if (empty($venta['factura_uuid'])) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('Esta venta no está facturada.');
+        }
+        $facturapiId = trim((string) ($venta['facturapi_receipt_id'] ?? ''));
+        if ($facturapiId === '') {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('La venta está marcada como facturada pero no tiene ID del PAC guardado.');
+        }
+
+        // ── Tipo de archivo ─────────────────────────────────────────────
+        $tipo = strtolower(trim((string) ($_GET['tipo'] ?? 'pdf')));
+        if (!in_array($tipo, ['xml', 'pdf'], true)) {
+            http_response_code(400);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('El tipo debe ser xml o pdf.');
+        }
+
+        // ── Credenciales del PAC ────────────────────────────────────────
+        $fac = Integraciones::de('facturapi');
+        $sandbox = !empty($fac['sandbox']);
+        $clave = $sandbox
+            ? trim((string) ($fac['llave_prueba'] ?? ''))
+            : trim((string) ($fac['llave'] ?? ''));
+        if ($clave === '' && $sandbox) {
+            $clave = trim((string) ($fac['llave'] ?? ''));
+        }
+        if ($clave === '') {
+            http_response_code(500);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('Facturapi sin credenciales configuradas.');
+        }
+
+        // ── Descarga ────────────────────────────────────────────────────
+        $cli = new Facturapi($clave, (string) ($fac['organizacion'] ?? ''));
+        $res = $cli->descargarFactura($facturapiId, $tipo);
+
+        if ($res['error'] !== '') {
+            error_log("Facturapi cURL descarga (venta {$id}, {$tipo}): " . $res['error']);
+            http_response_code(502);
+            header('Content-Type: text/plain; charset=UTF-8');
+            exit('Error de red al contactar al PAC.');
+        }
+        if ($res['http'] !== 200) {
+            error_log("Facturapi HTTP {$res['http']} descarga (venta {$id}, {$tipo}): "
+                    . substr($res['body'], 0, 500));
+            http_response_code(
+                $res['http'] >= 400 && $res['http'] < 600 ? $res['http'] : 502
+            );
+            header('Content-Type: text/plain; charset=UTF-8');
+            // Si el PAC devolvió JSON con mensaje, mostrarlo; si no, el código.
+            $msg = $res['json']['message']
+                 ?? "El PAC rechazó la descarga (HTTP {$res['http']}).";
+            exit($msg);
+        }
+
+        // ── Streaming al navegador ──────────────────────────────────────
+        // El filename usa el UUID (no el ID de Facturapi) porque es lo que
+        // el cliente reconoce y lo que va en el expediente fiscal.
+        $mime     = $tipo === 'pdf' ? 'application/pdf' : 'application/xml; charset=UTF-8';
+        $filename = 'cfdi-' . $venta['factura_uuid'] . '.' . $tipo;
+
+        header('Content-Type: ' . $mime);
+        header('Content-Disposition: attachment; filename="' . $filename . '"');
+        header('Content-Length: ' . strlen($res['body']));
+        header('Cache-Control: no-cache, must-revalidate');
+        echo $res['body'];
+        exit;
     }
 
     /**

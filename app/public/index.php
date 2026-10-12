@@ -148,6 +148,7 @@ $r->post('/ligas/aprobar', ['LibertyFin\Controlador\LigasControlador', 'aprobar'
 if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
     $r->get('/facturacion',              ['LibertyFin\Controlador\FacturacionControlador', 'index']);
     $r->get('/facturacion/{id}/timbrar', ['LibertyFin\Controlador\FacturacionControlador', 'timbrar']);
+    $r->get('/facturacion/{id}/descargar', ['LibertyFin\Controlador\FacturacionControlador', 'descargarCfdi']);
 }
 
 // Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
