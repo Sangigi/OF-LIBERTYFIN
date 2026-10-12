@@ -3927,3 +3927,34 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 /* El renglón de totales, con el mismo aire que los demás (sin esto el
    "Total" y sus cifras quedaban corridos respecto a las columnas). */
 .table > tfoot > tr > td,.table > tfoot > tr > th{padding:13px 14px;font-size:13px;vertical-align:middle}
+
+/* Reportes · De dónde a dónde: nombre | barra | monto. La barra ocupa el
+   hueco que quedaba entre el nombre y el monto y dice qué parte de lo que
+   entró se llevó cada renglón (todas sobre la misma base: Cobrado = 100%).
+   Gris para lo que salió, color de marca para lo que entró y lo que queda. */
+.lf-dd .lf-dd-nom{width:32%}
+.lf-dd .lf-dd-monto{width:1%;white-space:nowrap;padding-left:20px}
+.lf-dd .lf-dd-parte{padding-left:8px;padding-right:8px}
+.lf-dd-barra{display:flex;align-items:center;gap:10px}
+.lf-dd-barra .lf-prog{flex:1;margin:0;height:6px}
+.lf-dd-barra.sal .lf-prog > i{background:var(--lf-tinta-4)}
+.lf-dd-barra.neg .lf-prog > i{background:var(--lf-rojo)}
+.lf-dd-barra > b{font-family:var(--lf-mono);font-size:11.5px;font-weight:600;
+  color:var(--lf-tinta-3);min-width:44px;text-align:right}
+/* Línea gruesa antes de "Queda" (en el <tr> no se pinta: la tabla usa
+   border-collapse:separate). */
+.lf-dd tr:has(+ tr.lf-dd-total) > td{border-bottom:0}
+.lf-dd tr.lf-dd-total > td{border-top:2px solid var(--lf-linea)}
+/* En el celular no hay hueco que llenar: nombre y monto arriba, la barra
+   a todo lo ancho abajo. */
+@media(max-width:600px){
+  .lf-dd,.lf-dd tbody{display:block}
+  .lf-dd tr{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:14px;
+    align-items:center;padding:12px 0;border-bottom:1px solid var(--lf-linea)}
+  .lf-dd tr:has(+ tr.lf-dd-total){border-bottom:0}
+  .lf-dd tr.lf-dd-total{border-top:2px solid var(--lf-linea);border-bottom:0}
+  .lf-dd > tbody > tr > td,.lf-dd tr.lf-dd-total > td,
+  .lf-dd .lf-dd-nom,.lf-dd .lf-dd-monto{padding:0;border:0;width:auto}
+  .lf-dd .lf-dd-parte{grid-column:1 / -1;grid-row:2;padding:8px 0 0}
+  .lf-dd .lf-dd-parte:empty{display:none}
+}

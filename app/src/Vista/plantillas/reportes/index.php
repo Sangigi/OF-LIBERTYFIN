@@ -63,7 +63,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         Parte del dinero que entró, no de lo facturado</p></div>
   </header>
   <div class="card-body">
-    <table class="table" style="margin-bottom:0">
+    <table class="table lf-dd" style="margin-bottom:0">
       <tbody>
         <?php
         // Gastos generales solo si hay: una empresa que no los registra veía
@@ -76,18 +76,33 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
           ['Comisiones',          -$r['comisiones'],   'a', 'devengadas por lo cobrado'],
           ['IVA',                 -$r['iva_cobrado'],  'a', 'el que viene incluido en lo cobrado'],
         ]));
+        // La barra de en medio: qué parte de lo que entró se llevó cada
+        // renglón. Todas contra la misma base (Cobrado = 100%), así que las
+        // salidas más lo que queda suman la barra de Cobrado. Antes ese
+        // espacio era un hueco entre el nombre y el monto.
+        $parte = function ($monto, $clase) use ($r) {
+            if ($r['cobrado'] <= 0) return '';
+            $p   = abs($monto) / $r['cobrado'] * 100;
+            $txt = ($p > 0 && $p < 0.05) ? '<0.1' : preg_replace('/\.0$/', '', number_format($p, 1));
+            $txt = ($monto < 0 && $clase === 'neg' ? '−' : '') . $txt . '%';
+            return '<div class="lf-dd-barra ' . $clase . '" title="' . P::e($txt . ' de lo que entró') . '">'
+                 . '<span class="lf-prog"><i style="--w:' . round(min(100, $p), 2) . '%"></i></span>'
+                 . '<b>' . P::e($txt) . '</b></div>';
+        };
         foreach ($lineas as $l): list($n,$v,$t,$nota) = $l; ?>
           <tr>
-            <td style="width:44%"><b style="font-weight:600"><?= P::e($n) ?></b>
+            <td class="lf-dd-nom"><b style="font-weight:600"><?= P::e($n) ?></b>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px"><?= P::e($nota) ?></span></td>
-            <td class="text-end lf-mono" style="font-weight:700;font-size:15px;
+            <td class="lf-dd-parte"><?= $parte($v, $t === 'a' ? 'sal' : '') ?></td>
+            <td class="text-end lf-mono lf-dd-monto" style="font-weight:700;font-size:15px;
                 color:<?= $t==='a'?'var(--lf-tinta-3)':'var(--lf-brand-2)' ?>">
               <?= ($v<0?'−':'') . D::pesos(abs($v)) ?></td>
           </tr>
         <?php endforeach; ?>
-        <tr style="border-top:2px solid var(--lf-linea)">
-          <td><b style="font-weight:700;font-size:15px">Queda</b></td>
-          <td class="text-end lf-mono" style="font-weight:800;font-size:21px;letter-spacing:-.6px;
+        <tr class="lf-dd-total">
+          <td class="lf-dd-nom"><b style="font-weight:700;font-size:15px">Queda</b></td>
+          <td class="lf-dd-parte"><?= $parte($r['queda'], $r['queda'] >= 0 ? '' : 'neg') ?></td>
+          <td class="text-end lf-mono lf-dd-monto" style="font-weight:800;font-size:21px;letter-spacing:-.6px;
               color:<?= $r['queda']>=0?'var(--lf-brand-2)':'var(--lf-rojo)' ?>">
             <?= D::pesos($r['queda']) ?></td>
         </tr>
