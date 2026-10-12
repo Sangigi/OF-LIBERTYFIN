@@ -3896,3 +3896,17 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
    !important: sin esto, en la computadora salía un botón que no hacía
    nada (la columna de detalles ya está a la vista). */
 @media(min-width:941px){ .lf-ver-detalles{display:none!important} }
+
+/* Reportes · Por área: el detalle chico bajo cada monto (de dónde salió) y
+   la fila Total, que es la misma cifra del resultado de arriba. */
+.lf-tabla-areas .lf-ant-val b{display:block;font-weight:700}
+.lf-tabla-areas .lf-ant-val small{display:block;margin-top:1px;font-size:10.5px;font-weight:400;
+  line-height:1.4;color:var(--lf-tinta-4);font-family:var(--lf-font)}
+.lf-tabla-areas .lf-ant-val small.ant{color:var(--lf-amb)}
+.lf-tabla-areas tfoot td{border-top:2px solid var(--lf-linea);background:var(--lf-vidrio);font-weight:600}
+@media(max-width:576px){
+  .table-responsive.lf-cards tfoot{display:block}
+  .lf-tabla-areas tfoot tr{border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+    padding:10px 12px;background:var(--lf-vidrio)}
+  .lf-tabla-areas tfoot td{background:none;border-top:0}
+}

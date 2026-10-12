@@ -276,6 +276,25 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         <?php elseif (!$conBase): ?>
           <p style="font-size:13px;color:var(--lf-amb);margin:0">
             Esta venta no deja base comisionable: los gastos se comen la utilidad.</p>
+        <?php else:
+          /* Lo ya repartido de cada producto: las comisiones vivas de ese
+             producto y las viejas que van sobre toda la venta. Entre todos no
+             puede pasar de 100% (lo revisa AsignarComision al guardar); aquí
+             se dice antes, para no enterarse con el error. */
+          $idsLinea = array_map(function ($b) { return (int)$b['id']; }, $bases);
+          $repartido = function ($detId) use ($comisiones, $idsLinea) {
+              $s = 0.0;
+              foreach ($comisiones as $c) {
+                  $d = (int)($c['venta_detalle_id'] ?? 0);
+                  if ($d === (int)$detId || !$d || !in_array($d, $idsLinea, true)) $s += (float)$c['pct'];
+              }
+              return round($s, 2);
+          };
+          $pctTxt = function ($x) { return rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.'); };
+          $ya = $varios ? null : $repartido(reset($bases)['id']); ?>
+        <?php if (!$varios && $ya >= 99.999): ?>
+          <p style="font-size:13px;color:var(--lf-amb);margin:0">
+            Las comisiones de esta venta ya suman el 100%: no queda nada por repartir.</p>
         <?php else: ?>
         <form method="post" action="/ventas/<?= (int)$v['id'] ?>/comision"
               class="lf-campos" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
@@ -285,10 +304,12 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
             <label class="form-label">Producto</label>
             <select class="form-select" name="detalle" id="selDet" required>
               <option value="">Elegir…</option>
-              <?php foreach ($bases as $b): ?>
+              <?php foreach ($bases as $b): $yaB = $repartido($b['id']); $lleno = $yaB >= 99.999; ?>
                 <option value="<?= (int)$b['id'] ?>" data-base="<?= P::e(number_format($b['base'], 2, '.', '')) ?>"
-                        <?= $b['base'] > 0 ? '' : 'disabled' ?>>
-                  <?= P::e($b['producto']) ?> · <?= $b['base'] > 0 ? 'base ' . D::pesos($b['base']) : 'sin base comisionable' ?></option>
+                        data-libre="<?= P::e($pctTxt(max(0, 100 - $yaB))) ?>"
+                        <?= $b['base'] > 0 && !$lleno ? '' : 'disabled' ?>>
+                  <?= P::e($b['producto']) ?> · <?= $b['base'] > 0 ? 'base ' . D::pesos($b['base']) : 'sin base comisionable' ?><?=
+                      $yaB > 0 ? ' · repartido ' . $pctTxt($yaB) . '%' : '' ?></option>
               <?php endforeach; ?>
             </select>
           </div>
@@ -311,7 +332,8 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
           <div style="width:118px">
             <label class="form-label">Porcentaje</label>
             <input class="form-control lf-mono" type="number" name="pct" id="inpPct"
-                   step="0.01" min="0.01" max="100" placeholder="0.00" required>
+                   step="0.01" min="0.01" max="<?= $varios ? 100 : P::e($pctTxt(100 - $ya)) ?>"
+                   placeholder="0.00" required>
           </div>
           <div style="width:128px">
             <label class="form-label">Le tocarían</label>
@@ -321,9 +343,15 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
           <button class="btn btn-primary" type="submit">Asignar</button>
         </form>
         <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px">
+          <?php if (!$varios && $ya > 0): ?>
+            <b style="color:var(--lf-tinta-2)">Ya está repartido el <?= $pctTxt($ya) ?>%: quedan
+              <?= $pctTxt(100 - $ya) ?>% por asignar.</b><br>
+          <?php endif; ?>
           El porcentaje se sugiere solo con el que ese colaborador suele cobrar.
-          Nadie puede tener dos comisiones <?= $varios ? 'en el mismo producto' : 'en la misma venta' ?>.
+          Nadie puede tener dos comisiones <?= $varios ? 'en el mismo producto' : 'en la misma venta' ?>,
+          y entre todas no pueden pasar del 100% de <?= $varios ? 'cada producto' : 'la venta' ?>.
         </p>
+        <?php endif; ?>
         <?php endif; ?>
       </div>
     </section>
@@ -436,7 +464,12 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
       : '$' + (Math.round(b * p) / 100).toLocaleString('es-MX',
               {minimumFractionDigits:2, maximumFractionDigits:2});
   }
-  if (det) det.addEventListener('change', pintar);
+  // Con varios productos, el tope del porcentaje es lo que queda de ESE producto.
+  if (det) det.addEventListener('change', function(){
+    var o = det.options[det.selectedIndex];
+    pct.max = o && o.dataset.libre ? o.dataset.libre : 100;
+    pintar();
+  });
   sel.addEventListener('change', function(){
     var o = sel.options[sel.selectedIndex];
     if (o && o.dataset.pct) pct.value = o.dataset.pct;

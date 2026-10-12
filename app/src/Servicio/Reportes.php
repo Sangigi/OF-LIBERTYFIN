@@ -19,14 +19,14 @@ final class Reportes
     const TIPOS = [
         'area' => [
             'rotulo' => 'Por área',
-            'nota'   => 'El área sale del producto contratado, no del cliente. Una venta con '
-                      . 'productos de dos áreas reparte su dinero entre las dos. «De ventas '
-                      . 'anteriores» es lo que entró en el periodo (anticipos, abonos y liquidaciones) '
-                      . 'por ventas de antes del periodo; no suma a la utilidad, que es de las ventas '
-                      . 'del periodo. «Ventas liquidadas» cuenta las ventas de antes que quedaron '
-                      . 'pagadas en el periodo: no son ventas nuevas. Un cobro repartido entre dos '
-                      . 'áreas cuenta en las dos. «Comisiones de anteriores» es lo que generaron '
-                      . 'esos cobros: cuenta en este periodo, como el dinero.',
+            'nota'   => 'El resultado de cada área en el periodo: todo lo que entró, sus gastos y '
+                      . 'las comisiones que generó. Suma lo mismo que «Queda» (sin los gastos '
+                      . 'generales, que no son de ningún área). «Cobrado» junta lo de las ventas '
+                      . 'nuevas y lo de ventas anteriores (anticipos, abonos y liquidaciones que '
+                      . 'llegaron en el periodo); «Liquidaciones» son los cobros que dejaron pagada '
+                      . 'una venta anterior: son parte de «Cobros anteriores», no aparte. El área sale '
+                      . 'del producto contratado, no del cliente; una venta con productos de dos '
+                      . 'áreas reparte su dinero entre las dos, y un cobro repartido cuenta en las dos.',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
@@ -76,13 +76,16 @@ final class Reportes
             'nota'   => 'Una venta por renglón: las hechas en el periodo y, al final y marcadas, las de '
                       . 'antes que tuvieron anticipos, abonos o liquidaciones en él. «Cobrado en el '
                       . 'periodo» es lo que entró de cada una: sumado da lo mismo que «Entraron». '
-                      . 'Cada cobro, uno por uno, está en «Detalle de pagos».',
+                      . 'Gastos, comisión y «Queda» también son del periodo (el gasto cuenta en el mes '
+                      . 'de la venta; la comisión, en el del cobro que la generó): el total da lo mismo '
+                      . 'que el resultado de arriba. Cada cobro, uno por uno, está en «Detalle de pagos».',
         ],
         'desglose' => [
             'rotulo' => 'Desglose por área',
             'nota'   => 'Una tabla por área, con el producto y el especialista de cada '
                       . 'renglón. Contabilidad se parte en personas físicas y morales. Cada área '
-                      . 'trae también, marcadas, las ventas de antes con cobros en el periodo.',
+                      . 'trae también, marcadas, las ventas de antes con cobros en el periodo. '
+                      . 'Gastos, comisión y «Queda» son del periodo, igual que en el Detalle de ventas.',
         ],
     ];
 
@@ -100,56 +103,58 @@ final class Reportes
 
         switch ($tipo) {
             case 'area':
-                // Al final, aparte de la utilidad: lo que entró en el periodo
-                // por ventas de meses anteriores, de cada área. Son columnas y
-                // no subrenglones: así el Excel se puede sumar, filtrar y
-                // ordenar, y la hoja impresa sigue siendo una fila por área.
+                // EL RESULTADO DE CADA ÁREA EN EL PERIODO, con el criterio
+                // del resumen: lo que entró (de ventas nuevas y de ventas
+                // anteriores), sus gastos y TODAS las comisiones que generó.
+                // Antes "Utilidad" era solo de las ventas nuevas y lo de
+                // ventas anteriores iba aparte sin restarse: el área se veía
+                // mejor de lo que fue y las filas no sumaban "Queda".
+                // Son columnas y no subrenglones: así el Excel se puede
+                // sumar, filtrar y ordenar.
                 $f   = $r->porArea($desde, $hasta);
-                $ant = $r->deAnteriores($desde, $hasta);
+                $res = $r->resultado($desde, $hasta);
+                $margen = function ($queda, $cobrado) {
+                    return $cobrado > 0 ? round($queda / $cobrado, 4) : '';
+                };
                 return $this->envolver($tipo, $desde, $hasta,
-                    [['Área', Libro::TEXTO, 30], ['Ventas', Libro::NUMERO, 10],
-                     ['Vendido', Libro::MONEDA, 15], ['Cobrado', Libro::MONEDA, 15],
-                     ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
-                     ['Utilidad', Libro::MONEDA, 15],
-                     ['Cobros anteriores',    Libro::NUMERO, 11],
-                     ['Ventas liquidadas',    Libro::NUMERO, 11],
+                    [['Área', Libro::TEXTO, 30], ['Ventas nuevas', Libro::NUMERO, 10],
+                     ['Vendido', Libro::MONEDA, 15],
+                     ['Cobrado', Libro::MONEDA, 15],
+                     ['De ventas nuevas', Libro::MONEDA, 15],
                      ['De ventas anteriores', Libro::MONEDA, 15],
-                     // Las comisiones que generaron esos cobros: cuentan en
-                     // este periodo, como el dinero.
-                     ['Comisiones de anteriores', Libro::MONEDA, 15]],
-                    array_map(function ($x) {
-                        // Un área que solo recibió abonos de ventas viejas no
-                        // tiene ventas del periodo: sus cifras de venta van
-                        // vacías en vez de una fila de $0.00 que parece dato.
-                        $sinVentas = (int)$x['ventas'] === 0;
-                        $nAnt      = (int)($x['cobros_ant'] ?? 0);
-                        $lAnt      = (int)($x['liquidadas_ant'] ?? 0);
-                        $mAnt      = (float)($x['de_anteriores'] ?? 0);
-                        $cAnt      = (float)($x['comisiones_ant'] ?? 0);
+                     ['Cobros anteriores', Libro::NUMERO, 11],
+                     ['Liquidaciones', Libro::NUMERO, 11],
+                     ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
+                     ['Queda', Libro::MONEDA, 15], ['Margen', Libro::PORCENT, 10]],
+                    array_map(function ($x) use ($margen) {
+                        $nAnt = (int)($x['cobros_ant'] ?? 0);
+                        $lAnt = (int)($x['liquidadas_ant'] ?? 0);
+                        $mAnt = (float)($x['de_anteriores'] ?? 0);
                         return [$x['area'],
-                                $sinVentas ? '' : (int)$x['ventas'],
-                                $sinVentas ? '' : $x['vendido'],
-                                $sinVentas ? '' : $x['cobrado'],
-                                $sinVentas ? '' : $x['gastos'],
-                                $sinVentas ? '' : $x['comisiones'],
-                                $sinVentas ? '' : $x['cobrado'] - $x['gastos'] - $x['comisiones'],
+                                (int)$x['ventas'] ?: '',
+                                (int)$x['ventas'] ? $x['vendido'] : '',
+                                $x['cobrado_total'],
+                                (float)$x['cobrado'] ?: '',
+                                $mAnt > 0 ? $mAnt : '',
                                 $nAnt > 0 ? $nAnt : '',
                                 $lAnt > 0 ? $lAnt : '',
-                                $mAnt > 0 ? $mAnt : '',
-                                $cAnt > 0 ? $cAnt : ''];
+                                $x['gastos'], $x['comisiones_total'], $x['queda'],
+                                $margen($x['queda'], $x['cobrado_total'])];
                     }, $f),
-                    // El total de las dos columnas sale de deAnteriores(), la
-                    // misma cifra de "De lo que entró…" y del Detalle de pagos:
-                    // un pago de una venta con dos áreas cuenta en las dos
-                    // filas, y el monto repartido se redondea por área, así que
-                    // sumar la columna podía dar un cobro de más o un centavo
-                    // de diferencia.
-                    $this->sumar($f, ['ventas','vendido','cobrado','gastos','comisiones'],
-                        function ($t) use ($ant) { return ['TOTAL', (int)$t['ventas'], $t['vendido'],
-                            $t['cobrado'], $t['gastos'], $t['comisiones'],
-                            $t['cobrado'] - $t['gastos'] - $t['comisiones'],
-                            (int)$ant['cobros'], (int)$ant['liquidadas'], (float)$ant['monto'],
-                            (float)($ant['comisiones'] ?? 0)]; }));
+                    // EL TOTAL SALE DEL RESUMEN, no de sumar la columna: un
+                    // cobro de una venta con dos áreas cuenta en las dos filas
+                    // y cada área redondea su parte, así que la suma podía
+                    // diferir en un cobro o un centavo. Los gastos generales
+                    // (renta, nómina) no son de ningún área: no van aquí.
+                    $this->sumar($f, ['ventas'],
+                        function ($t) use ($res, $margen) {
+                            $queda = round($res['cobrado'] - $res['operacion'] - $res['comisiones'], 2);
+                            return ['TOTAL', (int)$t['ventas'], $res['vendido'],
+                                $res['cobrado'], round($res['cobrado'] - $res['de_anteriores'], 2),
+                                $res['de_anteriores'], $res['de_anteriores_cobros'],
+                                $res['de_anteriores_liquidadas'],
+                                $res['operacion'], $res['comisiones'], $queda,
+                                $margen($queda, $res['cobrado'])]; }));
 
             case 'colaborador':
                 $f = $r->porColaborador($desde, $hasta);
@@ -222,7 +227,7 @@ final class Reportes
                      ['Compras', Libro::NUMERO, 10], ['Vendido', Libro::MONEDA, 15],
                      ['Cobrado', Libro::MONEDA, 15], ['Debe', Libro::MONEDA, 15],
                      ['Cobros anteriores', Libro::NUMERO, 11],
-                     ['Ventas liquidadas', Libro::NUMERO, 11],
+                     ['Liquidaciones', Libro::NUMERO, 11],
                      ['De ventas anteriores', Libro::MONEDA, 15]],
                     $filas,
                     $this->sumar($f, ['compras','vendido','cobrado'],
@@ -301,6 +306,18 @@ final class Reportes
                 // con cobros en el periodo. "Cobrado en el periodo" es lo que
                 // entró de cada una: sumado da lo mismo que "Entraron".
                 $f = $r->detalle($desde, $hasta);
+                // GASTOS, COMISIÓN Y "QUEDA" SON DEL PERIODO, como en el
+                // resumen: el gasto cuenta en el mes de la venta (en una venta
+                // anterior ya contó en su mes) y la comisión en el del cobro
+                // que la generó. Antes eran de toda la venta y el TOTAL daba
+                // otra utilidad que "Queda" ($40,284.54 contra $38,299.54 en
+                // octubre de 2026). La venta completa está en su detalle.
+                foreach ($f as &$x) {
+                    $x['gastos_periodo'] = $x['anterior'] ? 0.0 : (float)$x['gastos'];
+                    $x['queda_periodo']  = (float)$x['cobrado_periodo'] - $x['gastos_periodo']
+                                         - (float)$x['comision_periodo'];
+                }
+                unset($x);
                 $rep = $this->envolver('detalle', $desde, $hasta,
                     [['Folio', Libro::TEXTO, 18], ['Cliente', Libro::TEXTO, 30],
                      ['Área', Libro::TEXTO, 24], ['Fecha', Libro::FECHA, 13],
@@ -309,23 +326,24 @@ final class Reportes
                      ['Total', Libro::MONEDA, 14], ['Cobrado', Libro::MONEDA, 14],
                      ['Cobrado en el periodo', Libro::MONEDA, 15],
                      ['Debe', Libro::MONEDA, 13], ['Gastos', Libro::MONEDA, 13],
-                     ['Comisión', Libro::MONEDA, 13], ['Utilidad', Libro::MONEDA, 14]],
+                     ['Comisión', Libro::MONEDA, 13], ['Queda', Libro::MONEDA, 14]],
                     array_map(function ($x) {
                         return [$x['folio'], $x['cliente'], $x['area'], $x['fecha'],
                                 $x['anterior'] ? ($x['liquidada'] ? 'Venta anterior · liquidada' : 'Venta anterior')
                                                : 'Venta del periodo',
                                 $x['subtotal'], $x['iva'], $x['total'], $x['cobrado'],
                                 (float)$x['cobrado_periodo'],
-                                $x['saldo'], $x['gastos'], $x['comision'],
-                                $x['cobrado'] - $x['gastos'] - $x['comision'],
+                                $x['saldo'], $x['gastos_periodo'], (float)$x['comision_periodo'],
+                                round($x['queda_periodo'], 2),
                                 '_venta'  => (int)$x['venta_id'],
                                 '_origen' => $x['anterior'] ? 'anterior' : ''];
                     }, $f),
-                    $this->sumar($f, ['subtotal','iva','total','cobrado','cobrado_periodo','saldo','gastos','comision'],
+                    $this->sumar($f, ['subtotal','iva','total','cobrado','cobrado_periodo','saldo',
+                                      'gastos_periodo','comision_periodo','queda_periodo'],
                         function ($t) { return ['TOTAL', '', '', '', '',
                             $t['subtotal'], $t['iva'], $t['total'], $t['cobrado'], $t['cobrado_periodo'],
-                            $t['saldo'], $t['gastos'], $t['comision'],
-                            $t['cobrado'] - $t['gastos'] - $t['comision']]; }));
+                            $t['saldo'], $t['gastos_periodo'], $t['comision_periodo'],
+                            round($t['queda_periodo'], 2)]; }));
                 $rep['partes'] = $this->partesDe($f, $desde, $hasta);
                 return $rep;
         }
@@ -558,7 +576,7 @@ final class Reportes
     }
 
     /**
-     * "2 cobros · 1 venta liquidada": lo que va debajo de cada monto del
+     * "2 cobros, 1 fue liquidación": lo que va debajo de cada monto del
      * resumen por origen, igual en pantalla, en la hoja impresa y en el Excel.
      *
      * Las ventas liquidadas solo se dicen para ventas de OTRO periodo: ahí son
@@ -571,8 +589,12 @@ final class Reportes
         $n = (int)($p['cobros'] ?? 0);
         $l = (int)($p['liquidadas'] ?? 0);
         $t = $n . ' cobro' . ($n === 1 ? '' : 's');
+        // "2 cobros, 1 fue liquidación" y no "2 cobros · 1 venta liquidada":
+        // así se leía como tres cosas, cuando la liquidación es UNO de los
+        // cobros (el que dejó la venta pagada).
         if ($k !== 'periodo' && $l > 0) {
-            $t .= ' · ' . $l . ' venta' . ($l === 1 ? '' : 's') . ' liquidada' . ($l === 1 ? '' : 's');
+            $t .= $n === 1 ? ' (liquidación)'
+                : ', ' . $l . ($l === 1 ? ' fue liquidación' : ' fueron liquidaciones');
         }
         return $t;
     }
@@ -614,6 +636,15 @@ final class Reportes
             $cache[$k] = (new ReporteRepo($this->db))->detallePorLinea($desde, $hasta);
         }
         $filas = $cache[$k];
+        // Gastos, comisión y «queda» DEL PERIODO, como en el resumen y en el
+        // Detalle de ventas: el gasto cuenta en el mes de la venta (en una
+        // venta anterior ya contó en su mes) y la comisión en el del cobro.
+        foreach ($filas as &$f) {
+            $f['gastos_periodo'] = !empty($f['anterior']) ? 0.0 : (float)$f['gastos'];
+            $f['queda_periodo']  = (float)$f['cobrado_periodo'] - $f['gastos_periodo']
+                                 - (float)$f['comision_periodo'];
+        }
+        unset($f);
         $campo = ($por === 'origen') ? 'area_origen' : 'area_servicio';
 
         $grupos = [];
@@ -628,8 +659,8 @@ final class Reportes
         }
         // De mayor a menor dinero: lo que mas pesa, arriba.
         uasort($grupos, function ($a, $b) {
-            return array_sum(array_column($b, 'cobrado'))
-               <=> array_sum(array_column($a, 'cobrado'));
+            return array_sum(array_column($b, 'cobrado_periodo'))
+               <=> array_sum(array_column($a, 'cobrado_periodo'));
         });
 
         // "Origen" y "Cobrado en el periodo": cada área trae también las
@@ -651,7 +682,7 @@ final class Reportes
             ['Debe',         Libro::MONEDA, 13],
             ['Gastos',       Libro::MONEDA, 12],
             ['Comisión',     Libro::MONEDA, 13],
-            ['Utilidad',     Libro::MONEDA, 14],
+            ['Queda',        Libro::MONEDA, 14],
             ['Forma',        Libro::TEXTO,  14],
         ];
 
@@ -672,8 +703,8 @@ final class Reportes
                                                : 'Del periodo',
                         $f['cantidad'],
                         $f['total_linea'], $f['cobrado'], (float)$f['cobrado_periodo'], $f['saldo'],
-                        $f['gastos'], $f['comision'],
-                        $f['cobrado'] - $f['gastos'] - $f['comision'],
+                        $f['gastos_periodo'], (float)$f['comision_periodo'],
+                        round($f['queda_periodo'], 2),
                         ucfirst((string)$f['metodo']),
                         // No son columnas: la pantalla los usa para abrir la
                         // venta y para resaltar las de otro periodo.
@@ -686,11 +717,9 @@ final class Reportes
                     array_sum(array_column($gf, 'cobrado')),
                     array_sum(array_column($gf, 'cobrado_periodo')),
                     array_sum(array_column($gf, 'saldo')),
-                    array_sum(array_column($gf, 'gastos')),
-                    array_sum(array_column($gf, 'comision')),
-                    array_sum(array_column($gf, 'cobrado'))
-                        - array_sum(array_column($gf, 'gastos'))
-                        - array_sum(array_column($gf, 'comision')),
+                    array_sum(array_column($gf, 'gastos_periodo')),
+                    array_sum(array_column($gf, 'comision_periodo')),
+                    round(array_sum(array_column($gf, 'queda_periodo')), 2),
                     ''],
             ];
         }
@@ -699,7 +728,8 @@ final class Reportes
             'rotulo'  => $por === 'origen' ? 'de donde salió la venta' : 'del producto contratado',
             'tablas'  => $tablas,
             'cuantas' => count($tablas),
-            'total'   => array_sum(array_column($filas, 'cobrado')),
+            // Lo que entró en el periodo de estas ventas: suma lo mismo que «Entraron».
+            'total'   => array_sum(array_column($filas, 'cobrado_periodo')),
         ];
     }
 

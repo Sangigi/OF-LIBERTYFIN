@@ -99,6 +99,23 @@ final class AsignarComision
      *                             omitirse solo si la venta tiene uno.
      * @throws \InvalidArgumentException con un mensaje apto para mostrar
      */
+    /**
+     * Qué porcentaje de un producto ya está repartido en comisiones vivas:
+     * las de ese producto y las viejas que van sobre toda la venta (sin
+     * producto, o con uno que ya no está en ella).
+     */
+    public function repartido($ventaId, $detalleId)
+    {
+        $st = $this->db->prepare("
+            SELECT COALESCE(SUM(vc.porcentaje_regla),0) FROM venta_comisiones vc
+            WHERE vc.venta_id = ? AND vc.cancelada = 0
+              AND ( vc.venta_detalle_id = ? OR vc.venta_detalle_id IS NULL
+                    OR NOT EXISTS ( SELECT 1 FROM venta_detalles dx
+                                    WHERE dx.id = vc.venta_detalle_id AND dx.venta_id = vc.venta_id ) )");
+        $st->execute([(int)$ventaId, (int)$detalleId]);
+        return round((float)$st->fetchColumn(), 2);
+    }
+
     public function asignar($ventaId, $colaboradorId, $porcentaje, $detalleId = null)
     {
         $ventaId = (int)$ventaId;
@@ -153,6 +170,21 @@ final class AsignarComision
         if ((int)$st->fetchColumn() > 0) {
             throw new \InvalidArgumentException($col['nombre'] . ' ya tiene comisión en '
                 . ($varios ? $l['producto'] : 'esta venta'));
+        }
+
+        // NI MÁS DEL 100% DE UN PRODUCTO ENTRE TODOS. Cada comisión ya estaba
+        // limitada a 100%, pero la suma no: cuatro personas podían repartirse
+        // más de lo que deja el producto y la empresa pagaba de su bolsa. Se
+        // cuentan las de ese producto y las viejas que van sobre toda la venta.
+        $ya = $this->repartido($ventaId, $l['id']);
+        if ($ya + $pct > 100.001) {
+            $n = function ($x) { return rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.'); };
+            $que = $varios ? $l['producto'] : 'esta venta';
+            throw new \InvalidArgumentException($ya >= 99.999
+                ? 'Las comisiones de ' . $que . ' ya suman el 100%: no queda nada por repartir.'
+                : 'Con ' . $n($pct) . '%, las comisiones de ' . $que . ' sumarían ' . $n($ya + $pct)
+                  . '%: se pagaría más de lo que deja. Ya está repartido el ' . $n($ya)
+                  . '%; quedan ' . $n(100 - $ya) . '% por asignar.');
         }
 
         $linea = $l['fila'];

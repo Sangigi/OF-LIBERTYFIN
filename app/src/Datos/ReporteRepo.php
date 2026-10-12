@@ -82,6 +82,33 @@ final class ReporteRepo extends Repo
                             GROUP BY pc.venta_id ) cs ON cs.venta_id = v.id";
 
     /**
+     * COMISION_POR_PRODUCTO, pero solo lo que devengaron los cobros DEL
+     * PERIODO (cpp/csp). Es el criterio del resumen: la comisión cuenta en
+     * el mes del cobro que la generó, como el dinero. Las fechas van como
+     * literales (citadas por PDO) para no mover los marcadores de quien la usa.
+     */
+    private function comisionPorProductoEn($a, $b)
+    {
+        $f = ' AND pc.fecha_pago >= ' . $this->db->quote($a)
+           . ' AND pc.fecha_pago < '  . $this->db->quote($b);
+        return "
+                LEFT JOIN ( SELECT vc.venta_detalle_id AS detalle_id, SUM(pc.monto) comision
+                            FROM pago_comisiones pc
+                            INNER JOIN venta_comisiones vc ON vc.id = pc.venta_comision_id
+                            INNER JOIN venta_detalles dd   ON dd.id = vc.venta_detalle_id
+                                                          AND dd.venta_id = pc.venta_id
+                            WHERE 1 = 1 {$f}
+                            GROUP BY vc.venta_detalle_id ) cpp ON cpp.detalle_id = d.id
+                LEFT JOIN ( SELECT pc.venta_id, SUM(pc.monto) comision
+                            FROM pago_comisiones pc
+                            LEFT JOIN venta_comisiones vc ON vc.id = pc.venta_comision_id
+                            LEFT JOIN venta_detalles dd   ON dd.id = vc.venta_detalle_id
+                                                         AND dd.venta_id = pc.venta_id
+                            WHERE dd.id IS NULL {$f}
+                            GROUP BY pc.venta_id ) csp ON csp.venta_id = v.id";
+    }
+
+    /**
      * El área del producto sobre el que va una comisión devengada (`pc`).
      * NULL si la comisión no dice de qué producto es o el producto no tiene
      * categoría: ahí se cae al área de la venta, como antes.
@@ -382,6 +409,20 @@ final class ReporteRepo extends Repo
                         'gastos' => 0, 'comisiones' => 0, 'cobros_ant' => 0, 'liquidadas_ant' => 0,
                         'de_anteriores' => 0.0, 'comisiones_ant' => round($x['monto'], 2)];
         }
+
+        // EL RESULTADO DEL ÁREA EN EL PERIODO, con el criterio del resumen:
+        // todo lo que entró (de ventas nuevas y de anteriores), sus gastos y
+        // todas las comisiones que generó. Antes "Queda" y el margen eran
+        // solo de las ventas nuevas: Legales salía con 60% cuando, contando
+        // los $4,500 que entraron de agosto y sus $3,930 de comisión, le
+        // quedó el 27%. Así las áreas suman lo mismo que "Queda".
+        foreach ($filas as &$f) {
+            $f['cobrado_total']    = round((float)$f['cobrado'] + (float)$f['de_anteriores'], 2);
+            $f['comisiones_total'] = round((float)$f['comisiones'] + (float)$f['comisiones_ant'], 2);
+            $f['queda'] = round($f['cobrado_total'] - (float)$f['gastos'] - $f['comisiones_total'], 2);
+        }
+        unset($f);
+        usort($filas, function ($x, $y) { return $y['cobrado_total'] <=> $x['cobrado_total']; });
         return $filas;
     }
 
@@ -410,8 +451,14 @@ final class ReporteRepo extends Repo
         // Por lo mismo, se parte de la VENTA y no de sus renglones: una venta
         // sin renglones (muchas vienen del sistema anterior) o con renglones
         // en $0 desaparecía de esta tabla con todo y lo cobrado. Ver PESO.
+        //
+        // Y LO COBRADO Y SUS COMISIONES, SOLO LO DEL PERIODO. Antes era todo lo
+        // de cada venta, aunque llegara después: consultar septiembre un mes
+        // más tarde metía en septiembre los abonos de octubre, y el reporte
+        // dejaba de cuadrar con "Entraron" y "Queda", que van por la fecha
+        // del cobro. Ahora es el mismo criterio que el resumen.
         $peso = self::PESO;
-        $cpro = self::COMISION_POR_PRODUCTO;
+        $cpro = $this->comisionPorProductoEn($a, $b);
         return $this->todos("
             SELECT area,
                    COUNT(DISTINCT venta_id)  AS ventas,
@@ -439,8 +486,8 @@ final class ReporteRepo extends Repo
                        -- La comisión de un producto es de SU área; solo
                        -- la que no dice de qué producto es (las viejas) se
                        -- reparte con el peso, como lo demás.
-                       COALESCE(cp.comision,0)
-                         + COALESCE(cs.comision,0) * ({$peso}) AS comisiones
+                       COALESCE(cpp.comision,0)
+                         + COALESCE(csp.comision,0) * ({$peso}) AS comisiones
                 FROM ventas v
                 LEFT JOIN venta_detalles d ON d.venta_id = v.id
                 LEFT JOIN productos p      ON p.id = d.producto_id
@@ -449,14 +496,15 @@ final class ReporteRepo extends Repo
                             FROM venta_detalles GROUP BY venta_id ) tot
                        ON tot.venta_id = v.id
                 LEFT JOIN ( SELECT venta_id, SUM(monto) cobrado FROM venta_pagos
-                            WHERE cancelado = 0 GROUP BY venta_id ) pg ON pg.venta_id = v.id
+                            WHERE cancelado = 0 AND fecha_pago >= ? AND fecha_pago < ?
+                            GROUP BY venta_id ) pg ON pg.venta_id = v.id
                 LEFT JOIN ( SELECT venta_id, SUM(monto) gastos FROM gastos
                             WHERE tipo = 'manual' AND categoria <> 'Costo de venta'
                             GROUP BY venta_id ) g ON g.venta_id = v.id
                 {$cpro}
                 WHERE v.estado <> 'cancelada' AND v.fecha >= ? AND v.fecha < ?
             ) x
-            GROUP BY area ORDER BY cobrado DESC", [$a, $b]);
+            GROUP BY area ORDER BY cobrado DESC", [$a, $b, $a, $b]);
     }
 
     public function porServicio($desde, $hasta, $tope = 12)
@@ -549,6 +597,9 @@ final class ReporteRepo extends Repo
                    v.total - COALESCE(pg.cobrado,0) AS saldo,
                    COALESCE(g.gastos,0) AS gastos,
                    COALESCE(cm.comision,0) AS comision,
+                   -- La que generaron los cobros DEL PERIODO: la que cuenta
+                   -- en «Queda», como el dinero (ver resultado()).
+                   COALESCE(cmp.comision,0) AS comision_periodo,
                    COALESCE(pp.monto,0) AS cobrado_periodo,
                    COALESCE(pp.n,0)     AS cobros_periodo,
                    pg.ultimo,
@@ -566,9 +617,12 @@ final class ReporteRepo extends Repo
                         GROUP BY venta_id ) g ON g.venta_id = v.id
             LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
                         GROUP BY venta_id ) cm ON cm.venta_id = v.id
+            LEFT JOIN ( SELECT venta_id, SUM(monto) comision FROM pago_comisiones
+                        WHERE fecha_pago >= ? AND fecha_pago < ?
+                        GROUP BY venta_id ) cmp ON cmp.venta_id = v.id
             WHERE v.estado <> 'cancelada'
               AND ((v.fecha >= ? AND v.fecha < ?) OR (v.fecha < ? AND pp.venta_id IS NOT NULL))
-            ORDER BY (v.fecha < ?), v.fecha", [$a, $b, $a, $b, $a, $a]);
+            ORDER BY (v.fecha < ?), v.fecha", [$a, $b, $a, $b, $a, $b, $a, $a]);
         return $this->marcarAnteriores($filas, $a, $b);
     }
 
@@ -852,6 +906,9 @@ final class ReporteRepo extends Repo
              ? "COALESCE(NULLIF(TRIM(v.especialista_nombre),''), 'Sin asignar')"
              : "'Sin asignar'";
         $cpro = self::COMISION_POR_PRODUCTO;
+        // Y la que devengaron los cobros DEL PERIODO (cpp/csp): la que cuenta
+        // en el resultado del periodo, como el dinero.
+        $cpro .= $this->comisionPorProductoEn($a, $b);
 
         // Con las líneas de las ventas de ANTES del periodo que tuvieron
         // cobros en él: van marcadas (`anterior`) y con `cobrado_periodo`,
@@ -897,6 +954,8 @@ final class ReporteRepo extends Repo
                    ROUND(COALESCE(cp.comision,0)
                          + COALESCE(cs.comision * (d.subtotal / NULLIF(tot.suma,0)), 0), 2) AS comision,
                    ROUND(COALESCE(pp.monto,0) * (d.subtotal / NULLIF(tot.suma,0)), 2) AS cobrado_periodo,
+                   ROUND(COALESCE(cpp.comision,0)
+                         + COALESCE(csp.comision * (d.subtotal / NULLIF(tot.suma,0)), 0), 2) AS comision_periodo,
                    v.total - COALESCE(pg.cobrado,0)        AS saldo_venta,
                    pg.ultimo,
                    v.metodo_pago                           AS metodo,

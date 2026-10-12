@@ -147,24 +147,33 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
 <?php endif; ?>
 
 <?php if ($areas): ?>
+<?php /* EL RESULTADO DE CADA ÁREA EN EL PERIODO, con el mismo criterio que
+         el de arriba: todo lo que entró (de ventas nuevas y de anteriores),
+         sus gastos y TODAS las comisiones que generó. Antes Queda y Margen
+         eran solo de las ventas nuevas y lo de ventas anteriores iba en una
+         columna aparte sin restarse: Legales salía con 60% cuando le quedó
+         el 27%, y las áreas no sumaban lo de arriba. */
+  $margenDe = function ($q, $c) { return $c > 0 ? round($q / $c * 100) : 0; };
+  $claseMg  = function ($mg) { return $mg >= 40 ? 'bg-success' : ($mg >= 15 ? 'bg-warning' : 'bg-danger'); }; ?>
 <section class="card">
-  <header class="card-header">Por área</header>
+  <header class="card-header">
+    <div><span>Por área</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Todo lo que entró en el periodo, sus gastos y las comisiones que generó</p></div>
+  </header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
-    <table class="table table-hover">
-      <thead><tr><th>Área</th><th class="text-end">Ventas</th><th class="text-end">Cobrado</th>
+    <table class="table table-hover lf-tabla-areas">
+      <thead><tr><th>Área</th><th class="text-end">Cobrado</th>
         <th class="text-end">Gastos</th><th class="text-end">Comisiones</th>
-        <th class="text-end">Queda</th><th class="text-end">Margen</th>
-        <th class="text-end lf-col-ant">De ventas anteriores</th></tr></thead>
+        <th class="text-end">Queda</th><th class="text-end">Margen</th></tr></thead>
       <tbody>
       <?php
       $hayAnt = false;
       foreach ($areas as $a):
-        $q = (float)$a['cobrado'] - (float)$a['gastos'] - (float)$a['comisiones'];
-        $mg = $a['cobrado'] > 0 ? round($q / $a['cobrado'] * 100) : 0;
-        /* Un área que solo recibió abonos de ventas viejas no tiene ventas del
-           periodo: sin ventas no hay "queda" ni margen que decir, y un 0% en
-           rojo haría creer que perdió dinero. */
-        $sinVentas = (int)$a['ventas'] === 0;
+        $cob  = (float)$a['cobrado_total'];
+        $q    = (float)$a['queda'];
+        $mg   = $margenDe($q, $cob);
+        $nV   = (int)$a['ventas'];
         $mAnt = (float)($a['de_anteriores'] ?? 0);
         $nAnt = (int)($a['cobros_ant'] ?? 0);
         $lAnt = (int)($a['liquidadas_ant'] ?? 0);
@@ -172,47 +181,59 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
         if ($mAnt > 0 || $cAnt > 0) $hayAnt = true; ?>
         <tr>
           <td data-label="Área"><b style="font-weight:600"><?= P::e($a['area']) ?></b></td>
-          <?php if ($sinVentas): ?>
-            <td data-label="Ventas" class="text-end lf-mono" colspan="6"
-                style="color:var(--lf-tinta-4);font-size:12px">
-              Sin ventas en el periodo; solo abonos de ventas anteriores</td>
-          <?php else: ?>
-          <td data-label="Ventas" class="text-end lf-mono"><?= (int)$a['ventas'] ?></td>
-          <td data-label="Cobrado" class="text-end lf-mono"><?= D::pesos($a['cobrado']) ?></td>
+          <td data-label="Cobrado" class="text-end lf-mono">
+            <?php /* Un solo elemento: en el celular la celda es flex y, sueltos,
+                     el monto y su detalle se iban a extremos opuestos. */ ?>
+            <span class="lf-ant-val"><b><?= D::pesos($cob) ?></b>
+              <?php if ($nV > 0): ?>
+                <small><?= D::pesos($a['cobrado']) ?> de <?= $nV ?> venta<?= $nV == 1 ? '' : 's' ?>
+                  nueva<?= $nV == 1 ? '' : 's' ?></small>
+              <?php endif; ?>
+              <?php if ($mAnt > 0): ?>
+                <small class="ant"><?= D::pesos($mAnt) ?> de ventas anteriores ·
+                  <?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes(
+                        ['cobros' => $nAnt, 'liquidadas' => $lAnt], 'anterior')) ?></small>
+              <?php endif; ?></span></td>
           <td data-label="Gastos" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
             <?= D::pesos($a['gastos']) ?></td>
           <td data-label="Comisiones" class="text-end lf-mono" style="color:var(--lf-tinta-3)">
-            <?= D::pesos($a['comisiones']) ?></td>
+            <span class="lf-ant-val"><b><?= D::pesos($a['comisiones_total']) ?></b>
+              <?php if ($cAnt > 0): ?><small class="ant"><?= D::pesos($cAnt) ?> de cobros anteriores</small><?php endif; ?></span></td>
           <td data-label="Queda" class="text-end lf-mono" style="font-weight:700;
               color:<?= $q>=0?'var(--lf-tinta)':'var(--lf-rojo)' ?>"><?= D::pesos($q) ?></td>
           <td data-label="Margen" class="text-end">
-            <span class="badge <?= $mg>=40?'bg-success':($mg>=15?'bg-warning':'bg-danger') ?>">
-              <?= $mg ?>%</span></td>
-          <?php endif; ?>
-          <td data-label="De ventas anteriores" class="text-end lf-mono lf-col-ant">
-            <?php if ($mAnt > 0 || $cAnt > 0): ?>
-              <?php /* Un solo elemento: en el celular la celda es flex y, sueltos,
-                       el monto y "N cobros" se iban a extremos opuestos. */ ?>
-              <span class="lf-ant-val"><b><?= D::pesos($mAnt) ?></b>
-                <small><?= P::e(\LibertyFin\Servicio\Reportes::cuentaPartes(
-                         ['cobros' => $nAnt, 'liquidadas' => $lAnt], 'anterior')) ?></small>
-                <?php if ($cAnt > 0): ?><small>comisiones <?= D::pesos($cAnt) ?></small><?php endif; ?></span>
-            <?php else: ?>–<?php endif; ?></td>
+            <span class="badge <?= $claseMg($mg) ?>"><?= $mg ?>%</span></td>
         </tr>
       <?php endforeach; ?>
       </tbody>
+      <?php /* El total sale del resultado de arriba, no de sumar la columna: un
+               cobro de una venta con dos áreas cuenta en las dos filas y cada
+               área redondea su parte. Los gastos generales no son de ningún área. */
+        $tq = round($r['cobrado'] - $r['operacion'] - $r['comisiones'], 2); $tmg = $margenDe($tq, $r['cobrado']); ?>
+      <tfoot><tr>
+        <td data-label="Área"><b>Total</b></td>
+        <td data-label="Cobrado" class="text-end lf-mono"><b><?= D::pesos($r['cobrado']) ?></b></td>
+        <td data-label="Gastos" class="text-end lf-mono"><?= D::pesos($r['operacion']) ?></td>
+        <td data-label="Comisiones" class="text-end lf-mono"><?= D::pesos($r['comisiones']) ?></td>
+        <td data-label="Queda" class="text-end lf-mono"><b><?= D::pesos($tq) ?></b></td>
+        <td data-label="Margen" class="text-end"><span class="badge <?= $claseMg($tmg) ?>"><?= $tmg ?>%</span></td>
+      </tr></tfoot>
     </table>
   </div>
   <div class="card-footer">
     El margen es lo que queda después de gastos y comisiones. Un área con mucho
     cobrado y margen bajo está trabajando para pagar comisiones.
     <?php if ($hayAnt): ?>
-      <br>«De ventas anteriores» es lo que entró en el periodo por anticipos, abonos y
-      liquidaciones de ventas <?= P::e($deAntes) ?>, repartido por el producto de cada venta,
-      con las comisiones que generaron (cuentan en este periodo, como el dinero).
-      No suma al margen, que es de las ventas del periodo.
+      <br>«Ventas anteriores» son anticipos, abonos y liquidaciones de ventas
+      <?= P::e($deAntes) ?> que llegaron en el periodo, repartidos por el producto de cada
+      venta. Cuentan aquí con las comisiones que generaron, igual que en el resultado de
+      arriba. Una liquidación es uno de esos cobros: el que dejó pagada la venta.
       <a href="?<?= P::e(http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'pagos'])) ?>#lfReportes"
          data-ir-pestana="pagos">Ver cada cobro</a>
+    <?php endif; ?>
+    <?php if ($r['generales'] > 0): ?>
+      <br>Los gastos generales (<?= D::pesos($r['generales']) ?>: renta, nómina, servicios) no son
+      de ningún área: se restan solo en el resultado de arriba.
     <?php endif; ?>
   </div>
 </section>
@@ -543,7 +564,7 @@ $columnasDe = function (array $cols, $clase = 'cols-l', $rotulo = 'Columnas', $e
 
     <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
       <span><?= $desglose['cuantas'] ?> tabla<?= $desglose['cuantas']==1?'':'s' ?> ·
-        cobrado de estas ventas <b class="lf-mono" style="color:var(--lf-tinta)">
+        entró en el periodo <b class="lf-mono" style="color:var(--lf-tinta)">
           <?= D::pesos($desglose['total']) ?></b></span>
       <a class="btn btn-secondary btn-sm" target="_blank"
          href="/reportes/imprimir?<?= http_build_query(['desde'=>$desde,'hasta'=>$hasta,'tipo'=>'desglose']) ?>">
