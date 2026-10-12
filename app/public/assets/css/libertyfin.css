@@ -3950,3 +3950,67 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
   .lf-dd-notas{border-left:0;border-top:1px solid var(--lf-linea);
     margin-top:16px;padding:14px 0 0;font-size:12px}
 }
+
+
+/* ══════════════════════════════════════════════════════
+   36 · CORREGIR UN RENGLÓN AL IMPORTAR
+   El archivo casi nunca viene perfecto: un folio con un
+   dedazo, una comisión sin llenar. La corrección se hace
+   aquí, no volviendo a Excel.
+   ══════════════════════════════════════════════════════ */
+.lf-ajustar{width:28px;height:28px;border-radius:7px;border:1px solid transparent;
+  background:none;cursor:pointer;color:var(--lf-tinta-4);font-size:14px;line-height:1;
+  transition:color .15s,background .15s,border-color .15s}
+.lf-ajustar:hover{color:var(--lf-brand-2);background:var(--lf-brand-glow);
+  border-color:var(--lf-brand)}
+.lf-ajustar.on{color:var(--lf-brand-2);background:var(--lf-brand-glow);
+  border-color:var(--lf-brand)}
+
+.lf-edicion[hidden]{display:none}
+.lf-edicion > td{padding:0!important;background:var(--lf-vidrio)}
+.lf-edit-caja{padding:14px 16px;border-left:3px solid var(--lf-brand);
+  animation:lf-ent .16s ease}
+.lf-edit-rejilla{display:grid;gap:10px 14px;
+  grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+.lf-edit-caja label{display:flex;flex-direction:column;gap:4px;min-width:0;
+  font-size:11px;font-weight:600;letter-spacing:.03em;text-transform:uppercase;
+  color:var(--lf-tinta-4)}
+.lf-edit-caja input[type=text],
+.lf-edit-caja input[type=date]{width:100%;max-width:100%;box-sizing:border-box;
+  padding:7px 9px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  background:var(--lf-panel);color:var(--lf-tinta);font:inherit;font-size:13px;
+  font-weight:400;text-transform:none;letter-spacing:0}
+.lf-edit-caja input:focus{outline:none;border-color:var(--lf-brand);
+  box-shadow:0 0 0 3px var(--lf-brand-glow)}
+.lf-edit-caja input:disabled{opacity:.5;cursor:not-allowed}
+
+/* Las comisiones aparte: son el campo que más se corrige y conviene
+   verlas juntas con su base al lado. */
+.lf-edit-com{margin-top:12px;padding-top:12px;border-top:1px dashed var(--lf-linea);
+  display:grid;gap:10px 14px;align-items:end;
+  grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.lf-edit-com .rot{grid-column:1/-1;font-size:11px;font-weight:700;
+  letter-spacing:.04em;text-transform:uppercase;color:var(--lf-tinta-3)}
+
+.lf-edit-pie{margin-top:12px;padding-top:10px;border-top:1px dashed var(--lf-linea);
+  display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.lf-edit-pie .fuente{margin-left:auto;font-size:11px;color:var(--lf-tinta-4)}
+.lf-check{display:flex;flex-direction:row!important;align-items:center;gap:7px;
+  cursor:pointer;text-transform:none!important;letter-spacing:0!important;
+  font-size:12.5px!important;font-weight:500!important;color:var(--lf-tinta-2)!important}
+.lf-check input{width:auto!important}
+
+/* La barra solo sale cuando hay algo que guardar: una barra fija que no
+   hace nada es ruido permanente. */
+.lf-barra-ajustes{position:sticky;bottom:0;z-index:20;
+  display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  margin-top:14px;padding:12px 16px;border-radius:var(--lf-r-panel);
+  background:var(--lf-panel);border:1px solid var(--lf-brand);
+  box-shadow:var(--lf-s3);animation:lf-ent .18s ease}
+.lf-barra-ajustes[hidden]{display:none}
+.lf-barra-ajustes > span{flex:1;min-width:140px;font-size:13px;font-weight:600;
+  color:var(--lf-brand-2)}
+@media(max-width:600px){
+  .lf-edit-caja{padding:12px}
+  .lf-barra-ajustes > span{flex-basis:100%}
+}

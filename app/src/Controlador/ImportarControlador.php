@@ -66,8 +66,35 @@ final class ImportarControlador
         // mano una de esas ventas.
         $_SESSION['lf_import'] = [
             'ruta' => $guardado['ruta'], 'nombre' => $guardado['nombre'],
-            'cuando' => time(),
+            'cuando' => time(), 'ajustes' => [],
         ];
+        $this->pantalla($plan, null);
+    }
+
+    /**
+     * Guarda las correcciones hechas en la pantalla y vuelve a revisar.
+     *
+     * No se escribe nada todavía: lo corregido se mete en el análisis y
+     * se valida igual que lo del archivo. Si el ajuste deja una venta
+     * imposible —un anticipo mayor que el total— sale marcada, como
+     * saldría si viniera así del Excel.
+     */
+    public function ajustar()
+    {
+        if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.');
+
+        $g = $_SESSION['lf_import'] ?? null;
+        if (!$g || !is_readable($g['ruta'])) {
+            $this->volver('Se perdió el archivo que estabas revisando. Vuelve a subirlo.');
+        }
+        $crudo = (isset($_POST['aj']) && is_array($_POST['aj'])) ? $_POST['aj'] : [];
+        $_SESSION['lf_import']['ajustes'] =
+            ImportarVentas::ajustar((array)($g['ajustes'] ?? []), $crudo);
+        // El reloj se reinicia: acaban de mirarlo.
+        $_SESSION['lf_import']['cuando'] = time();
+
+        list($plan, $error) = $this->planDe($g['ruta'], $g['nombre']);
+        if ($error) $this->volver($error);
         $this->pantalla($plan, null);
     }
 
@@ -125,7 +152,12 @@ final class ImportarControlador
         $solo = isset($_POST['hojas']) && is_array($_POST['hojas'])
               ? array_values(array_filter(array_map('strval', $_POST['hojas']))) : null;
 
-        $plan = (new ImportarVentas($db))->analizar($hojas, ['hojas' => $solo]);
+        $plan = (new ImportarVentas($db))->analizar($hojas, [
+            'hojas'   => $solo,
+            // Las correcciones se aplican SIEMPRE al releer: el archivo
+            // manda y el ajuste va encima, nunca al revés.
+            'ajustes' => (array)($_SESSION['lf_import']['ajustes'] ?? []),
+        ]);
         $plan['archivo']   = $nombre;
         $plan['disponibles'] = array_keys($hojas);
         return [$plan, null];

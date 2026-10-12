@@ -84,8 +84,13 @@ final class ImportarVentas
      */
     const CONCEPTOS = ['Vendedor', 'Gerente', 'Administración', 'Área'];
 
+    /** Los campos que se pueden corregir desde la pantalla. */
+    const AJUSTABLES = ['folio','fecha','cliente','area','servicio','forma',
+                        'total','anticipo','vendedor','com0','com1','com2','com3'];
+
     private $db;
     private $error = '';
+    private $ajustes = [];
 
     public function __construct(PDO $db) { $this->db = $db; }
 
@@ -104,13 +109,16 @@ final class ImportarVentas
     public function analizar(array $hojas, array $opc = [])
     {
         $soloEstas = $opc['hojas'] ?? null;
+        // Los ajustes que alguien escribió en la pantalla de revisión,
+        // guardados por hoja y fila. Ver `ajustar()` más abajo.
+        $this->ajustes = is_array($opc['ajustes'] ?? null) ? $opc['ajustes'] : [];
 
         $plan = [
             'renglones' => [], 'listas' => 0, 'abonos' => 0, 'conAviso' => 0,
             'repetidas' => 0, 'malas' => 0, 'sinFolio' => 0,
             'total' => 0.0, 'cobrado' => 0.0, 'comisiones' => 0.0,
             'nuevos' => ['clientes' => [], 'servicios' => [], 'areas' => [], 'colaboradores' => []],
-            'hojas' => [],
+            'hojas' => [], 'ajustados' => 0, 'excluidos' => 0,
         ];
 
         $vistos = [];                       // folios dentro del propio archivo
@@ -143,6 +151,8 @@ final class ImportarVentas
                     continue;
                 }
 
+                if (!empty($r['ajustado']))  $plan['ajustados']++;
+                if ($r['estado'] === 'excluida') { $plan['excluidos']++; $plan['renglones'][] = $r; continue; }
                 if ($r['estado'] === 'mala')        $plan['malas']++;
                 elseif ($r['estado'] === 'repetida') $plan['repetidas']++;
                 else {
@@ -208,6 +218,20 @@ final class ImportarVentas
             return $f[$col[$campo]] ?? null;
         };
 
+        // ── LOS AJUSTES VAN AQUÍ, ANTES DE VALIDAR ──
+        //
+        // Lo que alguien corrigió en la pantalla entra como si viniera
+        // del archivo, y después pasa por las MISMAS comprobaciones:
+        // que el anticipo quepa en el total, que la base cuadre, que el
+        // folio no choque. Si se aplicaran al final, un ajuste podría
+        // colar una venta imposible saltándose la revisión que es justo
+        // lo que esta pantalla existe para hacer.
+        //
+        // El archivo sigue siendo la fuente. El ajuste es una capa
+        // encima, guardada aparte y visible en la pantalla.
+        $ajuste = $this->ajustes[$hoja . '|' . ($n + 1)] ?? null;
+        $g = $this->conAjuste($g, $ajuste);
+
         $folio   = preg_replace('/\D/', '', (string)$g('folio'));
         $cliente = LectorHoja::limpiar($g('cliente'));
         $total   = self::numero($g('total'));
@@ -224,7 +248,23 @@ final class ImportarVentas
         // venta, cobrarla después o no duplicarla al reimportar. Sin él
         // no hay nada que hacer, así que se saltan en silencio y se
         // cuentan aparte.
-        if ($folio === '') return null;
+        if ($folio === '') {
+            // Si NADIE tocó este renglón, es del bloque de totales y se
+            // salta callado. Pero si alguien lo editó y lo dejó sin
+            // folio, verlo desaparecer de la lista parecería que se
+            // guardó bien. Se queda, marcado.
+            if (!$ajuste) return null;
+            return ['hoja' => $hoja, 'fila' => $n + 1, 'estado' => 'mala',
+                    'folio' => '', 'folioOriginal' => '', 'tipo' => 'venta',
+                    'cliente' => $cliente ?: '', 'area' => '', 'servicio' => '',
+                    'forma' => '', 'total' => 0.0, 'anticipo' => 0.0, 'restante' => 0.0,
+                    'iva' => 0.0, 'banca' => 0.0, 'gastos' => 0.0, 'base' => 0.0,
+                    'vendedor' => null, 'comisiones' => [], 'fecha' => null,
+                    'recibo' => null, 'solGastos' => null, 'folioVenta' => null,
+                    'ajustado' => array_values(array_diff(array_keys($ajuste), ['_ignorado'])),
+                    'avisos' => ['Le quitaste el folio. Sin folio no se puede guardar: '
+                               . 'ponle uno o sácalo con «No importar».']];
+        }
 
         $r = [
             'hoja' => $hoja, 'fila' => $n + 1, 'estado' => 'lista', 'avisos' => [],
@@ -246,7 +286,28 @@ final class ImportarVentas
             'comisiones' => [],
             'tipo' => 'venta',        // o 'abono', si el folio ya salió
             'folioVenta' => null,
+            'ajustado' => $ajuste
+                        ? array_values(array_diff(array_keys($ajuste), ['_ignorado'])) : [],
         ];
+
+        if (!empty($ajuste['_ignorado'])) {
+            $rot = ['total'=>'el total','anticipo'=>'lo que cobra','fecha'=>'la fecha',
+                    'com0'=>'la comisión del vendedor','com1'=>'la del gerente',
+                    'com2'=>'la de administración','com3'=>'la del área'];
+            $cuales = array_map(function ($k) use ($rot) { return $rot[$k] ?? $k; },
+                                (array)$ajuste['_ignorado']);
+            $r['avisos'][] = 'No entendí lo que escribiste en ' . implode(' y ', $cuales)
+                           . ': se dejó lo del archivo.';
+        }
+
+        // Excluir un renglón es una decisión, no un error: se enseña
+        // tachado en vez de desaparecer, para que se vea que fue a
+        // propósito y se pueda deshacer.
+        if (!empty($ajuste['excluir'])) {
+            $r['estado'] = 'excluida';
+            $r['avisos'][] = 'Lo sacaste a mano. No entra.';
+            return $r;
+        }
 
         // ── Fecha ──
         // Manda la columna Fecha, no la que lleva el folio dentro. El
@@ -366,7 +427,7 @@ final class ImportarVentas
                 $r['avisos'][] = 'Dice ser otro cobro de ' . $folio . ' pero no trae importe.';
             }
             // Un abono no vuelve a validar el total: no tiene.
-            $r['comisiones'] = $this->comisiones($f, $iCom, $r);
+            $r['comisiones'] = $this->comisiones($f, $iCom, $r, $ajuste);
             list($r['metodo'], $r['banco']) = self::formaDePago($r['forma']);
             if ($r['metodo'] === null) $r['metodo'] = 'efectivo';
             return $r;
@@ -407,7 +468,7 @@ final class ImportarVentas
         }
 
         // ── Comisiones ──
-        $r['comisiones'] = $this->comisiones($f, $iCom, $r);
+        $r['comisiones'] = $this->comisiones($f, $iCom, $r, $ajuste);
 
         // ── Forma de pago ──
         list($r['metodo'], $r['banco']) = self::formaDePago($r['forma']);
@@ -416,6 +477,80 @@ final class ImportarVentas
             $r['avisos'][] = 'No entendí la forma de pago "' . $r['forma'] . '": entra como efectivo.';
         }
         return $r;
+    }
+
+    /**
+     * Envuelve el lector de celdas para que devuelva el valor ajustado.
+     *
+     * Se queda con una función en vez de reescribir el array de la
+     * fila: así da igual en qué columna esté cada cosa —que entre las
+     * dos hojas no coincide— y el resto del código no se entera de que
+     * hubo un ajuste.
+     */
+    private function conAjuste(callable $g, $ajuste)
+    {
+        if (!$ajuste) return $g;
+        return function ($campo) use ($g, $ajuste) {
+            if (!array_key_exists($campo, $ajuste)) return $g($campo);
+            $v = $ajuste[$campo];
+            // Vacío quiere decir "borra lo que traía", no "usa el
+            // original": si alguien limpia el vendedor es porque esa
+            // venta no lleva vendedor.
+            return $v === '' ? null : $v;
+        };
+    }
+
+    /**
+     * Limpia y guarda lo que alguien corrigió en la pantalla.
+     *
+     * Solo se admiten los campos de AJUSTABLES y solo con la forma que
+     * les toca. Lo que llega del navegador lo escribe quien lo manda,
+     * así que un "total" con letras dentro no puede acabar en la base.
+     *
+     * @param array $previos  lo que ya se había ajustado
+     * @param array $crudo    lo que llega del formulario
+     * @return array          ajustes por 'HOJA|fila'
+     */
+    public static function ajustar(array $previos, array $crudo)
+    {
+        foreach ($crudo as $llave => $campos) {
+            if (!is_array($campos) || !preg_match('/^.+\|\d+$/', (string)$llave)) continue;
+            $limpio = [];
+            foreach ($campos as $k => $v) {
+                if ($k === 'excluir') { if ($v) $limpio['excluir'] = true; continue; }
+                if ($k === 'restaurar') continue;
+                if (!in_array($k, self::AJUSTABLES, true)) continue;
+                $v = LectorHoja::limpiar(is_scalar($v) ? (string)$v : '');
+                if ($v === null) { $limpio[$k] = ''; continue; }   // borrado a propósito
+                if (in_array($k, ['total','anticipo','com0','com1','com2','com3'], true)) {
+                    $n = self::numero($v);
+                    // NO SE TRAGA EN SILENCIO. Quien escribió "doscientos"
+                    // en un importe creería que se guardó, y al volver a
+                    // ver el número de antes pensaría que la pantalla
+                    // falla. Se descarta y se dice cuál se descartó.
+                    if ($n === null) { $limpio['_ignorado'][] = $k; continue; }
+                    $limpio[$k] = (string)round($n, 2);
+                } elseif ($k === 'fecha') {
+                    $f = self::fecha($v);
+                    if ($f === null) { $limpio['_ignorado'][] = $k; continue; }
+                    $limpio[$k] = $f;
+                } else {
+                    $limpio[$k] = mb_substr($v, 0, 255);
+                }
+            }
+            // Pedir "restaurar" quita el ajuste entero y vuelve a lo
+            // que dice el archivo.
+            if (!empty($campos['restaurar'])) { unset($previos[$llave]); continue; }
+            // Si lo ÚNICO que quedó fue el reporte de lo descartado, no
+            // hay ajuste que guardar: solo algo que avisar.
+            if ($limpio && $limpio !== ['_ignorado' => $limpio['_ignorado'] ?? null]) {
+                $previos[$llave] = $limpio;
+            } elseif (!empty($limpio['_ignorado'])) {
+                $previos[$llave] = ['_ignorado' => $limpio['_ignorado']];
+            }
+            else unset($previos[$llave]);
+        }
+        return $previos;
     }
 
     /**
@@ -433,13 +568,21 @@ final class ImportarVentas
      * deduce de él (monto ÷ base), en vez de aplicar un porcentaje fijo
      * y que salgan números que nadie reconoce.
      */
-    private function comisiones($f, $iCom, array $r)
+    private function comisiones($f, $iCom, array $r, $ajuste = null)
     {
-        if ($iCom === null) return [];
         $base = (float)$r['base'];
         $out = [];
         foreach (self::CONCEPTOS as $k => $concepto) {
-            $monto = self::numero($f[$iCom + $k] ?? null);
+            // Lo corregido a mano gana sobre lo del archivo. Un importe
+            // puesto en cero BORRA esa comisión, que es lo que alguien
+            // quiere decir al escribir cero.
+            if ($ajuste !== null && array_key_exists('com' . $k, $ajuste)) {
+                $monto = self::numero($ajuste['com' . $k]);
+            } elseif ($iCom === null) {
+                continue;
+            } else {
+                $monto = self::numero($f[$iCom + $k] ?? null);
+            }
             if ($monto === null || abs($monto) < 0.005) continue;
             // Sin base no hay porcentaje que valga: se guarda en cero y
             // el monto queda anotado para que alguien lo revise.

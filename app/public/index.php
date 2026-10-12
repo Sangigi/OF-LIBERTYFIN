@@ -104,6 +104,7 @@ $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 // Traer a LibertyFin la hoja de ventas que se llevaba en Excel.
 $r->get ('/importar',          ['LibertyFin\Controlador\ImportarControlador', 'index']);
 $r->post('/importar/analizar', ['LibertyFin\Controlador\ImportarControlador', 'analizar']);
+$r->post('/importar/ajustar',  ['LibertyFin\Controlador\ImportarControlador', 'ajustar']);
 $r->post('/importar/aplicar',  ['LibertyFin\Controlador\ImportarControlador', 'aplicar']);
 $r->get ('/importar/cancelar', ['LibertyFin\Controlador\ImportarControlador', 'cancelar']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
@@ -243,6 +244,7 @@ $permisos = [
   '/ventas'                 => 'ver.ventas',
   '/importar'               => 'importar.ventas',
   '/importar/analizar'      => 'importar.ventas',
+  '/importar/ajustar'       => 'importar.ventas',
   '/importar/aplicar'       => 'importar.ventas',
   '/importar/cancelar'      => 'importar.ventas',
   '/ventas/{id}'            => 'ver.ventas',
