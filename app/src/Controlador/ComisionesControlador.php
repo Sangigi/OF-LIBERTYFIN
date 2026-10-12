@@ -45,9 +45,73 @@ final class ComisionesControlador
             'candidatos' => $candidatos,
             'desde'      => $desde,
             'hasta'      => $hasta,
+            // El último "Recalcular comisiones", con lo que cambió y su Deshacer.
+            'recalculo'  => ($_SESSION['usuario_rol'] ?? '') === 'admin'
+                            ? (new \LibertyFin\Servicio\RecalcularComisiones($db))->ultimo() : null,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);
+    }
+
+    /**
+     * Recalcula lo devengado de todas las ventas contra sus pagos de hoy
+     * (ver Servicio\RecalcularComisiones). Lo que cambia se puede deshacer.
+     */
+    public function recalcular()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        try {
+            $r = (new \LibertyFin\Servicio\RecalcularComisiones($db))->todas();
+            Auditoria::anota('comision.recalcular', $r['revisadas'] . ' ventas revisadas', null,
+                $r['cambiadas'] . ' cambiaron');
+            $t = $r['cambiadas']
+                ? 'Listo: se revisaron ' . $r['revisadas'] . ' ventas y ' . $r['cambiadas']
+                  . ($r['cambiadas'] == 1 ? ' cambió' : ' cambiaron') . '. Abajo está qué se movió; si algo no te convence, puedes deshacerlo.'
+                : 'Listo: las ' . $r['revisadas'] . ' ventas ya estaban bien y no cambió nada.';
+            if ($r['errores']) {
+                $t .= ' ' . $r['errores'] . ($r['errores'] == 1 ? ' venta no se pudo' : ' ventas no se pudieron')
+                    . ' recalcular y ' . ($r['errores'] == 1 ? 'quedó' : 'quedaron') . ' como estaba' . ($r['errores'] == 1 ? '' : 'n') . '.';
+            }
+            $this->volver($t, 'ok');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] recalcular comisiones: ' . $e->getMessage());
+            $this->volver('No se pudieron recalcular las comisiones.', 'error');
+        }
+    }
+
+    /** Regresa las ventas de un recálculo a como estaban. */
+    public function deshacerRecalculo()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (empty($_SESSION['lf_token']) || empty($_POST['token'])
+            || !hash_equals($_SESSION['lf_token'], $_POST['token'])) {
+            $this->volver('No se pudo verificar el formulario.', 'error');
+        }
+        $id = (int)($_POST['id'] ?? 0);
+        try {
+            $r = (new \LibertyFin\Servicio\RecalcularComisiones($db))->deshacer($id);
+            Auditoria::anota('comision.deshacer', 'recálculo ' . $id, null,
+                $r['regresadas'] . ' ventas regresadas');
+            $t = 'Se deshizo el recálculo: ' . $r['regresadas']
+               . ($r['regresadas'] == 1 ? ' venta volvió' : ' ventas volvieron') . ' a como estaba'
+               . ($r['regresadas'] == 1 ? '' : 'n') . '.';
+            if ($r['saltadas']) {
+                $t .= ' ' . $r['saltadas'] . ($r['saltadas'] == 1 ? ' tuvo' : ' tuvieron')
+                    . ' un pago o una comisión nueva después y se ' . ($r['saltadas'] == 1 ? 'dejó' : 'dejaron')
+                    . ' como está' . ($r['saltadas'] == 1 ? '' : 'n') . ': regresarla' . ($r['saltadas'] == 1 ? '' : 's')
+                    . ' borraría eso.';
+            }
+            $this->volver($t, 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] deshacer recálculo: ' . $e->getMessage());
+            $this->volver('No se pudo deshacer el recálculo.', 'error');
+        }
     }
 
     /**

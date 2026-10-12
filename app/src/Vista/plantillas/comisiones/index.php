@@ -34,10 +34,78 @@ $qs = function ($x = []) use ($desde, $hasta) {
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
   <?php if ($esAdmin): ?>
-    <a class="btn btn-primary btn-sm" style="margin-left:auto"
+    <?php /* `form=`: el botón manda el formulario de abajo, que va fuera de este
+             (un formulario no puede ir dentro de otro). */ ?>
+    <button class="btn btn-secondary btn-sm" style="margin-left:auto" type="submit" form="formRecalcular"
+            title="Vuelve a repartir lo devengado de cada venta entre los pagos que tiene hoy">
+      Recalcular comisiones</button>
+    <a class="btn btn-primary btn-sm"
        href="/comisiones/lote?<?= P::e(http_build_query(['desde' => $desde, 'hasta' => $hasta])) ?>">Asignar en lote</a>
   <?php endif; ?>
 </form>
+
+<?php if ($esAdmin): ?>
+<form method="post" action="/comisiones/recalcular" id="formRecalcular" hidden
+      onsubmit="return confirm('¿Recalcular las comisiones de todas las ventas?\n\nCada venta se vuelve a calcular contra los pagos que tiene hoy. Las que ya están bien no cambian.\n\nAl terminar verás qué cambió y podrás deshacerlo.')">
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+</form>
+<?php endif; ?>
+
+<?php /* EL ÚLTIMO RECÁLCULO: qué ventas cambiaron, cuánto se movió de un mes
+         a otro, y el botón para regresarlo. Ver Servicio\RecalcularComisiones. */
+if (!empty($recalculo) && !$recalculo['deshecho_en'] && $recalculo['ventas']):
+  $mesCorto = function ($ym) {
+      $n = ['01'=>'Ene','02'=>'Feb','03'=>'Mar','04'=>'Abr','05'=>'May','06'=>'Jun',
+            '07'=>'Jul','08'=>'Ago','09'=>'Sep','10'=>'Oct','11'=>'Nov','12'=>'Dic'];
+      return ($n[substr($ym, 5, 2)] ?? $ym) . ' ' . substr($ym, 0, 4);
+  };
+  $cuantas = count($recalculo['ventas']); ?>
+<section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 35%,transparent)">
+  <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+    <div><span>Último recálculo</span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        <?= date('d/m/Y H:i', strtotime($recalculo['creado_en'])) ?>
+        <?= $recalculo['usuario_nombre'] ? '· ' . P::e($recalculo['usuario_nombre']) : '' ?>
+        · de <?= (int)$recalculo['ventas_revisadas'] ?> ventas revisadas, cambiaron <?= $cuantas ?></p></div>
+    <form method="post" action="/comisiones/recalcular/deshacer"
+          onsubmit="return confirm('¿Deshacer este recálculo?\n\nLas ventas de la lista vuelven a como estaban. Si alguna tuvo un pago o una comisión nueva después, esa se deja como está para no borrar lo nuevo.')">
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <input type="hidden" name="id" value="<?= (int)$recalculo['id'] ?>">
+      <button class="btn btn-secondary btn-sm" type="submit">Deshacer</button>
+    </form>
+  </header>
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table table-hover">
+      <thead><tr><th>Venta</th><th>Cliente</th><th class="text-end">Comisión antes</th>
+        <th class="text-end">Después</th><th>Qué se movió</th></tr></thead>
+      <tbody>
+      <?php foreach (array_slice($recalculo['ventas'], 0, 50) as $x): ?>
+        <tr>
+          <td data-label="Venta">
+            <a data-lf-fila href="/ventas/<?= (int)$x['venta_id'] ?>" data-modal
+               class="lf-mono" style="font-weight:600;color:var(--lf-tinta)"><?= P::e($x['folio']) ?></a></td>
+          <td data-label="Cliente" style="font-size:12.5px"><?= P::e($x['cliente']) ?></td>
+          <td data-label="Comisión antes" class="text-end lf-mono" style="color:var(--lf-tinta-3)"><?= D::pesos($x['antes']) ?></td>
+          <td data-label="Después" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($x['despues']) ?></td>
+          <td data-label="Qué se movió" style="font-size:12px">
+            <?php foreach ($x['meses'] as $ym => $dif): ?>
+              <span style="display:inline-block;margin-right:8px;white-space:nowrap;
+                    color:<?= $dif > 0 ? 'var(--lf-amb)' : 'var(--lf-brand-2)' ?>">
+                <?= P::e($mesCorto($ym)) ?> <?= $dif > 0 ? '+' : '−' ?><?= D::pesos(abs($dif)) ?></span>
+            <?php endforeach; ?></td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    Lo devengado de cada venta se volvió a repartir entre los pagos que tiene hoy; solo salen
+    las que cambiaron<?= $cuantas > 50 ? ' (aquí las 50 que más se movieron, de ' . $cuantas . ')' : '' ?>.
+    «+» es comisión que se suma a ese mes y «−» la que sale de él.
+    Quién cobra y cuánto, si liquida, no cambió.
+  </div>
+</section>
+<?php endif; ?>
 
 <div class="lf-stats">
   <div class="stat-card lf-hero">

@@ -32,6 +32,8 @@ final class Auditoria
         'comision.quitar'   => 'Quitó una comisión',
         'comision.reasignar'=> 'Reasignó una comisión',
         'comision.lote'     => 'Asignó comisiones en lote',
+        'comision.recalcular' => 'Recalculó las comisiones de todas las ventas',
+        'comision.deshacer' => 'Deshizo un recálculo de comisiones',
         'servicio.precio'   => 'Cambió un precio',
         'servicio.alternar' => 'Activó o desactivó un servicio',
         'gasto.borrar'      => 'Borró un gasto',
