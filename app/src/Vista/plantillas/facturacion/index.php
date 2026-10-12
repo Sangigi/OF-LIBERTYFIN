@@ -79,9 +79,8 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
           No hay ventas en este periodo.</td></tr>
       <?php endif; ?>
       <?php foreach ($ventas as $v):
-        $liquidada  = (float)$v['saldo'] <= 0.01;
-        $sinCliente = empty($v['cliente']);
-        $facturada  = !empty($v['factura_uuid']); ?>
+        $liquidada = (float)$v['saldo'] <= 0.01;
+        $sinCliente = empty($v['cliente']); ?>
         <tr>
           <td data-label="Cliente">
             <a data-lf-fila href="/ventas/<?= (int)$v['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
@@ -92,10 +91,7 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
           <td data-label="Total" class="text-end lf-mono"><?= D::pesos($v['total']) ?></td>
           <td data-label="Cobrado" class="text-end lf-mono"><?= D::pesos($v['cobrado']) ?></td>
           <td data-label="Estado">
-            <?php if ($facturada): ?>
-              <span class="badge bg-info" title="UUID <?= P::e($v['factura_uuid']) ?>">
-                Ya está facturada</span>
-            <?php elseif (!$liquidada): ?>
+            <?php if (!$liquidada): ?>
               <span class="badge bg-warning">Sin liquidar</span>
             <?php elseif ($sinCliente): ?>
               <span class="badge bg-secondary">Sin cliente</span>
@@ -104,15 +100,8 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
             <?php endif; ?>
           </td>
           <td style="text-align:right">
-            <?php if ($facturada): ?>
-              <a class="btn btn-secondary btn-sm" disabled
-                 href="#" onclick="return false"
-                 title="Venta ya facturada">
-                Timbrar
-              </a>
-            <?php elseif ($listo && $liquidada && !$sinCliente): ?>
-              <a class="btn btn-secondary btn-sm"
-                 href="/facturacion/<?= (int)$v['id'] ?>/timbrar">Timbrar</a>
+            <?php if ($listo && $liquidada && !$sinCliente): ?>
+              <a class="btn btn-secondary btn-sm" href="/facturacion/<?= (int)$v['id'] ?>/timbrar">Timbrar</a>
             <?php endif; ?>
           </td>
         </tr>
