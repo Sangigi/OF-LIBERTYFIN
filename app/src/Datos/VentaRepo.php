@@ -117,7 +117,7 @@ final class VentaRepo extends Repo
         // octubre que se liquidó en noviembre salía "Debe" al ver octubre, y
         // no coincidía con su detalle ni con el filtro de estado.
         return $this->todos("
-            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado,
+            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado, v.factura_uuid,c.regimen_fiscal,
                    COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
                    COALESCE(pv.cobrado,0) AS cobrado,
