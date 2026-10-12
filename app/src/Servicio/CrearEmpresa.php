@@ -169,8 +169,14 @@ final class CrearEmpresa
         // Cargar el esquema y ponerlo al día.
         $db = Conexion::de($base);
         $sql = file_get_contents($esquema);
+        // Se quitan los comentarios de línea ANTES de partir por ";". Si no,
+        // el encabezado del archivo se pega a la primera sentencia
+        // (CREATE TABLE sucursales), esta empieza con "--" y se descartaba
+        // completa: sin sucursales fallaban también las tablas con llave
+        // foránea hacia ella y el alta terminaba con "1146 table doesn't exist".
+        $sql = preg_replace('/^[ \t]*--.*$/m', '', $sql);
         foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $sent) {
-            if (strpos($sent, '--') === 0 || $sent === '') continue;
+            if ($sent === '') continue;
             try { $db->exec($sent); }
             catch (\Throwable $e) { error_log('[LibertyFin] esquema: ' . $e->getMessage()); }
         }
