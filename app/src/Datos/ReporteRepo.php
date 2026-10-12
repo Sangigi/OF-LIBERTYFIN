@@ -242,6 +242,24 @@ final class ReporteRepo extends Repo
         ];
     }
 
+    /**
+     * Para el Panel: lo que entró en el periodo —la misma cifra que
+     * «Entraron» de resultado()— y de dónde: de las ventas del periodo o de
+     * ventas anteriores. Dos consultas, no todo el resultado.
+     */
+    public function entro($desde, $hasta)
+    {
+        list($a, $b) = $this->rango($desde, $hasta);
+        $sql = "SELECT COALESCE(SUM(p.monto),0)
+                FROM venta_pagos p INNER JOIN ventas v ON v.id = p.venta_id
+                WHERE p.cancelado = 0 AND v.estado <> 'cancelada'
+                  AND p.fecha_pago >= ? AND p.fecha_pago < ?";
+        $total = (float)$this->valor($sql, [$a, $b]);
+        $ant   = (float)$this->valor($sql . " AND v.fecha < ?", [$a, $b, $a]);
+        return ['total' => round($total, 2), 'anteriores' => round($ant, 2),
+                'nuevas' => round($total - $ant, 2)];
+    }
+
     /** Lo mismo mes a mes, para ver la tendencia. */
     public function porMes($meses = 6)
     {

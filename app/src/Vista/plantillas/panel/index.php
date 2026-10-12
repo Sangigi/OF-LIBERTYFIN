@@ -25,7 +25,7 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
     <div style="flex:1;min-width:230px">
       <span class="lf-tag"><i></i>Síntesis del día</span>
       <h2>La cobranza <em><?= P::e($sintesis['tono']) ?></em><?php if(isset($sintesis['pct'])): ?>:
-        <?= $sintesis['pct'] ?>% del periodo ya entró.<?php endif; ?></h2>
+        <?= $sintesis['pct'] ?>% de lo vendido ya entró.<?php endif; ?></h2>
       <p><?= P::e($sintesis['detalle']) ?></p>
       <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:8px">
         El marcador es qué tan al corriente va la cobranza: el porcentaje ya
@@ -75,12 +75,22 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
   $sc = []; $sv = [];
   foreach ($meses as $m) { $sc[] = $m['cobrado']; $sv[] = $m['vendido']; }
   ?>
+  <?php /* LO QUE ENTRÓ, la misma cifra que «Entraron» de Reportes: antes
+           esta tarjeta decía "Cobrado en el periodo" pero solo contaba lo de
+           las ventas del periodo, y Reportes daba otra cifra. Abajo, de dónde
+           vino (las dos partes suman la grande). El avance contra lo vendido
+           pasó a "Por cobrar", que es donde se pregunta eso. */ ?>
   <div class="stat-card lf-hero">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>
-    <div class="stat-value"><?= D::pesos($cobrado) ?></div>
-    <div class="stat-label">Cobrado en el periodo</div>
-    <?php W::avance($avance); ?>
-    <div class="stat-meta"><?= $avance ?>% de lo vendido · faltan <?= D::corto($saldoT) ?></div>
+    <div class="stat-value"><?= D::pesos($entro['total']) ?></div>
+    <div class="stat-label">Entró en el periodo</div>
+    <div class="stat-meta">
+      <?php if ($entro['anteriores'] > 0): ?>
+        <?= D::pesos($entro['nuevas']) ?> de ventas del periodo ·
+        <?= D::pesos($entro['anteriores']) ?> de ventas anteriores
+      <?php else: ?>
+        todo de ventas del periodo
+      <?php endif; ?></div>
     <?php W::spark($sc); ?>
   </div>
 
@@ -88,8 +98,9 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
     <div class="lf-tile a"><?= W::icono('reloj','19px') ?></div>
     <div class="stat-value"><?= D::pesos($saldoT) ?></div>
     <div class="stat-label">Por cobrar</div>
-    <?php W::avance(100 - $avance, true); ?>
-    <div class="stat-meta"><?= (int)($resumen['con_saldo'] ?? 0) ?> ventas con saldo abierto</div>
+    <?php W::avance($avance); ?>
+    <div class="stat-meta"><?= (int)($resumen['con_saldo'] ?? 0) ?> ventas con saldo ·
+      llevas el <?= $avance ?>% de lo vendido</div>
   </div>
 
   <div class="stat-card">

@@ -36,6 +36,10 @@ final class PanelControlador
             'subtitulo' => Fechas::rotulo($desde, $hasta),
             'saludo'    => self::saludo(),
             'resumen'   => $resumen,
+            // Lo que ENTRÓ en el periodo, igual que «Entraron» de Reportes:
+            // incluye lo que llegó de ventas anteriores. `cobrado` (arriba)
+            // es solo lo de las ventas del periodo y sirve para el avance.
+            'entro'     => (new \LibertyFin\Datos\ReporteRepo($db))->entro($desde, $hasta),
             'avance'    => Dinero::pct($cobrado, $vendido),
             'alCorriente' => self::alCorriente($cobrado, $vendido, $viejo),
             'sintesis'  => self::sintesis($cobrado, $vendido, $resumen, $viejo),
