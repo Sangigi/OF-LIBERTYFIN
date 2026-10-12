@@ -23,10 +23,10 @@ final class Reportes
                       . 'las comisiones que generó y el IVA que venía en lo cobrado (no es de la empresa). Suma lo mismo que «Queda» (sin los gastos '
                       . 'generales, que no son de ningún área). «Cobrado» junta lo de las ventas '
                       . 'nuevas y lo de ventas anteriores (anticipos, abonos y liquidaciones que '
-                      . 'llegaron en el periodo); «Liquidaciones» son los cobros que dejaron pagada '
-                      . 'una venta anterior: son parte de «Cobros anteriores», no aparte. El área sale '
+                      . 'llegaron en el periodo). El área sale '
                       . 'del producto contratado, no del cliente; una venta con productos de dos '
-                      . 'áreas reparte su dinero entre las dos, y un cobro repartido cuenta en las dos.',
+                      . 'áreas reparte su dinero entre las dos. Cada cobro, y si fue abono o '
+                      . 'liquidación, está en «Detalle de pagos».',
         ],
         'colaborador' => [
             'rotulo' => 'Por colaborador',
@@ -44,9 +44,10 @@ final class Reportes
         ],
         'cliente' => [
             'rotulo' => 'Por cliente',
-            'nota'   => 'Lo que cada cliente ha comprado y lo que todavía debe. «De ventas anteriores» '
-                      . 'es lo que pagó en el periodo de compras de antes; quien solo abonó a una '
-                      . 'venta vieja sale resaltado.',
+            'nota'   => 'Lo que cada cliente compró en el periodo, lo que ya pagó de eso y lo que '
+                      . 'debe. «De ventas anteriores» es lo que pagó en el periodo de compras de '
+                      . 'antes; quien solo abonó a una venta vieja sale resaltado. Cada cobro, y si '
+                      . 'fue abono o liquidación, está en «Detalle de pagos».',
         ],
         'cobranza' => [
             'rotulo' => 'Cobranza',
@@ -111,6 +112,12 @@ final class Reportes
                 // mejor de lo que fue y las filas no sumaban "Queda".
                 // Son columnas y no subrenglones: así el Excel se puede
                 // sumar, filtrar y ordenar.
+                //
+                // SIN "Cobros anteriores" NI "Liquidaciones". Eran dos conteos
+                // lado a lado ("2" y "1") que se leían como tres cosas, cuando
+                // la liquidación es UNO de esos cobros. Lo que importa aquí es
+                // el dinero; cada cobro, con su estado, está en el Detalle de
+                // pagos.
                 $f   = $r->porArea($desde, $hasta);
                 $res = $r->resultado($desde, $hasta);
                 $margen = function ($queda, $cobrado) {
@@ -122,14 +129,10 @@ final class Reportes
                      ['Cobrado', Libro::MONEDA, 15],
                      ['De ventas nuevas', Libro::MONEDA, 15],
                      ['De ventas anteriores', Libro::MONEDA, 15],
-                     ['Cobros anteriores', Libro::NUMERO, 11],
-                     ['Liquidaciones', Libro::NUMERO, 11],
                      ['Gastos', Libro::MONEDA, 14], ['Comisiones', Libro::MONEDA, 14],
                      ['IVA cobrado', Libro::MONEDA, 13],
                      ['Queda', Libro::MONEDA, 15], ['Margen', Libro::PORCENT, 10]],
                     array_map(function ($x) use ($margen) {
-                        $nAnt = (int)($x['cobros_ant'] ?? 0);
-                        $lAnt = (int)($x['liquidadas_ant'] ?? 0);
                         $mAnt = (float)($x['de_anteriores'] ?? 0);
                         return [$x['area'],
                                 (int)$x['ventas'] ?: '',
@@ -137,8 +140,6 @@ final class Reportes
                                 $x['cobrado_total'],
                                 (float)$x['cobrado'] ?: '',
                                 $mAnt > 0 ? $mAnt : '',
-                                $nAnt > 0 ? $nAnt : '',
-                                $lAnt > 0 ? $lAnt : '',
                                 $x['gastos'], $x['comisiones_total'],
                                 (float)$x['iva'] ?: '', $x['queda'],
                                 $margen($x['queda'], $x['cobrado_total'])];
@@ -154,8 +155,7 @@ final class Reportes
                                          - $res['iva_cobrado'], 2);
                             return ['TOTAL', (int)$t['ventas'], $res['vendido'],
                                 $res['cobrado'], round($res['cobrado'] - $res['de_anteriores'], 2),
-                                $res['de_anteriores'], $res['de_anteriores_cobros'],
-                                $res['de_anteriores_liquidadas'],
+                                $res['de_anteriores'],
                                 $res['operacion'], $res['comisiones'], $res['iva_cobrado'], $queda,
                                 $margen($queda, $res['cobrado'])]; }));
 
@@ -181,27 +181,29 @@ final class Reportes
                 foreach ($f as $x) {
                     $a = $ant['filas'][(int)$x['producto_id']] ?? null;
                     unset($ant['filas'][(int)$x['producto_id']]);
+                    // Sin el conteo de "Cobros anteriores": un cobro de una
+                    // venta con dos productos contaba en los dos, y la suma de
+                    // la columna no daba los cobros que hubo.
                     $filas[] = [$x['nombre'], (int)$x['veces'], $x['facturado'],
-                                $a ? (int)$a['cobros'] : '', $a ? (float)$a['monto'] : ''];
+                                $a ? (float)$a['monto'] : ''];
                 }
                 foreach ($ant['filas'] as $a) {
-                    $filas[] = [$a['nombre'], '', '', (int)$a['cobros'], (float)$a['monto'],
+                    $filas[] = [$a['nombre'], '', '', (float)$a['monto'],
                                 '_origen' => 'anterior'];
                 }
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Producto', Libro::TEXTO, 44], ['Veces', Libro::NUMERO, 10],
                      ['Vendido', Libro::MONEDA, 16],
-                     ['Cobros anteriores', Libro::NUMERO, 11],
                      ['De ventas anteriores', Libro::MONEDA, 16]],
                     $filas,
                     // El TOTAL sale del resumen, no de sumar la columna: cada
                     // producto redondea su parte de la venta y la suma podía
                     // diferir en un centavo de lo vendido.
                     $this->sumar($f, ['veces'],
-                        function ($t) use ($ant, $r, $desde, $hasta) {
+                        function ($t) use ($r, $desde, $hasta) {
                             $res = $r->resultado($desde, $hasta);
                             return ['TOTAL', (int)$t['veces'], $res['vendido'],
-                                (int)$ant['cobros'], $res['de_anteriores']]; }));
+                                $res['de_anteriores']]; }));
 
             case 'cliente':
                 // Igual: sus compras del periodo y lo que pagó de compras de
@@ -213,35 +215,28 @@ final class Reportes
                 foreach ($f as $x) {
                     $a = $ant[(int)$x['cliente_id']] ?? null;
                     unset($ant[(int)$x['cliente_id']]);
+                    // Sin "Cobros anteriores" ni "Liquidaciones": dos conteos
+                    // lado a lado ("2" y "1") se leían como tres cosas, cuando
+                    // la liquidación es uno de esos cobros. Queda el dinero.
                     $filas[] = [$x['cliente'], $x['area'] ?? '', (int)$x['compras'],
                                 $x['vendido'], $x['cobrado'], $x['vendido'] - $x['cobrado'],
-                                $a ? (int)$a['cobros'] : '',
-                                $a ? ((int)$a['liquidadas'] ?: '') : '',
                                 $a ? (float)$a['monto'] : ''];
                 }
                 foreach ($ant as $a) {
-                    $filas[] = [$a['cliente'], '', '', '', '', '',
-                                (int)$a['cobros'], ((int)$a['liquidadas'] ?: ''), (float)$a['monto'],
+                    $filas[] = [$a['cliente'], '', '', '', '', '', (float)$a['monto'],
                                 '_origen' => 'anterior'];
                 }
-                $tAnt = ['cobros' => 0, 'liquidadas' => 0, 'monto' => 0.0];
-                foreach ($todos as $a) {
-                    $tAnt['cobros'] += (int)$a['cobros'];
-                    $tAnt['liquidadas'] += (int)$a['liquidadas'];
-                    $tAnt['monto'] += (float)$a['monto'];
-                }
+                $tAnt = 0.0;
+                foreach ($todos as $a) $tAnt += (float)$a['monto'];
                 return $this->envolver($tipo, $desde, $hasta,
                     [['Cliente', Libro::TEXTO, 34], ['Área', Libro::TEXTO, 24],
                      ['Compras', Libro::NUMERO, 10], ['Vendido', Libro::MONEDA, 15],
                      ['Cobrado', Libro::MONEDA, 15], ['Debe', Libro::MONEDA, 15],
-                     ['Cobros anteriores', Libro::NUMERO, 11],
-                     ['Liquidaciones', Libro::NUMERO, 11],
                      ['De ventas anteriores', Libro::MONEDA, 15]],
                     $filas,
                     $this->sumar($f, ['compras','vendido','cobrado'],
                         function ($t) use ($tAnt) { return ['TOTAL', '', (int)$t['compras'], $t['vendido'],
-                            $t['cobrado'], $t['vendido'] - $t['cobrado'],
-                            $tAnt['cobros'], $tAnt['liquidadas'], round($tAnt['monto'], 2)]; }));
+                            $t['cobrado'], $t['vendido'] - $t['cobrado'], round($tAnt, 2)]; }));
 
             case 'cobranza':
                 // Las ventas del periodo que deben y, al final, las de antes
@@ -283,7 +278,7 @@ final class Reportes
             case 'dia':
                 $f = $r->porDia($desde, $hasta);
                 return $this->envolver($tipo, $desde, $hasta,
-                    [['Fecha', Libro::FECHA, 14], ['Pagos', Libro::NUMERO, 10],
+                    [['Fecha', Libro::FECHA, 14], ['Cobros', Libro::NUMERO, 10],
                      ['Cobrado', Libro::MONEDA, 16]],
                     array_map(function ($x) {
                         return [$x['dia'], (int)$x['pagos'], $x['cobrado']];

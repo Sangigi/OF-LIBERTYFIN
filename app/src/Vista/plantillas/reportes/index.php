@@ -13,7 +13,6 @@ $seFue = array_keys(array_filter([
 $seFueTxt = count($seFue) > 1
     ? implode(', ', array_slice($seFue, 0, -1)) . (end($seFue) === 'IVA' ? ' e ' : ' y ') . end($seFue)
     : (string)reset($seFue);
-$qs = http_build_query(['desde'=>$desde,'hasta'=>$hasta]);
 
 /* Cómo llamar a las ventas de antes del periodo: "de meses anteriores" con
    meses completos, o "anteriores al 15/10/2026" con un rango a mitad de mes.
@@ -26,8 +25,8 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
   <input class="form-control form-control-sm" type="date" name="desde" value="<?= P::e($desde) ?>" style="width:auto">
   <input class="form-control form-control-sm" type="date" name="hasta" value="<?= P::e($hasta) ?>" style="width:auto">
   <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
-  <a class="btn btn-secondary btn-sm" href="/reportes/excel?<?= P::e($qs) ?>" style="margin-left:auto">
-    <?= W::icono('baja','15px') ?>Descargar detalle</a>
+  <?php /* Aquí había un "Descargar detalle" que bajaba el mismo archivo que
+           "Descargar Excel" de arriba y "Excel completo" de los reportes. */ ?>
 </form>
 
 <div class="lf-sintesis">
@@ -107,7 +106,7 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
       <b style="color:var(--lf-amb)"><?= D::pesos($r['por_cobrar']) ?></b>.
       Lo que falta no cuenta aquí hasta que entre: vender no es cobrar.</p>
       <?php if ($r['iva'] > 0): ?>
-      <p>De esas ventas, <b><?= D::pesos($r['iva']) ?></b> son IVA: no es ingreso, es del SAT.</p>
+      <p>De esas ventas, <b><?= D::pesos($r['iva']) ?></b> son IVA.</p>
       <?php endif; ?>
       <?php /* Lo que entró por ventas de meses anteriores. Ya está dentro de
                "Cobrado"; se dice aparte porque las tablas por fecha de venta
