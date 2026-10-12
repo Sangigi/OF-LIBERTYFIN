@@ -284,4 +284,130 @@ final class VentaRepo extends Repo
             ORDER BY dias DESC, saldo DESC
             LIMIT " . (int)$tope);
     }
+
+
+    // ─────────────────────────────────────────────────────────────
+    // FACTURACIÓN (CFDI)
+    //
+    // El schema de `clientes` ya guarda todo lo fiscal con sus nombres
+    // naturales (rfc, razon_social, regimen_fiscal, uso_cfdi,
+    // codigo_postal) y `ventas` ya tenía factura_uuid, factura_folio,
+    // facturapi_receipt_id y urlfacturacion. Así que en lugar de duplicar
+    // columnas con sufijo `_factura`, se reutiliza lo que ya existía.
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Datos fiscales del cliente para armar el CFDI.
+     *
+     * La ficha del cliente ES la ficha fiscal: lo que el usuario captura
+     * en la sección de clientes es exactamente lo que viaja al PAC. No hay
+     * columnas paralelas que puedan desincronizarse.
+     */
+    public function datosFiscalesCliente($clienteId)
+    {
+        return $this->uno("
+            SELECT rfc, razon_social, regimen_fiscal AS regimen,
+                   uso_cfdi, codigo_postal AS cp, email,
+                   calle_numero, numero_interior, colonia,
+                   delegacion_municipio, ciudad, estado_direccion, pais
+            FROM clientes WHERE id = ?", [(int)$clienteId]);
+    }
+
+    /**
+     * Marca la venta como facturada y guarda el bloque de respuesta del PAC.
+     *
+     * Columnas reutilizadas del schema original:
+     *   factura_uuid         -> uuid de Facturapi
+     *   factura_folio        -> folio_number
+     *   facturapi_receipt_id -> id de la factura en Facturapi (nombre
+     *                           engañoso: dice "receipt", pero es un varchar
+     *                           libre y estaba vacío)
+     *   urlfacturacion       -> verification_url
+     *
+     * El resto (receptor, impuestos, método/forma de pago) se persiste aquí
+     * por primera vez. Antes vivía solo en localStorage del navegador, y por
+     * eso al recargar la pestaña "Emitidas" se vaciaba y la misma venta se
+     * podía volver a timbrar por error — consumiendo timbre real.
+     */
+    /**
+     * Marca la venta como facturada y guarda el bloque de respuesta del PAC.
+     *
+     * Columnas reutilizadas del schema original:
+     *   factura_uuid         -> uuid de Facturapi
+     *   factura_folio        -> folio_number
+     *   facturapi_receipt_id -> id de la factura en Facturapi (nombre
+     *                           engañoso: dice "receipt", pero es un varchar
+     *                           libre y estaba vacío)
+     *   urlfacturacion       -> verification_url
+     *
+     * El resto (receptor, impuestos, método/forma de pago) se persiste aquí
+     * por primera vez. Antes vivía solo en localStorage del navegador, y por
+     * eso al recargar la pestaña "Emitidas" se vaciaba y la misma venta se
+     * podía volver a timbrar por error — consumiendo timbre real.
+     */
+    public function marcarFacturada($ventaId, array $d)
+    {
+        $this->db->prepare("
+            UPDATE ventas SET
+                facturada              = 1,
+                factura_uuid           = ?,
+                factura_folio          = ?,
+                facturapi_receipt_id   = ?,
+                urlfacturacion         = ?,
+                factura_fecha_timbrado = ?,
+                factura_subtotal       = ?,
+                factura_iva            = ?,
+                factura_total          = ?,
+                factura_rfc_receptor   = ?,
+                factura_razon_social   = ?,
+                factura_uso_cfdi       = ?,
+                factura_metodo_pago    = ?,
+                factura_forma_pago     = ?,
+                factura_cp_receptor    = ?,
+                factura_email_receptor = ?
+            WHERE id = ?
+        ")->execute([
+            $d['factura_uuid'],
+            $d['factura_folio'],
+            $d['facturapi_id'],
+            $d['urlfacturacion'],
+            $d['factura_fecha_timbrado'],
+            $d['factura_subtotal'],
+            $d['factura_iva'],
+            $d['factura_total'],
+            $d['factura_rfc_receptor'],
+            $d['factura_razon_social'],
+            $d['factura_uso_cfdi'],
+            $d['factura_metodo_pago'],
+            $d['factura_forma_pago'],
+            $d['factura_cp_receptor'],
+            $d['factura_email_receptor'],
+            (int) $ventaId,
+        ]);
+    }
+
+    /**
+     * Guarda los fiscales capturados en el formulario de facturación de
+     * vuelta en el cliente, para pre-rellenar la próxima. Se limita a las
+     * columnas que ya existen en `clientes`.
+     */
+    public function guardarFiscalesCliente($clienteId, array $d)
+    {
+        $this->db->prepare("
+            UPDATE clientes SET
+                rfc            = ?,
+                razon_social   = ?,
+                regimen_fiscal = ?,
+                uso_cfdi       = ?,
+                codigo_postal  = ?
+            WHERE id = ?
+        ")->execute([
+            $d['rfc'],
+            $d['razon_social'],
+            $d['regimen'],
+            $d['uso_cfdi'],
+            $d['cp'],
+            (int) $clienteId,
+        ]);
+    }
 }
