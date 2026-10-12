@@ -39,33 +39,8 @@ final class RecalcularComisiones
     private $db;
     public function __construct(PDO $db) { $this->db = $db; }
 
-    private function asegurar()
-    {
-        $this->db->exec("
-            CREATE TABLE IF NOT EXISTS comision_recalculos (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                creado_en DATETIME NOT NULL,
-                usuario_id INT NULL,
-                usuario_nombre VARCHAR(160) NULL,
-                ventas_revisadas INT NOT NULL DEFAULT 0,
-                ventas_cambiadas INT NOT NULL DEFAULT 0,
-                deshecho_en DATETIME NULL,
-                deshecho_por VARCHAR(160) NULL
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-        $this->db->exec("
-            CREATE TABLE IF NOT EXISTS comision_recalculo_ventas (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                recalculo_id INT NOT NULL,
-                venta_id INT NOT NULL,
-                antes DECIMAL(12,2) NOT NULL DEFAULT 0,
-                despues DECIMAL(12,2) NOT NULL DEFAULT 0,
-                meses TEXT NULL,
-                huella CHAR(32) NOT NULL,
-                filas_antes MEDIUMTEXT NOT NULL,
-                deshecha TINYINT(1) NOT NULL DEFAULT 0,
-                KEY ix_crv_recalculo (recalculo_id)
-            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    }
+    // Las tablas (comision_recalculos y comision_recalculo_ventas) las crea
+    // Servicio\Migraciones, versión 16, como el resto del esquema.
 
     /**
      * Recalcula todas las ventas (no canceladas) con comisiones.
@@ -73,7 +48,6 @@ final class RecalcularComisiones
      */
     public function todas()
     {
-        $this->asegurar();
         // Con muchas ventas tarda unos segundos: que el hosting no lo corte.
         if (function_exists('set_time_limit')) @set_time_limit(300);
 
@@ -132,7 +106,6 @@ final class RecalcularComisiones
      */
     public function deshacer($recalculoId)
     {
-        $this->asegurar();
         $st = $this->db->prepare("SELECT * FROM comision_recalculos WHERE id = ?");
         $st->execute([(int)$recalculoId]);
         $r = $st->fetch();

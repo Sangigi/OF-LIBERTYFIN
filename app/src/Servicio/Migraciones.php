@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 15;
+    const VERSION = 16;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -577,6 +577,49 @@ final class Migraciones
         }
     }
 
+    /**
+     * 16 · El historial de «Recalcular comisiones», para poder deshacerlo.
+     *
+     *   comision_recalculos        cada vez que se presionó el botón: quién,
+     *                              cuándo, cuántas ventas revisó y cambió, y
+     *                              si se deshizo.
+     *   comision_recalculo_ventas  cada venta que cambió: cómo estaban sus
+     *                              renglones de pago_comisiones antes
+     *                              (filas_antes) y la huella de cómo quedó,
+     *                              para no deshacer encima de algo nuevo.
+     *
+     * Antes las creaba RecalcularComisiones la primera vez que se usaba el
+     * botón: solo existían en las empresas que ya lo habían presionado y no
+     * aparecían aquí. En las que ya las tienen, IF NOT EXISTS no las toca.
+     */
+    private static function v16(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS comision_recalculos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                creado_en DATETIME NOT NULL,
+                usuario_id INT NULL,
+                usuario_nombre VARCHAR(160) NULL,
+                ventas_revisadas INT NOT NULL DEFAULT 0,
+                ventas_cambiadas INT NOT NULL DEFAULT 0,
+                deshecho_en DATETIME NULL,
+                deshecho_por VARCHAR(160) NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS comision_recalculo_ventas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                recalculo_id INT NOT NULL,
+                venta_id INT NOT NULL,
+                antes DECIMAL(12,2) NOT NULL DEFAULT 0,
+                despues DECIMAL(12,2) NOT NULL DEFAULT 0,
+                meses TEXT NULL,
+                huella CHAR(32) NOT NULL,
+                filas_antes MEDIUMTEXT NOT NULL,
+                deshecha TINYINT(1) NOT NULL DEFAULT 0,
+                KEY ix_crv_recalculo (recalculo_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -594,5 +637,6 @@ final class Migraciones
         13 => 'Detalle de las operaciones en lote en la bitácora',
         14 => 'Banco del pago con tarjeta o SPEI',
         15 => 'Datos fiscales del comprobante (receptor, uso CFDI, método/forma de pago, importes)',
+        16 => 'Historial de «Recalcular comisiones», para poder deshacerlo',
     ];
 }
