@@ -14,8 +14,6 @@ $seFueTxt = count($seFue) > 1
     ? implode(', ', array_slice($seFue, 0, -1)) . (end($seFue) === 'IVA' ? ' e ' : ' y ') . end($seFue)
     : (string)reset($seFue);
 $qs = http_build_query(['desde'=>$desde,'hasta'=>$hasta]);
-$ini = function ($n) { $p = preg_split('/\s+/', trim($n ?: '?'));
-    return mb_strtoupper(mb_substr($p[0],0,1) . (isset($p[1]) ? mb_substr($p[1],0,1) : '')); };
 
 /* Cómo llamar a las ventas de antes del periodo: "de meses anteriores" con
    meses completos, o "anteriores al 15/10/2026" con un rango a mitad de mes.
@@ -295,37 +293,6 @@ $deAntes = \LibertyFin\Servicio\Reportes::rotuloAntes($desde, $hasta);
   </section>
   <?php endif; ?>
 </div>
-
-<?php if ($colaboradores): ?>
-<section class="card" style="margin-top:2px">
-  <header class="card-header">
-    <div><span>Comisiones por colaborador</span>
-      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-        Devengado en el periodo</p></div>
-  </header>
-  <?php /* En rejilla, hasta tres por renglón: a todo lo ancho, el nombre
-           quedaba en una orilla y el monto en la otra, con un hueco enorme
-           en medio. */ ?>
-  <div class="lf-colabs">
-    <?php foreach ($colaboradores as $c): $sd = $c['nombre'] === 'POR ASIGNAR'; ?>
-      <div class="lf-row" style="<?= $sd?'opacity:.72':'' ?>">
-        <span class="lf-av <?= $sd?'gris':'' ?>"><?= $sd?'?':P::e($ini($c['nombre'])) ?></span>
-        <span style="flex:1;min-width:0">
-          <b style="display:block;font-size:13.5px"><?= P::e($c['nombre']) ?></b>
-          <small style="color:var(--lf-tinta-4);font-size:11.5px">
-            <?= P::e($c['area']) ?> · <?= (int)$c['ventas'] ?> venta<?= $c['ventas']==1?'':'s' ?></small>
-          <?php if ($sd): ?><span class="badge bg-warning" style="display:inline-block;margin-top:4px">No se paga</span><?php endif; ?>
-        </span>
-        <b class="lf-mono" style="font-size:14px;flex-shrink:0"><?= D::pesos($c['devengado']) ?></b>
-      </div>
-    <?php endforeach; ?>
-  </div>
-  <div class="card-footer" style="display:flex;justify-content:space-between">
-    <span>Total devengado</span>
-    <b class="lf-mono" style="color:var(--lf-tinta)"><?= D::pesos($r['comisiones']) ?></b>
-  </div>
-</section>
-<?php endif; ?>
 
 <?php /* ═══ LOS REPORTES DEL PERIODO ═══ */ ?>
 <?php

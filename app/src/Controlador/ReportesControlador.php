@@ -27,7 +27,6 @@ final class ReportesControlador
             'areas'        => $repo->porArea($desde, $hasta),
             'servicios'    => $repo->porServicio($desde, $hasta, 10),
             'metodos'      => $repo->porMetodo($desde, $hasta),
-            'colaboradores'=> $repo->porColaborador($desde, $hasta),
             // Los ocho reportes: la lista para las pestañas y el que se
             // está viendo. Salen del mismo sitio que el Excel y la hoja
             // imprimible, para que no puedan decir cosas distintas.

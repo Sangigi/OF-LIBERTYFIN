@@ -3950,13 +3950,3 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
   .lf-dd-notas{border-left:0;border-top:1px solid var(--lf-linea);
     margin-top:16px;padding:14px 0 0;font-size:12px}
 }
-
-/* Reportes · Comisiones por colaborador: en rejilla, hasta tres por
-   renglón, cada uno con su monto cerca del nombre. En una sola columna a
-   todo lo ancho quedaba un hueco enorme entre el nombre y el monto. */
-.lf-colabs{display:grid;gap:10px;padding:16px;
-  grid-template-columns:repeat(auto-fill,minmax(max(280px,calc((100% - 20px) / 3)),1fr))}
-.lf-colabs > .lf-row{border:1px solid var(--lf-linea);padding:12px 14px}
-@media(max-width:560px){
-  .lf-colabs{grid-template-columns:minmax(0,1fr);gap:8px;padding:12px}
-}
