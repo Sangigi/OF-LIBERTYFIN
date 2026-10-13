@@ -124,10 +124,12 @@ final class FacturacionControlador
      * Antes se mandaba una sola línea genérica con el total metido como
      * precio, lo que timbra pero no describe nada de lo vendido.
      *
-     * Sobre el IVA: `venta_detalles.precio_unitario` YA ES BASE (sin IVA).
-     * El IVA solo aparece al sumar el total de la venta. Por eso NO se
-     * divide entre 1.16 aquí — si se hiciera, el CFDI saldría 16% abajo
-     * y no cuadraría con `ventas.total`.
+     * Sobre el IVA: `venta_detalles.precio_unitario` trae el precio TAL
+     * COMO se cobró al cliente. Si `iva_modo = incluido`, ese precio ya
+     * tiene el IVA dentro y hay que desglosarlo UNA sola vez para que
+     * Facturapi (que suma el IVA encima del `price`) no cobre doble. El
+     * error anterior fue dividir entre 1.16 aquí Y además un segundo paso
+     * que ya traía el precio dividido: doble división = CFDI 16% abajo.
      */
     public function timbrar($id)
     {
@@ -230,23 +232,14 @@ final class FacturacionControlador
         $total       = (float) $venta['total'];
         $ivaIncluido = ($venta['iva_modo'] ?? 'incluido') === 'incluido';
 
-        // Base total de la venta: si los precios capturados traen IVA
-        // incluido, se desglosa UNA vez aquí. NO se divide por línea.
-        $baseTotal = $ivaIncluido
-            ? round($total / 1.16, 2)
-            : (float) $venta['subtotal'];
-
-        // Suma cruda de las líneas tal como están guardadas.
-        $sumLineas = 0.0;
-        foreach ($lineas as $ln) {
-            $sumLineas += ((float) $ln['cantidad'] * (float) $ln['precio_unitario'])
-                        - (float) $ln['descuento']
-                        - (float) $ln['descuento_promocion'];
-        }
-
-        // Factor para que la suma de líneas cuadre EXACTA con la base de
-        // la venta. Si `precio_unitario` ya es base, el factor sale 1.0.
-        $factor = $sumLineas > 0.005 ? $baseTotal / $sumLineas : 1.0;
+        // `venta_detalles.precio_unitario` trae el precio TAL COMO se
+        // cobró al cliente. Si `iva_modo = incluido`, ese precio YA trae
+        // el IVA dentro; hay que desglosarlo UNA vez para que Facturapi
+        // (que suma el IVA encima del `price`) no cobre de más.
+        //
+        // Una sola división, por línea. Si se divide dos veces, el CFDI
+        // sale 16% abajo y no cuadra con `ventas.total`.
+        $divisor = $ivaIncluido ? 1.16 : 1.0;
 
         $items       = [];
         $sumSubtotal = 0.0;
@@ -257,8 +250,8 @@ final class FacturacionControlador
                 continue;
             }
 
-            $pu   = round(((float) $ln['precio_unitario']) * $factor, 6);
-            $desc = round((((float) $ln['descuento']) + ((float) $ln['descuento_promocion'])) * $factor, 6);
+            $pu   = round(((float) $ln['precio_unitario']) / $divisor, 6);
+            $desc = round((((float) $ln['descuento']) + ((float) $ln['descuento_promocion'])) / $divisor, 6);
 
             $descripcion = trim((string) ($ln['producto'] ?? ''));
             if ($descripcion === '') {
@@ -299,8 +292,7 @@ final class FacturacionControlador
         // Cuadre final: subtotal = suma de bases de las líneas, IVA = lo
         // que falta para llegar al total real de la venta. Así los
         // `factura_subtotal` / `factura_iva` / `factura_total` guardados
-        // coinciden EXACTOS con lo que devuelve el PAC, sin importar
-        // redondeos por línea.
+        // coinciden EXACTOS con lo que devuelve el PAC.
         $subtotal   = round($sumSubtotal, 2);
         $iva        = round($total - $subtotal, 2);
         $cpReceptor = trim((string) $r['cp']);
