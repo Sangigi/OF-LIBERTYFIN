@@ -100,7 +100,7 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
             <?php elseif ($facturada): ?>
               <span class="badge bg-info" title="UUID <?= P::e($v['factura_uuid']) ?>">
                 Facturada PUE</span>
-            <?php elseif (!$liquidada): ?>
+            <?php elseif (!$liquidada && !$sinCliente): ?>
               <span class="badge bg-warning">Se factura PPD</span>
             <?php elseif ($sinCliente): ?>
               <span class="badge bg-secondary">Sin cliente</span>
