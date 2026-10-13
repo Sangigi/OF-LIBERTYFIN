@@ -46,7 +46,6 @@ final class FacturacionControlador
     ];
 
     private const CLAVE_PROD_SERV = '01010101';
-    private const CLAVE_UNIDAD    = 'H87';
     private const TOLERANCIA      = 0.05;
 
     /**
@@ -96,7 +95,7 @@ final class FacturacionControlador
         unset($_SESSION['lf_aviso']);
     }
 
-    /**
+  /**
      * Pantalla de complementos de pago de una venta PPD.
      *
      * Lista los abonos no cancelados y, por cada uno, si ya tiene
@@ -226,7 +225,7 @@ final class FacturacionControlador
 
         $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
 
-        // ── Conceptos ───────────────────────────────────────────────────
+         // ── Conceptos ───────────────────────────────────────────────────
         $lineas = $repo->lineas($id);
         if (!$lineas) {
             $this->aviso('La venta no tiene productos capturados: nada que facturar.', 'error');
@@ -274,7 +273,7 @@ final class FacturacionControlador
                 'product'  => [
                     'description'  => $descripcion,
                     'product_key'  => self::CLAVE_PROD_SERV,
-                    'unit_key'     => self::CLAVE_UNIDAD,
+                    'unit_key'     => $this->unidadSat($ln['unidad_medida'] ?? null),
                     'price'        => $pu,
                     'tax_included' => false,
                     'taxes'        => [['type' => 'IVA', 'rate' => 0.16]],
@@ -590,7 +589,7 @@ final class FacturacionControlador
             exit('La venta está marcada como facturada pero no tiene ID del PAC guardado.');
         }
 
-        $this->soltarArchivoPac($facturapiId, $venta['factura_uuid'], 'cfdi-' . $venta['factura_uuid']);
+        $this->soltarArchivoPac($facturapiId, 'cfdi-' . $venta['factura_uuid']);
     }
 
     /**
@@ -615,18 +614,14 @@ final class FacturacionControlador
             exit('El complemento no tiene id del PAC guardado.');
         }
 
-        $this->soltarArchivoPac(
-            $facturapiId,
-            $pago['cfdi_complemento_uuid'],
-            'complemento-' . $pago['cfdi_complemento_uuid']
-        );
+        $this->soltarArchivoPac($facturapiId, 'complemento-' . $pago['cfdi_complemento_uuid']);
     }
 
     /**
      * Común a descargarCfdi() y descargarComplemento(): valida el tipo,
      * pide el archivo a Facturapi y lo suelta como attachment.
      */
-    private function soltarArchivoPac(string $facturapiId, string $uuid, string $nombreBase): void
+    private function soltarArchivoPac(string $facturapiId, string $nombreBase): void
     {
         $tipo = strtolower(trim((string) ($_GET['tipo'] ?? 'pdf')));
         if (!in_array($tipo, ['xml', 'pdf'], true)) {
@@ -679,6 +674,27 @@ final class FacturacionControlador
         header('Cache-Control: no-cache, must-revalidate');
         echo $res['body'];
         exit;
+    }
+
+    /**
+     * Traduce `productos.unidad_medida` a la clave SAT del catálogo
+     * c_ClaveUnidad.
+     *
+     * El negocio solo captura tres valores: pieza, kilo y litro. Cualquier
+     * otra cosa (vacío, texto desconocido) cae a H87 (Pieza), que es la
+     * clave comodín aceptada por el SAT.
+     */
+    private function unidadSat(?string $unidadProducto): string
+    {
+        $u = strtolower(trim((string) $unidadProducto));
+
+        static $mapa = [
+            'pieza' => 'H87',   // Pieza
+            'kilo'  => 'KGM',   // Kilogramo
+            'litro' => 'LTR',   // Litro
+        ];
+
+        return $mapa[$u] ?? 'H87';
     }
 
     /**

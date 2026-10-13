@@ -165,11 +165,12 @@ final class VentaRepo extends Repo
 
     public function lineas($id)
     {
-        return $this->todos("
-            SELECT vd.*, p.nombre AS producto, p.codigo
-            FROM venta_detalles vd
-            LEFT JOIN productos p ON p.id = vd.producto_id
-            WHERE vd.venta_id = ?", [(int)$id]);
+    return $this->todos("
+        SELECT vd.*, p.nombre AS producto, p.codigo,
+               COALESCE(p.unidad_medida, '') AS unidad_medida
+        FROM venta_detalles vd
+        LEFT JOIN productos p ON p.id = vd.producto_id
+        WHERE vd.venta_id = ?", [(int)$id]);
     }
 
     public function pagos($id)
