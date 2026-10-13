@@ -33,7 +33,7 @@ use LibertyFin\Dominio\Dinero as D;
               <?= P::e($f['codigo_venta']) ?> · <?= date('d M Y', strtotime($f['fecha'])) ?></span>
           </td>
           <td data-label="Área"><span class="badge bg-secondary"><?= P::e($f['area_servicio']) ?></span></td>
-          <td data-label="%" class="text-end lf-mono"><?= number_format((float)$f['porcentaje'], 2) ?>%</td>
+          <td data-label="%" class="text-end lf-mono"><?= preg_replace('/(\.\d\d)0$/', '$1', number_format((float)$f['porcentaje'], 3, '.', '')) ?>%</td>
           <td data-label="Devengado" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($f['devengado']) ?></td>
           <td data-label="Por liberar" class="text-end lf-mono"
               <?= (float)$f['pendiente'] > 0.01 ? 'style="color:var(--lf-amb)"' : 'style="color:var(--lf-tinta-4)"' ?>>

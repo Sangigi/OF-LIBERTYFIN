@@ -155,7 +155,7 @@ $nDel = count($ventas) - $nAnt;
               <optgroup label="<?= P::e($nomArea) ?>">
                 <?php foreach ($gente as $c): ?>
                   <option value="<?= (int)$c['id'] ?>"
-                          data-pct="<?= isset($sugeridos[$c['id']]) ? P::e(rtrim(rtrim(number_format($sugeridos[$c['id']], 2, '.', ''), '0'), '.')) : '' ?>"><?= P::e($c['nombre']) ?></option>
+                          data-pct="<?= isset($sugeridos[$c['id']]) ? P::e(rtrim(rtrim(number_format($sugeridos[$c['id']], 3, '.', ''), '0'), '.')) : '' ?>"><?= P::e($c['nombre']) ?></option>
                 <?php endforeach; ?>
               </optgroup>
             <?php endforeach; ?>
@@ -164,7 +164,7 @@ $nDel = count($ventas) - $nAnt;
         <label class="pct">Porcentaje
           <span class="lf-lote-pct">
             <input class="form-control" type="number" name="porcentaje[]"
-                   min="0.01" max="100" step="0.01" inputmode="decimal" placeholder="10" required>
+                   min="0.001" max="100" step="0.001" inputmode="decimal" placeholder="10" required>
             <i>%</i>
           </span>
         </label>
@@ -597,7 +597,7 @@ $nDel = count($ventas) - $nAnt;
       var pasa = false;
       var l = mios.filter(function (p) {
         if ((',' + p.c + ',').indexOf(',' + id + ',') !== -1 || usados[id + ':' + p.k]) return false;
-        if ((suma[p.k] || 0) + (x.pct || 0) > 100.001) { pasa = true; return false; }
+        if ((suma[p.k] || 0) + (x.pct || 0) > 100.0001) { pasa = true; return false; }
         return true;
       });
       l.forEach(function (p) { usados[id + ':' + p.k] = true; suma[p.k] = (suma[p.k] || 0) + (x.pct || 0); });

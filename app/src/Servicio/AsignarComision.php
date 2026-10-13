@@ -113,13 +113,13 @@ final class AsignarComision
                     OR NOT EXISTS ( SELECT 1 FROM venta_detalles dx
                                     WHERE dx.id = vc.venta_detalle_id AND dx.venta_id = vc.venta_id ) )");
         $st->execute([(int)$ventaId, (int)$detalleId]);
-        return round((float)$st->fetchColumn(), 2);
+        return round((float)$st->fetchColumn(), 4);
     }
 
     public function asignar($ventaId, $colaboradorId, $porcentaje, $detalleId = null)
     {
         $ventaId = (int)$ventaId;
-        $pct     = (float)$porcentaje;
+        $pct     = round((float)$porcentaje, 3);   // hasta 3 decimales: 33.333
         if ($pct <= 0 || $pct > 100) {
             throw new \InvalidArgumentException('El porcentaje debe estar entre 0 y 100');
         }
@@ -177,8 +177,8 @@ final class AsignarComision
         // más de lo que deja el producto y la empresa pagaba de su bolsa. Se
         // cuentan las de ese producto y las viejas que van sobre toda la venta.
         $ya = $this->repartido($ventaId, $l['id']);
-        if ($ya + $pct > 100.001) {
-            $n = function ($x) { return rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.'); };
+        if ($ya + $pct > 100.0001) {
+            $n = function ($x) { return rtrim(rtrim(number_format($x, 3, '.', ''), '0'), '.'); };
             $que = $varios ? $l['producto'] : 'esta venta';
             throw new \InvalidArgumentException($ya >= 99.999
                 ? 'Las comisiones de ' . $que . ' ya suman el 100%: no queda nada por repartir.'

@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 15;
+    const VERSION = 16;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -639,6 +639,38 @@ final class Migraciones
         }
     }
 
+    /**
+     * Porcentajes de comisión con decimales (33.333).
+     *
+     * Las columnas eran DECIMAL(5,2) —solo dos decimales—, así que 33.333
+     * se guardaba como 33.33 y tres partes iguales nunca sumaban 100.
+     * Se amplían a DECIMAL(8,4). Solo se toca la columna que todavía tenga
+     * menos de 4 decimales, de modo que correrla otra vez no hace nada, y
+     * cada tabla va por su cuenta: si una falla se anota y se sigue.
+     */
+    private static function v16(PDO $db)
+    {
+        $columnas = [
+            ['venta_comisiones', 'porcentaje_regla',   "DECIMAL(8,4) NOT NULL"],
+            ['venta_comisiones', 'porcentaje_reparto', "DECIMAL(8,4) NOT NULL DEFAULT '100.0000'"],
+            ['comision_reglas',  'porcentaje',         "DECIMAL(8,4) NOT NULL"],
+            ['pago_comisiones',  'porcentaje',         "DECIMAL(8,4) NOT NULL DEFAULT '0.0000'"],
+        ];
+        foreach ($columnas as list($tabla, $columna, $definicion)) {
+            if (!self::hayTabla($db, $tabla) || !self::hayColumna($db, $tabla, $columna)) continue;
+            $st = $db->prepare("
+                SELECT NUMERIC_SCALE FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?");
+            $st->execute([$tabla, $columna]);
+            if ((int)$st->fetchColumn() >= 4) continue;
+            try {
+                $db->exec("ALTER TABLE `$tabla` MODIFY COLUMN `$columna` $definicion");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 16 · ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
+            }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -656,5 +688,6 @@ final class Migraciones
         13 => 'Detalle de las operaciones en lote en la bitácora',
         14 => 'Banco del pago con tarjeta o SPEI',
         15 => 'Datos fiscales del comprobante y domicilio/datos fiscales del cliente',
+        16 => 'Porcentajes de comisión con hasta 4 decimales (33.333)',
     ];
 }

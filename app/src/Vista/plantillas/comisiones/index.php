@@ -182,7 +182,7 @@ if (!empty($recalculo) && !$recalculo['deshecho_en'] && $recalculo['ventas']):
                 comisión del equipo <?= P::e($s['area_nombre']) ?></span>
             <?php endif; ?>
           </td>
-          <td data-label="%" class="text-end lf-mono"><?= number_format($s['porcentaje'],2) ?>%</td>
+          <td data-label="%" class="text-end lf-mono"><?= preg_replace('/(\.\d\d)0$/', '$1', number_format((float)$s['porcentaje'], 3, '.', '')) ?>%</td>
           <td data-label="Monto" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($s['monto']) ?></td>
           <td data-label="Asignar a">
             <?php if (!$esAdmin): ?>

@@ -228,7 +228,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
                 </span>
               </td>
               <td data-label="Área"><span class="badge bg-secondary"><?= P::e($c['area_nombre']) ?></span></td>
-              <td data-label="%" class="text-end lf-mono"><?= number_format($c['pct'],2) ?>%</td>
+              <td data-label="%" class="text-end lf-mono"><?= preg_replace('/(\.\d\d)0$/', '$1', number_format((float)$c['pct'], 3, '.', '')) ?>%</td>
               <td data-label="Si liquida" class="text-end lf-mono" style="color:var(--lf-tinta-3)"><?= D::pesos($c['asignada']) ?></td>
               <td data-label="Devengada" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($c['devengada']) ?></td>
               <td data-label="Pendiente" class="text-end lf-mono" style="color:var(--lf-amb)"><?= D::pesos($c['pendiente']) ?></td>
@@ -290,7 +290,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               }
               return round($s, 2);
           };
-          $pctTxt = function ($x) { return rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.'); };
+          $pctTxt = function ($x) { return rtrim(rtrim(number_format($x, 3, '.', ''), '0'), '.'); };
           $ya = $varios ? null : $repartido(reset($bases)['id']); ?>
         <?php if (!$varios && $ya >= 99.999): ?>
           <p style="font-size:13px;color:var(--lf-amb);margin:0">
@@ -332,8 +332,8 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
           <div style="width:118px">
             <label class="form-label">Porcentaje</label>
             <input class="form-control lf-mono" type="number" name="pct" id="inpPct"
-                   step="0.01" min="0.01" max="<?= $varios ? 100 : P::e($pctTxt(100 - $ya)) ?>"
-                   placeholder="0.00" required>
+                   step="0.001" min="0.001" max="<?= $varios ? 100 : P::e($pctTxt(100 - $ya)) ?>"
+                   placeholder="0.000" required>
           </div>
           <div style="width:128px">
             <label class="form-label">Le tocarían</label>
