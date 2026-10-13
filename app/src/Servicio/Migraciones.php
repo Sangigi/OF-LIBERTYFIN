@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 16;
+    const VERSION = 17;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -648,7 +648,7 @@ final class Migraciones
      * menos de 4 decimales, de modo que correrla otra vez no hace nada, y
      * cada tabla va por su cuenta: si una falla se anota y se sigue.
      */
-    private static function v16(PDO $db)
+    private static function v17(PDO $db)
     {
         $columnas = [
             ['venta_comisiones', 'porcentaje_regla',   "DECIMAL(8,4) NOT NULL"],
@@ -666,7 +666,7 @@ final class Migraciones
             try {
                 $db->exec("ALTER TABLE `$tabla` MODIFY COLUMN `$columna` $definicion");
             } catch (\Throwable $e) {
-                error_log('[LibertyFin] migración 16 · ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
+                error_log('[LibertyFin] migración 17 · ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
             }
         }
     }
@@ -688,6 +688,6 @@ final class Migraciones
         13 => 'Detalle de las operaciones en lote en la bitácora',
         14 => 'Banco del pago con tarjeta o SPEI',
         15 => 'Datos fiscales del comprobante y domicilio/datos fiscales del cliente',
-        16 => 'Porcentajes de comisión con hasta 4 decimales (33.333)',
+        17 => 'Porcentajes de comisión con hasta 4 decimales (33.333)',
     ];
 }

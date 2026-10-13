@@ -155,10 +155,6 @@ if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
     $r->get('/facturacion',              ['LibertyFin\Controlador\FacturacionControlador', 'index']);
     $r->get('/facturacion/{id}/timbrar', ['LibertyFin\Controlador\FacturacionControlador', 'timbrar']);
     $r->get('/facturacion/{id}/descargar', ['LibertyFin\Controlador\FacturacionControlador', 'descargarCfdi']);
-
-    $r->get('/facturacion/{id}/pagos', ['LibertyFin\Controlador\FacturacionControlador', 'pagos']);
-    $r->post('/facturacion/{id}/complemento/{pagoId}', ['LibertyFin\Controlador\FacturacionControlador', 'timbrarComplemento']);
-    $r->get('/facturacion/complemento/{pagoId}/descargar', ['LibertyFin\Controlador\FacturacionControlador', 'descargarComplemento']);
 }
 
 // Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
@@ -191,6 +187,7 @@ $r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlad
 $r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
 $r->post('/conocimiento/alternar',['LibertyFin\Controlador\ConocimientoControlador', 'alternar']);
 $r->get('/auditoria',             ['LibertyFin\Controlador\AuditoriaControlador', 'index']);
+$r->get('/incoherencias',         ['LibertyFin\Controlador\IncoherenciasControlador', 'index']);
 $r->get('/tickets',               ['LibertyFin\Controlador\TicketsControlador', 'index']);
 $r->post('/tickets/crear',        ['LibertyFin\Controlador\TicketsControlador', 'crear']);
 $r->get('/tickets/{id}',          ['LibertyFin\Controlador\TicketsControlador', 'ver']);
@@ -326,6 +323,7 @@ $permisos = [
   '/conocimiento/guardar'   => 'editar.conocimiento',
   '/conocimiento/alternar'  => 'editar.conocimiento',
   '/auditoria'              => 'ver.auditoria',
+  '/incoherencias'          => 'ver.auditoria',
   '/tickets'                => 'ver.tickets',
   '/tickets/crear'          => 'ver.tickets',
   '/tickets/{id}'           => 'ver.tickets',

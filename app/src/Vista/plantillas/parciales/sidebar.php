@@ -46,6 +46,7 @@ $deEmpresa = [
   ['ruta' => '/facturacion','icono' => 'serv',    'texto' => 'Facturación',   'p' => 'ver.facturacion',
    'si' => 'facturapi', 'sec' => 'facturacion'],
   ['ruta' => '/auditoria',  'icono' => 'reloj',   'texto' => 'Bitácora',      'p' => 'ver.auditoria'],
+  ['ruta' => '/incoherencias', 'icono' => 'alerta', 'texto' => 'Incoherencias', 'p' => 'ver.auditoria'],
   ['ruta' => '/ajustes',    'icono' => 'serv',    'texto' => 'Ajustes',       'p' => 'ver.ajustes'],
   ['grupo' => 'Soporte'],
   ['ruta' => '/ayuda',      'icono' => 'alerta',  'texto' => 'Ayuda',         'p' => 'abrir.ticket'],
