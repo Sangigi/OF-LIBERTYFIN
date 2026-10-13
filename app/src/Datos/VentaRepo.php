@@ -4,26 +4,15 @@ namespace LibertyFin\Datos;
 /**
  * Consultas de ventas y cobranza. UN solo lugar.
  *
- * En el sistema anterior estas consultas estaban repartidas en 77 sitios,
- * y no todas contaban igual. La distinción que más costó fue esta:
- *
  *   VENDIDO  = suma de ventas.total        lo facturado
  *   COBRADO  = suma de venta_pagos.monto   el dinero que entró
  *
- * Sumar `total` como si fuera ingreso fue lo que infló el histórico a
- * $558,057.60 cuando lo real eran $289,468.05.
- *
  * Y el periodo se aplica sobre DOS columnas distintas a propósito:
- *   ventas.fecha         -> qué ventas se listan
+ *   ventas.fecha           -> qué ventas se listan
  *   venta_pagos.fecha_pago -> qué cobros cuentan
- * Un abono de octubre sobre una venta de agosto es ingreso de OCTUBRE.
  */
 final class VentaRepo extends Repo
 {
-    /**
-     * Filtro de periodo sin envolver la columna en DATE().
-     * DATE(v.fecha) >= ? impide usar el índice: medido, 6.3 ms contra 1.2 ms.
-     */
     private function rango($desde, $hasta)
     {
         $w = []; $p = [];
@@ -32,19 +21,8 @@ final class VentaRepo extends Repo
         return [$w, $p];
     }
 
-    /**
-     * EL FILTRO "ESTADO" DICE LO MISMO QUE LA INSIGNIA DE CADA FILA.
-     *
-     * La insignia enseña Liquidada / Debe $X / Cancelada según lo que le
-     * falta pagar a la venta. El filtro, en cambio, comparaba la columna
-     * `ventas.estado` contra "completada" y "pendiente", y esa columna vale
-     * "completada" casi siempre, deba o no: "Pendientes" no traía nada y
-     * "Completadas" traía ventas con saldo. Ahora filtra por lo mismo que
-     * se ve, con TODO lo cobrado a la venta, sin importar cuándo.
-     */
     const ESTADOS = ['liquidada' => 'Liquidadas', 'debe' => 'Con saldo', 'cancelada' => 'Canceladas'];
 
-    /** Todo lo cobrado a cada venta (alias `pv`), para el filtro de estado. */
     const JOIN_COBRADO = "LEFT JOIN ( SELECT venta_id, SUM(monto) AS cobrado FROM venta_pagos
                                       WHERE cancelado = 0 GROUP BY venta_id ) pv ON pv.venta_id = v.id";
 
@@ -66,7 +44,6 @@ final class VentaRepo extends Repo
         return [$w, $p];
     }
 
-    /** Las cifras del periodo: cobrado, vendido, saldo. */
     public function resumen($desde, $hasta, array $filtros = [])
     {
         list($w, $p)   = $this->rango($desde, $hasta);
@@ -99,7 +76,6 @@ final class VentaRepo extends Repo
         ", array_merge($pp, $p)) ?: [];
     }
 
-    /** El listado, con el avance de cobro de cada venta. */
     public function listado($desde, $hasta, array $filtros = [], $limite = 25, $desfase = 0)
     {
         list($w, $p) = $this->rango($desde, $hasta);
@@ -112,12 +88,9 @@ final class VentaRepo extends Repo
         $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
         $jc = self::JOIN_COBRADO;
 
-        // El avance de cada venta es con TODO lo que se le ha cobrado, no
-        // solo lo cobrado dentro de las fechas del filtro: una venta de
-        // octubre que se liquidó en noviembre salía "Debe" al ver octubre, y
-        // no coincidía con su detalle ni con el filtro de estado.
         return $this->todos("
-            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado, v.factura_uuid,c.regimen_fiscal,
+            SELECT v.id, v.codigo_venta, v.fecha, v.total, v.estado, v.factura_uuid,
+                   v.factura_metodo_pago, c.regimen_fiscal,
                    COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
                    COALESCE(pv.cobrado,0) AS cobrado,
@@ -131,7 +104,6 @@ final class VentaRepo extends Repo
         ", $p);
     }
 
-    /** Cobrado por mes, para la gráfica. Va por fecha_pago, no por fecha de venta. */
     public function cobradoPorMes($meses = 6)
     {
         return $this->todos("
@@ -147,11 +119,11 @@ final class VentaRepo extends Repo
         ");
     }
 
-    /** Los saldos abiertos más grandes. */
     public function saldosAbiertos($tope = 5)
     {
         return $this->todos("
-            SELECT v.id, v.codigo_venta, v.fecha, v.total, COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
+            SELECT v.id, v.codigo_venta, v.fecha, v.total,
+                   COALESCE(NULLIF(v.area_nombre,''), (SELECT cat.nombre FROM venta_detalles d2 INNER JOIN productos p2 ON p2.id = d2.producto_id INNER JOIN categorias cat ON cat.id = p2.categoria_id WHERE d2.venta_id = v.id AND cat.nombre <> '' GROUP BY cat.nombre ORDER BY SUM(d2.subtotal) DESC LIMIT 1)) AS area_nombre,
                    c.nombre AS cliente,
                    COALESCE(pg.cobrado,0) AS cobrado,
                    v.total - COALESCE(pg.cobrado,0) AS saldo
@@ -165,7 +137,6 @@ final class VentaRepo extends Repo
             LIMIT " . (int)$tope . "
         ");
     }
-
 
     // ─────────────────────────────────────────────────────────────
     // DETALLE DE UNA VENTA
@@ -201,7 +172,6 @@ final class VentaRepo extends Repo
             WHERE vd.venta_id = ?", [(int)$id]);
     }
 
-    /** Los pagos, incluidos los cancelados: el rastro importa. */
     public function pagos($id)
     {
         return $this->todos("
@@ -222,10 +192,6 @@ final class VentaRepo extends Repo
             ORDER BY id", [(int)$id]);
     }
 
-    /**
-     * Comisiones de la venta: asignada si liquida, devengada por lo cobrado,
-     * y lo que falta liberar. Las tres juntas, que es como se entienden.
-     */
     public function comisiones($id)
     {
         return $this->todos("
@@ -260,13 +226,6 @@ final class VentaRepo extends Repo
             {$jc} {$where}", $p);
     }
 
-    /**
-     * Ventas que todavía deben algo.
-     *
-     * Se usa para elegir a cuál generarle una liga de pago: no tiene
-     * caso ofrecer las liquidadas, y escribir el id a mano invita a
-     * equivocarse de venta.
-     */
     public function conSaldo($tope = 30)
     {
         return $this->todos("
@@ -285,24 +244,10 @@ final class VentaRepo extends Repo
             LIMIT " . (int)$tope);
     }
 
-
     // ─────────────────────────────────────────────────────────────
     // FACTURACIÓN (CFDI)
-    //
-    // El schema de `clientes` ya guarda todo lo fiscal con sus nombres
-    // naturales (rfc, razon_social, regimen_fiscal, uso_cfdi,
-    // codigo_postal) y `ventas` ya tenía factura_uuid, factura_folio,
-    // facturapi_receipt_id y urlfacturacion. Así que en lugar de duplicar
-    // columnas con sufijo `_factura`, se reutiliza lo que ya existía.
     // ─────────────────────────────────────────────────────────────
 
-    /**
-     * Datos fiscales del cliente para armar el CFDI.
-     *
-     * La ficha del cliente ES la ficha fiscal: lo que el usuario captura
-     * en la sección de clientes es exactamente lo que viaja al PAC. No hay
-     * columnas paralelas que puedan desincronizarse.
-     */
     public function datosFiscalesCliente($clienteId)
     {
         return $this->uno("
@@ -313,38 +258,6 @@ final class VentaRepo extends Repo
             FROM clientes WHERE id = ?", [(int)$clienteId]);
     }
 
-    /**
-     * Marca la venta como facturada y guarda el bloque de respuesta del PAC.
-     *
-     * Columnas reutilizadas del schema original:
-     *   factura_uuid         -> uuid de Facturapi
-     *   factura_folio        -> folio_number
-     *   facturapi_receipt_id -> id de la factura en Facturapi (nombre
-     *                           engañoso: dice "receipt", pero es un varchar
-     *                           libre y estaba vacío)
-     *   urlfacturacion       -> verification_url
-     *
-     * El resto (receptor, impuestos, método/forma de pago) se persiste aquí
-     * por primera vez. Antes vivía solo en localStorage del navegador, y por
-     * eso al recargar la pestaña "Emitidas" se vaciaba y la misma venta se
-     * podía volver a timbrar por error — consumiendo timbre real.
-     */
-    /**
-     * Marca la venta como facturada y guarda el bloque de respuesta del PAC.
-     *
-     * Columnas reutilizadas del schema original:
-     *   factura_uuid         -> uuid de Facturapi
-     *   factura_folio        -> folio_number
-     *   facturapi_receipt_id -> id de la factura en Facturapi (nombre
-     *                           engañoso: dice "receipt", pero es un varchar
-     *                           libre y estaba vacío)
-     *   urlfacturacion       -> verification_url
-     *
-     * El resto (receptor, impuestos, método/forma de pago) se persiste aquí
-     * por primera vez. Antes vivía solo en localStorage del navegador, y por
-     * eso al recargar la pestaña "Emitidas" se vaciaba y la misma venta se
-     * podía volver a timbrar por error — consumiendo timbre real.
-     */
     public function marcarFacturada($ventaId, array $d)
     {
         $this->db->prepare("
@@ -386,11 +299,6 @@ final class VentaRepo extends Repo
         ]);
     }
 
-    /**
-     * Guarda los fiscales capturados en el formulario de facturación de
-     * vuelta en el cliente, para pre-rellenar la próxima. Se limita a las
-     * columnas que ya existen en `clientes`.
-     */
     public function guardarFiscalesCliente($clienteId, array $d)
     {
         $this->db->prepare("
@@ -409,5 +317,89 @@ final class VentaRepo extends Repo
             $d['cp'],
             (int) $clienteId,
         ]);
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // COMPLEMENTOS DE PAGO (CFDI tipo "P")
+    // ─────────────────────────────────────────────────────────────
+
+    /**
+     * Un pago con el contexto de su venta. Para emitir su complemento.
+     */
+    public function pago($pagoId)
+    {
+        return $this->uno("
+            SELECT p.*, v.factura_uuid, v.factura_metodo_pago,
+                   v.total AS venta_total, v.cliente_id, v.codigo_venta
+            FROM venta_pagos p
+            INNER JOIN ventas v ON v.id = p.venta_id
+            WHERE p.id = ?", [(int) $pagoId]);
+    }
+
+    /**
+     * Suma de los pagos ANTERIORES a este (por fecha, luego por id).
+     * Necesario porque el complemento lleva `last_balance`: lo que se debía
+     * ANTES de este abono, no el saldo actual.
+     */
+    public function pagadoAntesDe($ventaId, $pagoId, $fechaPago)
+    {
+        return (float) $this->valor("
+            SELECT COALESCE(SUM(monto), 0) FROM venta_pagos
+            WHERE venta_id = ? AND cancelado = 0
+              AND (fecha_pago < ? OR (fecha_pago = ? AND id < ?))",
+            [(int) $ventaId, $fechaPago, $fechaPago, (int) $pagoId]);
+    }
+
+    /**
+     * Número de parcialidad (1-based) de este pago dentro de su venta,
+     * contando solo los no cancelados.
+     */
+    public function parcialidadDe($ventaId, $pagoId, $fechaPago)
+    {
+        return 1 + (int) $this->valor("
+            SELECT COUNT(*) FROM venta_pagos
+            WHERE venta_id = ? AND cancelado = 0
+              AND (fecha_pago < ? OR (fecha_pago = ? AND id < ?))",
+            [(int) $ventaId, $fechaPago, $fechaPago, (int) $pagoId]);
+    }
+
+    /**
+     * Lista de pagos con el estado de su complemento, para la vista.
+     * Incluye `pagado_antes` y `parcialidad` para mostrarlos en la tabla
+     * sin volver a calcular.
+     */
+    public function pagosConComplemento($ventaId)
+    {
+        return $this->todos("
+            SELECT p.id, p.monto, p.fecha_pago, p.metodo_pago, p.referencia,
+                   p.tipo, p.cancelado,
+                   p.cfdi_complemento_id, p.cfdi_complemento_uuid, p.cfdi_complemento_en,
+                   (SELECT COALESCE(SUM(p2.monto), 0) FROM venta_pagos p2
+                     WHERE p2.venta_id = p.venta_id AND p2.cancelado = 0
+                       AND (p2.fecha_pago < p.fecha_pago
+                            OR (p2.fecha_pago = p.fecha_pago AND p2.id < p.id))) AS pagado_antes,
+                   (SELECT COUNT(*) FROM venta_pagos p3
+                     WHERE p3.venta_id = p.venta_id AND p3.cancelado = 0
+                       AND (p3.fecha_pago < p.fecha_pago
+                            OR (p3.fecha_pago = p.fecha_pago AND p3.id < p.id))) + 1 AS parcialidad
+            FROM venta_pagos p
+            WHERE p.venta_id = ?
+            ORDER BY p.fecha_pago, p.id", [(int) $ventaId]);
+    }
+
+    /**
+     * Guarda el resultado del timbrado del complemento en `venta_pagos`.
+     * Idempotente por diseño: solo actualiza si `cfdi_complemento_uuid`
+     * todavía está vacío, para no quemar timbre real por reenvíos.
+     */
+    public function marcarComplementoPago($pagoId, array $d)
+    {
+        $this->db->prepare("
+            UPDATE venta_pagos SET
+                cfdi_complemento_id   = ?,
+                cfdi_complemento_uuid = ?,
+                cfdi_complemento_en   = NOW()
+            WHERE id = ? AND (cfdi_complemento_uuid IS NULL OR cfdi_complemento_uuid = '')
+        ")->execute([$d['id'], $d['uuid'], (int) $pagoId]);
     }
 }

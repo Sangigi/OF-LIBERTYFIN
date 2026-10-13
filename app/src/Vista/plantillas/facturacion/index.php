@@ -67,7 +67,8 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
   <header class="card-header">
     <div><span>Ventas del periodo</span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-        Solo se factura lo cobrado: el SAT no timbra lo que todavía no se pagó</p></div>
+        Sin saldo se factura PUE; con saldo se factura PPD y se emiten
+        complementos conforme se cobre.</p></div>
   </header>
   <div class="table-responsive lf-cards" style="padding:0 12px 6px">
     <table class="table table-hover">
@@ -81,7 +82,8 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
       <?php foreach ($ventas as $v):
         $liquidada  = (float)$v['saldo'] <= 0.01;
         $sinCliente = empty($v['cliente']);
-        $facturada  = !empty($v['factura_uuid']); ?>
+        $facturada  = !empty($v['factura_uuid']);
+        $esPpd      = ($v['factura_metodo_pago'] ?? '') === 'PPD'; ?>
         <tr>
           <td data-label="Cliente">
             <a data-lf-fila href="/ventas/<?= (int)$v['id'] ?>" style="font-weight:600;color:var(--lf-tinta)">
@@ -92,31 +94,44 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
           <td data-label="Total" class="text-end lf-mono"><?= D::pesos($v['total']) ?></td>
           <td data-label="Cobrado" class="text-end lf-mono"><?= D::pesos($v['cobrado']) ?></td>
           <td data-label="Estado">
-            <?php if ($facturada): ?>
+            <?php if ($facturada && $esPpd): ?>
               <span class="badge bg-info" title="UUID <?= P::e($v['factura_uuid']) ?>">
-                Venta facturada</span>
+                Facturada PPD</span>
+            <?php elseif ($facturada): ?>
+              <span class="badge bg-info" title="UUID <?= P::e($v['factura_uuid']) ?>">
+                Facturada PUE</span>
             <?php elseif (!$liquidada): ?>
-              <span class="badge bg-warning">Sin liquidar</span>
+              <span class="badge bg-warning">Se factura PPD</span>
             <?php elseif ($sinCliente): ?>
               <span class="badge bg-secondary">Sin cliente</span>
             <?php else: ?>
-              <span class="badge bg-success">Se puede facturar</span>
+              <span class="badge bg-success">Se factura PUE</span>
             <?php endif; ?>
           </td>
           <td style="text-align:right">
-            <?php if ($facturada): ?>
-              <div style="display:flex;gap:6px;justify-content:flex-end">
+            <div style="display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap">
+              <?php if ($facturada): ?>
                 <a class="btn btn-secondary btn-sm"
                    href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=pdf"
-                   title="Descargar PDF">PDF</a>
+                   title="Descargar PDF de la factura">PDF</a>
                 <a class="btn btn-secondary btn-sm"
                    href="/facturacion/<?= (int)$v['id'] ?>/descargar?tipo=xml"
-                   title="Descargar XML">XML</a>
-              </div>
-            <?php elseif ($listo && $liquidada && !$sinCliente): ?>
-              <a class="btn btn-secondary btn-sm"
-                 href="/facturacion/<?= (int)$v['id'] ?>/timbrar">Timbrar</a>
-            <?php endif; ?>
+                   title="Descargar XML de la factura">XML</a>
+                <?php if ($esPpd): ?>
+                  <a class="btn btn-primary btn-sm"
+                     href="/facturacion/<?= (int)$v['id'] ?>/pagos"
+                     title="Complementos de pago (CFDI tipo P)">Complementos</a>
+                <?php endif; ?>
+              <?php elseif ($listo && !$sinCliente): ?>
+                <a class="btn btn-secondary btn-sm"
+                   href="/facturacion/<?= (int)$v['id'] ?>/timbrar"
+                   title="<?= $liquidada
+                      ? 'Factura PUE: la venta está cobrada al 100%'
+                      : 'Factura PPD: la venta tiene saldo; se complementará conforme se cobre' ?>">
+                  Timbrar <?= $liquidada ? '' : '(PPD)' ?>
+                </a>
+              <?php endif; ?>
+            </div>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -131,6 +146,7 @@ $listo = !$faltan && $docs['estado'] === 'aprobada';
   </div>
   <div class="card-footer" style="border-top:none;padding-top:0">
     Una venta sin cliente no se puede facturar: el CFDI necesita el RFC de quien
-    recibe. Y una sin liquidar tampoco, porque el SAT timbra el pago, no la promesa.
+    recibe. Una venta con saldo se factura PPD y se complementa conforme se
+    cobra, abono por abono.
   </div>
 </section>
