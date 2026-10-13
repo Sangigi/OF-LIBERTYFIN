@@ -56,12 +56,6 @@ final class FacturacionControlador
     /**
      * Claves SAT por defecto para cada concepto.
      *
-     * No viven en `productos` a propósito: mientras el negocio venda un
-     * solo tipo de cosa (servicios de estética, telas, refacciones
-     * sueltas), una columna por producto sería vocabulario vacío. El día
-     * que se necesite granularidad real (alimentos, medicamentos), se
-     * agregan las columnas y estas constantes pasan a ser el fallback.
-     *
      *   01010101 -> "No existe en el catálogo"  (comodín aceptado por el SAT)
      *   H87      -> "Pieza"                     (unidad genérica)
      */
@@ -121,15 +115,12 @@ final class FacturacionControlador
      *
      * Los conceptos salen de `venta_detalles`: una línea del CFDI por cada
      * producto capturado en la venta, con su cantidad, precio y descuento.
-     * Antes se mandaba una sola línea genérica con el total metido como
-     * precio, lo que timbra pero no describe nada de lo vendido.
      *
      * Sobre el IVA: `venta_detalles.precio_unitario` trae el precio TAL
-     * COMO se cobró al cliente. Si `iva_modo = incluido`, ese precio ya
-     * tiene el IVA dentro y hay que desglosarlo UNA sola vez para que
-     * Facturapi (que suma el IVA encima del `price`) no cobre doble. El
-     * error anterior fue dividir entre 1.16 aquí Y además un segundo paso
-     * que ya traía el precio dividido: doble división = CFDI 16% abajo.
+     * COMO se cobró al cliente (10.00, 25.00 — con IVA dentro). Se
+     * desglosa UNA sola vez aquí, por línea. NO hay factor, NO hay
+     * baseTotal, NO hay sumLineas: eso fueron intentos anteriores que
+     * dividían dos veces y dejaban el CFDI 16% abajo.
      */
     public function timbrar($id)
     {
@@ -143,12 +134,10 @@ final class FacturacionControlador
             $this->aviso('Venta no encontrada.', 'error');
         }
 
-        // Uso CFDI forzado desde la URL: ?uso=D10. Se usa cuando el
-        // cliente 605 ya sabe qué deducción personal va a aplicar. Si no
-        // viene o es inválido para su régimen, se ignora.
+        // Uso CFDI forzado desde la URL: ?uso=D10.
         $usoOverride = strtoupper(trim((string) Peticion::texto('uso', '')));
 
-        // ── Mismos candados que la vista anuncia ────────────────────────
+        // ── Candados ────────────────────────────────────────────────────
         if ((float) $venta['saldo'] > 0.01) {
             $this->aviso('No se puede facturar: la venta aún tiene saldo pendiente. '
                        . 'El SAT timbra el pago, no la promesa.', 'error');
@@ -214,8 +203,6 @@ final class FacturacionControlador
             (string) ($r['regimen'] ?? ''),
             (string) $r['rfc']
         );
-        // Si el override fue rechazado (porque no aplica al régimen), se
-        // avisa igual: el cajero creyó que iba a salir con ese uso y no.
         if ($usoOverride !== '' && $usoCfdi !== $usoOverride) {
             $ajusteUso = "el uso $usoOverride no aplica con el régimen "
                        . trim((string) $r['regimen']) . "; se usó $usoCfdi";
@@ -232,13 +219,7 @@ final class FacturacionControlador
         $total       = (float) $venta['total'];
         $ivaIncluido = ($venta['iva_modo'] ?? 'incluido') === 'incluido';
 
-        // `venta_detalles.precio_unitario` trae el precio TAL COMO se
-        // cobró al cliente. Si `iva_modo = incluido`, ese precio YA trae
-        // el IVA dentro; hay que desglosarlo UNA vez para que Facturapi
-        // (que suma el IVA encima del `price`) no cobre de más.
-        //
-        // Una sola división, por línea. Si se divide dos veces, el CFDI
-        // sale 16% abajo y no cuadra con `ventas.total`.
+        // Desglose del IVA: UNA sola división, por línea. Nada más.
         $divisor = $ivaIncluido ? 1.16 : 1.0;
 
         $items       = [];
@@ -269,14 +250,9 @@ final class FacturacionControlador
                 ],
             ];
 
-            // Facturapi rechaza `discount: 0` en algunos planes: solo va
-            // cuando hay algo que descontar.
             if ($desc > 0.005) {
                 $item['discount'] = $desc;
             }
-
-            // El SKU del negocio viaja como `sku`: sirve para que el
-            // cliente reconcilie el CFDI contra su almacén.
             if (!empty($ln['codigo'])) {
                 $item['product']['sku'] = (string) $ln['codigo'];
             }
@@ -289,10 +265,6 @@ final class FacturacionControlador
             $this->aviso('La venta no tiene líneas facturables.', 'error');
         }
 
-        // Cuadre final: subtotal = suma de bases de las líneas, IVA = lo
-        // que falta para llegar al total real de la venta. Así los
-        // `factura_subtotal` / `factura_iva` / `factura_total` guardados
-        // coinciden EXACTOS con lo que devuelve el PAC.
         $subtotal   = round($sumSubtotal, 2);
         $iva        = round($total - $subtotal, 2);
         $cpReceptor = trim((string) $r['cp']);
@@ -377,12 +349,6 @@ final class FacturacionControlador
 
     /**
      * Descarga el XML o PDF de una venta ya facturada.
-     *
-     * Solo admin: el CFDI tiene los datos fiscales completos del receptor
-     * y no hay razón para que un cajero se los baje. Si más adelante
-     * quieres que el cajero también pueda, se cambia el `if` del rol.
-     *
-     * El `tipo` viene por URL: ?tipo=pdf (default) o ?tipo=xml.
      */
     public function descargarCfdi($id)
     {
@@ -409,7 +375,6 @@ final class FacturacionControlador
             exit('La venta está marcada como facturada pero no tiene ID del PAC guardado.');
         }
 
-        // ── Tipo de archivo ─────────────────────────────────────────────
         $tipo = strtolower(trim((string) ($_GET['tipo'] ?? 'pdf')));
         if (!in_array($tipo, ['xml', 'pdf'], true)) {
             http_response_code(400);
@@ -417,7 +382,6 @@ final class FacturacionControlador
             exit('El tipo debe ser xml o pdf.');
         }
 
-        // ── Credenciales del PAC ────────────────────────────────────────
         $fac = Integraciones::de('facturapi');
         $sandbox = !empty($fac['sandbox']);
         $clave = $sandbox
@@ -432,7 +396,6 @@ final class FacturacionControlador
             exit('Facturapi sin credenciales configuradas.');
         }
 
-        // ── Descarga ────────────────────────────────────────────────────
         $cli = new Facturapi($clave, (string) ($fac['organizacion'] ?? ''));
         $res = $cli->descargarFactura($facturapiId, $tipo);
 
@@ -449,15 +412,11 @@ final class FacturacionControlador
                 $res['http'] >= 400 && $res['http'] < 600 ? $res['http'] : 502
             );
             header('Content-Type: text/plain; charset=UTF-8');
-            // Si el PAC devolvió JSON con mensaje, mostrarlo; si no, el código.
             $msg = $res['json']['message']
                  ?? "El PAC rechazó la descarga (HTTP {$res['http']}).";
             exit($msg);
         }
 
-        // ── Streaming al navegador ──────────────────────────────────────
-        // El filename usa el UUID (no el ID de Facturapi) porque es lo que
-        // el cliente reconoce y lo que va en el expediente fiscal.
         $mime     = $tipo === 'pdf' ? 'application/pdf' : 'application/xml; charset=UTF-8';
         $filename = 'cfdi-' . $venta['factura_uuid'] . '.' . $tipo;
 
@@ -471,17 +430,6 @@ final class FacturacionControlador
 
     /**
      * Devuelve un uso CFDI válido para el régimen del receptor.
-     *
-     * No confía en el dato capturado: si la pareja régimen+uso no está
-     * en el catálogo, cae a un valor que sí lo está en vez de mandarla
-     * al SAT y comerse el rechazo. Devuelve [uso_final, motivo_o_null].
-     *
-     * Reglas duras por régimen:
-     *   · 616 (público en general) solo admite S01.
-     *   · 605 (sueldos) solo admite D01-D10 o S01. Default S01: no se le
-     *     adivina al cliente qué deducción personal va a aplicar.
-     *   · D01-D10 son exclusivos de persona física.
-     *   · G/I aplican a todos los demás regímenes del catálogo.
      */
     private function usoValido(string $uso, string $regimen, string $rfc): array
     {
@@ -489,14 +437,11 @@ final class FacturacionControlador
         $regimen = trim($regimen);
         $rfc     = strtoupper(trim($rfc));
 
-        // RFC genérico -> régimen 616 -> S01, sin discusión.
         if ($rfc === 'XAXX010101000' || $rfc === 'XEXX010101000' || $regimen === '616') {
             $motivo = ($uso !== '' && $uso !== 'S01') ? 'régimen 616 exige S01' : null;
             return ['S01', $motivo];
         }
 
-        // ── 605 Sueldos y Salarios e Ingresos Asimilados ────────────────
-        // El SAT no admite G/I. Solo D01-D10 o S01. Default S01.
         if ($regimen === '605') {
             if (preg_match('/^D(0[1-9]|10)$/', $uso)) {
                 return [$uso, null];
@@ -507,7 +452,6 @@ final class FacturacionControlador
             return ['S01', $motivo];
         }
 
-        // Sin uso capturado: G03, que aplica a todos los regímenes de abajo.
         if ($uso === '') {
             return ['G03', 'el cliente no tenía uso CFDI capturado'];
         }
