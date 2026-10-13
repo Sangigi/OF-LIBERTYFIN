@@ -273,6 +273,9 @@ final class FacturacionControlador
                     'product_key' => self::CLAVE_PROD_SERV,
                     'unit_key'    => self::CLAVE_UNIDAD,
                     'price'       => $pu,
+                    // Facturapi asume por defecto tax_included = true y vuelve a
+                    // dividir entre 1.16. El precio que mandamos ya es base.
+                    'tax_included' => false,
                     'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
                 ],
             ];
@@ -351,9 +354,13 @@ final class FacturacionControlador
         $totalPac = isset($d['total']) && is_numeric($d['total'])
             ? round((float) $d['total'], 2)
             : $total;
+        $alertaTotal = '';
         if (abs($totalPac - $total) > self::TOLERANCIA) {
             error_log("ALERTA: CFDI de la venta {$id} timbrado por $totalPac "
                     . "pero la venta se cobró por $total (UUID " . ($d['uuid'] ?? '?') . ").");
+            $alertaTotal = ' ATENCIÓN: el PAC timbró ' . number_format($totalPac, 2)
+                         . ' pero la venta se cobró por ' . number_format($total, 2)
+                         . '. Cancela y vuelve a timbrar.';
         }
         $subtotalPac = round($totalPac / 1.16, 2);
         $ivaPac      = round($totalPac - $subtotalPac, 2);
@@ -394,8 +401,8 @@ final class FacturacionControlador
             : '';
         $this->aviso(
             'Venta facturada' . ($sandbox ? ' (PRUEBAS, sin validez fiscal)' : '')
-            . '. UUID: ' . ($d['uuid'] ?? 'pendiente') . $extra,
-            'ok'
+            . '. UUID: ' . ($d['uuid'] ?? 'pendiente') . $extra . $alertaTotal,
+            $alertaTotal === '' ? 'ok' : 'error'
         );
     }
 
