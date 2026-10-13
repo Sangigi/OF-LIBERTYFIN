@@ -86,7 +86,6 @@ if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
     $r->get ('/pagadetodo/consulta-clabe',      [$pdt, 'consultaClabe']);
     $r->post('/pagadetodo/pago-clabe',          [$pdt, 'pagoClabe']);
     $r->post('/pagadetodo/pago-liga',           [$pdt, 'pagoLiga']);
-    $r->post('/pagadetodo/entregar-liga', [$pdt, 'entregarLiga']);
     // La cancelación llega por DELETE o por POST: el proveedor decide.
     $r->post  ('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
     $r->delete('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
