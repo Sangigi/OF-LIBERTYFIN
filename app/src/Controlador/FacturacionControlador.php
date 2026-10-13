@@ -62,6 +62,9 @@ final class FacturacionControlador
     private const CLAVE_PROD_SERV = '01010101';
     private const CLAVE_UNIDAD    = 'H87';
 
+    /** Tolerancia (en pesos) al comparar totales por redondeo de centavos. */
+    private const TOLERANCIA = 0.05;
+
     public function index()
     {
         $db   = Conexion::de($_SESSION['empresa_db']);
@@ -116,11 +119,17 @@ final class FacturacionControlador
      * Los conceptos salen de `venta_detalles`: una línea del CFDI por cada
      * producto capturado en la venta, con su cantidad, precio y descuento.
      *
-     * Sobre el IVA: `venta_detalles.precio_unitario` trae el precio TAL
-     * COMO se cobró al cliente (10.00, 25.00 — con IVA dentro). Se
-     * desglosa UNA sola vez aquí, por línea. NO hay factor, NO hay
-     * baseTotal, NO hay sumLineas: eso fueron intentos anteriores que
-     * dividían dos veces y dejaban el CFDI 16% abajo.
+     * Sobre el IVA: NO se asume si `venta_detalles.precio_unitario` trae el
+     * IVA dentro o no. Se detecta comparando la suma de las líneas contra
+     * `ventas.total`:
+     *
+     *   - suma de líneas ≈ total          -> precios con IVA: se divide /1.16
+     *   - suma de líneas × 1.16 ≈ total   -> precios ya son base: divisor 1.0
+     *   - ninguna de las dos              -> no se timbra (datos inconsistentes)
+     *
+     * Además, antes de enviar al PAC se verifica que el CFDI calculado
+     * (subtotal × 1.16) coincida con lo que se cobró. Así nunca vuelve a
+     * llegar al SAT un comprobante con un total distinto al de la venta.
      */
     public function timbrar($id)
     {
@@ -216,11 +225,29 @@ final class FacturacionControlador
             $this->aviso('La venta no tiene productos capturados: nada que facturar.', 'error');
         }
 
-        $total       = (float) $venta['total'];
-        $ivaIncluido = ($venta['iva_modo'] ?? 'incluido') === 'incluido';
+        $total = (float) $venta['total'];
 
-        // Desglose del IVA: UNA sola división, por línea. Nada más.
-        $divisor = $ivaIncluido ? 1.16 : 1.0;
+        // Suma de las líneas tal como están guardadas (después de descuentos).
+        $sumLineas = 0.0;
+        foreach ($lineas as $ln) {
+            $sumLineas += ((float) $ln['cantidad'] * (float) $ln['precio_unitario'])
+                        - (float) $ln['descuento']
+                        - (float) $ln['descuento_promocion'];
+        }
+
+        // ¿Las líneas ya traen IVA (suman el total) o son base (×1.16 = total)?
+        if (abs($sumLineas - $total) <= self::TOLERANCIA) {
+            $divisor = 1.16;   // precios con IVA incluido -> desglosar UNA vez
+        } elseif (abs($sumLineas * 1.16 - $total) <= self::TOLERANCIA) {
+            $divisor = 1.0;    // precios ya son base sin IVA -> no dividir
+        } else {
+            $this->aviso(
+                'Las líneas de la venta no cuadran con el total '
+                . '(líneas: ' . number_format($sumLineas, 2)
+                . ', total: ' . number_format($total, 2) . '). No se timbró.',
+                'error'
+            );
+        }
 
         $items       = [];
         $sumSubtotal = 0.0;
@@ -269,6 +296,17 @@ final class FacturacionControlador
         $iva        = round($total - $subtotal, 2);
         $cpReceptor = trim((string) $r['cp']);
 
+        // ── Candado final: el CFDI debe sumar lo mismo que se cobró ─────
+        $totalCfdi = round($subtotal * 1.16, 2);
+        if (abs($totalCfdi - $total) > self::TOLERANCIA) {
+            $this->aviso(
+                'El CFDI calculado (' . number_format($totalCfdi, 2)
+                . ') no coincide con el total cobrado (' . number_format($total, 2)
+                . '). No se timbró.',
+                'error'
+            );
+        }
+
         $address = ['zip' => $cpReceptor, 'country' => 'MEX'];
         if (!empty($r['calle_numero']))     $address['street']       = trim($r['calle_numero']);
         if (!empty($r['numero_interior']))  $address['exterior']     = trim($r['numero_interior']);
@@ -306,15 +344,29 @@ final class FacturacionControlador
 
         // ── Persistencia ────────────────────────────────────────────────
         $d = $res['json'];
+
+        // Preferimos el total que devuelve el PAC (lo que realmente se
+        // timbró) sobre el calculado localmente, para que la BD refleje el
+        // CFDI real. Si difiere de lo cobrado, se deja constancia en el log.
+        $totalPac = isset($d['total']) && is_numeric($d['total'])
+            ? round((float) $d['total'], 2)
+            : $total;
+        if (abs($totalPac - $total) > self::TOLERANCIA) {
+            error_log("ALERTA: CFDI de la venta {$id} timbrado por $totalPac "
+                    . "pero la venta se cobró por $total (UUID " . ($d['uuid'] ?? '?') . ").");
+        }
+        $subtotalPac = round($totalPac / 1.16, 2);
+        $ivaPac      = round($totalPac - $subtotalPac, 2);
+
         $repo->marcarFacturada($id, [
             'facturapi_id'           => (string) $d['id'],
             'factura_uuid'           => (string) ($d['uuid'] ?? ''),
             'factura_folio'          => (string) ($d['folio_number'] ?? ''),
             'urlfacturacion'         => (string) ($d['verification_url'] ?? ''),
             'factura_fecha_timbrado' => (string) ($d['created_at'] ?? date('Y-m-d H:i:s')),
-            'factura_subtotal'       => $subtotal,
-            'factura_iva'            => $iva,
-            'factura_total'          => $total,
+            'factura_subtotal'       => $subtotalPac,
+            'factura_iva'            => $ivaPac,
+            'factura_total'          => $totalPac,
             'factura_rfc_receptor'   => $payload['customer']['tax_id'],
             'factura_razon_social'   => $payload['customer']['legal_name'],
             'factura_uso_cfdi'       => $usoCfdi,
