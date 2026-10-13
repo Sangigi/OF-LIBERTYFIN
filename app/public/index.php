@@ -155,6 +155,9 @@ if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
     $r->get('/facturacion',              ['LibertyFin\Controlador\FacturacionControlador', 'index']);
     $r->get('/facturacion/{id}/timbrar', ['LibertyFin\Controlador\FacturacionControlador', 'timbrar']);
     $r->get('/facturacion/{id}/descargar', ['LibertyFin\Controlador\FacturacionControlador', 'descargarCfdi']);
+    $r->get('/facturacion/{id}/pagos', ['LibertyFin\Controlador\FacturacionControlador', 'pagos']);
+    $r->post('/facturacion/{id}/complemento/{pagoId}', ['LibertyFin\Controlador\FacturacionControlador', 'timbrarComplemento']);
+    $r->get('/facturacion/complemento/{pagoId}/descargar', ['LibertyFin\Controlador\FacturacionControlador', 'descargarComplemento']);
 }
 
 // Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
