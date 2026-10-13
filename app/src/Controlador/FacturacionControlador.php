@@ -53,6 +53,21 @@ final class FacturacionControlador
         'D10' => ['605','606','607','608','611','612','614','615','625'],
     ];
 
+    /**
+     * Claves SAT por defecto para cada concepto.
+     *
+     * No viven en `productos` a propósito: mientras el negocio venda un
+     * solo tipo de cosa (servicios de estética, telas, refacciones
+     * sueltas), una columna por producto sería vocabulario vacío. El día
+     * que se necesite granularidad real (alimentos, medicamentos), se
+     * agregan las columnas y estas constantes pasan a ser el fallback.
+     *
+     *   01010101 -> "No existe en el catálogo"  (comodín aceptado por el SAT)
+     *   H87      -> "Pieza"                     (unidad genérica)
+     */
+    private const CLAVE_PROD_SERV = '01010101';
+    private const CLAVE_UNIDAD    = 'H87';
+
     public function index()
     {
         $db   = Conexion::de($_SESSION['empresa_db']);
@@ -103,6 +118,11 @@ final class FacturacionControlador
      * La venta tiene que estar cobrada al 100% y tener cliente con RFC/CP.
      * El CFDI se emite como PUE (Pago en Una Exhibición): como el candado
      * de saldo ya exigió cobro completo, no hay rama PPD.
+     *
+     * Los conceptos salen de `venta_detalles`: una línea del CFDI por cada
+     * producto capturado en la venta, con su cantidad, precio y descuento.
+     * Antes se mandaba una sola línea genérica con el total metido como
+     * precio, lo que timbra pero no describe nada de lo vendido.
      */
     public function timbrar($id)
     {
@@ -196,15 +216,77 @@ final class FacturacionControlador
 
         $regimenReceptor = trim((string) ($r['regimen'] ?: '616'));
 
-        // ── Importes ────────────────────────────────────────────────────
-        $total = (float) $venta['total'];
-        if (($venta['iva_modo'] ?? 'incluido') === 'incluido') {
-            $subtotal = round($total / 1.16, 2);
-        } else {
-            $subtotal = (float) $venta['subtotal'];
+        // ── Conceptos: una línea por cada producto de la venta ──────────
+        $lineas = $repo->lineas($id);
+        if (!$lineas) {
+            $this->aviso('La venta no tiene productos capturados: nada que facturar.', 'error');
         }
-        $iva = round($total - $subtotal, 2);
 
+        $total       = (float) $venta['total'];
+        $ivaIncluido = ($venta['iva_modo'] ?? 'incluido') === 'incluido';
+
+        $items       = [];
+        $sumSubtotal = 0.0;
+
+        foreach ($lineas as $ln) {
+            $cant = (float) $ln['cantidad'];
+            if ($cant <= 0) {
+                continue;
+            }
+
+            $pu   = (float) $ln['precio_unitario'];
+            $desc = (float) $ln['descuento'] + (float) $ln['descuento_promocion'];
+
+            // Facturapi suma el IVA ENCIMA del `price`. Si el negocio
+            // captura precios con IVA incluido (lo normal en mostrador),
+            // hay que desglosarlo aquí o el timbre sale 16% inflado.
+            if ($ivaIncluido) {
+                $pu   = round($pu   / 1.16, 2);
+                $desc = round($desc / 1.16, 2);
+            }
+
+            $descripcion = trim((string) ($ln['producto'] ?? ''));
+            if ($descripcion === '') {
+                $descripcion = 'Producto ' . (string) ($ln['producto_id'] ?? '');
+            }
+
+            $item = [
+                'quantity' => $cant,
+                'product'  => [
+                    'description' => $descripcion,
+                    'product_key' => self::CLAVE_PROD_SERV,
+                    'unit_key'    => self::CLAVE_UNIDAD,
+                    'price'       => $pu,
+                    'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
+                ],
+            ];
+
+            // Facturapi rechaza `discount: 0` en algunos planes: solo va
+            // cuando hay algo que descontar.
+            if ($desc > 0.005) {
+                $item['discount'] = $desc;
+            }
+
+            // El SKU del negocio viaja como `sku`: sirve para que el
+            // cliente reconcilie el CFDI contra su almacén.
+            if (!empty($ln['codigo'])) {
+                $item['product']['sku'] = (string) $ln['codigo'];
+            }
+
+            $items[]      = $item;
+            $sumSubtotal += ($cant * $pu) - $desc;
+        }
+
+        if (!$items) {
+            $this->aviso('La venta no tiene líneas facturables.', 'error');
+        }
+
+        // Cuadre de redondeo: el subtotal sale de las líneas, el IVA es lo
+        // que falta para llegar al `total` real de la venta. Así el CFDI
+        // siempre cuadra con lo cobrado, sin importar cómo se redondearon
+        // las líneas una por una.
+        $subtotal   = round($sumSubtotal, 2);
+        $iva        = round($total - $subtotal, 2);
         $cpReceptor = trim((string) $r['cp']);
 
         $address = ['zip' => $cpReceptor, 'country' => 'MEX'];
@@ -222,15 +304,7 @@ final class FacturacionControlador
                 'address'    => $address,
                 'email'      => !empty($r['email']) ? $r['email'] : null,
             ],
-            'items' => [[
-                'quantity' => 1,
-                'product'  => [
-                    'description' => trim((string) ($venta['descripcion'] ?: 'Servicios prestados')),
-                    'product_key' => '84111506',   // Servicios de facturación
-                    'price'       => $total,
-                    'taxes'       => [['type' => 'IVA', 'rate' => 0.16]],
-                ],
-            ]],
+            'items'          => $items,
             'use'            => $usoCfdi,
             'payment_form'   => $this->formaPagoSat((string) ($venta['metodo_pago'] ?? '')),
             'payment_method' => 'PUE',
@@ -293,7 +367,7 @@ final class FacturacionControlador
         );
     }
 
-        /**
+    /**
      * Descarga el XML o PDF de una venta ya facturada.
      *
      * Solo admin: el CFDI tiene los datos fiscales completos del receptor
