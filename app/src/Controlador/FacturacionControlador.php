@@ -478,6 +478,7 @@ final class FacturacionControlador
 
         // ── Saldos ANTES / DESPUÉS de este abono ───────────────────────
         $fechaPago    = (string) $pago['fecha_pago'];
+        $fechaHora    = (string) ($pago['creado_en'] ?: ($fechaPago . ' 00:00:00'));
         $pagadoAntes  = $repo->pagadoAntesDe($ventaId, $pagoId, $fechaPago);
         $parcialidad  = $repo->parcialidadDe($ventaId, $pagoId, $fechaPago);
         $monto        = round((float) $pago['monto'], 2);
@@ -514,7 +515,7 @@ final class FacturacionControlador
                 'type' => 'pago',
                 'data' => [[
                     'payment_form' => $this->formaPagoSat((string) ($pago['metodo_pago'] ?? '')),
-                    'date'         => date('c', strtotime($fechaPago)),
+                    'date' => date('c', strtotime($fechaHora)),
                     'related_documents' => [[
                         'uuid'         => (string) $venta['factura_uuid'],
                         'amount'       => $monto,

@@ -328,12 +328,13 @@ final class VentaRepo extends Repo
      */
     public function pago($pagoId)
     {
-        return $this->uno("
-            SELECT p.*, v.factura_uuid, v.factura_metodo_pago,
-                   v.total AS venta_total, v.cliente_id, v.codigo_venta
-            FROM venta_pagos p
-            INNER JOIN ventas v ON v.id = p.venta_id
-            WHERE p.id = ?", [(int) $pagoId]);
+    return $this->uno("
+        SELECT p.*, p.creado_en AS pagado_en,
+               v.factura_uuid, v.factura_metodo_pago,
+               v.total AS venta_total, v.cliente_id, v.codigo_venta
+        FROM venta_pagos p
+        INNER JOIN ventas v ON v.id = p.venta_id
+        WHERE p.id = ?", [(int) $pagoId]);
     }
 
     /**
@@ -371,21 +372,21 @@ final class VentaRepo extends Repo
     public function pagosConComplemento($ventaId)
     {
         return $this->todos("
-            SELECT p.id, p.monto, p.fecha_pago, p.metodo_pago, p.referencia,
-                   p.tipo, p.cancelado,
-                   p.cfdi_complemento_id, p.cfdi_complemento_uuid, p.cfdi_complemento_en,
-                   (SELECT COALESCE(SUM(p2.monto), 0) FROM venta_pagos p2
-                     WHERE p2.venta_id = p.venta_id AND p2.cancelado = 0
-                       AND (p2.fecha_pago < p.fecha_pago
-                            OR (p2.fecha_pago = p.fecha_pago AND p2.id < p.id))) AS pagado_antes,
-                   (SELECT COUNT(*) FROM venta_pagos p3
-                     WHERE p3.venta_id = p.venta_id AND p3.cancelado = 0
-                       AND (p3.fecha_pago < p.fecha_pago
-                            OR (p3.fecha_pago = p.fecha_pago AND p3.id < p.id))) + 1 AS parcialidad
-            FROM venta_pagos p
-            WHERE p.venta_id = ?
-            ORDER BY p.fecha_pago, p.id", [(int) $ventaId]);
-    }
+        SELECT p.id, p.monto, p.fecha_pago, p.creado_en, p.metodo_pago,
+               p.referencia, p.tipo, p.cancelado,
+               p.cfdi_complemento_id, p.cfdi_complemento_uuid, p.cfdi_complemento_en,
+               (SELECT COALESCE(SUM(p2.monto), 0) FROM venta_pagos p2
+                 WHERE p2.venta_id = p.venta_id AND p2.cancelado = 0
+                   AND (p2.fecha_pago < p.fecha_pago
+                        OR (p2.fecha_pago = p.fecha_pago AND p2.id < p.id))) AS pagado_antes,
+               (SELECT COUNT(*) FROM venta_pagos p3
+                 WHERE p3.venta_id = p.venta_id AND p3.cancelado = 0
+                   AND (p3.fecha_pago < p.fecha_pago
+                        OR (p3.fecha_pago = p.fecha_pago AND p3.id < p.id))) + 1 AS parcialidad
+        FROM venta_pagos p
+        WHERE p.venta_id = ?
+        ORDER BY p.fecha_pago, p.id", [(int) $ventaId]);
+    }   
 
     /**
      * Guarda el resultado del timbrado del complemento en `venta_pagos`.

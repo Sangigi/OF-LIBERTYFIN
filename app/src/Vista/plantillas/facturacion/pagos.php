@@ -6,10 +6,10 @@ use LibertyFin\Dominio\Dinero as D;
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
 
-$totalVenta      = (float) $venta['total'];
-$metodoFactura   = $venta['factura_metodo_pago'] ?? '';
-$esPpd           = $metodoFactura === 'PPD';
-$tieneFactura    = !empty($venta['factura_uuid']);
+$totalVenta    = (float) $venta['total'];
+$metodoFactura = $venta['factura_metodo_pago'] ?? '';
+$esPpd         = $metodoFactura === 'PPD';
+$tieneFactura  = !empty($venta['factura_uuid']);
 ?>
 
 <?php if ($aviso): ?>
@@ -77,7 +77,7 @@ $tieneFactura    = !empty($venta['factura_uuid']);
     <table class="table table-hover">
       <thead><tr>
         <th>#</th>
-        <th>Fecha</th>
+        <th>Fecha de pago</th>
         <th class="text-end">Monto</th>
         <th>Método</th>
         <th>Complemento</th>
@@ -96,7 +96,15 @@ $tieneFactura    = !empty($venta['factura_uuid']);
         $saldoDespues = max(0.0, round($saldoAntes - $monto, 2));
         $tieneComp    = !empty($p['cfdi_complemento_uuid']);
         $cancelado    = !empty($p['cancelado']);
-        $puedeTimb    = $esPpd && $tieneFactura && !$tieneComp && !$cancelado; ?>
+        $puedeTimb    = $esPpd && $tieneFactura && !$tieneComp && !$cancelado;
+
+        // `fecha_pago` es DATE (solo día). La hora real de captura está en
+        // `creado_en`. Si por algún motivo viene vacío, se muestra solo el día.
+        $fhReal     = (string) ($p['creado_en'] ?? '');
+        $fhValida   = $fhReal !== '' && $fhReal !== '0000-00-00 00:00:00';
+        $mismoDia   = $fhValida
+            && substr($fhReal, 0, 10) === substr((string) $p['fecha_pago'], 0, 10);
+      ?>
         <tr>
           <td data-label="#">
             <span class="lf-mono" style="font-weight:600">
@@ -106,22 +114,29 @@ $tieneFactura    = !empty($venta['factura_uuid']);
               <?= P::e($p['tipo']) ?>
             </span>
           </td>
-          <td data-label="Fecha">
+          <td data-label="Fecha de pago">
             <?= date('d M Y', strtotime($p['fecha_pago'])) ?>
+            <?php if ($fhValida && $mismoDia): ?>
+              <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
+                <?= date('H:i', strtotime($fhReal)) ?>
+              </span>
+            <?php endif; ?>
             <?php if ($cancelado): ?>
-              <span class="badge bg-danger" style="margin-left:6px">Cancelado</span>
+              <span class="badge bg-danger" style="margin-top:2px">Cancelado</span>
             <?php endif; ?>
           </td>
           <td data-label="Monto" class="text-end lf-mono">
             <?= D::pesos($monto) ?>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
-              base <?= D::pesos(round($monto / 1.16, 2)) ?></span>
+              base <?= D::pesos(round($monto / 1.16, 2)) ?>
+            </span>
           </td>
           <td data-label="Método">
             <?= P::e($p['metodo_pago'] ?: '—') ?>
             <?php if (!empty($p['referencia'])): ?>
               <span style="display:block;color:var(--lf-tinta-4);font-size:11.5px">
-                Ref. <?= P::e($p['referencia']) ?></span>
+                Ref. <?= P::e($p['referencia']) ?>
+              </span>
             <?php endif; ?>
           </td>
           <td data-label="Complemento">
@@ -133,6 +148,11 @@ $tieneFactura    = !empty($venta['factura_uuid']);
                    title="<?= P::e($p['cfdi_complemento_uuid']) ?>">
                 <?= P::e(substr($p['cfdi_complemento_uuid'], 0, 8)) ?>…
               </div>
+              <?php if (!empty($p['cfdi_complemento_en'])): ?>
+                <div style="font-size:11px;color:var(--lf-tinta-4)">
+                  <?= date('d M Y H:i', strtotime($p['cfdi_complemento_en'])) ?>
+                </div>
+              <?php endif; ?>
             <?php else: ?>
               <span class="badge bg-warning">Pendiente</span>
               <div style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:2px">
@@ -159,10 +179,12 @@ $tieneFactura    = !empty($venta['factura_uuid']);
                 </form>
               <?php elseif (!$esPpd): ?>
                 <small style="color:var(--lf-tinta-4);font-size:11.5px">
-                  Factura PUE: no aplica</small>
+                  Factura PUE: no aplica
+                </small>
               <?php elseif ($cancelado): ?>
                 <small style="color:var(--lf-tinta-4);font-size:11.5px">
-                  Pago cancelado</small>
+                  Pago cancelado
+                </small>
               <?php endif; ?>
             </div>
           </td>
