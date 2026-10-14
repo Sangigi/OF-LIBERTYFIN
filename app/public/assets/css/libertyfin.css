@@ -4201,3 +4201,19 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 }
 /* Lo que solo hace falta sin JavaScript (ver layout: html.lf-js). */
 .lf-js .lf-sin-js{display:none!important}
+/* Caja · cobro completo (sin campo) o solo una parte (con campo) */
+.lf-cobro-completo{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:4px 10px}
+.lf-cobro-completo span{font-size:12.5px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-cobro-completo b{font-size:17px;font-weight:800;letter-spacing:-.3px;color:var(--lf-tinta)}
+.lf-cobro-completo .lf-link{grid-column:1 / -1;justify-self:end}
+.lf-link{border:0;background:none;padding:0;font-size:12px;font-weight:600;color:var(--lf-brand-2);
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.lf-link:hover{color:var(--lf-tinta)}
+/* Billetes rápidos para el cambio */
+.lf-pagacon .billetes{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.lf-pagacon .billetes:empty{display:none}
+.lf-pagacon .billetes button{flex:1;min-width:64px;padding:7px 8px;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r);background:var(--lf-sup);font-family:var(--lf-mono);font-size:12.5px;
+  font-weight:700;color:var(--lf-tinta-2);cursor:pointer}
+.lf-pagacon .billetes button:first-child{font-family:var(--lf-font)}
+.lf-pagacon .billetes button:hover{border-color:var(--lf-brand);color:var(--lf-brand-2)}

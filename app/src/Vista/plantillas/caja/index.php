@@ -289,27 +289,40 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
              value="<?= P::e($opciones[0]['id'] ?? 'efectivo') ?>">
     </div>
 
-    <?php /* Cuánto se cobra hoy. Arranca como diga Ajustes → Caja (el total
-             o vacío) y los atajos evitan teclear lo de siempre. */ ?>
+    <?php /* CUÁNTO SE COBRA HOY.
+             Lo normal es cobrar completo, y entonces no hay nada que
+             escribir: solo se dice el monto. El campo aparece cuando el
+             cliente deja una parte («Solo una parte»). Antes había dos campos
+             de dinero seguidos —este y «Paga con»— y no se entendía por qué
+             escribir dos veces. Con Ajustes → Caja en «Vacío» arranca abierto. */ ?>
     <div class="lf-anticipo" id="cajaAnticipo">
-      <div class="cab">
-        <label for="anticipo">Se cobra hoy</label>
-        <span class="atajos">
-          <button type="button" data-ant="1" id="antTotal">Total</button>
-          <button type="button" data-ant="0.5">50%</button>
-        </span>
+      <div class="lf-cobro-completo" id="cobroCompleto">
+        <span>Se cobra completo</span>
+        <b class="lf-mono" id="cobroCompletoMonto">$0.00</b>
+        <button type="button" class="lf-link" id="soloParte">Solo una parte</button>
       </div>
-      <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01">
-      <p id="msgSaldo">Deja el total para liquidar de una vez.</p>
+      <div class="lf-cobro-parte" id="cobroParte" hidden>
+        <div class="cab">
+          <label for="anticipo">¿Cuánto deja hoy?</label>
+          <span class="atajos">
+            <button type="button" data-ant="0.5">50%</button>
+            <button type="button" data-ant="1" id="antTotal">Completo</button>
+          </span>
+        </div>
+        <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01"
+               placeholder="0.00">
+        <p id="msgSaldo"></p>
+      </div>
     </div>
 
-    <?php /* Paga con: solo en efectivo. El cambio se ve mientras se escribe y
-             el servidor lo vuelve a calcular al cobrar (es dinero que el
-             cajero va a entregar). Los campos se habían perdido de la
-             pantalla y el código seguía buscándolos. */ ?>
+    <?php /* Paga con: solo en efectivo, para el cambio. Es lo único que se
+             escribe en una venta en efectivo, y los billetes de abajo lo
+             evitan casi siempre. El servidor vuelve a calcular el cambio al
+             cobrar: es dinero que el cajero va a entregar. */ ?>
     <div class="lf-pagacon" id="cajaPagaCon">
-      <label for="pagaCon">Paga con <small>(opcional)</small></label>
-      <input type="number" name="paga_con" id="pagaCon" min="0" step="0.01" placeholder="¿Con cuánto paga?">
+      <label for="pagaCon">¿Con cuánto paga? <small>(para el cambio)</small></label>
+      <div class="billetes" id="billetes"></div>
+      <input type="number" name="paga_con" id="pagaCon" min="0" step="0.01" placeholder="0.00">
       <p class="cambio" id="verCambio" aria-live="polite"></p>
     </div>
 
@@ -568,19 +581,27 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     var sigue = !a.dataset.manual && (omitir || (!esLinea && (ANTICIPO_TOTAL || a.dataset.sigue === '1')));
     if (sigue) a.value = cap.toFixed(2);
     if ($('antTotal')) $('antTotal').classList.toggle('on', sigue && cap > 0);
+    /* Completo: solo el monto, sin campo. Una parte: el campo para escribir
+       cuánto deja. */
+    $('cobroCompleto').hidden = !sigue;
+    $('cobroParte').hidden = sigue;
+    $('cobroCompletoMonto').textContent = pesos(cap);
 
     var ant = parseFloat($('anticipo').value) || 0;
     if (ant > cap) { $('anticipo').value = cap.toFixed(2); ant = cap; }
     var saldo = cap - ant;
-    $('msgSaldo').innerHTML = saldo <= 0.009
-      ? 'Se liquida completa. La comisión se libera toda.'
-      : 'Queda un saldo de <b class="lf-mono" style="color:var(--lf-amb)">' + pesos(saldo)
-        + '</b>. La comisión se libera conforme el cliente pague.';
+    $('msgSaldo').innerHTML = ant <= 0
+      ? 'Escribe cuánto deja hoy. En cero, la venta se registra sin cobro.'
+      : (saldo <= 0.009
+        ? 'Es el total: se liquida completa.'
+        : 'Queda un saldo de <b class="lf-mono" style="color:var(--lf-amb)">' + pesos(saldo)
+          + '</b>. La comisión se libera conforme el cliente pague.');
     var enLinea = esLinea && !omitir;
     $('btnTexto').textContent = enLinea
       ? 'Cobrar ' + pesos(cap)
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
     $('btnTexto').dataset.total = (ant > 0 ? ant : cap).toFixed(2);
+    pintarBilletes(ant > 0 ? ant : cap);
     /* Mientras el servidor contesta las promociones, no se cobra: el total
        todavía puede cambiar. */
     var esperando = !!(promo && promo.esperando);
@@ -604,7 +625,47 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
   /* ══════════════════════════════════════════════════════
      ANTICIPO, IVA Y CELULAR
      ══════════════════════════════════════════════════════ */
-  /* Atajos del anticipo. «Total» vuelve a seguir al total (si se agrega
+  /* «Solo una parte»: aparece el campo, vacío y con el cursor dentro. */
+  $('soloParte').addEventListener('click', function(){
+    var a = $('anticipo');
+    a.dataset.manual = '1'; a.dataset.sigue = ''; a.value = '';
+    calcular();
+    a.focus();
+    if (window.lfGuardarTicket) window.lfGuardarTicket();
+  });
+
+  /* Billetes para «¿Con cuánto paga?»: el monto exacto y los siguientes
+     redondos, siempre por encima (al siguiente cien, quinientos y mil:
+     con $3,000 sugiere $3,100, $3,500 y $4,000). Tocar uno llena el campo
+     y el cambio sale solo. */
+  var ultimoBillete = null;
+  function pintarBilletes(monto){
+    var caja = $('billetes');
+    if (!caja) return;
+    monto = Math.round(monto * 100) / 100;
+    if (monto === ultimoBillete) return;
+    ultimoBillete = monto;
+    if (monto <= 0) { caja.innerHTML = ''; return; }
+    var op = [];
+    [100, 500, 1000].forEach(function(r){
+      var v = Math.floor(monto / r) * r + r;
+      if (op.indexOf(v) === -1) op.push(v);
+    });
+    op.sort(function(x, y){ return x - y; });
+    caja.innerHTML = '<button type="button" data-billete="' + monto.toFixed(2) + '">Exacto</button>'
+      + op.slice(0, 3).map(function(v){
+          return '<button type="button" data-billete="' + v + '">' + pesos(v).replace('.00', '') + '</button>';
+        }).join('');
+  }
+  if ($('billetes')) $('billetes').addEventListener('click', function(e){
+    var b = e.target.closest('[data-billete]');
+    if (!b) return;
+    var i = $('pagaCon');
+    i.value = (+b.dataset.billete).toFixed(2);
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+
+  /* Atajos del anticipo. «Completo» vuelve a seguir al total (si se agrega
      otro producto, sube con él); «50%» es una cantidad fija. */
   document.querySelectorAll('[data-ant]').forEach(function(b){
     b.addEventListener('click', function(){
@@ -631,15 +692,32 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     var b = $('cajaBarra');
     if (b) b.hidden = !lineas.length || ticketVisible;
   }
-  if ('IntersectionObserver' in window && $('cajaBarra')) {
-    new IntersectionObserver(function(es){
-      ticketVisible = es[0].isIntersecting;
-      barraCelular();
-    }).observe($('ticket'));
+  /* ¿Se ve el ticket? Se revisa al desplazar: es medir un solo elemento, y
+     el navegador ya manda a lo más un evento de desplazamiento por cuadro.
+     El escucha se pone una sola vez —la navegación sin recarga vuelve a
+     correr este script— y llama a la revisión de la Caja que esté abierta. */
+  window.lfCajaRevisarBarra = function(){
+    var t = $('ticket');
+    if (!t || !document.body.contains(t)) return;
+    var r = t.getBoundingClientRect();
+    ticketVisible = r.top < window.innerHeight && r.bottom > 0;
+    barraCelular();
+  };
+  if (!window.lfCajaScroll) {
+    window.lfCajaScroll = true;
+    var revisar = function(){ if (window.lfCajaRevisarBarra) window.lfCajaRevisarBarra(); };
+    document.addEventListener('scroll', revisar, { passive: true, capture: true });
+    window.addEventListener('resize', revisar);
   }
+  window.lfCajaRevisarBarra();
   if ($('barraIr')) $('barraIr').addEventListener('click', function(){
     var t = $('ticket');
-    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (!t) return;
+    /* Va al ticket: la barra se quita ya, sin esperar a que se mida, y se
+       vuelve a revisar cuando termina de desplazarse. */
+    ticketVisible = true; barraCelular();
+    t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(window.lfCajaRevisarBarra, 800);
   });
 
   /* ══════════════════════════════════════════════════════
