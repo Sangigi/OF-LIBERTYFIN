@@ -370,84 +370,144 @@ final class PagosEntrantesControlador
      * esto el abono tarda hasta que alguien abre la pantalla, y el
      * cliente ya se fue creyendo que pagó.
      */
-    public function pagoLiga()
-    {
-        $this->abrirPuerta();
-        $d = $this->cuerpo();
+public function pagoLiga()
+{
+    $this->abrirPuerta();
+    $d = $this->cuerpo();
 
-        $ref = preg_replace('/\D/', '', (string)($d['reference'] ?? ''));
-        $respuesta = strtolower(trim((string)($d['response'] ?? '')));
-        if ($ref === '') $this->json(['code' => '21', 'message' => 'Referencia obligatoria.']);
+    $ref       = preg_replace('/\D/', '', (string)($d['reference'] ?? ''));
+    $respuesta = strtolower(trim((string)($d['response'] ?? '')));
 
-        $hallado = $this->ubicar($ref);
-        if (!$hallado) $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
-        list($db, $l) = $hallado;
+    // Traza de entrada: qué nos llegó, en una sola línea.
+    error_log(sprintf(
+        '[LibertyFin] pagoLiga ← ref=%s response=%s auth=%s folio=%s amount=%s',
+        $ref !== '' ? $ref : '(vacía)',
+        $respuesta !== '' ? $respuesta : '(vacío)',
+        (string)($d['auth'] ?? ''),
+        (string)($d['foliocpagos'] ?? ''),
+        (string)($d['amount'] ?? '')
+    ));
 
-        // Solo `approved` mueve dinero. `denied` y `error` se anotan para
-        // que en la pantalla se vea que el intento existió y falló, en
-        // vez de dejar el cobro como si nadie lo hubiera tocado.
-        if ($respuesta !== 'approved') {
-            (new LigaRepo($db))->marcarRevisada($l['id']);
-            $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
-        }
-        if ($l['estado'] === 'pagada') {
-            // Ya marcada en una vuelta anterior: reconciliar el plan
-            // aquí también, por si el aviso se reintentó después de un
-            // fallo de red a mitad del handler.
-            $this->aprobarPlanSiAplica($l);
-            $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
-        }
+    if ($ref === '') {
+        error_log('[LibertyFin] pagoLiga ✗ sin referencia en el cuerpo');
+        $this->json(['code' => '21', 'message' => 'Referencia obligatoria.']);
+    }
 
-        // Aquí el monto viene en PESOS y con comas ("1,156.00"), no en
-        // centavos como en los otros avisos. Es del proveedor, no un
-        // descuido nuestro.
-        $monto = (float)str_replace([',', '$', ' '], '', (string)($d['amount'] ?? 0));
-        if ($monto <= 0) $monto = (float)$l['monto'];
-        $saldo = $this->saldoDe($db, $l);
-        if ($saldo > 0 && $monto > $saldo) $monto = $saldo;
+    $hallado = $this->ubicar($ref);
+    if (!$hallado) {
+        error_log('[LibertyFin] pagoLiga ✗ referencia no ubicada: ' . $ref);
+        $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
+    }
+    list($db, $l) = $hallado;
 
-        try {
-            $repo = new LigaRepo($db);
-            $repo->anotarAviso($l['id'], (string)($d['foliocpagos'] ?? ''),
-                (string)($d['auth'] ?? ''), $monto);
+    error_log(sprintf(
+        '[LibertyFin] pagoLiga · ubicada id=%s estado=%s venta_id=%s monto_liga=%s',
+        (string)$l['id'],
+        (string)$l['estado'],
+        var_export($l['venta_id'] ?? null, true),
+        (string)$l['monto']
+    ));
 
-            // Mismo criterio que en autorizar(): la revisión es para
-            // ventas. Un pago de plan se aprueba solo.
-            if (!empty($l['venta_id']) && (new ConfigRepo($db))->exigeAprobacion()) {
-                $repo->marcarRevisada($l['id'], 'por_aprobar');
-                $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
-            }
-
-            $pagoId = null;
-            if (!empty($l['venta_id']) && $monto > 0) {
-                $res = (new RegistrarPago($db))->abonar((int)$l['venta_id'], [
-                    'monto'      => $monto,
-                    'metodo'     => 'tarjeta',
-                    'referencia' => 'Liga ' . $l['referencia'],
-                    'fecha'      => date('Y-m-d'),
-                    'usuario_id' => null,
-                ]);
-                $pagoId = $res['pago_id'] ?? null;
-            }
-            $repo->marcarPagada($l['id'], $pagoId);
-
-            // ─────────────────────────────────────────────────────
-            // SI ERA UN PAGO DE PLAN, APROBARLO TAMBIÉN.
-            // La liga ya quedó `pagada`; el plan no se entera solo.
-            // ─────────────────────────────────────────────────────
-            $this->aprobarPlanSiAplica($l);
-
-            Auditoria::anota('pago.registrar', 'liga cobrada · ' . $l['referencia'],
-                'esperando', Dinero::pesos($monto), $db);
-        } catch (\Throwable $e) {
-            // Se contesta 00 de todos modos: el cobro con el banco ya se
-            // hizo y pedirle al proveedor que reintente no arregla un
-            // problema que es nuestro. Queda en el log para revisarlo.
-            error_log('[LibertyFin] aviso de liga ' . $ref . ': ' . $e->getMessage());
-        }
+    // Solo `approved` mueve dinero. `denied` y `error` se anotan para
+    // que en la pantalla se vea que el intento existió y falló.
+    if ($respuesta !== 'approved') {
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga · intento NO aprobado (response=%s) → marcarRevisada id=%s',
+            $respuesta !== '' ? $respuesta : '(vacío)',
+            (string)$l['id']
+        ));
+        (new LigaRepo($db))->marcarRevisada($l['id']);
         $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
     }
 
+    if ($l['estado'] === 'pagada') {
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga · id=%s ya estaba pagada → reconciliar plan',
+            (string)$l['id']
+        ));
+        $this->aprobarPlanSiAplica($l);
+        $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
+    }
+
+    // Aquí el monto viene en PESOS y con comas ("1,156.00").
+    $monto = (float)str_replace([',', '$', ' '], '', (string)($d['amount'] ?? 0));
+    if ($monto <= 0) {
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga · monto del aviso inválido (%s) → uso monto de liga %s',
+            (string)($d['amount'] ?? ''),
+            (string)$l['monto']
+        ));
+        $monto = (float)$l['monto'];
+    }
+
+    $saldo = $this->saldoDe($db, $l);
+    if ($saldo > 0 && $monto > $saldo) {
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga · monto %s > saldo %s → recorto al saldo',
+            $monto, $saldo
+        ));
+        $monto = $saldo;
+    }
+
+    error_log(sprintf(
+        '[LibertyFin] pagoLiga · a aplicar monto=%.2f saldo=%.2f venta_id=%s',
+        $monto, $saldo, var_export($l['venta_id'] ?? null, true)
+    ));
+
+    try {
+        $repo = new LigaRepo($db);
+        $repo->anotarAviso($l['id'], (string)($d['foliocpagos'] ?? ''),
+            (string)($d['auth'] ?? ''), $monto);
+
+        // Mismo criterio que en autorizar(): la revisión es para ventas.
+        if (!empty($l['venta_id']) && (new ConfigRepo($db))->exigeAprobacion()) {
+            error_log(sprintf(
+                '[LibertyFin] pagoLiga · venta %s exige aprobación → por_aprobar',
+                (string)$l['venta_id']
+            ));
+            $repo->marcarRevisada($l['id'], 'por_aprobar');
+            $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
+        }
+
+        $pagoId = null;
+        if (!empty($l['venta_id']) && $monto > 0) {
+            $res = (new RegistrarPago($db))->abonar((int)$l['venta_id'], [
+                'monto'      => $monto,
+                'metodo'     => 'tarjeta',
+                'referencia' => 'Liga ' . $l['referencia'],
+                'fecha'      => date('Y-m-d'),
+                'usuario_id' => null,
+            ]);
+            $pagoId = $res['pago_id'] ?? null;
+            error_log(sprintf(
+                '[LibertyFin] pagoLiga · abono registrado venta=%s pago_id=%s',
+                (string)$l['venta_id'], var_export($pagoId, true)
+            ));
+        } else {
+            error_log('[LibertyFin] pagoLiga · sin venta_id → es pago de plan');
+        }
+        $repo->marcarPagada($l['id'], $pagoId);
+
+        $this->aprobarPlanSiAplica($l);
+
+        Auditoria::anota('pago.registrar', 'liga cobrada · ' . $l['referencia'],
+            'esperando', Dinero::pesos($monto), $db);
+
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga ✓ id=%s ref=%s monto=%.2f',
+            (string)$l['id'], $l['referencia'], $monto
+        ));
+    } catch (\Throwable $e) {
+        // Se contesta 00 de todos modos: el cobro con el banco ya se hizo.
+        error_log(sprintf(
+            '[LibertyFin] pagoLiga ✗ EXCEPCIÓN ref=%s id=%s monto=%.2f: %s @ %s:%d',
+            $ref, (string)$l['id'], $monto,
+            $e->getMessage(), $e->getFile(), $e->getLine()
+        ));
+        error_log('[LibertyFin] pagoLiga · trace: ' . $e->getTraceAsString());
+    }
+    $this->json(['code' => '00', 'message' => 'Recibido correctamente.']);
+}
     // ════════════════════════════════════════════════════════════
     //  LO COMPARTIDO
     // ════════════════════════════════════════════════════════════
@@ -492,11 +552,69 @@ final class PagosEntrantesControlador
                 ->aprobarPorPago($l['referencia'], null);   // null = automático
 
             if ($aprobado) {
+                $nombrePlan = (string)($aprobado['nombre_plan'] ?? $aprobado['plan'] ?? '');
+
                 error_log(sprintf(
                     '[LibertyFin] webhook: plan %s aprobado · empresa %d · vence %s',
-                    $aprobado['plan'] ?? '?',
-                    (int)$aprobado['empresa_id'],
+                    $nombrePlan !== '' ? $nombrePlan : '?',
+                    (int)($aprobado['empresa_id'] ?? 0),
                     $aprobado['vence_nuevo'] ?? '?'
+                ));
+
+                // ─────────────────────────────────────────────────
+                // AVISO DE PAGO CONFIRMADO
+                //
+                // El destinatario es el correo del usuario que CREÓ la
+                // liga, guardado en `ligas.usuario_correo` cuando el
+                // admin estaba logueado en la pestaña Plan. Aquí no hay
+                // sesión —el proveedor pega sin cookies—, así que la
+                // única forma de tener ese correo es haberlo persistido
+                // al crear la liga (ver UsuariosControlador::generarLigaPlan).
+                //
+                // Envuelto en su propio try/catch: el pago YA quedó
+                // aprobado. Un SMTP caído no puede hacer que le
+                // contestemos 500 al proveedor por un correo que no salió.
+                // ─────────────────────────────────────────────────
+                $destino = (string)($l['usuario_correo'] ?? '');
+                if ($destino === '') {
+                    $destino = (string)($aprobado['email_admin'] ?? '');
+                }
+                $nombre  = (string)($l['usuario_nombre']
+                                    ?? $aprobado['nombre_contacto'] ?? '');
+                $vence   = !empty($aprobado['vence_nuevo'])
+                           ? date('d/m/Y', strtotime($aprobado['vence_nuevo']))
+                           : '';
+
+                $enviado = false;
+                $motivo  = '';
+                if ($destino === '') {
+                    $motivo = 'sin correo en la liga ni en el pago del plan';
+                } else {
+                    try {
+                        $enviado = \LibertyFin\Servicio\Avisos::pagoPlanRevisado(
+                            $destino, $nombre, $nombrePlan, true, $vence,
+                            (isset($_SERVER['HTTPS']) ? 'https' : 'http') . '://'
+                                . ($_SERVER['HTTP_HOST'] ?? '') . '/cuenta?t=plan');
+                        if (!$enviado) {
+                            $motivo = \LibertyFin\Servicio\Avisos::activos()
+                                ? 'el envío devolvió false'
+                                : 'SMTP no configurado';
+                        }
+                    } catch (\Throwable $e) {
+                        $motivo = 'excepción: ' . $e->getMessage();
+                    }
+                }
+
+                // Una sola línea, siempre, con el desenlace del correo.
+                // Cuando alguien pregunte "¿le llegó?", se busca la
+                // referencia en el log y se sabe de inmediato.
+                error_log(sprintf(
+                    '[LibertyFin] aviso pago plan webhook ref=%s plan="%s" para=%s — %s%s',
+                    (string)($l['referencia'] ?? ''),
+                    $nombrePlan,
+                    $destino !== '' ? $destino : '(sin correo)',
+                    $enviado ? 'correo ENVIADO' : 'correo NO enviado',
+                    $enviado ? '' : ' (' . ($motivo ?: 'motivo desconocido') . ')'
                 ));
             }
         } catch (\Throwable $e) {
