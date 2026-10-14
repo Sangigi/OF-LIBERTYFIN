@@ -320,7 +320,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
              evitan casi siempre. El servidor vuelve a calcular el cambio al
              cobrar: es dinero que el cajero va a entregar. */ ?>
     <div class="lf-pagacon" id="cajaPagaCon">
-      <label for="pagaCon">¿Con cuánto paga? <small>(para el cambio)</small></label>
+      <label for="pagaCon">¿Con cuánto paga? <small>(opcional, solo para calcular el cambio)</small></label>
       <div class="billetes" id="billetes"></div>
       <input type="number" name="paga_con" id="pagaCon" min="0" step="0.01" placeholder="0.00">
       <p class="cambio" id="verCambio" aria-live="polite"></p>
