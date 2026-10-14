@@ -45,7 +45,7 @@ final class FacturacionControlador
         'D10' => ['605','606','607','608','611','612','614','615','625'],
     ];
 
-    private const CLAVE_PROD_SERV = '01010101';
+    private const CLAVE_PROD_SERV = '43232804';
     private const TOLERANCIA      = 0.05;
 
     /**
