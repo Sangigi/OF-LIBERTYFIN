@@ -4144,7 +4144,7 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-cant button:disabled{opacity:.3;cursor:default}
 .lf-cant .n{min-width:22px;text-align:center;font-family:var(--lf-mono);font-size:12.5px;font-weight:700;color:var(--lf-tinta)}
 /* Más datos: plegable, como "Agregar a una venta" */
-.lf-mas-datos{margin:12px 20px 0;border:1px solid var(--lf-linea);border-radius:var(--lf-r);overflow:hidden}
+.lf-mas-datos{margin:14px 20px 16px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);overflow:hidden}
 .lf-mas-datos > summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:10px 13px;cursor:pointer;
   list-style:none;font-size:12.5px;font-weight:600;color:var(--lf-tinta-2)}
 .lf-mas-datos > summary::-webkit-details-marker{display:none}
@@ -4217,3 +4217,5 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
   font-weight:700;color:var(--lf-tinta-2);cursor:pointer}
 .lf-pagacon .billetes button:first-child{font-family:var(--lf-font)}
 .lf-pagacon .billetes button:hover{border-color:var(--lf-brand);color:var(--lf-brand-2)}
+/* "Agregar a una venta que ya existe" no va pegado al encabezado del ticket. */
+.lf-ticket .lf-ampliar{margin-top:14px}
