@@ -178,7 +178,7 @@ final class AsignarComision
         // cuentan las de ese producto y las viejas que van sobre toda la venta.
         $ya = $this->repartido($ventaId, $l['id']);
         if ($ya + $pct > 100.0001) {
-            $n = function ($x) { return rtrim(rtrim(number_format($x, 3, '.', ''), '0'), '.'); };
+            $n = function ($x) { return rtrim(rtrim(number_format($x, 4, '.', ''), '0'), '.'); };
             $que = $varios ? $l['producto'] : 'esta venta';
             throw new \InvalidArgumentException($ya >= 99.999
                 ? 'Las comisiones de ' . $que . ' ya suman el 100%: no queda nada por repartir.'

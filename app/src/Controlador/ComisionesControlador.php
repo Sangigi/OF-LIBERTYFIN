@@ -300,7 +300,7 @@ final class ComisionesControlador
         $pares = []; $vistos = [];
         foreach ((array)($_POST['colaborador'] ?? []) as $i => $q) {
             $q   = trim((string)$q);
-            $pct = round((float)($pcts[$i] ?? 0), 3);
+            $pct = round((float)($pcts[$i] ?? 0), 4);
             if ($q === '' && $pct == 0) continue;                       // fila vacía
             if ($q === '' || ($q !== 'esp' && !isset($nombres[(int)$q]))) {
                 $falla('Elige a quién en cada fila.');
@@ -405,7 +405,7 @@ final class ComisionesControlador
             $en = '';
             if (strpos($p['en'], 'a:') === 0) $en = ' en ' . substr($p['en'], 2);
             if (strpos($p['en'], 'p:') === 0) $en = ' en ' . ($nombreProd[(int)substr($p['en'], 2)] ?? 'un producto');
-            return $p['nombre'] . ' ' . rtrim(rtrim(number_format($p['pct'], 3, '.', ''), '0'), '.') . '%' . $en;
+            return $p['nombre'] . ' ' . rtrim(rtrim(number_format($p['pct'], 4, '.', ''), '0'), '.') . '%' . $en;
         }, $pares));
         $varias = count($pares) > 1;
 

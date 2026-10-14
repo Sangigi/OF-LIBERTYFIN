@@ -18,7 +18,7 @@ $qs = function ($c = []) use ($filtros) {
 $sinRegla = function () use ($qs) { return $qs(['regla' => null, 'p' => null]) ; };
 
 $pct = function ($v) {
-    return rtrim(rtrim(number_format((float)$v, 3, '.', ''), '0'), '.') . '%';
+    return rtrim(rtrim(number_format((float)$v, 4, '.', ''), '0'), '.') . '%';
 };
 $cifra = function ($v, $unidad) use ($pct) {
     if ($v === null) return '—';
@@ -26,6 +26,8 @@ $cifra = function ($v, $unidad) use ($pct) {
 };
 $clase = ['alta' => 'bg-danger', 'media' => 'bg-warning', 'baja' => 'bg-secondary'];
 ?>
+
+<?php P::parcial('auditoria/_pestanas', ['actual' => 'incoherencias']); ?>
 
 <form class="lf-filtros" method="get">
   <div class="lf-search" style="max-width:210px">

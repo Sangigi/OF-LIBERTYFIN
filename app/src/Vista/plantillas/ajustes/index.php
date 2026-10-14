@@ -333,7 +333,7 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
                 del sistema · marca comisiones sin dueño</span><?php endif; ?></td>
             <td data-label="Área"><span class="badge bg-secondary"><?= P::e($c['area']) ?></span></td>
             <td data-label="% usual" class="text-end lf-mono">
-              <?= $c['pct_usual'] !== null ? preg_replace('/(\.\d\d)0$/', '$1', number_format((float)$c['pct_usual'], 3, '.', '')).'%' : '—' ?></td>
+              <?= $c['pct_usual'] !== null ? preg_replace('/(\.\d\d\d*?)0+$/', '$1', number_format((float)$c['pct_usual'], 4, '.', '')).'%' : '—' ?></td>
             <td data-label="Devengado" class="text-end lf-mono" style="font-weight:700">
               <?= D::pesos($c['devengado']) ?></td>
             <td style="text-align:right;white-space:nowrap">

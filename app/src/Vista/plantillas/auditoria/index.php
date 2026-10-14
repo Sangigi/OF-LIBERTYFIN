@@ -13,11 +13,13 @@ $qs = function ($c = []) use ($filtros) {
     return '?' . http_build_query(array_merge($b, array_filter($c, function ($v) { return $v !== null; })));
 };
 $ini = function ($n) { return mb_strtoupper(mb_substr(trim((string)$n), 0, 1) ?: '?'); };
-$pctTxt = function ($p) { return rtrim(rtrim(number_format((float)$p, 3, '.', ''), '0'), '.') . '%'; };
+$pctTxt = function ($p) { return rtrim(rtrim(number_format((float)$p, 4, '.', ''), '0'), '.') . '%'; };
 // Lo que mueve dinero se marca: es lo que se revisa primero.
 $pesadas = ['pago.cancelar','gasto.borrar','servicio.precio','comision.quitar',
             'usuario.rol','usuario.clave','usuario.alternar'];
 ?>
+
+<?php P::parcial('auditoria/_pestanas', ['actual' => 'bitacora']); ?>
 
 <form class="lf-filtros" method="get">
   <div class="lf-search" style="max-width:250px">

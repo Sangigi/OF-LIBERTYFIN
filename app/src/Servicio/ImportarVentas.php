@@ -91,6 +91,8 @@ final class ImportarVentas
     private $db;
     private $error = '';
     private $ajustes = [];
+    /** Solo para comparar (Auditoría): ver analizar(). */
+    private $comparar = false;
 
     public function __construct(PDO $db) { $this->db = $db; }
 
@@ -112,6 +114,10 @@ final class ImportarVentas
         // Los ajustes que alguien escribió en la pantalla de revisión,
         // guardados por hoja y fila. Ver `ajustar()` más abajo.
         $this->ajustes = is_array($opc['ajustes'] ?? null) ? $opc['ajustes'] : [];
+        // COMPARAR: la misma lectura, pero sin saltarse lo que ya está en el
+        // sistema, que es justo lo que Auditoría quiere revisar contra la
+        // hoja. Tampoco busca qué daría de alta: no se va a importar nada.
+        $this->comparar = !empty($opc['comparar']);
 
         $plan = [
             'renglones' => [], 'listas' => 0, 'abonos' => 0, 'conAviso' => 0,
@@ -161,7 +167,7 @@ final class ImportarVentas
                     $plan['total']      += $r['total'];
                     $plan['cobrado']    += $r['anticipo'];
                     $plan['comisiones'] += array_sum(array_column($r['comisiones'], 'monto'));
-                    $this->anotarNuevos($plan['nuevos'], $r);
+                    if (!$this->comparar) $this->anotarNuevos($plan['nuevos'], $r);
                 }
                 $plan['renglones'][] = $r;
             }
@@ -405,7 +411,9 @@ final class ImportarVentas
             $vistos[$folio] = ['total' => $r['total'], 'fila' => $n + 1, 'ventas' => 1, 'cobros' => 0];
         }
 
-        if (($r['tipo'] ?? 'venta') === 'venta') {
+        if ($this->comparar) {
+            // Ni venta ni cobro se saltan por existir: se van a comparar.
+        } elseif (($r['tipo'] ?? 'venta') === 'venta') {
             if ($this->yaExiste($folio)) {
                 $r['estado'] = 'repetida';
                 $r['avisos'][] = 'Ya está en el sistema. Se salta.';

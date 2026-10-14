@@ -35,9 +35,9 @@ final class AuditoriaControlador
         $total  = Auditoria::cuantos($db, $filtros);
 
         Plantilla::pagina('auditoria/index', [
-            'titulo'     => 'Bitácora',
-            'icono'      => 'reloj',
-            'subtitulo'  => number_format($total) . ' movimientos',
+            'titulo'     => 'Auditoría',
+            'icono'      => 'alerta',
+            'subtitulo'  => 'Bitácora · ' . number_format($total) . ' movimientos',
             'filas'      => Auditoria::listado($db, $filtros, $porPag, ($pagina - 1) * $porPag),
             'porUsuario' => Auditoria::porUsuario($db, $desde, $hasta),
             'porAccion'  => Auditoria::porAccion($db, $desde, $hasta),

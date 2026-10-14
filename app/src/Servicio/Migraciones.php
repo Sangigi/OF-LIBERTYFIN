@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 17;
+    const VERSION = 19;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -671,6 +671,118 @@ final class Migraciones
         }
     }
 
+    /**
+     * 18 · El historial de «Recalcular comisiones», para poder deshacerlo.
+     *
+     *   comision_recalculos        cada vez que se presionó el botón: quién,
+     *                              cuándo, cuántas ventas revisó y cambió, y
+     *                              si se deshizo.
+     *   comision_recalculo_ventas  cada venta que cambió: cómo estaban sus
+     *                              renglones de pago_comisiones antes
+     *                              (filas_antes) y la huella de cómo quedó,
+     *                              para no deshacer encima de algo nuevo.
+     *
+     * Fue la versión 16, pero ese número lo tomó después la de los
+     * decimales (hoy la 17) y esta se perdió. No se puede volver a usar el
+     * 16: una base que ya está en 16 o más se lo saltaría. En las empresas
+     * que ya tienen las tablas, IF NOT EXISTS no las toca.
+     */
+    private static function v18(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS comision_recalculos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                creado_en DATETIME NOT NULL,
+                usuario_id INT NULL,
+                usuario_nombre VARCHAR(160) NULL,
+                ventas_revisadas INT NOT NULL DEFAULT 0,
+                ventas_cambiadas INT NOT NULL DEFAULT 0,
+                deshecho_en DATETIME NULL,
+                deshecho_por VARCHAR(160) NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS comision_recalculo_ventas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                recalculo_id INT NOT NULL,
+                venta_id INT NOT NULL,
+                antes DECIMAL(12,2) NOT NULL DEFAULT 0,
+                despues DECIMAL(12,2) NOT NULL DEFAULT 0,
+                meses TEXT NULL,
+                huella CHAR(32) NOT NULL,
+                filas_antes MEDIUMTEXT NOT NULL,
+                deshecha TINYINT(1) NOT NULL DEFAULT 0,
+                KEY ix_crv_recalculo (recalculo_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
+    /**
+     * 19 · Promociones.
+     *
+     *   lf_promociones           la promoción: tipo, valor, vigencia, días,
+     *                            código (cupón), compra mínima y límite de usos.
+     *   lf_promocion_objetivos   a qué aplica: productos o áreas (categorías).
+     *                            En un paquete, los productos que lo forman y
+     *                            cuántos de cada uno.
+     *   lf_promocion_usos        cada vez que una venta la usó, por producto y
+     *                            con cuánto se descontó. De aquí salen el límite
+     *                            de usos y lo que costó cada promoción.
+     *
+     * Nombres propios a propósito: el esquema heredado trae `promociones` y
+     * sus tablas hermanas, pensadas para una tienda (marcas, mayoreo), con la
+     * definición cortada en config/esquema.sql. Nadie las usa, y en las bases
+     * viejas pueden existir con otra forma: compartir el nombre las pisaría.
+     */
+    private static function v19(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_promociones (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                nombre VARCHAR(120) NOT NULL,
+                tipo VARCHAR(12) NOT NULL,
+                valor DECIMAL(12,4) NOT NULL DEFAULT 0,
+                lleva INT NULL,
+                paga INT NULL,
+                alcance VARCHAR(10) NOT NULL DEFAULT 'productos',
+                desde DATE NULL,
+                hasta DATE NULL,
+                dias VARCHAR(20) NULL,
+                codigo VARCHAR(30) NULL,
+                minimo DECIMAL(12,2) NOT NULL DEFAULT 0,
+                limite INT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                nota VARCHAR(255) NULL,
+                creado_en DATETIME NOT NULL,
+                creado_por VARCHAR(160) NULL,
+                actualizado_en DATETIME NULL,
+                KEY ix_pr_activo (activo, desde, hasta),
+                KEY ix_pr_codigo (codigo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_promocion_objetivos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                promocion_id INT NOT NULL,
+                tipo VARCHAR(10) NOT NULL,
+                ref_id INT NOT NULL,
+                cantidad INT NOT NULL DEFAULT 1,
+                KEY ix_po_promo (promocion_id),
+                KEY ix_po_ref (tipo, ref_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_promocion_usos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                promocion_id INT NOT NULL,
+                venta_id INT NOT NULL,
+                producto_id INT NULL,
+                cantidad DECIMAL(10,3) NOT NULL DEFAULT 1,
+                descuento DECIMAL(12,2) NOT NULL DEFAULT 0,
+                codigo VARCHAR(30) NULL,
+                usuario_id INT NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_pu_promo (promocion_id),
+                KEY ix_pu_venta (venta_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -689,5 +801,7 @@ final class Migraciones
         14 => 'Banco del pago con tarjeta o SPEI',
         15 => 'Datos fiscales del comprobante y domicilio/datos fiscales del cliente',
         17 => 'Porcentajes de comisión con hasta 4 decimales (33.333)',
+        18 => 'Historial de «Recalcular comisiones», para poder deshacerlo',
+        19 => 'Promociones: descuentos, precios especiales, paquetes y códigos',
     ];
 }

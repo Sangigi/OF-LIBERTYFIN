@@ -228,7 +228,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
                 </span>
               </td>
               <td data-label="Área"><span class="badge bg-secondary"><?= P::e($c['area_nombre']) ?></span></td>
-              <td data-label="%" class="text-end lf-mono"><?= preg_replace('/(\.\d\d)0$/', '$1', number_format((float)$c['pct'], 4, '.', '')) ?>%</td>
+              <td data-label="%" class="text-end lf-mono"><?= preg_replace('/(\.\d\d\d*?)0+$/', '$1', number_format((float)$c['pct'], 4, '.', '')) ?>%</td>
               <td data-label="Si liquida" class="text-end lf-mono" style="color:var(--lf-tinta-3)"><?= D::pesos($c['asignada']) ?></td>
               <td data-label="Devengada" class="text-end lf-mono" style="font-weight:700"><?= D::pesos($c['devengada']) ?></td>
               <td data-label="Pendiente" class="text-end lf-mono" style="color:var(--lf-amb)"><?= D::pesos($c['pendiente']) ?></td>
@@ -369,6 +369,13 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               <small style="color:var(--lf-tinta-4);font-size:11px">
                 <?= (float)$l['cantidad'] ?> × <?= D::pesos($l['precio_unitario']) ?>
                 <?= $l['codigo'] ? ' · ' . P::e($l['codigo']) : '' ?></small>
+              <?php /* El descuento de la línea (promociones). El importe de la
+                       derecha ya lo trae restado. */
+              if ((float)($l['descuento'] ?? 0) > 0.004): ?>
+                <span class="lf-promo-tag" style="display:flex;width:fit-content;margin-top:4px">
+                  <?= P::e(($promosVenta[(int)$l['producto_id']] ?? '') ?: 'Descuento') ?> ·
+                  −<?= D::pesos($l['descuento']) ?></span>
+              <?php endif; ?>
             </div>
             <span class="lf-mono" style="font-weight:700"><?= D::pesos($l['subtotal']) ?></span>
           </div>

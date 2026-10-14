@@ -121,6 +121,9 @@ $r->get('/caja/ventas-abiertas', ['LibertyFin\Controlador\CajaControlador', 'ven
 $r->get('/qr',              ['LibertyFin\Controlador\CajaControlador', 'qr']);
 $r->get('/caja/estado/{id}', ['LibertyFin\Controlador\CajaControlador', 'estado']);
 $r->post('/caja/cobrar',  ['LibertyFin\Controlador\CajaControlador', 'cobrar']);
+// El descuento de las promociones mientras se arma el ticket. Lo calcula el
+// servidor, el mismo que lo vuelve a calcular al cobrar.
+$r->post('/caja/promociones', ['LibertyFin\Controlador\CajaControlador', 'promociones']);
 $r->get('/comisiones',            ['LibertyFin\Controlador\ComisionesControlador', 'index']);
 $r->get('/comisiones/colaborador/{id}', ['LibertyFin\Controlador\ComisionesControlador', 'colaborador']);
 $r->post('/comisiones/reasignar', ['LibertyFin\Controlador\ComisionesControlador', 'reasignar']);
@@ -139,6 +142,9 @@ $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
 $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  'guardar']);
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
+$r->post('/servicios/promociones/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardarPromocion']);
+$r->post('/servicios/promociones/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternarPromocion']);
+$r->post('/servicios/promociones/borrar',   ['LibertyFin\Controlador\ServiciosControlador', 'borrarPromocion']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
 // Ligas de pago: solo con credenciales de SPEI.
 if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
@@ -189,8 +195,16 @@ $r->get('/informes',              ['LibertyFin\Controlador\InformesControlador',
 $r->get('/conocimiento',          ['LibertyFin\Controlador\ConocimientoControlador', 'index']);
 $r->post('/conocimiento/guardar', ['LibertyFin\Controlador\ConocimientoControlador', 'guardar']);
 $r->post('/conocimiento/alternar',['LibertyFin\Controlador\ConocimientoControlador', 'alternar']);
-$r->get('/auditoria',             ['LibertyFin\Controlador\AuditoriaControlador', 'index']);
-$r->get('/incoherencias',         ['LibertyFin\Controlador\IncoherenciasControlador', 'index']);
+// AUDITORÍA: una sección con tres pestañas. Incoherencias va primero porque
+// es la que contesta "¿qué está mal?"; la comparación contra un Excel revisa
+// lo capturado contra la hoja que se llevaba aparte; la Bitácora dice quién
+// hizo qué. /incoherencias se queda para no romper enlaces guardados.
+$r->get('/auditoria',               ['LibertyFin\Controlador\IncoherenciasControlador', 'index']);
+$r->get('/auditoria/excel',         ['LibertyFin\Controlador\CompararExcelControlador', 'index']);
+$r->post('/auditoria/excel',        ['LibertyFin\Controlador\CompararExcelControlador', 'subir']);
+$r->get('/auditoria/excel/quitar',  ['LibertyFin\Controlador\CompararExcelControlador', 'quitar']);
+$r->get('/auditoria/bitacora',      ['LibertyFin\Controlador\AuditoriaControlador', 'index']);
+$r->get('/incoherencias',           ['LibertyFin\Controlador\IncoherenciasControlador', 'aAuditoria']);
 $r->get('/tickets',               ['LibertyFin\Controlador\TicketsControlador', 'index']);
 $r->post('/tickets/crear',        ['LibertyFin\Controlador\TicketsControlador', 'crear']);
 $r->get('/tickets/{id}',          ['LibertyFin\Controlador\TicketsControlador', 'ver']);
@@ -261,6 +275,7 @@ $permisos = [
   '/caja/clientes'          => 'cobrar',
   '/caja/ventas-abiertas'   => 'cobrar',
   '/caja/cobrar'            => 'cobrar',
+  '/caja/promociones'       => 'cobrar',
   '/caja/estado/{id}'       => 'cobrar',
   '/qr'                     => 'cobrar',
   '/cobranza'               => 'ver.cobranza',
@@ -283,6 +298,9 @@ $permisos = [
   '/servicios'              => 'ver.servicios',
   '/servicios/guardar'      => 'editar.servicios',
   '/servicios/alternar'     => 'editar.servicios',
+  '/servicios/promociones/guardar'  => 'editar.servicios',
+  '/servicios/promociones/alternar' => 'editar.servicios',
+  '/servicios/promociones/borrar'   => 'editar.servicios',
   '/reportes'               => 'ver.reportes',
   '/reportes/excel'         => 'ver.reportes',
   '/reportes/imprimir'      => 'ver.reportes',
@@ -326,6 +344,9 @@ $permisos = [
   '/conocimiento/guardar'   => 'editar.conocimiento',
   '/conocimiento/alternar'  => 'editar.conocimiento',
   '/auditoria'              => 'ver.auditoria',
+  '/auditoria/excel'        => 'ver.auditoria',
+  '/auditoria/excel/quitar' => 'ver.auditoria',
+  '/auditoria/bitacora'     => 'ver.auditoria',
   '/incoherencias'          => 'ver.auditoria',
   '/tickets'                => 'ver.tickets',
   '/tickets/crear'          => 'ver.tickets',

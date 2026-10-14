@@ -13,6 +13,8 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     return '?' . http_build_query(array_merge(['desde'=>$desde,'hasta'=>$hasta,'q'=>$buscar], $x)); };
 ?>
 
+<?php P::parcial('servicios/_pestanas', ['actual' => 'catalogo', 'vigentes' => $vigentes ?? 0]); ?>
+
 <?php if ($aviso): ?>
 <div class="alert alert-<?= $aviso['tipo']==='error'?'danger':'success' ?>" style="margin-bottom:18px">
   <?= W::icono('alerta','18px') ?><span><?= P::e($aviso['texto']) ?></span>

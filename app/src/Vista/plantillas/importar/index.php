@@ -459,6 +459,12 @@ use LibertyFin\Dominio\Dinero as D;
         Hasta <?= (int)$maxMb ?> MB. Se aceptan <code>.xlsx</code> y <code>.csv</code>.
         Todas las hojas del libro se leen.
       </p>
+      <?php if (\LibertyFin\Dominio\Permisos::puede('ver.auditoria')): ?>
+      <p style="margin:6px 0 0;font-size:12px;color:var(--lf-tinta-4)">
+        ¿Solo quieres ver en qué no coincide la hoja con lo que ya está capturado, sin meter nada?
+        Usa <a href="/auditoria/excel">Auditoría · Contra un Excel</a>.
+      </p>
+      <?php endif; ?>
       <button class="btn btn-primary btn-sm" type="submit" style="margin-top:14px">
         Revisar
       </button>

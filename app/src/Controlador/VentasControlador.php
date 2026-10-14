@@ -96,6 +96,8 @@ final class VentasControlador
                           . date('d/m/Y H:i', strtotime($venta['fecha'])),
             'venta'      => $venta,
             'lineas'     => $repo->lineas($id),
+            // Qué promoción tuvo cada producto, para decirlo junto al descuento.
+            'promosVenta'=> (new \LibertyFin\Servicio\Promociones($db))->deVenta($id),
             'metodos'    => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
             'pagos'      => $repo->pagos($id),
             'gastos'     => $repo->gastos($id),
@@ -254,6 +256,7 @@ final class VentasControlador
         Plantilla::parcial('ventas/ticket', [
             'venta'   => $venta,
             'lineas'  => $repo->lineas($id),
+            'promos'  => (new \LibertyFin\Servicio\Promociones($db))->deVenta($id),
             'empresa' => $empresa,
         ]);
     }

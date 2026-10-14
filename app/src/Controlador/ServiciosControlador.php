@@ -5,6 +5,7 @@ use LibertyFin\Datos\Conexion;
 use LibertyFin\Datos\ServicioRepo;
 use LibertyFin\Http\Peticion;
 use LibertyFin\Servicio\Auditoria;
+use LibertyFin\Servicio\Promociones;
 use LibertyFin\Vista\Plantilla;
 
 final class ServiciosControlador
@@ -12,6 +13,10 @@ final class ServiciosControlador
     public function index()
     {
         $db   = Conexion::de($_SESSION['empresa_db']);
+        // Las promociones son una pestaña de Productos: hablan de sus precios.
+        if (Peticion::opcion('t', ['catalogo', 'promociones'], 'catalogo') === 'promociones') {
+            return $this->promociones($db);
+        }
         $repo = new ServicioRepo($db);
 
         $desde  = Peticion::fecha('desde', date('Y-m-01'));
@@ -38,6 +43,7 @@ final class ServiciosControlador
             'editando'  => $editar ? $repo->uno_($editar) : null,
             'abrir'     => $editar > 0 || Peticion::texto('nuevo') !== '',
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
+            'vigentes'  => $this->cuantasVigentes($db),
         ]);
         unset($_SESSION['lf_aviso']);
     }
@@ -122,15 +128,114 @@ final class ServiciosControlador
         }
     }
 
+    // ════════════════════════════════════════════════════════
+    //  PROMOCIONES
+    // ════════════════════════════════════════════════════════
+
+    private function promociones($db)
+    {
+        $srv    = new Promociones($db);
+        $editar = Peticion::entero('editar');
+        $promos = $srv->listar();
+        Plantilla::pagina('servicios/promociones', [
+            'titulo'    => 'Productos',
+            'icono'     => 'serv',
+            'subtitulo' => 'Promociones · se aplican solas en Caja',
+            'promos'    => $promos,
+            // Para elegir a qué aplica: los productos activos y las áreas.
+            'productos' => (new \LibertyFin\Datos\CatalogoRepo($db))->servicios(null, '', '', 3000),
+            'categorias'=> (new ServicioRepo($db))->categorias(),
+            'editando'  => $editar ? $srv->una($editar) : null,
+            'abrir'     => $editar > 0 || Peticion::texto('nueva') !== '',
+            'puedeEditar' => \LibertyFin\Dominio\Permisos::puede('editar.servicios'),
+            'vigentes'  => count(array_filter($promos, function ($p) {
+                return $p['estado']['clave'] === 'vigente'; })),
+            'aviso'     => $_SESSION['lf_aviso'] ?? null,
+        ]);
+        unset($_SESSION['lf_aviso']);
+    }
+
+    public function guardarPromocion()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error', '?t=promociones');
+        $srv = new Promociones($db);
+        $id  = (int)($_POST['id'] ?? 0);
+        try {
+            $antes = $id ? $srv->una($id) : null;
+            $id = $srv->guardar($_POST, $_SESSION['usuario_nombre'] ?? '');
+            $p  = $srv->una($id);
+            Auditoria::anota('promocion.guardar', $p['nombre'],
+                $antes ? Promociones::describir($antes) : null, Promociones::describir($p));
+            $this->volver($antes ? 'Promoción actualizada.' : 'Promoción creada. Caja ya la aplica.',
+                          'ok', '?t=promociones');
+        } catch (\InvalidArgumentException $e) {
+            // Se regresa al formulario con lo que estaba editando, no a la lista.
+            $this->volver($e->getMessage(), 'error',
+                          '?t=promociones&' . ($id ? 'editar=' . $id : 'nueva=1'));
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] guardar promoción: ' . $e->getMessage());
+            $this->volver('No se pudo guardar la promoción.', 'error', '?t=promociones');
+        }
+    }
+
+    public function alternarPromocion()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error', '?t=promociones');
+        $srv = new Promociones($db);
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            $activa = $srv->alternar($id);
+            $p = $srv->una($id);
+            Auditoria::anota('promocion.estado', $p ? $p['nombre'] : 'promoción ' . $id,
+                $activa ? 'pausada' : 'activa', $activa ? 'activa' : 'pausada');
+            $this->volver($activa ? 'Promoción reanudada.' : 'Promoción pausada. Caja ya no la aplica.',
+                          'ok', '?t=promociones');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] alternar promoción: ' . $e->getMessage());
+            $this->volver('No se pudo cambiar la promoción.', 'error', '?t=promociones');
+        }
+    }
+
+    public function borrarPromocion()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error', '?t=promociones');
+        $srv = new Promociones($db);
+        try {
+            $id = (int)($_POST['id'] ?? 0);
+            $p  = $srv->una($id);
+            $srv->borrar($id);
+            Auditoria::anota('promocion.borrar', $p ? $p['nombre'] : 'promoción ' . $id,
+                $p ? Promociones::describir($p) : null, null);
+            $this->volver('Promoción borrada.', 'ok', '?t=promociones');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($e->getMessage(), 'error', '?t=promociones');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] borrar promoción: ' . $e->getMessage());
+            $this->volver('No se pudo borrar la promoción.', 'error', '?t=promociones');
+        }
+    }
+
+    /** Para la pestaña: cuántas se están aplicando hoy. */
+    private function cuantasVigentes($db)
+    {
+        try {
+            return count(array_filter((new Promociones($db))->listar(), function ($p) {
+                return $p['estado']['clave'] === 'vigente'; }));
+        } catch (\Throwable $e) { return 0; }
+    }
+
     private function tokenValido()
     {
         return !empty($_SESSION['lf_token']) && !empty($_POST['token'])
             && hash_equals($_SESSION['lf_token'], $_POST['token']);
     }
 
-    private function volver($texto, $tipo)
+    private function volver($texto, $tipo, $donde = '')
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
-        header('Location: /servicios'); exit;
+        header('Location: /servicios' . $donde); exit;
     }
 }

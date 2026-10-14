@@ -79,7 +79,11 @@ body{font-family:'Google Sans',system-ui,sans-serif;background:#f1f4f2;
     <?php foreach ($lineas as $l): ?>
       <div class="l">
         <span><b><?= P::e($l['producto'] ?: 'Producto') ?></b>
-          <small><?= (float)$l['cantidad'] ?> × <?= D::pesos($l['precio_unitario']) ?></small></span>
+          <small><?= (float)$l['cantidad'] ?> × <?= D::pesos($l['precio_unitario']) ?></small>
+          <?php if ((float)($l['descuento'] ?? 0) > 0.004): ?>
+            <small><?= P::e(($promos[(int)$l['producto_id']] ?? '') ?: 'Descuento') ?>
+              −<?= D::pesos($l['descuento']) ?></small>
+          <?php endif; ?></span>
         <span class="m"><?= D::pesos($l['subtotal']) ?></span>
       </div>
     <?php endforeach; ?>

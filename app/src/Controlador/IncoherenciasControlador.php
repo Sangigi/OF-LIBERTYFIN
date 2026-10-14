@@ -16,6 +16,18 @@ final class IncoherenciasControlador
 {
     const POR_PAGINA = 40;
 
+    /**
+     * /incoherencias ahora es una pestaña de Auditoría (/auditoria). Se
+     * conserva la dirección vieja, con sus filtros, para no romper enlaces
+     * guardados.
+     */
+    public function aAuditoria()
+    {
+        $q = (string)($_SERVER['QUERY_STRING'] ?? '');
+        header('Location: /auditoria' . ($q !== '' ? '?' . $q : ''), true, 301);
+        exit;
+    }
+
     public function index()
     {
         $db = Conexion::de($_SESSION['empresa_db']);
@@ -65,9 +77,9 @@ final class IncoherenciasControlador
         foreach ($todo['hallazgos'] as $h) $porSeveridad[$h['severidad']]++;
 
         Plantilla::pagina('incoherencias/index', [
-            'titulo'     => 'Incoherencias',
+            'titulo'     => 'Auditoría',
             'icono'      => 'alerta',
-            'subtitulo'  => $total === 0 ? 'Nada que revisar' : number_format($total) . ' por revisar',
+            'subtitulo'  => 'Incoherencias · ' . ($total === 0 ? 'nada que revisar' : number_format($total) . ' por revisar'),
             'filas'      => array_slice($lista, ($pagina - 1) * self::POR_PAGINA, self::POR_PAGINA),
             'resumen'    => $todo['resumen'],
             'truncadas'  => $todo['truncadas'],
@@ -95,8 +107,8 @@ final class IncoherenciasControlador
             fputcsv($f, [
                 Incoherencias::SEVERIDADES[$h['severidad']],
                 $h['titulo'], self::sinFormula($h['codigo']), substr((string)$h['fecha'], 0, 10),
-                $h['actual'] === null ? '' : number_format($h['actual'], 3, '.', ''),
-                $h['esperado'] === null ? '' : number_format($h['esperado'], 3, '.', ''),
+                $h['actual'] === null ? '' : number_format($h['actual'], 4, '.', ''),
+                $h['esperado'] === null ? '' : number_format($h['esperado'], 4, '.', ''),
                 self::sinFormula($h['nota']), self::sinFormula($h['usuario']), self::sinFormula($h['sucursal']),
             ]);
         }

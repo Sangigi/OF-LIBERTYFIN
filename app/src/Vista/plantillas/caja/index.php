@@ -191,7 +191,22 @@ $token = $_SESSION['lf_token'];
     <p id="vacio" style="padding:26px 20px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
       Toca un producto para agregarlo.</p>
 
+    <?php /* Promociones: las que el cajero quitó y el descuento que vio. Al
+             cobrar, el servidor las vuelve a calcular y, si no da lo mismo,
+             no cobra (ver CajaControlador::cobrar). */ ?>
+    <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="[]">
+    <input type="hidden" name="promo_esperado" id="promoEsperado" value="0">
+
     <div class="lf-sumas">
+      <?php if (!empty($promos['codigos'])): ?>
+      <div class="lf-promo-cupon">
+        <input class="form-control form-control-sm lf-mono" type="text" name="promo_codigo" id="promoCodigo"
+               maxlength="30" autocomplete="off" placeholder="Código de promoción" aria-label="Código de promoción">
+        <small id="promoMsg" aria-live="polite"></small>
+      </div>
+      <?php endif; ?>
+      <div id="filaDesc" class="lf-promo-total" hidden><span>Descuento por promociones</span>
+        <span class="lf-mono" id="sDesc">−$0.00</span></div>
       <div><span>Subtotal</span><span class="lf-mono" id="sSub">$0.00</span></div>
       <div style="align-items:center">
         <span style="display:flex;align-items:center;gap:7px">IVA
@@ -427,7 +442,8 @@ $token = $_SESSION['lf_token'];
       // El precio es editable: muchos servicios se cotizan por caso y el
       // catálogo los tiene en cero a propósito.
       d.innerHTML = '<div style="flex:1;min-width:0"><b>' + l.nombre + '</b>'
-        + '<small>cantidad ' + l.cantidad + '</small></div>'
+        + '<small>cantidad ' + l.cantidad + '</small>'
+        + '<div class="lf-promo-l" data-promo-i="' + i + '"></div></div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
         + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>';
@@ -435,7 +451,9 @@ $token = $_SESSION['lf_token'];
     });
     $('vacio').hidden = lineas.length > 0;
     $('conteo').textContent = lineas.length + ' concepto' + (lineas.length===1?'':'s');
+    pintarPromos();
     calcular();   // calcular() ya serializa las líneas
+    pedirPromos();
   }
 
   function calcular(){
@@ -448,7 +466,13 @@ $token = $_SESSION['lf_token'];
     $('lineas').value = JSON.stringify(lineas.map(function(l){
       return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
 
-    var cap = lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0);
+    /* El descuento de las promociones ya viene por renglón (ver
+       pedirPromos): el total es lo capturado menos eso. */
+    var desc = lineas.reduce(function(a,l){ return a + (l.desc || 0); }, 0);
+    var cap = Math.max(0, lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0) - desc);
+    $('promoEsperado').value = desc.toFixed(2);
+    $('filaDesc').hidden = desc <= 0.004;
+    $('sDesc').textContent = '−' + pesos(desc);
     var pct = parseFloat($('ivaPct').value) || 0;
     // IVA incluido: el total es lo capturado y el impuesto se extrae.
     var base = pct > 0 ? cap / (1 + pct/100) : cap;
@@ -479,9 +503,115 @@ $token = $_SESSION['lf_token'];
       ? 'Cobrar ' + pesos(cap)
       : (ant > 0 ? 'Cobrar ' + pesos(ant) : 'Registrar sin cobro');
     $('btnTexto').dataset.total = (ant > 0 ? ant : cap).toFixed(2);
+    /* Mientras el servidor contesta las promociones, no se cobra: el total
+       todavía puede cambiar. */
+    var esperando = !!(promo && promo.esperando);
+    if (esperando) $('btnTexto').textContent = 'Revisando promociones…';
     document.dispatchEvent(new Event('lf-recalcular'));
-    $('btnCobrar').disabled = lineas.length === 0;
+    $('btnCobrar').disabled = lineas.length === 0 || esperando;
   }
+
+  /* ══════════════════════════════════════════════════════
+     PROMOCIONES
+     El servidor dice cuánto descuenta cada renglón: es el mismo que lo
+     vuelve a calcular al cobrar, así que pantalla y venta no pueden
+     decir cosas distintas. Aquí solo se pregunta y se enseña. El cajero
+     puede quitar la de un renglón (y volver a ponerla).
+     ══════════════════════════════════════════════════════ */
+  var HAY_PROMOS = <?= !empty($promos['hay']) ? 'true' : 'false' ?>;
+  var promo = { quitadas: [], esperando: false, n: 0, t: null };
+
+  function escP(t){ var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+
+  function pintarPromos(){
+    lineas.forEach(function(l, i){
+      var c = document.querySelector('[data-promo-i="' + i + '"]');
+      if (!c) return;
+      if (l.promo) {
+        c.innerHTML = '<span class="lf-promo-tag"><b>−' + pesos(l.desc) + '</b>&nbsp;· ' + escP(l.promo.nombre) + '</span>'
+          + '<button type="button" class="lf-promo-x" data-promo-quitar="' + l.promo.id + '"'
+          + ' title="No aplicar esta promoción a este ticket">quitar</button>';
+      } else if (l.quitada) {
+        c.innerHTML = '<span class="lf-promo-tag off">' + escP(l.quitada.nombre) + ' · quitada</span>'
+          + '<button type="button" class="lf-promo-x" data-promo-volver="' + l.quitada.id + '">aplicar</button>';
+      } else {
+        c.innerHTML = '';
+      }
+    });
+  }
+
+  function mensajeCodigo(c){
+    var m = $('promoMsg');
+    if (!m) return;
+    m.textContent = c && c.texto ? c.mensaje : '';
+    m.className = !c || !c.texto ? '' : (c.estado === 'ok' ? 'ok' : 'mal');
+  }
+
+  function sinPromos(){
+    lineas.forEach(function(l){ l.desc = 0; l.promo = null; l.quitada = null; });
+  }
+
+  function pedirPromos(){
+    if (!HAY_PROMOS) return;
+    clearTimeout(promo.t);
+    promo.esperando = lineas.length > 0;
+    if (!lineas.length) { sinPromos(); mensajeCodigo(null); calcular(); return; }
+    calcular();
+    promo.t = setTimeout(function(){
+      var n = ++promo.n;
+      var fd = new FormData();
+      fd.append('token', document.querySelector('#ticket input[name="token"]').value);
+      fd.append('lineas', JSON.stringify(lineas.map(function(l){
+        return {id:l.id, cantidad:l.cantidad, precio:l.precio}; })));
+      fd.append('promo_codigo', $('promoCodigo') ? $('promoCodigo').value : '');
+      fd.append('promo_quitadas', JSON.stringify(promo.quitadas));
+      fetch('/caja/promociones', { method:'POST', body:fd, credentials:'same-origin',
+                                   headers:{'Accept':'application/json'} })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (n !== promo.n) return;          // ya se pidió otra más nueva
+          sinPromos();
+          if (d && d.ok) {
+            d.lineas.forEach(function(r){
+              var l = lineas[r.i];
+              if (!l) return;
+              l.desc = +r.descuento || 0;
+              l.promo = r.promo_id ? {id:r.promo_id, nombre:r.nombre} : null;
+              l.quitada = r.quitada || null;
+            });
+            mensajeCodigo(d.codigo);
+          }
+          promo.esperando = false;
+          pintarPromos(); calcular();
+        })
+        .catch(function(){
+          /* Sin respuesta se cobra sin promociones. Si el servidor sí las
+             tiene, al cobrar lo dice y se vuelve a revisar. */
+          if (n !== promo.n) return;
+          sinPromos();
+          promo.esperando = false;
+          pintarPromos(); calcular();
+        });
+    }, 250);
+  }
+
+  $('lista').addEventListener('click', function(e){
+    var q = e.target.closest('[data-promo-quitar]'), v = e.target.closest('[data-promo-volver]');
+    if (!q && !v) return;
+    if (q) {
+      var id = +q.dataset.promoQuitar;
+      if (promo.quitadas.indexOf(id) === -1) promo.quitadas.push(id);
+    } else {
+      var id2 = +v.dataset.promoVolver;
+      promo.quitadas = promo.quitadas.filter(function(x){ return x !== id2; });
+    }
+    $('promoQuitadas').value = JSON.stringify(promo.quitadas);
+    pedirPromos();
+  });
+  if ($('promoCodigo')) $('promoCodigo').addEventListener('input', function(){
+    this.value = this.value.toUpperCase();
+    pedirPromos();
+  });
 
   /* ══════════════════════════════════════════════════════
      CATÁLOGO: CATEGORÍA, BÚSQUEDA Y PÁGINAS, SIN RECARGAR
@@ -647,6 +777,7 @@ $token = $_SESSION['lf_token'];
     if (!i) return;
     lineas[+i.dataset.i].precio = Math.max(0, parseFloat(i.value) || 0);
     calcular();
+    pedirPromos();   // un precio cambiado a mano deja de llevar promoción
   });
 
   ['ivaPct','anticipo','gastos'].forEach(function(id){
@@ -737,7 +868,9 @@ $token = $_SESSION['lf_token'];
         metodo: $('comoPaga').value,
         sinLiga: $('sinLiga') ? $('sinLiga').checked : null,
         ref: $('refTransf') ? $('refTransf').value : '',
-        banco: $('bancoPago') ? $('bancoPago').value : ''
+        banco: $('bancoPago') ? $('bancoPago').value : '',
+        quitadas: promo.quitadas,
+        codigo: $('promoCodigo') ? $('promoCodigo').value : ''
       }));
     } catch (e) { /* sin sessionStorage se opera igual, solo que sin guardar */ }
   };
@@ -745,7 +878,8 @@ $token = $_SESSION['lf_token'];
   /* Lo que se va a registrar, leído de la pantalla, para el resumen de
      confirmación. */
   window.lfResumenTicket = function(){
-    var cap = lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0);
+    var desc = lineas.reduce(function(a,l){ return a + (l.desc || 0); }, 0);
+    var cap = Math.max(0, lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0) - desc);
     var ant = parseFloat($('anticipo').value) || 0;
     if (ant > cap) ant = cap;
     var act = document.querySelector('.lf-metodos .m.on');
@@ -754,7 +888,9 @@ $token = $_SESSION['lf_token'];
     var se = $('selEspecialista');
     var v = window.lfVentaElegida && window.lfVentaElegida();
     return {
-      lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio}; }),
+      lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
+                                              desc:l.desc || 0, promo:l.promo ? l.promo.nombre : ''}; }),
+      descuento: desc,
       total: cap, anticipo: ant, saldo: cap - ant,
       liga: esLinea && !(sl && sl.checked),
       metodo: (act ? act.textContent.trim() : 'Efectivo')
@@ -798,6 +934,11 @@ $token = $_SESSION['lf_token'];
       if ($('sinLiga') && g.sinLiga !== null) $('sinLiga').checked = !!g.sinLiga;
       if ($('refTransf')) $('refTransf').value = g.ref || '';
       if ($('bancoPago')) $('bancoPago').value = g.banco || '';
+      /* Las promociones quitadas y el código; el descuento se vuelve a
+         pedir al servidor al pintar (pudo cambiar desde que se guardó). */
+      promo.quitadas = (g.quitadas || []).map(Number);
+      $('promoQuitadas').value = JSON.stringify(promo.quitadas);
+      if ($('promoCodigo')) $('promoCodigo').value = g.codigo || '';
       $('anticipo').value = g.anticipo;
       $('anticipo').dataset.manual = g.manual || '';
       if ($('sinLiga')) $('sinLiga').dispatchEvent(new Event('change'));
@@ -1142,8 +1283,9 @@ $token = $_SESSION['lf_token'];
         av.push('<b>No se cobra nada hoy</b>: se registra solo la venta.');
     }
     var items = r.lineas.slice(0, 5).map(function(l){
-      return '<li><span>' + (l.cantidad > 1 ? l.cantidad + ' × ' : '') + esc(l.nombre) + '</span>'
-           + '<b class="lf-mono">' + money(l.precio * l.cantidad) + '</b></li>';
+      return '<li><span>' + (l.cantidad > 1 ? l.cantidad + ' × ' : '') + esc(l.nombre)
+           + (l.promo ? '<small class="lf-conf-promo">' + esc(l.promo) + ' · −' + money(l.desc) + '</small>' : '')
+           + '</span><b class="lf-mono">' + money(l.precio * l.cantidad - (l.desc || 0)) + '</b></li>';
     }).join('');
     if (r.lineas.length > 5) items += '<li class="mas">y ' + (r.lineas.length - 5) + ' más…</li>';
 
@@ -1162,6 +1304,8 @@ $token = $_SESSION['lf_token'];
     confCuerpo.innerHTML =
         (av.length ? '<div class="lf-conf-av">' + av.map(function(a){ return '<p>' + a + '</p>'; }).join('') + '</div>' : '')
       + '<ul class="lf-conf-items">' + items + '</ul>'
+      + (r.descuento > 0.004 ? '<div class="lf-conf-desc"><span>Descuento por promociones</span>'
+           + '<b class="lf-mono">−' + money(r.descuento) + '</b></div>' : '')
       + '<div class="lf-conf-total"><span>Total</span><b class="lf-mono">' + money(r.total) + '</b></div>'
       + '<dl class="lf-conf-datos">' + filas.map(function(f){
           return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>'; }).join('') + '</dl>';

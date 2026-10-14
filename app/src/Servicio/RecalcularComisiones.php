@@ -40,7 +40,7 @@ final class RecalcularComisiones
     public function __construct(PDO $db) { $this->db = $db; }
 
     // Las tablas (comision_recalculos y comision_recalculo_ventas) las crea
-    // Servicio\Migraciones, versión 16, como el resto del esquema.
+    // Servicio\Migraciones, versión 18, como el resto del esquema.
 
     /**
      * Recalcula todas las ventas (no canceladas) con comisiones.

@@ -27,7 +27,13 @@ final class CajaControlador
         // abierta" teniéndola, y sus ventas se guardaban fuera del corte.
         $turno = \LibertyFin\Servicio\Caja::abierta($db);
 
+        // Si hoy no hay ninguna promoción, Caja ni pregunta: las empresas que
+        // no las usan no pagan una consulta por cada producto que se agrega.
+        $vig = (new \LibertyFin\Servicio\Promociones($db))->vigentes();
+        $conCodigo = array_filter($vig, function ($p) { return !empty($p['codigo']); });
+
         Plantilla::pagina('caja/index', [
+            'promos'    => ['hay' => (bool)$vig, 'codigos' => (bool)$conCodigo],
             'titulo'    => 'Caja',
             'icono'     => 'caja',
             'subtitulo' => 'Venta nueva · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
@@ -77,51 +83,46 @@ final class CajaControlador
         if (!is_array($lineas) || !$lineas) {
             $this->volver('El ticket está vacío.', 'error');
         }
+        $validas = $this->lineasValidas($db, $lineas);
+        if (!$validas) $this->volver('El ticket está vacío.', 'error');
 
-        // El precio SÍ puede venir del formulario: estos servicios se cotizan
-        // por caso y el catálogo tiene varios en cero a propósito.
+        // ── PROMOCIONES ──
         //
-        // Lo que se relee de la base es el NOMBRE y el COSTO, y se valida que
-        // el producto exista y esté activo. El precio se acepta, se limpia y
-        // queda registrado en venta_detalles junto con el usuario que lo
-        // capturó: aquí el control es el rastro, no el candado.
-        //
-        // Si el formulario no manda precio, se usa el del catálogo.
-        $ids = array_map(function ($l) { return (int)($l['id'] ?? 0); }, $lineas);
-        $ids = array_values(array_filter(array_unique($ids)));
-        if (!$ids) $this->volver('El ticket está vacío.', 'error');
-
-        $marcas = implode(',', array_fill(0, count($ids), '?'));
-        // El precio de venta es `subprecio`. Releerlo mal aquí sería peor que
-        // no releerlo: cobraría el importe equivocado con toda confianza.
-        $st = $db->prepare("
-            SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio, costo
-            FROM productos WHERE id IN ($marcas) AND activo = 1");
-        $st->execute($ids);
-        $reales = [];
-        foreach ($st->fetchAll() as $p) $reales[(int)$p['id']] = $p;
+        // Se calculan OTRA VEZ aquí, con lo que hay en la base, aunque Caja
+        // ya las enseñó: el navegador solo las muestra. Si lo que se va a
+        // descontar no es lo que el cajero vio y confirmó (una venció, otra
+        // venta agotó los usos), no se cobra: un total distinto del que se
+        // le dijo al cliente es peor que pedir que lo revise.
+        $promos = new \LibertyFin\Servicio\Promociones($db);
+        $calc = $promos->paraTicket($validas, [
+            'codigo'   => $_POST['promo_codigo'] ?? '',
+            'quitadas' => self::quitadas(),
+        ]);
+        if (isset($_POST['promo_esperado'])
+            && abs((float)$_POST['promo_esperado'] - $calc['descuento']) > 0.009) {
+            $this->volver('Las promociones cambiaron mientras armabas el ticket (alguna venció o se agotó). '
+                        . 'Revisa el total y vuelve a cobrar.', 'error');
+        }
 
         $pct  = max(0, min(100, (float)($_POST['iva_pct'] ?? 0)));
         $modo = ($_POST['iva_modo'] ?? 'incluido') === 'sumar' ? Iva::SUMAR : Iva::INCLUIDO;
         $ticket = new Ticket(new Iva($pct, $modo));
 
-        foreach ($lineas as $l) {
-            $id = (int)($l['id'] ?? 0);
-            if (!isset($reales[$id])) continue;
-            $p = $reales[$id];
-
-            $precio = isset($l['precio']) ? round((float)$l['precio'], 2) : (float)$p['precio'];
-            if ($precio < 0) $precio = 0;
-            if ($precio > 9999999) {
-                $this->volver('Ese precio no parece correcto. Revísalo.', 'error');
-            }
-            $ticket->agregar($id, $p['nombre'], $precio,
-                max(1, (float)($l['cantidad'] ?? 1)), 0, $p['costo'] ?? 0);
+        foreach ($validas as $i => $v) {
+            // El descuento va en la línea: Ticket lo resta del total y
+            // Dominio\Comision de la base, así que la comisión ya sale
+            // sobre el precio con descuento.
+            $ticket->agregar($v['id'], $v['nombre'], $v['precio'], $v['cantidad'],
+                             $calc['lineas'][$i]['descuento'] ?? 0, $v['costo']);
         }
 
         // Un ticket entero en cero casi siempre es un dedazo, no una cortesía.
-        if ($ticket->subtotalCapturado() <= 0) {
+        $bruto = array_sum(array_map(function ($v) { return $v['precio'] * $v['cantidad']; }, $validas));
+        if ($bruto <= 0) {
             $this->volver('El ticket suma cero. Pon el precio de cada producto antes de cobrar.', 'error');
+        }
+        if ($ticket->subtotalCapturado() <= 0) {
+            $this->volver('Con las promociones el ticket queda en $0. Quita alguna antes de cobrar.', 'error');
         }
         $ticket->gastosOperacion((float)($_POST['gastos'] ?? 0));
 
@@ -136,7 +137,7 @@ final class CajaControlador
         // agrega lo vendido y se abre saldo, que es lo que de verdad
         // pasó. El dinero entra después por donde entra siempre.
         $ampliar = (int)($_POST['ampliar_venta'] ?? 0);
-        if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket);
+        if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket, $calc);
 
         // EL CLIENTE. Se eligió de la lista (id), o se escribió un nombre.
         // Un nombre escrito se enlaza al cliente que ya tenga ese nombre
@@ -211,6 +212,7 @@ final class CajaControlador
             error_log('[LibertyFin] cobrar: ' . $e->getMessage());
             $this->volver('No se pudo registrar la venta. Quedó anotado el error.', 'error');
         }
+        $this->anotarPromos($db, $r['id'], $calc);
 
         // Pago en linea: se genera el cobro y se devuelven los datos
         // para el modal, sin salir de la caja.
@@ -238,6 +240,118 @@ final class CajaControlador
 
         header('Location: /ventas/' . $r['id'] . '?nueva=1');
         exit;
+    }
+
+    /**
+     * El descuento de las promociones para el ticket que se está armando.
+     * JSON. Solo informa: al cobrar se vuelve a calcular (ver cobrar()).
+     */
+    public function promociones()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (!$this->tokenValido()) {
+            $this->json(['ok' => false, 'error' => 'No se pudo verificar el formulario.']);
+        }
+        $lineas  = json_decode($_POST['lineas'] ?? '[]', true);
+        $validas = $this->lineasValidas($db, is_array($lineas) ? $lineas : [], false);
+        $calc = (new \LibertyFin\Servicio\Promociones($db))->paraTicket($validas, [
+            'codigo'   => $_POST['promo_codigo'] ?? '',
+            'quitadas' => self::quitadas(),
+        ]);
+        // Cada renglón vuelve con el índice que tiene en la pantalla: si uno
+        // se descartó (un producto que se desactivó), los demás no se corren.
+        $out = [];
+        foreach ($validas as $i => $v) {
+            $c = $calc['lineas'][$i];
+            $out[] = ['i' => $v['i'], 'promo_id' => $c['promo_id'], 'nombre' => $c['nombre'],
+                      'descuento' => $c['descuento'], 'quitada' => $c['quitada']];
+        }
+        $this->json(['ok' => true, 'lineas' => $out, 'descuento' => $calc['descuento'],
+                     'codigo' => $calc['codigo']]);
+    }
+
+    /**
+     * Los renglones del ticket, limpios y con lo que hay que releer de la base.
+     *
+     * El precio SÍ puede venir del formulario: estos servicios se cotizan
+     * por caso y el catálogo tiene varios en cero a propósito.
+     *
+     * Lo que se relee de la base es el NOMBRE y el COSTO, y se valida que
+     * el producto exista y esté activo. El precio se acepta, se limpia y
+     * queda registrado en venta_detalles junto con el usuario que lo
+     * capturó: aquí el control es el rastro, no el candado. Si el formulario
+     * no manda precio, se usa el del catálogo.
+     *
+     * También se lee el precio de LISTA y el área: las promociones van
+     * sobre el precio de catálogo (uno cambiado a mano no lleva) y algunas
+     * aplican a un área completa.
+     *
+     * @param bool $estricto  al cobrar, un precio absurdo detiene todo; al
+     *                        pedir promociones, solo se ignora ese renglón.
+     */
+    private function lineasValidas($db, array $lineas, $estricto = true)
+    {
+        $ids = array_map(function ($l) { return (int)($l['id'] ?? 0); }, $lineas);
+        $ids = array_values(array_filter(array_unique($ids)));
+        if (!$ids) return [];
+
+        $marcas = implode(',', array_fill(0, count($ids), '?'));
+        // El precio de venta es `subprecio`. Releerlo mal aquí sería peor que
+        // no releerlo: cobraría el importe equivocado con toda confianza.
+        $st = $db->prepare("
+            SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio, costo, categoria_id
+            FROM productos WHERE id IN ($marcas) AND activo = 1");
+        $st->execute($ids);
+        $reales = [];
+        foreach ($st->fetchAll() as $p) $reales[(int)$p['id']] = $p;
+
+        $out = [];
+        foreach (array_values($lineas) as $i => $l) {
+            $id = (int)($l['id'] ?? 0);
+            if (!isset($reales[$id])) continue;
+            $p = $reales[$id];
+
+            $precio = isset($l['precio']) ? round((float)$l['precio'], 2) : (float)$p['precio'];
+            if ($precio < 0) $precio = 0;
+            if ($precio > 9999999) {
+                if ($estricto) $this->volver('Ese precio no parece correcto. Revísalo.', 'error');
+                continue;
+            }
+            $out[] = [
+                'i'        => $i,
+                'id'       => $id,
+                'nombre'   => $p['nombre'],
+                'precio'   => $precio,
+                'cantidad' => max(1, (float)($l['cantidad'] ?? 1)),
+                'costo'    => (float)($p['costo'] ?? 0),
+                'lista'    => (float)$p['precio'],
+                'area'     => (int)($p['categoria_id'] ?? 0),
+            ];
+        }
+        return $out;
+    }
+
+    /** Las promociones que el cajero quitó del ticket (ids). */
+    private static function quitadas()
+    {
+        $q = json_decode((string)($_POST['promo_quitadas'] ?? '[]'), true);
+        return is_array($q) ? array_values(array_filter(array_map('intval', $q))) : [];
+    }
+
+    /**
+     * Anota qué promociones usó la venta. Nunca tumba el cobro: la venta ya
+     * quedó, con su descuento en cada línea; si esto falla, solo se pierde la
+     * cuenta de usos de la promoción, y se deja en el log.
+     */
+    private function anotarPromos($db, $ventaId, array $calc)
+    {
+        if (empty($calc['usadas'])) return;
+        try {
+            (new \LibertyFin\Servicio\Promociones($db))->anotarUsos($ventaId, $calc,
+                ['usuario_id' => $_SESSION['usuario_id'] ?? null]);
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] usos de promoción, venta ' . $ventaId . ': ' . $e->getMessage());
+        }
     }
 
     /**
@@ -285,13 +399,14 @@ final class CajaControlador
      * No cobra. Agrega lo vendido y deja el saldo abierto, porque eso es
      * lo que pasó: el cliente pidió más, no pagó más.
      */
-    private function ampliar($db, $ventaId, $ticket)
+    private function ampliar($db, $ventaId, $ticket, array $calc = [])
     {
         try {
             $r = (new \LibertyFin\Servicio\AmpliarVenta($db))
                  ->agregar($ventaId, $ticket, [
                      'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
                  ]);
+            if ($calc) $this->anotarPromos($db, $r['id'], $calc);
         } catch (\InvalidArgumentException $e) {
             if ($this->pideJson()) {
                 $this->json(['ok' => false, 'error' => $e->getMessage()]);
@@ -329,7 +444,10 @@ final class CajaControlador
                          'mensaje' => $aviso]);
         }
         $_SESSION['lf_aviso'] = ['texto' => $aviso, 'tipo' => $r['de_hoy'] ? 'ok' : 'alerta'];
-        $this->a('/ventas/' . $r['id']);
+        // Este controlador no tiene un a(): la llamada que había aquí tronaba
+        // cuando el envío no iba por el modal (sin JavaScript o si falló).
+        header('Location: /ventas/' . $r['id']);
+        exit;
     }
 
     /**

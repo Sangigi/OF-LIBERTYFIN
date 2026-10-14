@@ -4014,3 +4014,92 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
   .lf-edit-caja{padding:12px}
   .lf-barra-ajustes > span{flex-basis:100%}
 }
+
+/* ══════════════════════════════════════════════════════
+   PROMOCIONES (Productos · Promociones y Caja)
+   ══════════════════════════════════════════════════════ */
+/* El segmento marca la opción elegida aunque no haya JavaScript que ponga
+   la clase .on (lo usan Apariencia y "Aplica a"). */
+.lf-segmento label:has(input:checked){background:var(--lf-sup);color:var(--lf-tinta);box-shadow:var(--lf-s1)}
+.lf-promo-bloque{width:100%;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.lf-promo-ayuda{font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.5}
+.lf-promo-chips{display:flex;flex-wrap:wrap;gap:6px}
+.lf-promo-chips label{position:relative;display:inline-flex;align-items:center;margin:0;padding:6px 12px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r-pill);font-size:12.5px;font-weight:600;
+  color:var(--lf-tinta-3);background:var(--lf-sup);cursor:pointer;transition:background .15s,color .15s,border-color .15s}
+.lf-promo-chips label:hover{color:var(--lf-tinta)}
+.lf-promo-chips label:has(input:checked){background:var(--lf-brand-soft);border-color:var(--lf-brand);color:var(--lf-tinta)}
+.lf-promo-chips label:focus-within{box-shadow:0 0 0 2px var(--lf-brand-ring)}
+.lf-promo-chips input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer}
+.lf-promo-chips.dias label{min-width:46px;justify-content:center;padding:6px 8px}
+/* La lista para elegir productos: con buscador, y los elegidos resaltados. */
+.lf-promo-elige{width:100%;max-width:760px}
+.lf-promo-elige .lf-search{margin-bottom:8px}
+.lf-promo-elige .lista{max-height:280px;overflow-y:auto;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r);background:var(--lf-sup)}
+.lf-promo-elige .fila{display:flex;align-items:center;gap:10px;margin:0;padding:9px 12px;
+  border-bottom:1px solid var(--lf-linea);cursor:pointer}
+.lf-promo-elige .fila:last-child{border-bottom:0}
+.lf-promo-elige .fila:hover{background:var(--lf-vidrio)}
+.lf-promo-elige .fila.on{background:var(--lf-brand-soft)}
+.lf-promo-elige .fila input[type="checkbox"]{width:16px;height:16px;flex:none;accent-color:var(--lf-brand)}
+.lf-promo-elige .n{flex:1;min-width:0}
+.lf-promo-elige .n b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-promo-elige .n small{font-size:11px;color:var(--lf-tinta-4)}
+.lf-promo-elige .p{font-size:12px;color:var(--lf-tinta-3);white-space:nowrap}
+.lf-promo-elige .cant{display:inline-flex;align-items:center;gap:3px;font-size:12px;color:var(--lf-tinta-3)}
+.lf-promo-elige .cant input{width:52px;padding:3px 6px;border:1px solid var(--lf-linea);border-radius:8px;
+  background:var(--lf-panel);color:var(--lf-tinta);font-family:var(--lf-mono);font-size:12px}
+/* En un paquete, la cantidad solo cuenta en los elegidos. */
+.lf-promo-elige .fila:not(.on) .cant{opacity:.35}
+@media(max-width:600px){
+  .lf-promo-elige .p{display:none}
+  .lf-promo-form > div{width:100%!important;min-width:0!important}
+}
+/* Caja: la promoción de cada renglón, con su "quitar". */
+.lf-promo-l:empty{display:none}
+.lf-promo-l{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:5px}
+/* El monto va primero: con un nombre largo, lo que importa se ve igual. */
+.lf-promo-tag{display:inline-block;max-width:100%;padding:2px 9px;border-radius:10px;
+  font-size:11px;font-weight:600;line-height:1.5;color:var(--lf-brand-2);background:var(--lf-brand-soft)}
+.lf-promo-tag b,.lf-linea .lf-promo-tag b{display:inline;font-size:inherit;font-family:var(--lf-mono);font-weight:700;white-space:nowrap}
+.lf-promo-tag.off{color:var(--lf-tinta-4);background:var(--lf-vidrio);text-decoration:line-through}
+.lf-promo-x{border:0;background:none;padding:0;font-size:11px;font-weight:600;color:var(--lf-tinta-4);
+  text-decoration:underline;cursor:pointer}
+.lf-promo-x:hover{color:var(--lf-tinta)}
+.lf-sumas > .lf-promo-cupon{display:flex;flex-direction:column;align-items:stretch;gap:4px;margin-bottom:10px}
+.lf-promo-cupon input{text-transform:uppercase}
+.lf-promo-cupon small{font-size:11.5px;line-height:1.4}
+.lf-promo-cupon small:empty{display:none}
+.lf-promo-cupon small.ok{color:var(--lf-brand-2)}
+.lf-promo-cupon small.mal{color:var(--lf-amb)}
+.lf-sumas > .lf-promo-total span:last-child{color:var(--lf-brand-2);font-weight:600}
+.lf-conf-promo{display:block;font-size:11px;color:var(--lf-brand-2);margin-top:1px}
+.lf-conf-items li span:has(.lf-conf-promo){white-space:normal}
+.lf-conf-desc{display:flex;justify-content:space-between;padding:8px 0 0;font-size:13px;color:var(--lf-brand-2)}
+
+/* Auditoría · Contra un Excel */
+.lf-aud-grupo{display:flex;align-items:flex-start;gap:10px;margin-top:6px}
+.lf-aud-grupo > small{flex:none;width:128px;padding-top:7px;font-size:11.5px;font-weight:600;color:var(--lf-tinta-4)}
+.lf-aud-archivo{display:flex;align-items:center;gap:12px;margin:0 0 18px;padding:12px 16px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);background:var(--lf-sup)}
+.lf-aud-archivo .ic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:10px;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-aud-archivo b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-aud-archivo small{display:block;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-aud-filtros{margin-bottom:18px}
+.lf-aud-filtros .form-control,.lf-aud-filtros .form-select{width:auto}
+.stat-card.lf-aud-mal .stat-value{color:var(--lf-amb)}
+@media(max-width:600px){
+  .lf-aud-grupo{flex-direction:column;gap:4px}
+  .lf-aud-grupo > small{width:auto;padding-top:0}
+  .lf-aud-archivo{flex-wrap:wrap}
+}
+/* La lista de promociones cabe en el ancho: los textos largos se parten en
+   vez de mandar las acciones (editar, pausar) fuera de la vista. */
+.table-responsive > .table.lf-promo-tabla{min-width:0}
+.lf-promo-tabla td{vertical-align:top}
+.lf-promo-tabla td:last-child,.lf-promo-tabla td.text-end,.lf-promo-tabla .badge{white-space:nowrap}
+.lf-promo-cond{display:block;font-size:11.5px;color:var(--lf-tinta-4);margin-top:2px}
+.lf-promo-cond b{color:var(--lf-tinta-2);font-weight:600}
+.lf-aud-tabla td[data-label="Detalle"]{min-width:200px}

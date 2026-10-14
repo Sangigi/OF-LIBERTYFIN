@@ -155,7 +155,7 @@ $nDel = count($ventas) - $nAnt;
               <optgroup label="<?= P::e($nomArea) ?>">
                 <?php foreach ($gente as $c): ?>
                   <option value="<?= (int)$c['id'] ?>"
-                          data-pct="<?= isset($sugeridos[$c['id']]) ? P::e(rtrim(rtrim(number_format($sugeridos[$c['id']], 3, '.', ''), '0'), '.')) : '' ?>"><?= P::e($c['nombre']) ?></option>
+                          data-pct="<?= isset($sugeridos[$c['id']]) ? P::e(rtrim(rtrim(number_format($sugeridos[$c['id']], 4, '.', ''), '0'), '.')) : '' ?>"><?= P::e($c['nombre']) ?></option>
                 <?php endforeach; ?>
               </optgroup>
             <?php endforeach; ?>
@@ -164,7 +164,7 @@ $nDel = count($ventas) - $nAnt;
         <label class="pct">Porcentaje
           <span class="lf-lote-pct">
             <input class="form-control" type="number" name="porcentaje[]"
-                   min="0.001" max="100" step="0.001" inputmode="decimal" placeholder="10" required>
+                   min="0.0001" max="100" step="0.0001" inputmode="decimal" placeholder="10" required>
             <i>%</i>
           </span>
         </label>
@@ -440,7 +440,9 @@ $nDel = count($ventas) - $nAnt;
       r.querySelector('[data-elegir]').disabled = !s.value;
     });
     mas.disabled = rs.length >= MAX;
-    total = Math.round(total * 100) / 100;
+    // A 4 decimales, como se guardan: a 2, 33.3334 × 3 decía "100%" y el
+    // servidor lo rechazaba por 100.0002.
+    total = Math.round(total * 10000) / 10000;
     // La suma solo dice algo si todos van a todo; si no, se revisa
     // producto por producto en la lista.
     suma.textContent = rs.length > 1 && total && todosEnTodo
