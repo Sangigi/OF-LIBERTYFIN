@@ -190,20 +190,12 @@ final class UsuariosControlador
             // lectura, la pestaña Plan entra al `if (!empty($reciente))`
             // con null, cae al último `else` de la vista y el usuario
             // solo ve el aviso de texto — sin la liga, sin la CLABE,
-            // sin nada accionable.
-            //
-            // La liga se conserva hasta 24 h para que el polling del
-            // modal de pago confirmado siga funcionando si el usuario
-            // recarga mientras espera. Cuando estadoPlan() confirma el
-            // pago, la borra desde ahí: en la siguiente carga ya no
-            // hace falta.
+            // sin nada accionable. El comentario de la plantilla dice
+            // "el controlador limpia lf_liga al terminar de pintar":
+            // esta es esa limpieza.
             // ─────────────────────────────────────────────────────
             $datos['reciente'] = $_SESSION['lf_liga'] ?? null;
-            if (!empty($_SESSION['lf_liga']['creado_en'])
-                && (time() - (int)$_SESSION['lf_liga']['creado_en']) > 86400) {
-                unset($_SESSION['lf_liga']);
-                $datos['reciente'] = null;
-            }
+            unset($_SESSION['lf_liga']);
         }
         if ($p === 'fiscales') {
             foreach (EmpresaRepo::FISCALES as $c) $datos['fiscales'][$c] = $cfg->valorDe('fiscal.' . $c, '');
@@ -318,16 +310,12 @@ final class UsuariosControlador
                     //
                     // `liga_id` es el id de la fila en `ligas`: es el que
                     // necesita el botón "Ver comprobante" de la vista
-                    // (ruta `/ligas/<id>/documento`) y el polling del
-                    // modal de pago confirmado.
-                    //
-                    // `creado_en` marca la antigüedad: miCuenta() deja
-                    // caducar la liga a las 24 h para no arrastrar un
-                    // modal de un pago viejo.
+                    // (ruta `/ligas/<id>/documento`). Sin él, la vista
+                    // no podría armar el enlace aunque tuviera la
+                    // referencia del pago, porque son tablas distintas.
                     $_SESSION['lf_liga'] = [
                         'pago_id'    => (int)$pago['id'],
                         'liga_id'    => $g['liga_id'] ?? null,
-                        'creado_en'  => time(),
                         'metodo'     => $forma,
                         'monto'      => (float)$pago['monto'],
                         'descripcion'=> $pago['nombre_plan'] ?? '',
@@ -435,9 +423,15 @@ final class UsuariosControlador
             // tiene en PlanRepo::deEmpresa(), referenciado por el
             // mismo `referencia` que aquí se guarda.
             //
-            // EL ID DE LA LIGA SE DEVUELVE: es el que necesita el
-            // polling del modal de pago confirmado, y el botón "Ver
-            // comprobante" de la pestaña Plan.
+            // ─────────────────────────────────────────────────────
+            // EL ID DE LA LIGA SE DEVUELVE
+            //
+            // Antes se llamaba a crear() sin capturar lo que devolvía.
+            // Ese id es el que necesita el botón "Ver comprobante" de la
+            // pestaña Plan: la ruta es `/ligas/<id>/documento` y apunta
+            // a la fila de `ligas`, no al pago de plan. Sin capturarlo,
+            // la vista tendría que adivinar el id y no hay forma: son
+            // tablas distintas.
             // ─────────────────────────────────────────────────────
             $ligaId = (int)(new \LibertyFin\Datos\LigaRepo($principal))->crear([
                 'referencia'     => $g['referencia'] ?? $semilla,
@@ -513,27 +507,12 @@ final class UsuariosControlador
             $this->json(['ok' => false, 'error' => 'No es tuya'], 403);
         }
 
-        // Ya resuelto en una vuelta anterior del modal. Se enriquece
-        // con el plan y el vencimiento para que el modal tenga algo
-        // que mostrar: en esa vuelta no hay `$aprobado`, hay que
-        // releerlo de `pagos_plan` y `empresas`.
+        // Ya resuelto en una vuelta anterior del modal.
         if ($l['estado'] === 'pagada') {
-            unset($_SESSION['lf_liga']);   // el modal ya lo va a mostrar
-            $this->json([
-                'ok'     => true,
-                'pagado' => true,
-                'estado' => 'pagada',
-                'plan'   => $this->datosPlanDeLiga($principal, $l),
-            ]);
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'pagada']);
         }
         if ($l['estado'] === 'por_aprobar') {
-            unset($_SESSION['lf_liga']);
-            $this->json([
-                'ok'     => true,
-                'pagado' => true,
-                'estado' => 'por_aprobar',
-                'plan'   => null,
-            ]);
+            $this->json(['ok' => true, 'pagado' => true, 'estado' => 'por_aprobar']);
         }
 
         // Solo la tarjeta se consulta. SPEI y tienda avisan por webhook.
@@ -571,22 +550,14 @@ final class UsuariosControlador
                     // aquí no hay venta, hay un pago de plan (ya aprobado
                     // arriba). Omitirlo es un error fatal en PHP 8.
                     $ligaRepo->marcarPagada($l['id'], null);
-
-                    // El modal ya lo va a mostrar; en la siguiente carga
-                    // no hace falta.
-                    unset($_SESSION['lf_liga']);
-
                     $this->json([
                         'ok'      => true,
                         'pagado'  => true,
                         'estado'  => 'pagada',
-                        // Si `aprobarPorPago` devolvió null (porque el
-                        // webhook ya lo había aprobado), se relee de la
-                        // base para no dejar el modal sin datos.
                         'plan'    => $aprobado ? [
                             'nombre' => $aprobado['nombre_plan'] ?? '',
                             'vence'  => $aprobado['vence_nuevo'] ?? null,
-                        ] : $this->datosPlanDeLiga($principal, $l),
+                        ] : null,
                     ]);
                 }
 
@@ -605,41 +576,6 @@ final class UsuariosControlador
             'estado'   => 'pendiente',
             'consulta' => $consultable,
         ]);
-    }
-
-    /**
-     * El plan y el vencimiento que quedaron tras aprobar un pago de plan.
-     *
-     * Se usa cuando el modal pregunta por una liga ya pagada: en esa
-     * vuelta no hay `$aprobado` (eso solo existe la primera vez), así que
-     * hay que releerlo de `pagos_plan` y de `empresas`. El vencimiento
-     * real vive en `empresas.fecha_vencimiento`, no en el pago.
-     *
-     * Devuelve null si no hay nada que mostrar: el modal se abre igual,
-     * solo sin las dos líneas del resumen.
-     */
-    private function datosPlanDeLiga($principal, array $liga)
-    {
-        $ref = trim((string)($liga['referencia'] ?? ''));
-        if ($ref === '') return null;
-        try {
-            $st = $principal->prepare(
-                "SELECT nombre_plan FROM pagos_plan
-                  WHERE referencia = ? AND estado = 'aprobado'
-                  ORDER BY id DESC LIMIT 1");
-            $st->execute([$ref]);
-            $nombre = (string)$st->fetchColumn();
-            if ($nombre === '') return null;
-
-            $st = $principal->prepare("SELECT fecha_vencimiento FROM empresas WHERE id = ?");
-            $st->execute([(int)($_SESSION['empresa_id'] ?? 0)]);
-            $vence = $st->fetchColumn();
-
-            return ['nombre' => $nombre, 'vence' => $vence ?: null];
-        } catch (\Throwable $e) {
-            error_log('[LibertyFin] datos plan de liga: ' . $e->getMessage());
-            return null;
-        }
     }
 
     /** Mismo mapa que usa la Caja: '' = no eligió pagar en línea. */

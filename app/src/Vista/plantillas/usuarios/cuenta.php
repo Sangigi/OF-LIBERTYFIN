@@ -327,10 +327,9 @@ if (!empty($catalogo)):
      tarjeta: aquí no hay cajero esperando, el usuario se lleva
      los datos y los usa cuando pueda.
 
-     La liga se conserva en la sesión hasta 24 h para que el
-     polling del modal de pago confirmado siga funcionando si el
-     usuario recarga. Cuando el pago se confirma desde
-     estadoPlan(), se borra de la sesión.
+     Se muestra UNA vez: el controlador limpia `lf_liga` al
+     terminar de pintar. Los datos quedan en el pago (Mis pagos) y
+     se pueden recuperar desde ahí.
      ───────────────────────────────────────────────────── */ ?>
 <section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 45%,transparent);
          margin-bottom:18px">
@@ -516,121 +515,6 @@ if (!empty($catalogo)):
     </p>
   </div>
 </section>
-
-<?php /* ─────────────────────────────────────────────────────
-     MODAL DE PAGO CONFIRMADO
-
-     Se muestra cuando el polling detecta que la liga pasó a
-     `pagada` y (si aplica) el pago de plan quedó aprobado.
-
-     Solo se pinta si hay `liga_id`: el endpoint
-     /cuenta/plan/estado/<liga_id> trabaja sobre la fila de
-     `ligas`, no sobre el pago de plan. Sin ese id no hay a qué
-     preguntar.
-
-     Duración: 10 minutos máximo. Un pago que no entra en ese
-     rango casi siempre significa que el usuario se fue a hacer
-     otra cosa; el modal ya no le sirve a nadie.
-     ───────────────────────────────────────────────────── */ ?>
-<?php if (!empty($lr['liga_id'])): ?>
-<div class="lf-modal" id="lfModalPagado" hidden>
-  <div class="caja" role="dialog" aria-modal="true" aria-labelledby="lfPagadoTit">
-    <header>
-      <div>
-        <h2 id="lfPagadoTit">¡Pago confirmado!</h2>
-        <p>Tu plan ya está activo.</p>
-      </div>
-      <button type="button" class="cerrar" data-cerrar-pagado aria-label="Cerrar">×</button>
-    </header>
-    <div class="cuerpo" style="text-align:center;padding:8px 4px 4px">
-      <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 16px;
-                  background:var(--lf-brand-soft);color:var(--lf-brand-2);
-                  display:flex;align-items:center;justify-content:center">
-        <?= W::icono('cobro','32px') ?>
-      </div>
-      <p style="font-size:14px;line-height:1.6;margin:0 0 18px">
-        Recibimos tu pago de
-        <b class="lf-mono"><?= D::pesos($lr['monto']) ?></b>
-        para <b><?= P::e($lr['descripcion']) ?></b>.
-      </p>
-      <dl id="lfPagadoDatos" class="lf-conf-datos" style="text-align:left"></dl>
-    </div>
-    <footer>
-      <a class="btn btn-primary" href="/cuenta?t=plan" style="width:100%">
-        Ver mi plan</a>
-    </footer>
-  </div>
-</div>
-
-<script>
-/* Polling del estado del pago.
-   Cada 5 s pregunta a /cuenta/plan/estado/<liga_id>. Se detiene al
-   mostrar el modal o a los 10 minutos, lo que ocurra primero.
-
-   Para tarjeta el endpoint consulta al proveedor (y aprueba si ya
-   pagó). Para SPEI y tienda no hay nada que consultar: el estado
-   cambia solo cuando el webhook marca la liga, y el polling lo ve. */
-(function () {
-  var ligaId = <?= (int)$lr['liga_id'] ?>;
-  var modal  = document.getElementById('lfModalPagado');
-  if (!modal) return;
-
-  var intervalo = null, intentos = 0, MAX = 120;
-
-  function mostrarPagado(datos) {
-    if (intervalo) { clearInterval(intervalo); intervalo = null; }
-
-    var filas = [];
-    if (datos.plan && datos.plan.nombre) filas.push(['Plan', esc(datos.plan.nombre)]);
-    if (datos.plan && datos.plan.vence) {
-      var f = new Date(datos.plan.vence + 'T00:00:00');
-      filas.push(['Vence', f.toLocaleDateString('es-MX',
-        { day:'2-digit', month:'2-digit', year:'numeric' })]);
-    }
-    document.getElementById('lfPagadoDatos').innerHTML = filas.map(function (fi) {
-      return '<div><dt>' + fi[0] + '</dt><dd>' + fi[1] + '</dd></div>';
-    }).join('');
-
-    modal.hidden = false;
-    document.body.classList.add('lf-modal-abierto');
-    var b = modal.querySelector('[data-cerrar-pagado]');
-    if (b) b.focus();
-  }
-
-  function cerrar() {
-    modal.hidden = true;
-    document.body.classList.remove('lf-modal-abierto');
-  }
-  modal.querySelectorAll('[data-cerrar-pagado]').forEach(function (b) {
-    b.addEventListener('click', cerrar);
-  });
-  modal.addEventListener('click', function (e) { if (e.target === modal) cerrar(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && !modal.hidden) cerrar();
-  });
-
-  function preguntar() {
-    if (++intentos > MAX) { clearInterval(intervalo); intervalo = null; return; }
-    fetch('/cuenta/plan/estado/' + ligaId, {
-      credentials: 'same-origin',
-      headers: { 'X-LF-Json': '1' }
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (j) { if (j.ok && j.pagado) mostrarPagado(j); })
-      .catch(function () { /* reintenta en la próxima vuelta */ });
-  }
-
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
-      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
-    });
-  }
-
-  intervalo = setInterval(preguntar, 5000);
-})();
-</script>
-<?php endif; ?>
-
 <script>
 document.querySelectorAll('[data-copiar]').forEach(function (b) {
   b.addEventListener('click', function () {
