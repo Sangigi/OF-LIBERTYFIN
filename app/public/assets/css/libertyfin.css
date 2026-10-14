@@ -4111,3 +4111,98 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
   background:var(--lf-brand-soft);color:var(--lf-brand-2)}
 .lf-imp-ejemplo b{display:block;font-size:13px;color:var(--lf-tinta)}
 .lf-imp-ejemplo small{display:block;font-size:12px;line-height:1.5;color:var(--lf-tinta-3);margin-top:2px}
+
+/* Ajustes · Caja: dos tarjetas lado a lado en pantalla ancha. */
+.lf-ajustes-caja{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:0 18px;align-items:start}
+.lf-ajustes-nota{font-size:11.5px;color:var(--lf-tinta-4);line-height:1.6;margin:14px 0 0;
+  padding-top:13px;border-top:1px solid var(--lf-linea)}
+.lf-ajustes-sub{font-size:12px;font-weight:700;color:var(--lf-tinta-3);margin:16px 0 8px;
+  text-transform:uppercase;letter-spacing:.4px}
+
+/* ══════════════════════════════════════════════════════
+   CAJA · EL TICKET REACOMODADO
+   Orden del cajero: a quién, qué lleva, cuánto y cómo paga. El total y
+   el botón de cobrar quedan fijos al pie mientras el ticket se ve; en el
+   celular, una barra lleva al ticket mientras se eligen productos.
+   ══════════════════════════════════════════════════════ */
+.lf-ticket-quien{padding:0 20px 12px;display:flex;flex-direction:column;gap:8px}
+.lf-ticket-esp{display:flex;align-items:center;gap:10px;margin:0;font-size:12px;font-weight:600;color:var(--lf-tinta-3)}
+.lf-ticket-esp span{flex:none;width:76px}
+.lf-ticket-esp select{flex:1;min-width:0}
+.lf-ticket-vacio{padding:22px 20px;text-align:center;color:var(--lf-tinta-4);font-size:13px;margin:0;
+  border-top:1px solid var(--lf-linea)}
+.lf-ticket-vacio small{display:block;font-size:11px;margin-top:6px}
+.lf-ticket-vacio kbd,.lf-cant kbd{font-family:var(--lf-mono);font-size:10.5px;padding:1px 5px;border-radius:5px;
+  border:1px solid var(--lf-linea-f);background:var(--lf-vidrio);color:var(--lf-tinta-3)}
+#lista .lf-linea:first-child{border-top:1px solid var(--lf-linea)}
+/* Cantidad con − y + */
+.lf-cant{display:inline-flex;align-items:center;gap:2px;margin-top:5px;padding:2px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r-pill);background:var(--lf-vidrio)}
+.lf-cant button{width:24px;height:24px;border:0;border-radius:50%;background:none;cursor:pointer;
+  font-size:15px;line-height:1;color:var(--lf-tinta-2);display:grid;place-items:center}
+.lf-cant button:hover:not(:disabled){background:var(--lf-sup);color:var(--lf-brand-2)}
+.lf-cant button:disabled{opacity:.3;cursor:default}
+.lf-cant .n{min-width:22px;text-align:center;font-family:var(--lf-mono);font-size:12.5px;font-weight:700;color:var(--lf-tinta)}
+/* Más datos: plegable, como "Agregar a una venta" */
+.lf-mas-datos{margin:12px 20px 0;border:1px solid var(--lf-linea);border-radius:var(--lf-r);overflow:hidden}
+.lf-mas-datos > summary{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;padding:10px 13px;cursor:pointer;
+  list-style:none;font-size:12.5px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-mas-datos > summary::-webkit-details-marker{display:none}
+.lf-mas-datos > summary::before{content:'+';font-family:var(--lf-mono);color:var(--lf-brand-2);width:10px}
+.lf-mas-datos[open] > summary::before{content:'−'}
+.lf-mas-datos > summary small{font-weight:400;color:var(--lf-tinta-4);font-size:11.5px}
+.lf-mas-datos > summary:hover{background:var(--lf-vidrio)}
+.lf-mas-datos[open] > summary{border-bottom:1px solid var(--lf-linea)}
+.lf-mas-datos .cuerpo{padding:12px 13px 13px}
+.lf-mas-datos .form-label small{font-weight:400;color:var(--lf-tinta-4)}
+.lf-mas-datos .pista{font-size:11px;color:var(--lf-tinta-4);line-height:1.5;margin:6px 2px 0}
+/* IVA: interruptor */
+.lf-sumas > .lf-iva-fila{align-items:center}
+.lf-sw{display:inline-flex;align-items:center;gap:8px;margin:0;cursor:pointer;font-size:13px;color:var(--lf-tinta-2)}
+.lf-sw input{position:absolute;opacity:0;width:1px;height:1px}
+.lf-sw i{position:relative;flex:none;width:34px;height:20px;border-radius:var(--lf-r-pill);
+  background:var(--lf-linea-f);transition:background .15s}
+.lf-sw i::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;
+  background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.lf-sw input:checked + i{background:var(--lf-brand)}
+.lf-sw input:checked + i::after{transform:translateX(14px)}
+.lf-sw input:focus-visible + i{box-shadow:0 0 0 3px var(--lf-brand-ring)}
+.lf-sw input:not(:checked) ~ span{color:var(--lf-tinta-4)}
+/* Anticipo con atajos */
+.lf-anticipo .cab{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:7px}
+.lf-anticipo .cab label{margin:0}
+.lf-anticipo .atajos{display:flex;gap:5px}
+.lf-anticipo .atajos button{padding:4px 11px;border:1px solid var(--lf-linea);border-radius:var(--lf-r-pill);
+  background:var(--lf-sup);font-size:11.5px;font-weight:600;color:var(--lf-tinta-3);cursor:pointer}
+.lf-anticipo .atajos button:hover{border-color:var(--lf-brand);color:var(--lf-brand-2)}
+.lf-anticipo .atajos button.on{background:var(--lf-brand-soft);border-color:var(--lf-brand);color:var(--lf-brand-2)}
+.lf-pagacon label small{font-weight:400;color:var(--lf-tinta-4)}
+/* El pie fijo: total y cobrar, siempre a la vista mientras se ve el ticket */
+.lf-ticket .lf-cobrar-pie{position:sticky;bottom:0;z-index:5;margin-top:6px;padding:12px 20px 16px;
+  background:var(--lf-sup);border-top:1px solid var(--lf-linea);
+  border-radius:0 0 var(--lf-r-lg) var(--lf-r-lg);box-shadow:0 -8px 16px -12px rgba(0,0,0,.18)}
+.lf-cobrar-pie .tot{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px}
+.lf-cobrar-pie .tot span{font-size:14px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-cobrar-pie .tot b{font-size:24px;font-weight:800;letter-spacing:-.6px;color:var(--lf-tinta)}
+.lf-cobrar-pie .btn{width:100%;padding:14px;justify-content:center}
+/* Productos sin imagen: tarjeta compacta (nombre, código y precio) */
+.lf-grid-serv:has(.lf-serv.sin-img){grid-auto-rows:auto}
+.lf-serv.sin-img{padding-top:14px}
+.lf-serv.sin-img .e{display:none}
+.lf-serv.sin-img b{height:auto;min-height:calc(1.3em * 2);-webkit-line-clamp:2;line-clamp:2}
+/* Barra del celular, encima de la barra del pulgar (que se esconde al bajar) */
+.lf-caja-barra{display:none}
+@media(max-width:940px){
+  .lf-caja-barra:not([hidden]){display:flex;align-items:center;justify-content:space-between;gap:12px;
+    position:fixed;left:12px;right:12px;z-index:39;padding:10px 12px 10px 16px;
+    bottom:calc(74px + env(safe-area-inset-bottom,0px));transition:bottom .2s;
+    background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r-lg);box-shadow:var(--lf-s3)}
+  body.lf-dedo-oculta .lf-caja-barra{bottom:calc(12px + env(safe-area-inset-bottom,0px))}
+  .lf-caja-barra b{display:block;font-size:17px;font-weight:800;color:var(--lf-tinta)}
+  .lf-caja-barra small{display:block;font-size:11px;color:var(--lf-tinta-4)}
+  /* El pie fijo del ticket no se esconde detrás de la barra del pulgar */
+  .lf-ticket .lf-cobrar-pie{bottom:calc(66px + env(safe-area-inset-bottom,0px));transition:bottom .2s}
+  body.lf-dedo-oculta .lf-ticket .lf-cobrar-pie{bottom:env(safe-area-inset-bottom,0px)}
+}
+/* Lo que solo hace falta sin JavaScript (ver layout: html.lf-js). */
+.lf-js .lf-sin-js{display:none!important}

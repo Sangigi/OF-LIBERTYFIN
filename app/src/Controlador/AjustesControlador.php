@@ -21,6 +21,7 @@ final class AjustesControlador
 {
     const PESTANAS = [
         'empresa'      => 'Empresa',
+        'caja'         => 'Caja',
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
         'categorias'   => 'Categorías',
@@ -46,7 +47,7 @@ final class AjustesControlador
             'abrir'      => $editar > 0 || Peticion::texto('nuevo') !== '',
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
             'sucursales' => [], 'areas' => [], 'colaboradores' => [], 'categorias' => [],
-            'empresa' => null, 'integraciones' => [],
+            'empresa' => null, 'integraciones' => [], 'caja' => [],
         ];
         if ($p === 'integraciones') {
             $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
@@ -66,6 +67,7 @@ final class AjustesControlador
                 'logo'  => $cfg->valorDe('marca.logo', ''),
             ];
         }
+        if ($p === 'caja') $datos['caja'] = (new ConfigRepo($db))->caja();
         if ($p === 'sucursales') $datos['sucursales'] = $repo->sucursales();
         if ($p === 'comisiones') {
             $datos['areas'] = $repo->areas();
@@ -85,6 +87,27 @@ final class AjustesControlador
         $repo = new AjustesRepo($db);
         $que  = $_POST['que'] ?? '';
         $id   = (int)($_POST['id'] ?? 0);
+
+        // Caja: cómo arranca cada venta. Cada opción se guarda al elegirla.
+        if ($que === 'caja') {
+            try {
+                $cfg = new ConfigRepo($db);
+                $antes = $cfg->caja();
+                $cfg->guardarCaja($_POST);
+                $ahora = $cfg->caja();
+                $cambio = array_diff_assoc($ahora, $antes);
+                if ($cambio) {
+                    \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar', 'Caja',
+                        json_encode(array_intersect_key($antes, $cambio)), json_encode($cambio));
+                }
+                $this->volver('caja', 'Guardado.', 'ok');
+            } catch (\InvalidArgumentException $e) {
+                $this->volver('caja', $e->getMessage(), 'error');
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] ajustes/caja: ' . $e->getMessage());
+                $this->volver('caja', 'No se pudo guardar.', 'error');
+            }
+        }
 
         $mapa = [
             'sucursal'    => ['guardarSucursal',    'sucursales', 'Sucursal'],

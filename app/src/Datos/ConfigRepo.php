@@ -312,6 +312,52 @@ final class ConfigRepo extends Repo
         return isset(self::APROBACION[$v]) ? $v : 'auto';
     }
 
+    /**
+     * Cómo arranca cada venta en Caja (Ajustes → Caja). La primera opción
+     * de cada lista es la que vale si nadie la ha cambiado.
+     *
+     *   anticipo    total = la venta se cobra completa salvo que el cajero
+     *               escriba otra cantidad; vacio = arranca en $0 y el cajero
+     *               escribe cuánto deja (para quien casi siempre cobra un
+     *               anticipo).
+     *   iva_inicio  sin = cada venta empieza sin IVA (lo normal cuando el IVA
+     *               solo va si el cliente pide factura); con = empieza con IVA.
+     *   iva_tasa    16 o 8 (zona fronteriza). Los precios ya lo traen: el IVA
+     *               no cambia lo que paga el cliente, dice qué parte es IVA.
+     */
+    const CAJA = [
+        'anticipo'   => ['total' => ['El total de la venta', 'Se cobra completa. Si deja solo una parte, el cajero escribe cuánto.'],
+                         'vacio' => ['Vacío', 'El cajero escribe cuánto deja. Para quien casi siempre cobra un anticipo.']],
+        'iva_inicio' => ['sin'   => ['Sin IVA', 'El cajero lo enciende cuando la venta lleva IVA (por ejemplo, si piden factura).'],
+                         'con'   => ['Con IVA', 'Toda venta lleva IVA; el cajero lo apaga cuando no.']],
+        'iva_tasa'   => ['16'    => ['16%', 'La tasa general.'],
+                         '8'     => ['8%', 'Región fronteriza.']],
+    ];
+
+    public function caja()
+    {
+        $r = [];
+        foreach (self::CAJA as $k => $ops) {
+            $v = (string)$this->valorDe('caja.' . $k, '');
+            $r[$k] = isset($ops[$v]) ? $v : (string)key($ops);
+        }
+        return $r;
+    }
+
+    /** Guarda solo las opciones que vengan, y solo si son válidas. */
+    public function guardarCaja(array $d)
+    {
+        $hecho = 0;
+        foreach (self::CAJA as $k => $ops) {
+            if (!isset($d[$k])) continue;
+            $v = (string)$d[$k];
+            if (!isset($ops[$v])) throw new \InvalidArgumentException('Esa opción no existe.');
+            $this->guardar('caja.' . $k, $v);
+            $hecho++;
+        }
+        return $hecho;
+    }
+
     public function exigeAprobacion()
     {
         return $this->modoAprobacion() === 'revisar';

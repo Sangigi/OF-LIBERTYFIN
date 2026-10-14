@@ -11,6 +11,10 @@ use LibertyFin\Vista\Widget as W;
 // parpadeo blanco es lo que hace que un modo oscuro se sienta barato.
 (function(){
   var raiz = document.documentElement;
+  // Con JavaScript, lo que solo sirve sin él (los "Guardar" de las opciones
+  // que se guardan al elegirlas, .lf-sin-js) se esconde. Sin esta marca
+  // esos botones se veían siempre.
+  raiz.classList.add('lf-js');
   var oscuro = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
   /* 'auto' (como el equipo) solo existe si la persona lo eligió en Mi
      cuenta: entonces sí se sigue al sistema, y al momento si cambia. */

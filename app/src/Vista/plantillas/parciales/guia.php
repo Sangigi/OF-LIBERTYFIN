@@ -44,7 +44,8 @@ $pasos = [
   ['ruta' => '/caja', 'p' => 'cobrar', 'icono' => 'caja',
    'titulo' => 'Cobrar',
    'texto'  => 'Tu pantalla del día a día. Puedes cobrar completo o dejar un anticipo: '
-             . 'el saldo queda persiguiéndose solo.'],
+             . 'el saldo queda persiguiéndose solo. En Ajustes → Caja eliges con qué '
+             . 'empieza cada venta (cobro completo o vacío, con IVA o sin IVA).'],
 
   ['ruta' => '/ventas', 'p' => 'ver.ventas', 'icono' => 'ventas',
    'titulo' => 'Cobrado, no vendido',

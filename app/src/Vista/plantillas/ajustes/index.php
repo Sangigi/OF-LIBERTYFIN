@@ -225,6 +225,58 @@ $em = $empresa; ?>
 </section>
 <?php endif; ?>
 
+<?php /* ═══════════════ CAJA ═══════════════ */ elseif ($pestana === 'caja'):
+  $opCaja = \LibertyFin\Datos\ConfigRepo::CAJA;
+  /* Cada grupo es su propio formulario con `data-al-elegir`: basta con
+     escoger la opción y se guarda (ver el layout). Sin JavaScript queda
+     el botón Guardar. */
+  $grupoCaja = function ($clave) use ($opCaja, $caja, $token) { ?>
+    <form method="post" action="/ajustes/guardar" class="lf-modos" data-guardar data-al-elegir>
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <input type="hidden" name="que" value="caja">
+      <?php foreach ($opCaja[$clave] as $k => $m): $on = ($caja[$clave] ?? '') === (string)$k; ?>
+        <label class="m<?= $on ? ' on' : '' ?>">
+          <input type="radio" name="<?= P::e($clave) ?>" value="<?= P::e($k) ?>" <?= $on ? 'checked' : '' ?>>
+          <span><b><?= P::e($m[0]) ?></b><small><?= P::e($m[1]) ?></small></span>
+        </label>
+      <?php endforeach; ?>
+      <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
+      <p data-aviso hidden></p>
+    </form>
+  <?php }; ?>
+
+<div class="lf-ajustes-caja">
+  <section class="card">
+    <header class="card-header">
+      <div><span>Al cobrar, el anticipo empieza en…</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Lo que aparece solo en «Anticipo que se cobra hoy»</p></div>
+    </header>
+    <div class="card-body">
+      <?php $grupoCaja('anticipo'); ?>
+      <p class="lf-ajustes-nota">Con cualquiera de las dos, en Caja están los botones
+        <b>Total</b> y <b>50%</b> junto al anticipo para no teclear.</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <header class="card-header">
+      <div><span>IVA</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Cómo empieza cada venta y con qué tasa</p></div>
+    </header>
+    <div class="card-body">
+      <?php $grupoCaja('iva_inicio'); ?>
+      <h4 class="lf-ajustes-sub">Tasa</h4>
+      <?php $grupoCaja('iva_tasa'); ?>
+      <p class="lf-ajustes-nota">Los precios del catálogo ya incluyen el IVA: encenderlo
+        <b>no cambia lo que paga el cliente</b>, dice qué parte de lo cobrado es IVA. De ahí
+        salen el IVA de Reportes, el de las facturas, y la base de las comisiones, que se
+        calculan sin IVA. En Caja se enciende o apaga en cada venta.</p>
+    </div>
+  </section>
+</div>
+
 <?php /* ═══════════════ SUCURSALES ═══════════════ */ elseif ($pestana === 'sucursales'):
 $e = $buscar_ed($sucursales); ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>

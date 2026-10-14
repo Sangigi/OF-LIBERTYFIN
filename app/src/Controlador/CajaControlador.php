@@ -34,6 +34,8 @@ final class CajaControlador
 
         Plantilla::pagina('caja/index', [
             'promos'    => ['hay' => (bool)$vig, 'codigos' => (bool)$conCodigo],
+            // Cómo arranca cada venta: anticipo e IVA (Ajustes → Caja).
+            'cajaCfg'   => (new \LibertyFin\Datos\ConfigRepo($db))->caja(),
             'titulo'    => 'Caja',
             'icono'     => 'caja',
             'subtitulo' => 'Venta nueva · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),

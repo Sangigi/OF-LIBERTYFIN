@@ -5,6 +5,10 @@ use LibertyFin\Dominio\Dinero as D;
 
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
+// Cómo arranca cada venta (Ajustes → Caja).
+$cfgCaja = $cajaCfg ?? ['anticipo' => 'total', 'iva_inicio' => 'sin', 'iva_tasa' => '16'];
+$tasaIva = (string)$cfgCaja['iva_tasa'];
+$ivaOn   = $cfgCaja['iva_inicio'] === 'con';
 ?>
 
 <?php if ($aviso): ?>
@@ -37,6 +41,12 @@ $token = $_SESSION['lf_token'];
 <div class="alert alert-success" style="margin-bottom:14px">
   <?= W::icono('ok','18px') ?>
   <span>Venta <b><?= P::e($cobrada) ?></b> cobrada.
+    <?php /* El ticket, a un clic: antes, cobrando en efectivo sin cambio, no
+             había por dónde imprimirlo sin ir a buscar la venta. */
+    if (($vId = \LibertyFin\Http\Peticion::entero('v')) > 0): ?>
+      <a href="/ventas/<?= (int)$vId ?>/ticket?auto=1" target="_blank" data-completo
+         style="font-weight:600">Imprimir ticket</a> ·
+    <?php endif; ?>
     <a href="/ventas?q=<?= urlencode($cobrada) ?>" style="font-weight:600">Verla</a></span>
 </div>
 <?php endif; ?>
@@ -61,8 +71,8 @@ $token = $_SESSION['lf_token'];
       </div>
       <form class="lf-search" method="get" style="max-width:240px" id="formBuscaCat">
         <?= W::icono('buscar','15px') ?>
-        <input type="search" name="q" id="buscaCat" value="<?= P::e($buscar) ?>" placeholder="Nombre o código"
-               autocomplete="off">
+        <input type="search" name="q" id="buscaCat" value="<?= P::e($buscar) ?>" placeholder="Nombre o código  ( / )"
+               autocomplete="off" title="Atajo: / para buscar, Enter agrega el primero, Esc limpia">
         <?php if ($area): ?><input type="hidden" name="area" value="<?= P::e($area) ?>"><?php endif; ?>
       </form>
     </header>
@@ -86,7 +96,9 @@ $token = $_SESSION['lf_token'];
          style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
         No hay productos que coincidan.</p>
       <?php foreach ($servicios as $s): ?>
-        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
+        <?php /* Sin imagen, tarjeta compacta: nombre y precio, sin el cuadro
+                 del ícono que se comía más de la mitad de la tarjeta. */ ?>
+        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= empty($s['imagen']) ? ' sin-img' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
                 data-area="<?= (int)($s['categoria_id'] ?? 0) ?>"
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
@@ -104,13 +116,26 @@ $token = $_SESSION['lf_token'];
     </div>
   </section>
 
-  <form class="card" method="post" action="/caja/cobrar" id="ticket" style="align-self:start">
+  <?php /* ═══════════ EL TICKET ═══════════
+       El orden sigue al cajero: a quién, qué se lleva, cuánto y cómo paga.
+       Lo que se llena de vez en cuando (descripción, gastos) va plegado en
+       «Más datos». El total y el botón de cobrar quedan fijos al pie: antes
+       en una laptop quedaban 650 px abajo y cada venta era bajar a buscarlos. */ ?>
+  <form class="card lf-ticket" method="post" action="/caja/cobrar" id="ticket" style="align-self:start">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <input type="hidden" name="lineas" id="lineas" value="[]">
     <input type="hidden" name="cliente_id" id="cliente_id" value="">
     <?php /* Con valor, las lineas entran a ESA venta en vez de abrir
              una nueva. Ver Servicio\AmpliarVenta. */ ?>
     <input type="hidden" name="ampliar_venta" id="ampliarVenta" value="">
+    <?php /* Promociones: las que el cajero quitó y el descuento que vio. Al
+             cobrar, el servidor las vuelve a calcular y, si no da lo mismo,
+             no cobra (ver CajaControlador::cobrar). */ ?>
+    <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="[]">
+    <input type="hidden" name="promo_esperado" id="promoEsperado" value="0">
+    <?php /* El porcentaje que se manda: la tasa de Ajustes con el interruptor
+             encendido, 0 apagado. El cajero ya no teclea un número. */ ?>
+    <input type="hidden" name="iva_pct" id="ivaPct" value="<?= $ivaOn ? P::e($tasaIva) : '0' ?>">
 
     <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <span id="tituloTicket">Ticket</span>
@@ -154,48 +179,54 @@ $token = $_SESSION['lf_token'];
               title="Hacer una venta nueva" aria-label="Hacer una venta nueva">&times;</button>
     </div>
 
-    <div style="padding:0 20px 12px">
+    <?php /* A quién y quién lo atiende. Cliente y especialista van arriba y a
+             la vista: el especialista decide a quién va la comisión (sin él
+             la venta queda "POR ASIGNAR"), así que no se esconde. */ ?>
+    <div class="lf-ticket-quien">
       <div class="lf-search">
         <?= W::icono('cliente','15px') ?>
         <?php /* `name="cliente_nombre"`: si el nombre NO se eligió de la lista,
                  el servidor lo busca por nombre exacto o crea el cliente.
                  Antes ese texto se perdía y la venta salía sin cliente. */ ?>
         <input type="text" id="buscaCliente" name="cliente_nombre" maxlength="150"
-               placeholder="Cliente (opcional)" autocomplete="off">
+               placeholder="Cliente (opcional)" autocomplete="off"
+               title="Elígelo de la lista o escribe su nombre: si no existe, se crea al cobrar.">
       </div>
       <div id="sugerencias" class="lf-sugerencias" hidden></div>
-      <p style="font-size:11px;color:var(--lf-tinta-4);margin:6px 2px 0;line-height:1.4">
-        Elígelo de la lista o escribe su nombre: si no existe, se crea al cobrar.</p>
-    </div>
-
-    <?php /* Quién va a hacer el trabajo, no quién cobra. De aquí sale a quién
-             se le asigna la comisión: sin esto toda venta queda "POR ASIGNAR". */ ?>
-    <div style="padding:0 20px 12px">
-      <label class="form-label" for="selEspecialista">Especialista asignado</label>
-      <select class="form-select form-select-sm" name="especialista" id="selEspecialista">
-        <option value="">Sin asignar</option>
-        <?php foreach (($equipo ?? []) as $nombreArea => $gente): ?>
-          <optgroup label="<?= P::e($nombreArea) ?>">
-            <?php foreach ($gente as $c): ?>
-              <option value="<?= (int)$c['id'] ?>"><?= P::e($c['nombre']) ?></option>
-            <?php endforeach; ?>
-          </optgroup>
-        <?php endforeach; ?>
-      </select>
-      <label class="form-label" for="descVenta" style="margin-top:12px">Descripción <small style="font-weight:400;color:var(--lf-tinta-4)">(opcional)</small></label>
-      <textarea class="form-control lf-desc" name="descripcion" id="descVenta" rows="2"
-                placeholder="Qué se vendió, condiciones, referencias…"></textarea>
+      <label class="lf-ticket-esp">
+        <span>Especialista</span>
+        <select class="form-select form-select-sm" name="especialista" id="selEspecialista">
+          <option value="">Sin asignar</option>
+          <?php foreach (($equipo ?? []) as $nombreArea => $gente): ?>
+            <optgroup label="<?= P::e($nombreArea) ?>">
+              <?php foreach ($gente as $c): ?>
+                <option value="<?= (int)$c['id'] ?>"><?= P::e($c['nombre']) ?></option>
+              <?php endforeach; ?>
+            </optgroup>
+          <?php endforeach; ?>
+        </select>
+      </label>
     </div>
 
     <div id="lista"></div>
-    <p id="vacio" style="padding:26px 20px;text-align:center;color:var(--lf-tinta-4);font-size:13px">
-      Toca un producto para agregarlo.</p>
+    <p id="vacio" class="lf-ticket-vacio">
+      Toca un producto para agregarlo.<small>Atajo: <kbd>/</kbd> para buscar y <kbd>Enter</kbd> para agregar.</small></p>
 
-    <?php /* Promociones: las que el cajero quitó y el descuento que vio. Al
-             cobrar, el servidor las vuelve a calcular y, si no da lo mismo,
-             no cobra (ver CajaControlador::cobrar). */ ?>
-    <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="[]">
-    <input type="hidden" name="promo_esperado" id="promoEsperado" value="0">
+    <?php /* Lo de vez en cuando. Los gastos de operación NO cambian lo que
+             paga el cliente: antes estaban entre los totales con un "−" y
+             parecía que se le restaban. */ ?>
+    <details class="lf-mas-datos" id="masDatos">
+      <summary><span>Más datos</span><small id="masDatosRes">descripción y gastos de operación</small></summary>
+      <div class="cuerpo">
+        <label class="form-label" for="descVenta">Descripción <small>(opcional)</small></label>
+        <textarea class="form-control lf-desc" name="descripcion" id="descVenta" rows="2"
+                  placeholder="Qué se vendió, condiciones, referencias…"></textarea>
+        <label class="form-label" for="gastos" style="margin-top:12px">Gastos de operación <small>(opcional)</small></label>
+        <input class="form-control lf-mono" type="number" name="gastos" id="gastos" value="0" min="0" step="0.01">
+        <p class="pista">Lo que cuesta hacer el servicio (trámites, envíos, derechos). No cambia lo que
+          paga el cliente: se descuenta antes de calcular la comisión.</p>
+      </div>
+    </details>
 
     <div class="lf-sumas">
       <?php if (!empty($promos['codigos'])): ?>
@@ -208,32 +239,22 @@ $token = $_SESSION['lf_token'];
       <div id="filaDesc" class="lf-promo-total" hidden><span>Descuento por promociones</span>
         <span class="lf-mono" id="sDesc">−$0.00</span></div>
       <div><span>Subtotal</span><span class="lf-mono" id="sSub">$0.00</span></div>
-      <div style="align-items:center">
-        <span style="display:flex;align-items:center;gap:7px">IVA
-          <input class="form-control form-control-sm lf-mono" type="number" name="iva_pct" id="ivaPct"
-                 value="0" min="0" max="100" step="0.01" style="width:68px;padding:4px 7px">%
-        </span>
+      <div class="lf-iva-fila">
+        <?php /* Los precios ya traen el IVA: encenderlo no cambia el total,
+                 dice qué parte es IVA (Reportes, facturas, comisiones). */ ?>
+        <label class="lf-sw" title="Los precios ya incluyen el IVA: no cambia lo que paga el cliente">
+          <input type="checkbox" id="conIva" <?= $ivaOn ? 'checked' : '' ?>>
+          <i aria-hidden="true"></i><span>IVA <?= P::e($tasaIva) ?>%</span>
+        </label>
         <span class="lf-mono" id="sIva">$0.00</span>
       </div>
-      <div><span>Gastos de operación</span>
-        <span style="display:flex;align-items:center;gap:6px">−
-          <input class="form-control form-control-sm lf-mono" type="number" name="gastos" id="gastos"
-                 value="0" min="0" step="0.01" style="width:104px;padding:4px 7px">
-        </span></div>
-      <div class="tt"><span>Total</span><span id="sTot">$0.00</span></div>
     </div>
 
-    <div class="lf-anticipo" id="cajaAnticipo">
-      <label for="anticipo">Anticipo que se cobra hoy</label>
-      <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01">
-      <p id="msgSaldo">Deja el total para liquidar de una vez.</p>
-    </div>
-
-      <?php
-      // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a quien
-      // la tiene apagada hace que el cajero la elija y la venta falle al
-      // guardar, cuando el cliente ya está esperando.
-      /* LOS CUATRO, NI UNO MAS.
+    <?php
+    // Solo lo que esta empresa puede cobrar. Ofrecer tarjeta a quien
+    // la tiene apagada hace que el cajero la elija y la venta falle al
+    // guardar, cuando el cliente ya está esperando.
+    /* LOS CUATRO, NI UNO MAS.
        Antes salian seis o siete porque se mezclaban los metodos del
        mostrador con los de linea. Con tantos botones el cajero tiene
        que leerlos cada vez en vez de dar al de siempre. */
@@ -270,6 +291,30 @@ $token = $_SESSION['lf_token'];
              value="<?= P::e($opciones[0]['id'] ?? 'efectivo') ?>">
     </div>
 
+    <?php /* Cuánto se cobra hoy. Arranca como diga Ajustes → Caja (el total
+             o vacío) y los atajos evitan teclear lo de siempre. */ ?>
+    <div class="lf-anticipo" id="cajaAnticipo">
+      <div class="cab">
+        <label for="anticipo">Se cobra hoy</label>
+        <span class="atajos">
+          <button type="button" data-ant="1" id="antTotal">Total</button>
+          <button type="button" data-ant="0.5">50%</button>
+        </span>
+      </div>
+      <input class="lf-mono" type="number" name="anticipo" id="anticipo" value="0" min="0" step="0.01">
+      <p id="msgSaldo">Deja el total para liquidar de una vez.</p>
+    </div>
+
+    <?php /* Paga con: solo en efectivo. El cambio se ve mientras se escribe y
+             el servidor lo vuelve a calcular al cobrar (es dinero que el
+             cajero va a entregar). Los campos se habían perdido de la
+             pantalla y el código seguía buscándolos. */ ?>
+    <div class="lf-pagacon" id="cajaPagaCon">
+      <label for="pagaCon">Paga con <small>(opcional)</small></label>
+      <input type="number" name="paga_con" id="pagaCon" min="0" step="0.01" placeholder="¿Con cuánto paga?">
+      <p class="cambio" id="verCambio" aria-live="polite"></p>
+    </div>
+
     <?php /* Solo con Tarjeta, SPEI o Efectivo (tienda), que normalmente
              generan una liga. Marcado: NO se genera y el cobro pasa como
              pagado, para cuando el cliente ya transfirió o pagó por otro
@@ -298,12 +343,22 @@ $token = $_SESSION['lf_token'];
       </div>
     </div>
 
-
-    <button class="btn btn-primary" type="submit" id="btnCobrar" disabled
-            style="width:calc(100% - 40px);margin:0 20px 20px;padding:14px">
-      <?= W::icono('cobro','16px') ?><span id="btnTexto">Cobrar</span>
-    </button>
+    <?php /* Fijo al pie del ticket mientras se ve: el total y el botón. */ ?>
+    <div class="lf-cobrar-pie" id="cobrarPie">
+      <div class="tot"><span>Total</span><b class="lf-mono" id="sTot">$0.00</b></div>
+      <button class="btn btn-primary" type="submit" id="btnCobrar" disabled>
+        <?= W::icono('cobro','16px') ?><span id="btnTexto">Cobrar</span>
+      </button>
+    </div>
   </form>
+</div>
+
+<?php /* En el celular el ticket queda debajo del catálogo: mientras se
+         eligen productos, esta barra dice cuánto va y lleva al ticket. Se
+         esconde en cuanto el ticket está a la vista. */ ?>
+<div class="lf-caja-barra" id="cajaBarra" hidden>
+  <span><b class="lf-mono" id="barraTotal">$0.00</b><small id="barraConteo">0 conceptos</small></span>
+  <button type="button" class="btn btn-primary btn-sm" id="barraIr">Ver ticket y cobrar</button>
 </div>
 
 <script>
@@ -441,8 +496,14 @@ $token = $_SESSION['lf_token'];
       d.className = 'lf-linea';
       // El precio es editable: muchos servicios se cotizan por caso y el
       // catálogo los tiene en cero a propósito.
+      // − y + para la cantidad: antes, para pasar de 3 a 2, había que
+      // quitar el producto y volver a agregarlo.
       d.innerHTML = '<div style="flex:1;min-width:0"><b>' + l.nombre + '</b>'
-        + '<small>cantidad ' + l.cantidad + '</small>'
+        + '<span class="lf-cant">'
+        +   '<button type="button" data-menos="' + i + '" aria-label="Uno menos"'
+        +     (l.cantidad <= 1 ? ' disabled' : '') + '>−</button>'
+        +   '<span class="n">' + l.cantidad + '</span>'
+        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>'
         + '<div class="lf-promo-l" data-promo-i="' + i + '"></div></div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
@@ -456,6 +517,19 @@ $token = $_SESSION['lf_token'];
     pedirPromos();
   }
 
+  /* EL TOTAL, EN UN SOLO LUGAR. La pantalla y el resumen de confirmación
+     lo calculaban cada uno por su lado; si uno cambiaba, decían cosas
+     distintas. */
+  function totales(){
+    var bruto = lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0);
+    var desc  = lineas.reduce(function(a,l){ return a + (l.desc || 0); }, 0);
+    return { bruto: bruto, desc: desc, total: Math.max(0, bruto - desc) };
+  }
+  /* ¿El anticipo sigue al total? Con Ajustes en "el total" sí, salvo que
+     el cajero escriba otra cantidad; con "vacío" solo si tocó «Total». */
+  var ANTICIPO_TOTAL = <?= $cfgCaja['anticipo'] === 'total' ? 'true' : 'false' ?>;
+  var TASA_IVA = <?= json_encode((float)$tasaIva) ?>;
+
   function calcular(){
     /* SE VUELVE A SERIALIZAR AQUÍ, NO SOLO EN pintar().
        Editar un precio no repinta la lista —perdería el foco a media
@@ -468,8 +542,7 @@ $token = $_SESSION['lf_token'];
 
     /* El descuento de las promociones ya viene por renglón (ver
        pedirPromos): el total es lo capturado menos eso. */
-    var desc = lineas.reduce(function(a,l){ return a + (l.desc || 0); }, 0);
-    var cap = Math.max(0, lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0) - desc);
+    var tt = totales(), desc = tt.desc, cap = tt.total;
     $('promoEsperado').value = desc.toFixed(2);
     $('filaDesc').hidden = desc <= 0.004;
     $('sDesc').textContent = '−' + pesos(desc);
@@ -489,7 +562,14 @@ $token = $_SESSION['lf_token'];
     var esLinea = !!(act && act.dataset.linea);
     var sl = $('sinLiga');
     var omitir = esLinea && sl && sl.checked;
-    if (omitir && !$('anticipo').dataset.manual) $('anticipo').value = cap.toFixed(2);
+    /* En el mostrador (o con "Ya me pagaron") el anticipo sigue al total
+       mientras el cajero no escriba otra cantidad. Antes en efectivo
+       arrancaba en $0: cobrar una venta completa obligaba a teclear el
+       total, y si se olvidaba, la venta quedaba "sin cobro". */
+    var a = $('anticipo');
+    var sigue = !a.dataset.manual && (omitir || (!esLinea && (ANTICIPO_TOTAL || a.dataset.sigue === '1')));
+    if (sigue) a.value = cap.toFixed(2);
+    if ($('antTotal')) $('antTotal').classList.toggle('on', sigue && cap > 0);
 
     var ant = parseFloat($('anticipo').value) || 0;
     if (ant > cap) { $('anticipo').value = cap.toFixed(2); ant = cap; }
@@ -507,9 +587,62 @@ $token = $_SESSION['lf_token'];
        todavía puede cambiar. */
     var esperando = !!(promo && promo.esperando);
     if (esperando) $('btnTexto').textContent = 'Revisando promociones…';
+
+    /* La barra del celular y el resumen de «Más datos». */
+    if ($('barraTotal')) {
+      $('barraTotal').textContent = pesos(cap);
+      $('barraConteo').textContent = lineas.length + ' concepto' + (lineas.length === 1 ? '' : 's');
+      barraCelular();
+    }
+    var gs = parseFloat($('gastos').value) || 0, ds = ($('descVenta').value || '').trim();
+    $('masDatosRes').textContent = (ds || gs > 0)
+      ? [ds ? 'con descripción' : '', gs > 0 ? 'gastos ' + pesos(gs) : ''].filter(Boolean).join(' · ')
+      : 'descripción y gastos de operación';
+
     document.dispatchEvent(new Event('lf-recalcular'));
     $('btnCobrar').disabled = lineas.length === 0 || esperando;
   }
+
+  /* ══════════════════════════════════════════════════════
+     ANTICIPO, IVA Y CELULAR
+     ══════════════════════════════════════════════════════ */
+  /* Atajos del anticipo. «Total» vuelve a seguir al total (si se agrega
+     otro producto, sube con él); «50%» es una cantidad fija. */
+  document.querySelectorAll('[data-ant]').forEach(function(b){
+    b.addEventListener('click', function(){
+      var f = +b.dataset.ant, a = $('anticipo');
+      a.value = (Math.round(totales().total * f * 100) / 100).toFixed(2);
+      a.dataset.manual = f === 1 ? '' : '1';
+      a.dataset.sigue  = f === 1 ? '1' : '';
+      calcular();
+      if (window.lfGuardarTicket) window.lfGuardarTicket();
+    });
+  });
+
+  /* IVA: un interruptor en vez de teclear el porcentaje. Se manda la tasa
+     de Ajustes encendido y 0 apagado. */
+  function ponerIva(){
+    $('ivaPct').value = $('conIva').checked ? TASA_IVA : 0;
+    calcular();
+  }
+  $('conIva').addEventListener('change', ponerIva);
+
+  /* Celular: la barra aparece si hay productos y el ticket no se ve. */
+  var ticketVisible = false;
+  function barraCelular(){
+    var b = $('cajaBarra');
+    if (b) b.hidden = !lineas.length || ticketVisible;
+  }
+  if ('IntersectionObserver' in window && $('cajaBarra')) {
+    new IntersectionObserver(function(es){
+      ticketVisible = es[0].isIntersecting;
+      barraCelular();
+    }).observe($('ticket'));
+  }
+  if ($('barraIr')) $('barraIr').addEventListener('click', function(){
+    var t = $('ticket');
+    if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 
   /* ══════════════════════════════════════════════════════
      PROMOCIONES
@@ -684,6 +817,35 @@ $token = $_SESSION['lf_token'];
       });
       var fq = $('formBuscaCat');
       if (fq) fq.addEventListener('submit', function(ev){ ev.preventDefault(); });
+
+      /* Atajos: Enter agrega el primer producto que se ve, Esc limpia. Así
+         un servicio de siempre se cobra escribiendo tres letras. */
+      campoQ.addEventListener('keydown', function(ev){
+        if (ev.key === 'Enter') {
+          ev.preventDefault();
+          var primero = visibles[(actual - 1) * POR_PAG];
+          if (primero) { primero.click(); campoQ.select(); }
+        } else if (ev.key === 'Escape' && campoQ.value) {
+          ev.preventDefault();
+          campoQ.value = ''; q = ''; filtrar(); direccion();
+        }
+      });
+    }
+
+    /* «/» lleva al buscador desde cualquier lado de Caja (si no se está
+       escribiendo en otro campo). Una sola vez: la navegación sin recarga
+       vuelve a correr este script. */
+    if (!window.lfCajaAtajo) {
+      window.lfCajaAtajo = true;
+      document.addEventListener('keydown', function(ev){
+        if (ev.key !== '/' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        var t = document.activeElement;
+        if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+        var c = document.getElementById('buscaCat');
+        if (!c || !c.offsetParent) return;
+        ev.preventDefault();
+        c.focus(); c.select();
+      });
     }
 
     filtrar();
@@ -727,7 +889,7 @@ $token = $_SESSION['lf_token'];
       aplicarSinLiga();
     });
     /* Si el cajero escribe un anticipo a mano, deja de seguir al total. */
-    $('anticipo').addEventListener('input', function(){ this.dataset.manual = '1'; });
+    $('anticipo').addEventListener('input', function(){ this.dataset.manual = '1'; this.dataset.sigue = ''; });
 
     document.querySelectorAll('.lf-metodos .m').forEach(function(b){
       b.addEventListener('click', function(){
@@ -765,6 +927,14 @@ $token = $_SESSION['lf_token'];
   });
 
   $('lista').addEventListener('click', function(e){
+    var mas = e.target.closest('[data-mas]'), menos = e.target.closest('[data-menos]');
+    if (mas || menos) {
+      var l = lineas[+(mas || menos).dataset[mas ? 'mas' : 'menos']];
+      if (!l) return;
+      l.cantidad = Math.max(1, l.cantidad + (mas ? 1 : -1));
+      pintar();
+      return;
+    }
     var b = e.target.closest('.lf-quitar');
     if (!b) return;
     lineas.splice(+b.dataset.i, 1);
@@ -780,7 +950,7 @@ $token = $_SESSION['lf_token'];
     pedirPromos();   // un precio cambiado a mano deja de llevar promoción
   });
 
-  ['ivaPct','anticipo','gastos'].forEach(function(id){
+  ['anticipo','gastos','descVenta'].forEach(function(id){
     $(id).addEventListener('input', calcular);
   });
 
@@ -862,6 +1032,7 @@ $token = $_SESSION['lf_token'];
         lineas: lineas,
         iva: $('ivaPct').value, gastos: $('gastos').value,
         anticipo: $('anticipo').value, manual: $('anticipo').dataset.manual || '',
+        sigue: $('anticipo').dataset.sigue || '',
         clienteId: $('cliente_id').value, cliente: $('buscaCliente').value,
         esp: $('selEspecialista') ? $('selEspecialista').value : '',
         desc: $('descVenta') ? $('descVenta').value : '',
@@ -878,8 +1049,7 @@ $token = $_SESSION['lf_token'];
   /* Lo que se va a registrar, leído de la pantalla, para el resumen de
      confirmación. */
   window.lfResumenTicket = function(){
-    var desc = lineas.reduce(function(a,l){ return a + (l.desc || 0); }, 0);
-    var cap = Math.max(0, lineas.reduce(function(a,l){ return a + l.precio*l.cantidad; }, 0) - desc);
+    var tt = totales(), desc = tt.desc, cap = tt.total;
     var ant = parseFloat($('anticipo').value) || 0;
     if (ant > cap) ant = cap;
     var act = document.querySelector('.lf-metodos .m.on');
@@ -920,12 +1090,16 @@ $token = $_SESSION['lf_token'];
       lineas = g.lineas.map(function(l){
         return {id:l.id, nombre:l.nombre, precio:+l.precio, cantidad:+l.cantidad || 1};
       });
-      $('ivaPct').value = g.iva;
+      /* El IVA vuelve como interruptor, con la tasa de hoy. */
+      $('conIva').checked = parseFloat(g.iva) > 0;
+      $('ivaPct').value = $('conIva').checked ? TASA_IVA : 0;
       $('gastos').value = g.gastos;
       $('cliente_id').value = g.clienteId || '';
       $('buscaCliente').value = g.cliente || '';
       if ($('selEspecialista')) $('selEspecialista').value = g.esp || '';
       if ($('descVenta')) $('descVenta').value = g.desc || '';
+      /* Si traía descripción o gastos, «Más datos» se abre para que se vea. */
+      if ((g.desc || '').trim() || parseFloat(g.gastos) > 0) $('masDatos').open = true;
 
       /* El método: se "toca" su botón para que todo lo que depende de él
          (anticipo, casilla de "Ya me pagaron", referencia) se acomode. */
@@ -945,6 +1119,7 @@ $token = $_SESSION['lf_token'];
       /* `change` en la casilla reinicia el anticipo; se vuelve a poner. */
       $('anticipo').value = g.anticipo;
       $('anticipo').dataset.manual = g.manual || '';
+      $('anticipo').dataset.sigue = g.sigue || '';
     }
     ticketListo = true;
   }
@@ -1231,7 +1406,7 @@ $token = $_SESSION['lf_token'];
            que solo pide cerrarse es un clic de más en la operación que
            más se repite en el día. Se avisa arriba y a la siguiente. */
         if (d.modo === 'cobrado' && !(d.venta.cambio > 0) && d.venta.en_corte) {
-          location.href = '/caja?ok=' + encodeURIComponent(d.venta.codigo);
+          location.href = '/caja?ok=' + encodeURIComponent(d.venta.codigo) + '&v=' + (+d.venta.id || '');
           return;
         }
         pintar(d);
