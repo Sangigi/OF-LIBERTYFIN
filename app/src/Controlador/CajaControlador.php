@@ -624,11 +624,16 @@ final class CajaControlador
      */
     private static function metodoDe($como, $db)
     {
-        $linea = self::formaEnLinea($como);
-        if ($linea) return $linea === 'tarjeta' ? 'tarjeta' : 'transferencia';
+    $linea = self::formaEnLinea($como);
+    if ($linea !== '') {
+        // Tarjeta → tarjeta · SPEI → transferencia · Tienda → efectivo
+        if ($linea === 'tarjeta')  return 'tarjeta';
+        if ($linea === 'efectivo') return 'efectivo';
+        return 'transferencia';
+    }
 
-        $validos = (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles();
-        return in_array($como, $validos, true) ? $como : 'efectivo';
+    $validos = (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles();
+    return in_array($como, $validos, true) ? $como : 'efectivo';
     }
 
     /** ¿La petición espera JSON en vez de una página? */
