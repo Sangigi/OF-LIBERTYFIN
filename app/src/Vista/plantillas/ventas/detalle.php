@@ -332,7 +332,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
           <div style="width:118px">
             <label class="form-label">Porcentaje</label>
             <input class="form-control lf-mono" type="number" name="pct" id="inpPct"
-                   step="0.001" min="0.001" max="<?= $varios ? 100 : P::e($pctTxt(100 - $ya)) ?>"
+                   step="0.0001" min="0.0001" max="<?= $varios ? 100 : P::e($pctTxt(100 - $ya)) ?>"
                    placeholder="0.000" required>
           </div>
           <div style="width:128px">
