@@ -96,9 +96,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
          style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
         No hay productos que coincidan.</p>
       <?php foreach ($servicios as $s): ?>
-        <?php /* Sin imagen, tarjeta compacta: nombre y precio, sin el cuadro
-                 del ícono que se comía más de la mitad de la tarjeta. */ ?>
-        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= empty($s['imagen']) ? ' sin-img' : '' ?>"
+        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
                 data-area="<?= (int)($s['categoria_id'] ?? 0) ?>"
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"

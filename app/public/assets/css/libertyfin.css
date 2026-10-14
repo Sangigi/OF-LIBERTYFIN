@@ -4185,11 +4185,6 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-cobrar-pie .tot span{font-size:14px;font-weight:600;color:var(--lf-tinta-2)}
 .lf-cobrar-pie .tot b{font-size:24px;font-weight:800;letter-spacing:-.6px;color:var(--lf-tinta)}
 .lf-cobrar-pie .btn{width:100%;padding:14px;justify-content:center}
-/* Productos sin imagen: tarjeta compacta (nombre, código y precio) */
-.lf-grid-serv:has(.lf-serv.sin-img){grid-auto-rows:auto}
-.lf-serv.sin-img{padding-top:14px}
-.lf-serv.sin-img .e{display:none}
-.lf-serv.sin-img b{height:auto;min-height:calc(1.3em * 2);-webkit-line-clamp:2;line-clamp:2}
 /* Barra del celular, encima de la barra del pulgar (que se esconde al bajar) */
 .lf-caja-barra{display:none}
 @media(max-width:940px){
