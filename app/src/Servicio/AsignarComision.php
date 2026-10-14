@@ -119,7 +119,7 @@ final class AsignarComision
     public function asignar($ventaId, $colaboradorId, $porcentaje, $detalleId = null)
     {
         $ventaId = (int)$ventaId;
-        $pct     = round((float)$porcentaje, 3);   // hasta 3 decimales: 33.333
+        $pct     = round((float)$porcentaje, 4);   // hasta 4 decimales: 33.3333
         if ($pct <= 0 || $pct > 100) {
             throw new \InvalidArgumentException('El porcentaje debe estar entre 0 y 100');
         }
