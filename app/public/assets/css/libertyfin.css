@@ -4219,3 +4219,8 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-pagacon .billetes button:hover{border-color:var(--lf-brand);color:var(--lf-brand-2)}
 /* "Agregar a una venta que ya existe" no va pegado al encabezado del ticket. */
 .lf-ticket .lf-ampliar{margin-top:14px}
+/* Confirmación de Caja: precio por pieza, IVA y cambio */
+.lf-conf-pu{display:block;font-size:11px;color:var(--lf-tinta-4);margin-top:1px}
+.lf-conf-items li span:has(.lf-conf-pu){white-space:normal}
+.lf-conf-iva{display:flex;justify-content:space-between;padding:8px 0 0;font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-conf-cambio{color:var(--lf-brand-2)}

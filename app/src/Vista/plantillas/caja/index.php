@@ -1133,11 +1133,19 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     var sl = $('sinLiga');
     var se = $('selEspecialista');
     var v = window.lfVentaElegida && window.lfVentaElegida();
+    var ivaPct = parseFloat($('ivaPct').value) || 0;
+    var cobra = (esLinea && !(sl && sl.checked)) ? 0 : ant;
+    var pc = $('cajaPagaCon') && !$('cajaPagaCon').hidden ? (parseFloat($('pagaCon').value) || 0) : 0;
     return {
       lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
                                               desc:l.desc || 0, promo:l.promo ? l.promo.nombre : ''}; }),
       descuento: desc,
       total: cap, anticipo: ant, saldo: cap - ant,
+      // Lo que el resumen de confirmación también dice.
+      ivaPct: ivaPct, iva: ivaPct > 0 ? cap - cap / (1 + ivaPct / 100) : 0,
+      pagaCon: pc, cambio: pc > 0 ? pc - cobra : 0,
+      gastos: parseFloat($('gastos').value) || 0,
+      descripcion: ($('descVenta').value || '').trim(),
       liga: esLinea && !(sl && sl.checked),
       metodo: (act ? act.textContent.trim() : 'Efectivo')
               + ($('bancoPago') && $('bancoPago').value.trim() && !$('cajaBanco').hidden
@@ -1532,13 +1540,18 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
         av.push('Quedará un <b>saldo de ' + money(r.saldo) + '</b> por cobrar.');
       if (!r.liga && r.anticipo <= 0)
         av.push('<b>No se cobra nada hoy</b>: se registra solo la venta.');
+      if (!r.liga && r.pagaCon > 0 && r.cambio < -0.009)
+        av.push('Lo que entrega (' + money(r.pagaCon) + ') <b>no alcanza</b>: faltan ' + money(-r.cambio) + '.');
     }
-    var items = r.lineas.slice(0, 5).map(function(l){
+    /* Cada producto con su precio por pieza cuando son varias: "10 ×" solo
+       con el total no deja ver si el precio quedó bien. */
+    var items = r.lineas.slice(0, 6).map(function(l){
       return '<li><span>' + (l.cantidad > 1 ? l.cantidad + ' × ' : '') + esc(l.nombre)
+           + (l.cantidad > 1 ? '<small class="lf-conf-pu">' + money(l.precio) + ' c/u</small>' : '')
            + (l.promo ? '<small class="lf-conf-promo">' + esc(l.promo) + ' · −' + money(l.desc) + '</small>' : '')
            + '</span><b class="lf-mono">' + money(l.precio * l.cantidad - (l.desc || 0)) + '</b></li>';
     }).join('');
-    if (r.lineas.length > 5) items += '<li class="mas">y ' + (r.lineas.length - 5) + ' más…</li>';
+    if (r.lineas.length > 6) items += '<li class="mas">y ' + (r.lineas.length - 6) + ' más…</li>';
 
     var filas = [];
     if (r.ampliar) {
@@ -1546,17 +1559,28 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     } else {
       filas.push(['Cliente', r.cliente ? esc(r.cliente) : '<i>Público general</i>']);
       filas.push(['Especialista', r.esp ? esc(r.esp) : '<i>Sin asignar</i>']);
-      filas.push(['Paga con', esc(r.metodo)]);
+      filas.push(['Forma de pago', esc(r.metodo)]);
       filas.push(r.liga ? ['Se genera una liga por', '<b class="lf-mono">' + money(r.total) + '</b>']
                         : ['Se cobra hoy', '<b class="lf-mono">' + money(r.anticipo) + '</b>']);
-      if (!r.liga && r.saldo > 0.009) filas.push(['Saldo', '<b class="lf-mono">' + money(r.saldo) + '</b>']);
+      if (!r.liga && r.saldo > 0.009) filas.push(['Queda debiendo', '<b class="lf-mono">' + money(r.saldo) + '</b>']);
+      if (!r.liga && r.pagaCon > 0 && r.cambio >= -0.009) {
+        filas.push(['Entrega', '<span class="lf-mono">' + money(r.pagaCon) + '</span>']);
+        filas.push(['Cambio', '<b class="lf-mono lf-conf-cambio">' + money(r.cambio) + '</b>']);
+      }
     }
+    if (r.gastos > 0) filas.push(['Gastos de operación', '<span class="lf-mono">' + money(r.gastos) + '</span>']);
+    if (r.descripcion) filas.push(['Descripción', esc(r.descripcion.length > 140
+                                                       ? r.descripcion.slice(0, 140) + '…' : r.descripcion)]);
 
     confCuerpo.innerHTML =
         (av.length ? '<div class="lf-conf-av">' + av.map(function(a){ return '<p>' + a + '</p>'; }).join('') + '</div>' : '')
       + '<ul class="lf-conf-items">' + items + '</ul>'
       + (r.descuento > 0.004 ? '<div class="lf-conf-desc"><span>Descuento por promociones</span>'
            + '<b class="lf-mono">−' + money(r.descuento) + '</b></div>' : '')
+      /* Con o sin IVA: no cambia el total, pero sí los reportes, la factura
+         y la comisión, y es fácil olvidar encenderlo. */
+      + '<div class="lf-conf-iva"><span>' + (r.ivaPct > 0 ? 'IVA incluido (' + r.ivaPct + '%)' : 'Sin IVA') + '</span>'
+      +   '<span class="lf-mono">' + (r.ivaPct > 0 ? money(r.iva) : '—') + '</span></div>'
       + '<div class="lf-conf-total"><span>Total</span><b class="lf-mono">' + money(r.total) + '</b></div>'
       + '<dl class="lf-conf-datos">' + filas.map(function(f){
           return '<div><dt>' + f[0] + '</dt><dd>' + f[1] + '</dd></div>'; }).join('') + '</dl>';
