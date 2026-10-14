@@ -118,6 +118,12 @@ final class ImportarControlador
 
         list($plan, $error) = $this->planDe($g['ruta'], $g['nombre']);
         if ($error) $this->volver($error);
+        // El archivo de ejemplo trae datos inventados: se revisa, no se guarda.
+        if (!empty($plan['ejemplo'])) {
+            $this->borrar($g['ruta']); unset($_SESSION['lf_import']);
+            $this->volver('Ese es el archivo de ejemplo: sirve para ver cómo se revisa, pero no se guarda. '
+                        . 'Llena tu propia hoja con el mismo formato y súbela.');
+        }
 
         $db  = Conexion::de($_SESSION['empresa_db']);
         $res = (new ImportarVentas($db))->aplicar($plan, [
@@ -130,6 +136,29 @@ final class ImportarControlador
         unset($_SESSION['lf_import']);
 
         $this->pantalla(null, $res);
+    }
+
+    /**
+     * Baja una hoja de ejemplo con datos inventados (ver
+     * ImportarVentas::ejemplo()). Se arma al momento con los mismos
+     * encabezados que reconoce el importador.
+     */
+    public function ejemplo()
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'lf') . '.xlsx';
+        try {
+            ImportarVentas::ejemplo()->guardar($tmp);
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] ejemplo de importar: ' . $e->getMessage());
+            $this->volver('No se pudo generar el ejemplo.');
+        }
+        header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        header('Content-Disposition: attachment; filename="ejemplo-importar-ventas.xlsx"');
+        header('Content-Length: ' . filesize($tmp));
+        header('Cache-Control: no-store');
+        readfile($tmp);
+        @unlink($tmp);
+        exit;
     }
 
     /** Tira el archivo sin aplicar nada. */

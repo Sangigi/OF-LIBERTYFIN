@@ -107,6 +107,7 @@ $r->post('/importar/analizar', ['LibertyFin\Controlador\ImportarControlador', 'a
 $r->post('/importar/ajustar',  ['LibertyFin\Controlador\ImportarControlador', 'ajustar']);
 $r->post('/importar/aplicar',  ['LibertyFin\Controlador\ImportarControlador', 'aplicar']);
 $r->get ('/importar/cancelar', ['LibertyFin\Controlador\ImportarControlador', 'cancelar']);
+$r->get ('/importar/ejemplo',  ['LibertyFin\Controlador\ImportarControlador', 'ejemplo']);
 $r->get('/ventas/{id}',               ['LibertyFin\Controlador\VentasControlador', 'ver']);
 $r->get('/ventas/{id}/ticket',        ['LibertyFin\Controlador\VentasControlador', 'ticket']);
 $r->post('/ventas/{id}/pagar',        ['LibertyFin\Controlador\VentasControlador', 'pagar']);
@@ -265,6 +266,7 @@ $permisos = [
   '/importar/ajustar'       => 'importar.ventas',
   '/importar/aplicar'       => 'importar.ventas',
   '/importar/cancelar'      => 'importar.ventas',
+  '/importar/ejemplo'       => 'importar.ventas',
   '/ventas/{id}'            => 'ver.ventas',
   '/ventas/{id}/ticket'     => 'ver.ventas',
   '/ventas/{id}/pagar'      => 'abonar',

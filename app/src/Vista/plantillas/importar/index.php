@@ -162,10 +162,16 @@ use LibertyFin\Dominio\Dinero as D;
       </div>
     <?php endif; ?>
 
+    <?php if (!empty($p['ejemplo'])): ?>
+      <div class="alert alert-warning" style="display:block;margin:18px 0 0">
+        <b>Es la hoja de ejemplo.</b> Así se ve la revisión de un archivo bien llenado, pero sus datos
+        son inventados y no se guarda. Llena tu propia hoja con el mismo formato y súbela.
+      </div>
+    <?php endif; ?>
     <form method="post" action="/importar/aplicar" style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <button class="btn btn-primary" type="submit"
-              <?= $p['listas'] + $p['abonos'] ? '' : 'disabled' ?>>
+              <?= ($p['listas'] + $p['abonos']) && empty($p['ejemplo']) ? '' : 'disabled' ?>>
         Guardar <?= (int)($p['listas'] + $p['abonos']) ?> renglones
       </button>
       <a class="btn btn-secondary" href="/importar/cancelar">Cancelar</a>
@@ -446,6 +452,20 @@ use LibertyFin\Dominio\Dinero as D;
         Abre la hoja en Excel y guárdala como <b>CSV</b>; así sí entra.
       </div>
     <?php endif; ?>
+
+    <?php /* El ejemplo: datos inventados con el formato que se espera. Subido
+             tal cual se revisa como uno de verdad, pero no se guarda. */ ?>
+    <div class="lf-imp-ejemplo">
+      <span class="ic"><?= W::icono('baja','17px') ?></span>
+      <span style="flex:1;min-width:220px">
+        <b>¿Primera vez? Baja la hoja de ejemplo.</b>
+        <small>Datos inventados con el formato que se espera: dos meses, una venta que se cobra en
+          dos partes, IVA, comisión del banco, gastos y las cuatro comisiones. Súbela tal cual para ver
+          cómo se revisa (no se guarda) y llena la tuya igual.</small>
+      </span>
+      <a class="btn btn-secondary btn-sm" href="/importar/ejemplo" data-completo download>
+        <?= W::icono('baja','14px') ?>Descargar ejemplo</a>
+    </div>
 
     <form method="post" action="/importar/analizar" enctype="multipart/form-data">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">

@@ -85,6 +85,9 @@ final class ImportarVentas
     const CONCEPTOS = ['Vendedor', 'Gerente', 'Administración', 'Área'];
 
     /** Los campos que se pueden corregir desde la pantalla. */
+    /** Lo que lleva en el título el archivo de ejemplo. Ver ejemplo(). */
+    const MARCA_EJEMPLO = 'ARCHIVO DE EJEMPLO';
+
     const AJUSTABLES = ['folio','fecha','cliente','area','servicio','forma',
                         'total','anticipo','vendedor','com0','com1','com2','com3'];
 
@@ -125,6 +128,7 @@ final class ImportarVentas
             'total' => 0.0, 'cobrado' => 0.0, 'comisiones' => 0.0,
             'nuevos' => ['clientes' => [], 'servicios' => [], 'areas' => [], 'colaboradores' => []],
             'hojas' => [], 'ajustados' => 0, 'excluidos' => 0,
+            'ejemplo' => false,
         ];
 
         $vistos = [];                       // folios dentro del propio archivo
@@ -143,6 +147,12 @@ final class ImportarVentas
                 continue;
             }
             list($col, $iEnc, $iCom) = $enc;
+            // El archivo de ejemplo se deja revisar pero no guardar: ver ejemplo().
+            for ($i = 0; $i < $iEnc; $i++) {
+                foreach ((array)($filas[$i] ?? []) as $c) {
+                    if (is_string($c) && mb_stripos($c, self::MARCA_EJEMPLO) !== false) $plan['ejemplo'] = true;
+                }
+            }
 
             foreach ($filas as $n => $f) {
                 if ($n <= $iEnc) continue;
@@ -1072,5 +1082,96 @@ final class ImportarVentas
         if (strpos($f, 'TARJETA') !== false
             || strpos($f, 'TDC') !== false || strpos($f, 'TDD') !== false) return ['tarjeta', $banco];
         return [null, $banco];
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  EL ARCHIVO DE EJEMPLO
+    // ════════════════════════════════════════════════════════
+
+    /**
+     * Una hoja de ejemplo con datos inventados, para ver cómo se llena.
+     *
+     * Trae lo que una hoja de verdad trae y que hay que saber hacer: un
+     * título encima del encabezado, dos meses en dos hojas, una venta que
+     * se cobra en dos partes (el abono va en la hoja del mes siguiente con
+     * el mismo folio y SIN total), IVA, comisión del banco, gastos y las
+     * cuatro comisiones después de VENDEDOR. Al pie, el bloque de totales,
+     * que el importador salta.
+     *
+     * Lleva MARCA_EJEMPLO en el título: si alguien lo sube, se revisa igual
+     * que uno de verdad pero no se deja guardar. Probar el formato no debe
+     * meter ventas inventadas en una empresa real.
+     *
+     * Los encabezados son los que COLUMNAS reconoce; si ahí cambia un
+     * nombre, este archivo tiene que cambiar con él.
+     */
+    public static function ejemplo()
+    {
+        $T = Libro::TEXTO; $F = Libro::FECHA; $M = Libro::MONEDA;
+        $cols = [
+            ['FOLIO', $T, 17], ['FECHA', $F, 12], ['CLIENTE', $T, 34], ['ÁREA', $T, 15],
+            ['SERVICIO', $T, 28], ['FORMA', $T, 22], ['COSTO TOTAL DE VENTA', $M, 15],
+            ['MONTO ANTICIPO', $M, 14], ['RESTANTES', $M, 13], ['IVA', $M, 11], ['COM. BANCA', $M, 11],
+            ['REAL BANCO', $M, 13], ['RECIBO PAGO', $T, 12], ['SOL. GASTOS', $T, 16], ['CANTIDAD', $M, 11],
+            ['A COMISIONAR', $M, 13], ['VENDEDOR', $T, 16],
+            // Las cuatro comisiones van justo después de VENDEDOR, en este
+            // orden. El nombre del encabezado no importa: cuenta la posición.
+            ['COM. VENDEDOR', $M, 13], ['COM. GERENTE', $M, 13], ['COM. ADMINISTRACIÓN', $M, 15], ['COM. ÁREA', $M, 11],
+        ];
+
+        // Un renglón: lo que se cobró y de qué. Lo demás se calcula igual que
+        // en una hoja bien llevada: base = cobro − IVA − banco − gastos, y las
+        // comisiones como porcentaje de la base (10%, 3%, 2% y 5%).
+        $renglon = function ($folio, $fecha, $cliente, $area, $servicio, $forma, $total, $cobro,
+                             $restante, $conIva, $pctBanco, $solGastos, $gastos, $vendedor, $recibo) {
+            $iva   = $conIva ? round($cobro - $cobro / 1.16, 2) : 0;
+            $banco = round($cobro * $pctBanco / 100, 2);
+            $base  = round($cobro - $iva - $banco - $gastos, 2);
+            return [$folio, $fecha, $cliente, $area, $servicio, $forma, $total, $cobro, $restante,
+                    $iva, $banco, round($cobro - $banco, 2), $recibo, $solGastos, $gastos, $base, $vendedor,
+                    round($base * .10, 2), round($base * .03, 2), round($base * .02, 2), round($base * .05, 2)];
+        };
+        $totales = function (array $filas) {
+            $t = ['TOTAL'];
+            foreach ([6, 7, 8, 9, 10, 11, 14, 15, 17, 18, 19, 20] as $i) {
+                $t[$i] = round(array_sum(array_map(function ($f) use ($i) { return (float)$f[$i]; }, $filas)), 2);
+            }
+            return $t;
+        };
+
+        $sep = [
+            $renglon('20260903101500', '2026-09-03', 'Laura Méndez Ruiz', 'CONTABILIDAD', 'Declaración anual',
+                     'EFECTIVO', 1160, 1160, 0, true, 0, '', 0, 'Ana Torres', 'R-0901'),
+            // Esta se cobra en dos partes: la mitad hoy y el resto en octubre.
+            $renglon('20260908121000', '2026-09-08', 'Comercializadora Sol del Norte SA de CV', 'LEGALES',
+                     'Constitución de empresa', 'TRANSFERENCIA BBVA', 9280, 4640, 4640, true, 0,
+                     'Notaría', 1500, 'Luis Ramírez', 'R-0902'),
+            $renglon('20260915170500', '2026-09-15', 'Pedro Salinas Vega', 'MARKETING', 'Logo y manual de marca',
+                     'TARJETA BANORTE', 3480, 3480, 0, true, 3, '', 0, 'Ana Torres', 'R-0903'),
+            $renglon('20260922093000', '2026-09-22', 'Laura Méndez Ruiz', 'CONTABILIDAD', 'Contabilidad mensual',
+                     'EFECTIVO', 1500, 1500, 0, false, 0, '', 0, 'Sofía Herrera', 'R-0904'),
+        ];
+        $oct = [
+            $renglon('20261002110000', '2026-10-02', 'Grupo Ferretero Alameda', 'CONTABILIDAD', 'Contabilidad mensual',
+                     'SPEI BANORTE', 2320, 2320, 0, true, 0, '', 0, 'Sofía Herrera', 'R-1001'),
+            // EL ABONO: mismo folio que la de septiembre, total VACÍO. Así se
+            // sabe que es otro cobro de esa venta y no una venta nueva.
+            $renglon('20260908121000', '2026-10-06', 'Comercializadora Sol del Norte SA de CV', 'LEGALES',
+                     'Constitución de empresa', 'TRANSFERENCIA BBVA', '', 4640, 0, true, 0, '', 0,
+                     'Luis Ramírez', 'R-1002'),
+            $renglon('20261014160000', '2026-10-14', 'Pedro Salinas Vega', 'MARKETING', 'Campaña en redes (1 mes)',
+                     'EFECTIVO', 4500, 2000, 2500, false, 0, 'Pauta en Meta', 800, 'Ana Torres', 'R-1003'),
+            $renglon('20261020130000', '2026-10-20', 'Mariana Ortiz Lugo', 'LEGALES', 'Registro de marca',
+                     'TARJETA BBVA', 5800, 5800, 0, true, 3, 'Derechos IMPI', 2800, 'Luis Ramírez', 'R-1004'),
+        ];
+
+        $sub = 'Datos inventados para ver el formato. Cada renglón es un cobro; si un folio se repite '
+             . 'SIN total, es otro abono de esa venta. Si lo subes a Importar se revisa, pero no se guarda.';
+        $l = new Libro();
+        $l->hoja('Septiembre', $cols, $sep, ['titulo' => 'PAGOS DE CLIENTES · SEPTIEMBRE 2026 · ' . self::MARCA_EJEMPLO,
+                                              'subtitulo' => $sub, 'totales' => $totales($sep)]);
+        $l->hoja('Octubre', $cols, $oct, ['titulo' => 'PAGOS DE CLIENTES · OCTUBRE 2026 · ' . self::MARCA_EJEMPLO,
+                                           'subtitulo' => $sub, 'totales' => $totales($oct)]);
+        return $l;
     }
 }

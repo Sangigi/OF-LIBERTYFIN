@@ -4103,3 +4103,11 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-promo-cond{display:block;font-size:11.5px;color:var(--lf-tinta-4);margin-top:2px}
 .lf-promo-cond b{color:var(--lf-tinta-2);font-weight:600}
 .lf-aud-tabla td[data-label="Detalle"]{min-width:200px}
+
+/* Importar: el aviso de la hoja de ejemplo, arriba del botón de subir. */
+.lf-imp-ejemplo{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;padding:12px 14px;
+  border:1px dashed var(--lf-linea-f);border-radius:var(--lf-r);background:var(--lf-vidrio)}
+.lf-imp-ejemplo .ic{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:10px;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-imp-ejemplo b{display:block;font-size:13px;color:var(--lf-tinta)}
+.lf-imp-ejemplo small{display:block;font-size:12px;line-height:1.5;color:var(--lf-tinta-3);margin-top:2px}
