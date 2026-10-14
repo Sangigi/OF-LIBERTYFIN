@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 19;
+    const VERSION = 20;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -783,6 +783,61 @@ final class Migraciones
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    /**
+     * 20 · Lo que una empresa NUEVA no tenía y el código ya usaba.
+     *
+     * Las empresas que vienen del sistema anterior traen estas columnas en
+     * su base; config/esquema.sql no, y ninguna versión las agregaba. Una
+     * empresa creada desde LibertyFin no podía ni abrir Ventas
+     * ("Unknown column 'v.area_nombre'") ni cobrar en Caja (iva_modo y el
+     * total de la línea). Se encontraron cruzando cada consulta del código
+     * contra lo que crea una empresa nueva.
+     *
+     *   ventas.area_nombre                el área de la venta (la de más peso)
+     *   ventas.iva_modo                   si el IVA va incluido o se suma
+     *   venta_comisiones.descuento_linea  el descuento de la línea, sin IVA
+     *   venta_pagos.cfdi_complemento_*    el complemento de pago timbrado
+     *   venta_detalles.total              tenía NOT NULL sin valor por
+     *                                     omisión y nadie lo llena: toda
+     *                                     línea nueva tronaba
+     *
+     * Solo se agrega lo que falte: en una base que ya lo tiene no toca nada.
+     */
+    private static function v20(PDO $db)
+    {
+        $columnas = [
+            ['ventas',           'area_nombre',           "VARCHAR(150) NULL DEFAULT NULL"],
+            ['ventas',           'iva_modo',              "VARCHAR(10) NOT NULL DEFAULT 'incluido'"],
+            ['venta_comisiones', 'descuento_linea',       "DECIMAL(12,2) NOT NULL DEFAULT 0"],
+            ['venta_pagos',      'cfdi_complemento_id',   "VARCHAR(64) NULL DEFAULT NULL"],
+            ['venta_pagos',      'cfdi_complemento_uuid', "VARCHAR(64) NULL DEFAULT NULL"],
+            ['venta_pagos',      'cfdi_complemento_en',   "DATETIME NULL DEFAULT NULL"],
+        ];
+        foreach ($columnas as list($tabla, $columna, $definicion)) {
+            if (!self::hayTabla($db, $tabla) || self::hayColumna($db, $tabla, $columna)) continue;
+            try {
+                $db->exec("ALTER TABLE `$tabla` ADD COLUMN `$columna` $definicion");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 20 · ' . $tabla . '.' . $columna . ': ' . $e->getMessage());
+            }
+        }
+
+        // venta_detalles.total: valor por omisión, conservando su tipo. Solo
+        // si es obligatorio y no tiene uno (en las bases viejas ya lo tiene).
+        try {
+            $st = $db->query("
+                SELECT COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'venta_detalles' AND COLUMN_NAME = 'total'");
+            $c = $st->fetch(PDO::FETCH_ASSOC);
+            if ($c && $c['IS_NULLABLE'] === 'NO' && $c['COLUMN_DEFAULT'] === null
+                && preg_match('/^(decimal|int|float|double)/i', $c['COLUMN_TYPE'])) {
+                $db->exec("ALTER TABLE venta_detalles MODIFY COLUMN `total` {$c['COLUMN_TYPE']} NOT NULL DEFAULT 0");
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] migración 20 · venta_detalles.total: ' . $e->getMessage());
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -803,5 +858,6 @@ final class Migraciones
         17 => 'Porcentajes de comisión con hasta 4 decimales (33.333)',
         18 => 'Historial de «Recalcular comisiones», para poder deshacerlo',
         19 => 'Promociones: descuentos, precios especiales, paquetes y códigos',
+        20 => 'Columnas que les faltaban a las empresas nuevas (área e IVA de la venta, complemento de pago)',
     ];
 }
