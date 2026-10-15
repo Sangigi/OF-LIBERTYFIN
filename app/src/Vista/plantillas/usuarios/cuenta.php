@@ -1236,6 +1236,14 @@ $grupos = [
     JPG, PNG o PDF, máximo 10 MB. Un administrador de LibertyFin los revisa en 24 a 72 horas.</span>
 </div>
 
+<style>
+/* Cada tarjeta guarda su propio alto: si una crece (motivo de rechazo), las
+   demás ya no se estiran con un hueco en medio. min-width:0 y el corte de
+   palabras evitan que un texto largo ensanche la columna y desborde la fila. */
+.lf-docs{align-items:start}
+.lf-doc,.lf-doc .card-body{min-width:0}
+.lf-doc p{overflow-wrap:anywhere}
+</style>
 <div class="lf-docs">
   <?php foreach (C::DOCUMENTOS as $k => $d):
     $doc = $documentos[$k] ?? null;
@@ -1247,15 +1255,17 @@ $grupos = [
                 style="width:38px;height:38px;border-radius:12px;margin:0;flex-shrink:0">
             <?= W::icono($est==='aprobado'?'cobro':($est==='rechazado'?'alerta':'serv'),'17px') ?></span>
           <div style="flex:1;min-width:0">
-            <b style="display:block;font-size:13.5px;font-weight:600;line-height:1.35">
+            <b style="display:block;font-size:13.5px;font-weight:600;line-height:1.35;overflow-wrap:anywhere">
               <?= P::e($d[0]) ?></b>
-            <small style="font-size:11px;color:var(--lf-tinta-4)">
-              <?= $d[1] ? 'Obligatorio' : 'Opcional' ?></small>
+            <span style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:3px">
+              <small style="font-size:11px;color:var(--lf-tinta-4)">
+                <?= $d[1] ? 'Obligatorio' : 'Opcional' ?></small>
+              <?php if ($est === 'aprobado'): ?><span class="badge bg-success">Aprobado</span>
+              <?php elseif ($est === 'rechazado'): ?><span class="badge bg-danger">Rechazado</span>
+              <?php elseif ($est): ?><span class="badge bg-warning">En revisión</span>
+              <?php endif; ?>
+            </span>
           </div>
-          <?php if ($est === 'aprobado'): ?><span class="badge bg-success">Aprobado</span>
-          <?php elseif ($est === 'rechazado'): ?><span class="badge bg-danger">Rechazado</span>
-          <?php elseif ($est): ?><span class="badge bg-warning">En revisión</span>
-          <?php endif; ?>
         </div>
 
         <?php if ($est === 'rechazado' && !empty($doc['motivo_rechazo'])): ?>
