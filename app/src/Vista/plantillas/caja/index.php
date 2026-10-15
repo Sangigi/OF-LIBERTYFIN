@@ -1371,7 +1371,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
         + copiable(l.liga, 'mLiga')
         + '<div class="espera" id="mEspera"><span class="giro"></span>'
         + 'Esperando a que pague. Esto se actualiza solo.</div>' + aviso;
-      ponerQr(l.qr);
+      cargarQr(l.liga);
       pie.innerHTML = '<a class="btn btn-secondary" href="' + esc(l.liga)
         + '" target="_blank" rel="noopener">Abrir la página</a>' + confirmar(l)
         + '<button type="button" class="btn btn-primary" data-seguir>Siguiente venta</button>';
@@ -1406,15 +1406,16 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     }
   }
 
-  /* El QR ya viene dibujado en la respuesta del cobro: es el MISMO
-     Qr::svg() que usa el panel de pago (ligas/panel), así que las dos
-     pantallas no pueden mostrar códigos distintos. Antes se pedía a
-     /qr en un segundo viaje; ahora llega junto con la liga y no hay
-     forma de que uno cambie sin el otro. */
-  function ponerQr(svg){
+  /* El QR se pide al servidor, que ya sabe dibujarlo. Meter un generador
+     en el navegador sería repetir trescientas líneas que ya existen. */
+  function cargarQr(url){
     var c = document.getElementById('mQr');
     if (!c) return;
-    c.innerHTML = svg || '';
+    c.innerHTML = '<span class="giro"></span>';
+    fetch('/qr?t=' + encodeURIComponent(url), { credentials:'same-origin' })
+      .then(function(r){ return r.text(); })
+      .then(function(svg){ c.innerHTML = svg; })
+      .catch(function(){ c.innerHTML = ''; });
   }
 
   document.addEventListener('click', function(e){
