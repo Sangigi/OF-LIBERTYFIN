@@ -29,6 +29,9 @@ use PDO;
 final class CrearEmpresa
 {
     /** Los giros que se ofrecen en el registro. «Otro» deja escribirlo. */
+    /** Días de la prueba gratuita: de aquí sale el vencimiento y el texto del registro. */
+    const DIAS_PRUEBA = 15;
+
     const GIROS = [
         'Contabilidad y fiscal', 'Despacho legal', 'Marketing y publicidad', 'Consultoría',
         'Salud y bienestar', 'Belleza y estética',
@@ -247,7 +250,7 @@ final class CrearEmpresa
                 (nombre_empresa, giro_comercial, rfc, no_distribuidor, telefono,
                  nombre_contacto, email_admin, usuario_admin, nombre_base_datos,
                  activo, plan, fecha_vencimiento)
-            VALUES (?,?,?,?,?,?,?,?,?, 1, ?, DATE_ADD(CURDATE(), INTERVAL 30 DAY))
+            VALUES (?,?,?,?,?,?,?,?,?, 1, ?, DATE_ADD(CURDATE(), INTERVAL " . (int)self::DIAS_PRUEBA . " DAY))
         ")->execute([
             $s['nombre_empresa'], $s['giro_comercial'], $s['rfc'], $s['no_distribuidor'],
             $s['telefono'], $s['nombre_contacto'], $s['email_admin'], $usuario, $base,
