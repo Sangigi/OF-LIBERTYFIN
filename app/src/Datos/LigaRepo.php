@@ -51,6 +51,20 @@ final class LigaRepo extends Repo
                     KEY ix_lp_venta (venta_id),
                     KEY ix_lp_trans (transaccion)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            // Migración: agrega usuario_correo si falta (instalaciones viejas)
+            $col = $this->db->query("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'lf_ligas_pago'
+                  AND COLUMN_NAME = 'usuario_correo'
+            ")->fetchColumn();
+
+            if ((int)$col === 0) {
+                $this->db->exec("
+                    ALTER TABLE lf_ligas_pago
+                    ADD COLUMN usuario_correo VARCHAR(160) DEFAULT NULL AFTER usuario_nombre");
+            }
         } catch (\Throwable $e) {
             error_log('[LibertyFin] lf_ligas_pago: ' . $e->getMessage());
         }
