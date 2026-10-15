@@ -108,8 +108,14 @@ final class RecargasControlador
         $_SESSION['lf_emida_intento'] = time();
         $r = $this->bajarCatalogo(Conexion::de($_SESSION['empresa_db']));
         if ($r['ok']) unset($_SESSION['lf_emida_error']); else $_SESSION['lf_emida_error'] = $r['error'];
-        if ($json) $this->json(['ok' => $r['ok'], 'n' => $r['n'], 'mensaje' => $r['ok'] ? $r['n'] . ' productos actualizados.' : $r['error']]);
-        $this->volver($r['ok'] ? $r['n'] . ' productos actualizados.' : $r['error'], $r['ok'] ? 'ok' : 'error');
+        $repo = new EmidaRepo(Conexion::de($_SESSION['empresa_db']));
+        $msj = $r['ok']
+            ? 'Emida mandó ' . number_format($r['n']) . ' productos. En el catálogo hay '
+              . number_format($repo->cuantos()) . ' a la venta'
+              . ($repo->ocultos() ? ' y ' . number_format($repo->ocultos()) . ' ocultos.' : '.')
+            : $r['error'];
+        if ($json) $this->json(['ok' => $r['ok'], 'n' => $r['n'], 'mensaje' => $msj]);
+        $this->volver($msj, $r['ok'] ? 'ok' : 'error');
     }
 
     /**
