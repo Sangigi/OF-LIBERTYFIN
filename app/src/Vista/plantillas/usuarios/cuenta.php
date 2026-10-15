@@ -1317,22 +1317,39 @@ $grupos = [
     var txt = btn.textContent;
     btn.disabled = true; btn.textContent = 'Subiendo…';
 
-    /* El aviso flota fuera de la rejilla: meterlo dentro de la tarjeta la
-       hacía crecer y desacomodaba toda la fila. */
+    /* El aviso flota fuera de la rejilla (dentro de la tarjeta la hacía crecer
+       y desacomodaba la fila). Usa los colores del tema, igual que el resto
+       de avisos: en modo oscuro toma la superficie oscura, no un fondo claro. */
     function msj(t, ok) {
+      if (!document.getElementById('lfAvisoDocCss')) {
+        var s = document.createElement('style'); s.id = 'lfAvisoDocCss';
+        s.textContent =
+          '#lfAvisoDoc{position:fixed;left:50%;bottom:24px;z-index:500;display:flex;align-items:center;gap:10px;'
+          + 'max-width:min(92vw,440px);padding:12px 16px;border-radius:16px;font-size:13px;line-height:1.45;'
+          + 'font-weight:600;color:var(--lf-tinta);'
+          + 'background:color-mix(in srgb,var(--lf-sup) 90%,transparent);'
+          + 'border:1px solid color-mix(in srgb,var(--lf-linea) 85%,transparent);'
+          + '-webkit-backdrop-filter:blur(14px) saturate(1.4);backdrop-filter:blur(14px) saturate(1.4);'
+          + 'box-shadow:0 12px 32px rgba(0,0,0,.18);'
+          + 'opacity:0;transform:translate(-50%,14px) scale(.97);pointer-events:none;'
+          + 'transition:opacity .28s ease,transform .38s cubic-bezier(.2,.9,.3,1.2)}'
+          + '#lfAvisoDoc.on{opacity:1;transform:translate(-50%,0) scale(1);pointer-events:auto}'
+          + '#lfAvisoDoc i{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--lf-brand)}'
+          + '#lfAvisoDoc.mal i{background:var(--lf-rojo)}';
+        document.head.appendChild(s);
+      }
       var a = document.getElementById('lfAvisoDoc');
       if (!a) {
         a = document.createElement('div');
         a.id = 'lfAvisoDoc'; a.setAttribute('role', 'status');
-        a.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);'
-          + 'z-index:500;max-width:min(92vw,460px);padding:12px 18px;border-radius:14px;'
-          + 'font-size:13px;line-height:1.45;font-weight:600;color:#fff;'
-          + 'box-shadow:0 12px 32px rgba(0,0,0,.18)';
+        a.innerHTML = '<i></i><span></span>';
         document.body.appendChild(a);
       }
-      a.style.background = ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)';
-      a.textContent = t; a.hidden = false;
-      clearTimeout(a._t); a._t = setTimeout(function () { a.hidden = true; }, 6000);
+      a.querySelector('span').textContent = t;
+      a.classList.toggle('mal', !ok);
+      void a.offsetWidth;                       /* reinicia la transición si ya estaba */
+      a.classList.add('on');
+      clearTimeout(a._t); a._t = setTimeout(function () { a.classList.remove('on'); }, 6000);
     }
 
     fetch(f.action, { method: 'POST', body: new FormData(f), credentials: 'same-origin',
