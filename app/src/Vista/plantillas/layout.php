@@ -114,8 +114,11 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
       <?php endif; ?>
       <?= $contenido ?></div>
   </div>
-  <?php if (!empty($_SESSION['lf_mostrar_guia'])): unset($_SESSION['lf_mostrar_guia']);
-        P::parcial('parciales/guia'); endif; ?>
+  <?php /* La guía sale mientras la marca siga en la sesión; la quita
+           /guia/vista al CERRARLA. Antes se quitaba aquí, al dibujar, y el
+           login —que se envía por detrás y sigue la redirección— la gastaba
+           en una página que nadie veía: la guía nunca salía. */
+        if (!empty($_SESSION['lf_mostrar_guia'])) P::parcial('parciales/guia'); ?>
   </div>
 </div>
 

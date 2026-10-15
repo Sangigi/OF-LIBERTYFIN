@@ -49,6 +49,15 @@ final class Inventario
         'metro'   => ['Metro', 'm'],
     ];
 
+    /** Las que se venden por fracción: 0.5 kg, 1.25 m. Las demás, por pieza entera. */
+    const FRACCION = ['kg', 'litro', 'metro'];
+
+    /** ¿Esta unidad admite fracciones? La del sistema anterior puede venir como «Kg». */
+    public static function fraccionable($unidad)
+    {
+        return in_array(strtolower(trim((string)$unidad)), self::FRACCION, true);
+    }
+
     private $db;
     private $cfg;
 

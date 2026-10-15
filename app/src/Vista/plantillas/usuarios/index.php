@@ -72,17 +72,16 @@ $cuenta = $cupo['max'] > 0
             <?= (isset($e['rol']) && $e['rol']===$k)?'selected':'' ?>><?= P::e($v['rotulo']) ?></option>
         <?php endforeach; ?>
       </select>
-      <small id="rolPara" style="font-size:11px;color:var(--lf-tinta-4);
-             margin-top:5px;display:block;line-height:1.4;max-width:160px"></small>
     </div>
+    <?php /* Sin «Sin asignar»: la sucursal es dónde cobra (sus ventas, su
+             corte, las existencias que descuenta) y la columna no admite
+             vacío; en MySQL estricto el alta fallaba. Nueva, va la matriz. */ ?>
     <div style="width:160px">
       <label class="form-label">Sucursal</label>
-      <select class="form-select" name="sucursal_id">
-        <option value="">Sin asignar</option>
-        <?php foreach ($sucursales as $s): ?>
-          <option value="<?= (int)$s['id'] ?>"
-            <?= (isset($e['sucursal_id']) && (int)$e['sucursal_id']===(int)$s['id'])?'selected':'' ?>>
-            <?= P::e($s['nombre']) ?></option>
+      <select class="form-select" name="sucursal_id" required>
+        <?php foreach ($sucursales as $k => $s):
+          $sel = isset($e['sucursal_id']) ? (int)$e['sucursal_id'] === (int)$s['id'] : $k === 0; ?>
+          <option value="<?= (int)$s['id'] ?>" <?= $sel ? 'selected' : '' ?>><?= P::e($s['nombre']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
@@ -96,12 +95,14 @@ $cuenta = $cupo['max'] > 0
       <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
       <?php if ($e): ?><a class="btn btn-secondary" href="/usuarios">Cancelar</a><?php endif; ?>
     </div>
-    <?php if (!$e): ?>
+    <?php /* Para quién es el rol, a todo lo ancho: debajo del selector hacía
+             más alta esa columna y descuadraba la fila. */ ?>
+    <p class="lf-usr-rol" id="rolPara" aria-live="polite"></p>
     <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
-      La contraseña se muestra a propósito: la escribes tú y se la dices a la persona.
-      Nadie puede volver a verla después, ni tú.
+      La sucursal es donde trabaja: ahí quedan sus ventas, su corte de caja y las existencias que descuenta.
+      <?php if (!$e): ?>La contraseña se muestra a propósito: la escribes tú y se la dices a la persona.
+      Nadie puede volver a verla después, ni tú.<?php endif; ?>
     </p>
-    <?php endif; ?>
   </form>
 </details>
 <?php endif; ?>
@@ -207,7 +208,13 @@ $cuenta = $cupo['max'] > 0
 (function(){
   var s = document.getElementById('selRol'), t = document.getElementById('rolPara');
   if (!s || !t) return;
-  function pinta(){ t.textContent = s.options[s.selectedIndex].dataset.para || ''; }
+  function pinta(){
+    var o = s.options[s.selectedIndex];
+    t.innerHTML = '';
+    if (!o || !o.dataset.para) return;
+    var b = document.createElement('b'); b.textContent = o.textContent.trim() + ': ';
+    t.appendChild(b); t.appendChild(document.createTextNode(o.dataset.para));
+  }
   s.addEventListener('change', pinta); pinta();
 })();
 

@@ -376,8 +376,14 @@ foreach ($pasos as $p) {
   function cerrar(irA){
     g.hidden = true;
     document.body.style.overflow = '';
-    fetch('/guia/vista', {method:'POST', headers:{'X-Requested-With':'fetch'}}).catch(function(){});
-    if (irA) location.href = irA;
+    /* Si se cambia de página en seguida, el aviso se cancelaba y la guía
+       volvía a salir. Se espera la respuesta (o medio segundo) antes de ir,
+       y `keepalive` lo deja terminar aunque la página se vaya. */
+    var ido = false, ir = function(){ if (!ido && irA) { ido = true; location.href = irA; } };
+    fetch('/guia/vista', {method:'POST', keepalive:true, credentials:'same-origin',
+                          headers:{'X-Requested-With':'fetch'}})
+      .then(ir, ir);
+    if (irA) setTimeout(ir, 600);
   }
 
   document.getElementById('lfGuiaSaltar').addEventListener('click', function(){ cerrar(); });

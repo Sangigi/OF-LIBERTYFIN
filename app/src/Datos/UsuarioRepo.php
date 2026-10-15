@@ -40,7 +40,8 @@ final class UsuarioRepo extends Repo
 
     public function sucursales()
     {
-        return $this->todos("SELECT id, nombre FROM sucursales ORDER BY nombre");
+        // La matriz primero: es la que se propone al dar de alta.
+        return $this->todos("SELECT id, nombre FROM sucursales ORDER BY COALESCE(es_matriz,0) DESC, nombre");
     }
 
     /**
@@ -119,8 +120,13 @@ final class UsuarioRepo extends Repo
         if ($this->valor($sql . " LIMIT 1", $p)) {
             throw new \InvalidArgumentException('Ya existe un usuario llamado ' . $username);
         }
-        return [$username, $nombre, $email ?: null, $rol,
-                (int)($d['sucursal_id'] ?? 0) ?: null];
+        // `usuarios.sucursal_id` no admite vacío: sin sucursal elegida, la
+        // matriz. Antes se mandaba NULL y en MySQL estricto el alta fallaba.
+        $suc = (int)($d['sucursal_id'] ?? 0);
+        if (!$suc || !$this->valor("SELECT id FROM sucursales WHERE id = ?", [$suc])) {
+            $suc = (int)$this->valor("SELECT id FROM sucursales ORDER BY COALESCE(es_matriz,0) DESC, id LIMIT 1");
+        }
+        return [$username, $nombre, $email ?: null, $rol, $suc ?: null];
     }
 
     /** Los usuarios activos de la empresa: los que cuentan para el plan. */

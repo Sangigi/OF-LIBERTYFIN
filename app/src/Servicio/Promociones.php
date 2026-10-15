@@ -165,7 +165,8 @@ final class Promociones
         foreach (array_values($lineas) as $i => $l) {
             $precio = max(0, (float)($l['precio'] ?? 0));
             $lista  = max(0, (float)($l['lista'] ?? $precio));
-            $cant   = max(1, (float)($l['cantidad'] ?? 1));
+            // Puede ser fracción (0.5 kg): Caja ya decidió si el producto la admite.
+            $cant   = max(0.001, (float)($l['cantidad'] ?? 1));
             $L[$i] = [
                 'id' => (int)($l['id'] ?? 0), 'area' => (int)($l['area'] ?? 0),
                 'precio' => $precio, 'cantidad' => $cant,

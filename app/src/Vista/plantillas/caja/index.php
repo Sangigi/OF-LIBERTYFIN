@@ -117,6 +117,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         $ex = $inventario['existencias'][(int)$s['id']] ?? null;
         $hay = $ex !== null ? (float)$ex['existencia'] : null;
         if ($hay !== null) $titulo .= "\n" . ($hay > 0 ? 'Quedan ' . \LibertyFin\Servicio\Inventario::conUnidad($hay, $s['unidad_medida'] ?? '') : 'Agotado');
+        // Por kilo, litro o metro: se vende en fracciones y el precio es por unidad.
+        $frac = \LibertyFin\Servicio\Inventario::fraccionable($s['unidad_medida'] ?? '');
       ?>
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= $susPromos ? ' con-promo' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
@@ -124,7 +126,9 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
                 title="<?= P::e($titulo) ?>"
-                <?php if ($hay !== null): ?>data-hay="<?= number_format($hay, 3, '.', '') ?>" data-u="<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'] ?? '')) ?>"<?php endif; ?>
+                <?php if ($hay !== null): ?>data-hay="<?= number_format($hay, 3, '.', '') ?>"<?php endif; ?>
+                data-u="<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'] ?? '')) ?>"
+                <?= $frac ? 'data-frac="1"' : '' ?>
                 data-precio="<?= (float)$s['precio'] ?>">
           <?php if ($hay !== null): ?>
             <span class="lf-serv-hay<?= $hay <= 0 ? ' agotado' : ($hay <= (float)$ex['minimo'] ? ' bajo' : '') ?>">
@@ -139,7 +143,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
             <?= !empty($s['imagen']) ? '' : W::icono('serv','17px') ?></span>
           <b><?= P::e($s['nombre']) ?></b>
           <small><?= P::e($s['codigo']) ?></small>
-          <span class="p"><?= (float)$s['precio'] > 0 ? D::pesos($s['precio']) : 'Precio libre' ?></span>
+          <span class="p"><?= (float)$s['precio'] > 0 ? D::pesos($s['precio']) : 'Precio libre' ?><?php if ($frac && (float)$s['precio'] > 0): ?><small class="por">/<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'])) ?></small><?php endif; ?></span>
         </button>
       <?php endforeach; ?>
     </div>
@@ -541,13 +545,20 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       // catálogo los tiene en cero a propósito.
       // − y + para la cantidad: antes, para pasar de 3 a 2, había que
       // quitar el producto y volver a agregarlo.
+      // Por kilo, litro o metro la cantidad se ESCRIBE (0.5 kg): con − y +
+      // solo se llegaría a kilos enteros.
+      var c = CARTA[l.id], frac = !!(c && c.frac);
+      var cant = frac
+        ? '<span class="lf-cant frac"><input class="lf-cant-in lf-mono" type="number" data-cant="' + i + '"'
+          + ' step="0.001" min="0.001" inputmode="decimal" value="' + l.cantidad + '"'
+          + ' aria-label="Cantidad en ' + escP(c.u) + '"><span class="u">' + escP(c.u) + '</span></span>'
+        : '<span class="lf-cant">'
+          + '<button type="button" data-menos="' + i + '" aria-label="Uno menos"'
+          +   (l.cantidad <= 1 ? ' disabled' : '') + '>−</button>'
+          + '<span class="n">' + l.cantidad + '</span>'
+          + '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>';
       d.innerHTML = '<div style="flex:1;min-width:0"><b>' + l.nombre + '</b>'
-        + '<span class="lf-cant">'
-        +   '<button type="button" data-menos="' + i + '" aria-label="Uno menos"'
-        +     (l.cantidad <= 1 ? ' disabled' : '') + '>−</button>'
-        +   '<span class="n">' + l.cantidad + '</span>'
-        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>'
-        + pistaExistencia(l) + '</div>'
+        + cant + pistaExistencia(l) + '</div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
         + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>'
@@ -779,7 +790,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   document.querySelectorAll('.lf-serv').forEach(function(b){
     CARTA[+b.dataset.id] = { nombre: b.dataset.nombre, precio: +b.dataset.precio,
                              hay: b.dataset.hay !== undefined ? parseFloat(b.dataset.hay) : null,
-                             u: b.dataset.u || '' };
+                             u: b.dataset.u || '', frac: b.dataset.frac === '1' };
   });
 
   /* ── EXISTENCIAS (solo con Inventario encendido) ──
@@ -1177,10 +1188,15 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       var id = +b.dataset.id;
       if (!cabeUnaMas(id)) return;
       var y = lineas.filter(function(l){ return l.id === id; })[0];
-      if (y) y.cantidad++;
+      if (y) y.cantidad = Math.round((y.cantidad + 1) * 1000) / 1000;
       else lineas.push({id:id, nombre:b.dataset.nombre, precio:+b.dataset.precio, cantidad:1});
       pintar();
       if (!y) avisarPromo(id);
+      // Por kilo: el cursor va a la cantidad, lista para escribir «0.5».
+      if (!y && CARTA[id] && CARTA[id].frac) {
+        var q = document.querySelector('.lf-cant-in[data-cant="' + (lineas.length - 1) + '"]');
+        if (q) { q.focus(); q.select(); }
+      }
     });
   });
 
@@ -1198,6 +1214,29 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     if (!b) return;
     lineas.splice(+b.dataset.i, 1);
     pintar();
+  });
+
+  /* La cantidad escrita (por kilo, litro o metro). Igual que el precio: al
+     escribir no se repinta, para no perder el foco; al salir del campo sí,
+     para acomodar el número y lo que diga de las existencias. */
+  $('lista').addEventListener('input', function(e){
+    var q = e.target.closest('.lf-cant-in');
+    if (!q) return;
+    var l = lineas[+q.dataset.cant], v = parseFloat(q.value);
+    if (!l) return;
+    l.cantidad = v > 0 ? Math.round(v * 1000) / 1000 : 0.001;
+    calcular();
+    pedirPromos();
+  });
+  $('lista').addEventListener('change', function(e){
+    var q = e.target.closest('.lf-cant-in');
+    if (!q) return;
+    var l = lineas[+q.dataset.cant];
+    if (l && !(parseFloat(q.value) > 0)) l.cantidad = 1;   // vacío o cero: vuelve a 1
+    pintar();
+  });
+  $('lista').addEventListener('keydown', function(e){
+    if (e.key === 'Enter' && e.target.closest('.lf-cant-in')) e.target.blur();   // Enter confirma
   });
 
   // Cambiar el precio no repinta la lista: perdería el foco a media escritura.
@@ -1321,6 +1360,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     var pc = $('cajaPagaCon') && !$('cajaPagaCon').hidden ? (parseFloat($('pagaCon').value) || 0) : 0;
     return {
       lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
+                                              u: CARTA[l.id] && CARTA[l.id].frac ? CARTA[l.id].u : '',
                                               desc:l.desc || 0, promo:l.promo ? l.promo.nombre : ''}; }),
       descuento: desc,
       total: cap, anticipo: ant, saldo: cap - ant,
@@ -1729,8 +1769,11 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     /* Cada producto con su precio por pieza cuando son varias: "10 ×" solo
        con el total no deja ver si el precio quedó bien. */
     var items = r.lineas.slice(0, 6).map(function(l){
-      return '<li><span>' + (l.cantidad > 1 ? l.cantidad + ' × ' : '') + esc(l.nombre)
-           + (l.cantidad > 1 ? '<small class="lf-conf-pu">' + money(l.precio) + ' c/u</small>' : '')
+      // Por kilo: «0.5 kg × Queso» y el precio por kilo, aunque sea menos de uno.
+      var cuanto = l.u ? (l.cantidad + ' ' + esc(l.u) + ' × ') : (l.cantidad > 1 ? l.cantidad + ' × ' : '');
+      return '<li><span>' + cuanto + esc(l.nombre)
+           + (l.u ? '<small class="lf-conf-pu">' + money(l.precio) + '/' + esc(l.u) + '</small>'
+                  : (l.cantidad > 1 ? '<small class="lf-conf-pu">' + money(l.precio) + ' c/u</small>' : ''))
            + (l.promo ? '<small class="lf-conf-promo">' + esc(l.promo) + ' · −' + money(l.desc) + '</small>' : '')
            + '</span><b class="lf-mono">' + money(l.precio * l.cantidad - (l.desc || 0)) + '</b></li>';
     }).join('');

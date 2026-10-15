@@ -869,6 +869,8 @@ final class UsuariosControlador
     /** Marca la guía como vista. De autoservicio: cada quien la suya. */
     public function guiaVista()
     {
+        // Cerrada: deja de salir en esta sesión (layout la muestra mientras siga).
+        unset($_SESSION['lf_mostrar_guia']);
         try {
             // Soporte no tiene empresa: la marca va en su propia cuenta.
             if (!empty($_SESSION['plataforma'])) {

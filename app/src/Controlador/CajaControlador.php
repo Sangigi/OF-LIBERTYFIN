@@ -324,7 +324,7 @@ final class CajaControlador
         // El precio de venta es `subprecio`. Releerlo mal aquí sería peor que
         // no releerlo: cobraría el importe equivocado con toda confianza.
         $st = $db->prepare("
-            SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio, costo, categoria_id
+            SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio, costo, categoria_id, unidad_medida
             FROM productos WHERE id IN ($marcas) AND activo = 1");
         $st->execute($ids);
         $reales = [];
@@ -347,7 +347,11 @@ final class CajaControlador
                 'id'       => $id,
                 'nombre'   => $p['nombre'],
                 'precio'   => $precio,
-                'cantidad' => max(1, (float)($l['cantidad'] ?? 1)),
+                // Por kilo, litro o metro se vende en fracciones (0.5 kg);
+                // lo demás, por pieza entera.
+                'cantidad' => \LibertyFin\Servicio\Inventario::fraccionable($p['unidad_medida'] ?? '')
+                              ? max(0.001, round((float)($l['cantidad'] ?? 1), 3))
+                              : max(1, (int)round((float)($l['cantidad'] ?? 1))),
                 'costo'    => (float)($p['costo'] ?? 0),
                 'lista'    => (float)$p['precio'],
                 'area'     => (int)($p['categoria_id'] ?? 0),
