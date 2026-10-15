@@ -190,6 +190,28 @@ $delta   = $promedio > 0 ? round((($hoyMonto - $promedio) / $promedio) * 100) : 
 </div>
 
 <?php
+// Inventario: lo que se acabó o está por acabarse. Solo con Inventario
+// encendido y para quien puede resurtir (ver PanelControlador::faltantes).
+$falta = $faltantes ?? null;
+if ($falta && ($falta['agotados'] + $falta['bajos']) > 0): ?>
+<a class="alert alert-warning" href="/inventario?bajos=1" style="text-decoration:none">
+  <span class="lf-tile a" style="width:34px;height:34px;border-radius:11px;margin:0;font-size:16px;flex-shrink:0">
+    <?= W::icono('bolsa','17px') ?></span>
+  <span>
+    <b style="display:block;font-size:13.5px;margin-bottom:2px">
+      <?php
+        $partes = [];
+        if ($falta['agotados']) $partes[] = $falta['agotados'] . ' agotado' . ($falta['agotados'] === 1 ? '' : 's');
+        if ($falta['bajos'])    $partes[] = $falta['bajos'] . ' bajo su mínimo';
+        echo P::e(implode(' y ', $partes));
+      ?></b>
+    <span style="font-size:12.5px;color:var(--lf-tinta-2)">
+      Hay que resurtir. Ver cuáles en Inventario.</span>
+  </span>
+</a>
+<?php endif; ?>
+
+<?php
 // El aviso de comisiones sin dueño solo lo ve quien puede entrar a
 // resolverlo. A un cajero le decía un importe que no le toca saber y lo
 // mandaba a una pantalla donde igual iba a recibir un 403.

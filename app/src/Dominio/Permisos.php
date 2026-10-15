@@ -98,6 +98,8 @@ final class Permisos
         'ver.clientes'     => ['admin','cajero'],
         'ver.cobranza'     => ['admin'],
         'ver.servicios'    => ['admin','cajero','inventario'],
+        // Existencias y movimientos: quien surte y quien responde por ellos.
+        'ver.inventario'   => ['admin','inventario'],
         'ver.comisiones'   => ['admin'],
         'ver.gastos'       => ['admin','inventario'],
         'ver.reportes'     => ['admin'],
@@ -118,6 +120,7 @@ final class Permisos
         'timbrar'          => ['admin'],
         'editar.clientes'  => ['admin','cajero'],
         'editar.servicios' => ['admin','inventario'],
+        'editar.inventario'=> ['admin','inventario'],
         'editar.gastos'    => ['admin','inventario'],
         'borrar.gastos'    => ['admin'],
         'asignar.comision' => ['admin'],

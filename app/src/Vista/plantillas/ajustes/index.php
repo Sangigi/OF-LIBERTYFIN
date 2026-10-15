@@ -277,6 +277,53 @@ $em = $empresa; ?>
   </section>
 </div>
 
+<?php /* ═══════════════ INVENTARIO ═══════════════ */ elseif ($pestana === 'inventario'):
+  $opInv = \LibertyFin\Datos\ConfigRepo::INVENTARIO;
+  $grupoInv = function ($clave) use ($opInv, $inventario, $token) { ?>
+    <form method="post" action="/ajustes/guardar" class="lf-modos" data-guardar data-al-elegir>
+      <input type="hidden" name="token" value="<?= P::e($token) ?>">
+      <input type="hidden" name="que" value="inventario">
+      <?php foreach ($opInv[$clave] as $k => $m): $on = ($inventario[$clave] ?? '') === (string)$k; ?>
+        <label class="m<?= $on ? ' on' : '' ?>">
+          <input type="radio" name="<?= P::e($clave) ?>" value="<?= P::e($k) ?>" <?= $on ? 'checked' : '' ?>>
+          <span><b><?= P::e($m[0]) ?></b><small><?= P::e($m[1]) ?></small></span>
+        </label>
+      <?php endforeach; ?>
+      <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
+      <p data-aviso hidden></p>
+    </form>
+  <?php }; ?>
+
+<div class="lf-ajustes-caja">
+  <section class="card">
+    <header class="card-header">
+      <div><span>Inventario</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Para las empresas que venden productos físicos</p></div>
+    </header>
+    <div class="card-body">
+      <?php $grupoInv('activo'); ?>
+      <p class="lf-ajustes-nota">Encendido, aparece <b>Inventario</b> en el menú y, en cada producto,
+        la casilla <b>«Lleva existencias»</b>. Solo cuentan los productos que la tengan marcada: los
+        servicios se quedan como están. <?= ($inventario['activo'] ?? '') === 'si'
+          ? '<a href="/inventario">Ir a Inventario</a>.' : '' ?></p>
+    </div>
+  </section>
+
+  <section class="card">
+    <header class="card-header">
+      <div><span>Si en Caja no alcanzan las existencias…</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Por ejemplo, quedan 2 y el cliente lleva 3</p></div>
+    </header>
+    <div class="card-body">
+      <?php $grupoInv('sin_existencia'); ?>
+      <p class="lf-ajustes-nota">Recomendado al empezar: <b>avisar y dejar vender</b>. Mientras las
+        existencias no estén al día, bloquear deja clientes sin atender por un número mal capturado.</p>
+    </div>
+  </section>
+</div>
+
 <?php /* ═══════════════ SUCURSALES ═══════════════ */ elseif ($pestana === 'sucursales'):
 $e = $buscar_ed($sucursales); ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>

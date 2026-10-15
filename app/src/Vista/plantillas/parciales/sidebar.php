@@ -40,6 +40,9 @@ $deEmpresa = [
   ['ruta' => '/gastos',     'icono' => 'baja',    'texto' => 'Gastos',        'p' => 'ver.gastos',
    'sec' => 'gastos'],
   ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Productos', 'p' => 'ver.servicios'],
+  // Solo para las empresas que lo encendieron (Ajustes → Inventario).
+  ['ruta' => '/inventario', 'icono' => 'bolsa',   'texto' => 'Inventario',    'p' => 'ver.inventario',
+   'inv' => true],
   ['ruta' => '/importar',   'icono' => 'bolsa',   'texto' => 'Importar',      'p' => 'importar.ventas'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
@@ -72,12 +75,15 @@ $secciones = Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '') ? $dePlatafo
 // Qué secciones apagó soporte para esta empresa.
 // Un rol de plataforma no tiene empresa: no hay secciones que apagar.
 $apagadas = [];
+$conInventario = false;
 try {
     if (empty($_SESSION['empresa_db'])) throw new \RuntimeException('sin empresa');
     $cfg = new ConfigRepo(Conexion::de($_SESSION['empresa_db']));
     foreach (ConfigRepo::APAGABLES as $k => $_) {
         if (!$cfg->seccionActiva($k)) $apagadas[$k] = true;
     }
+    // Al revés que las de arriba: nace apagado y la empresa lo enciende.
+    $conInventario = $cfg->inventarioActivo();
 } catch (\Throwable $e) { /* sin tabla de config, todo encendido */ }
 
 $menu = []; $pendiente = null;
@@ -85,6 +91,7 @@ foreach ($secciones as $s) {
     if (isset($s['grupo'])) { $pendiente = $s; continue; }
     if (!Permisos::puede($s['p'])) continue;
     if (isset($s['si']) && !Integraciones::activa($s['si'])) continue;
+    if (!empty($s['inv']) && !$conInventario) continue;
     // Soporte sigue viéndolas aunque estén apagadas: para eso entra.
     if (isset($s['sec']) && isset($apagadas[$s['sec']])
         && ($_SESSION['usuario_rol'] ?? '') !== 'soporte') continue;

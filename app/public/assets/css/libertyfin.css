@@ -4315,3 +4315,67 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-margen.mal .t,.lf-margen.mal b{color:var(--lf-rojo)}
 .lf-form > .lf-prod-mas{flex:0 0 100%;margin:0}
 .lf-prod-mas textarea{width:100%;resize:vertical}
+/* ══════════════════════════════════════════════════════
+   INVENTARIO
+   Existencias (lo que hay, lo que falta primero) y Movimientos (por qué
+   cambió). Más el rastro en Caja y en el formulario de producto.
+   ══════════════════════════════════════════════════════ */
+.lf-inv-apagado .card-body{display:flex;flex-direction:column;align-items:flex-start;gap:10px;padding:26px 24px;max-width:620px}
+.lf-inv-apagado h3{margin:4px 0 0;font-size:17px;font-weight:700;color:var(--lf-tinta)}
+.lf-inv-apagado p{margin:0;font-size:13.5px;line-height:1.55;color:var(--lf-tinta-3)}
+.lf-inv-apagado .lf-tile{width:44px;height:44px;border-radius:13px;margin:0}
+.lf-inv-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.lf-inv-cab .lf-pills{margin:0}
+.lf-inv-suc{display:inline-flex;align-items:center;padding:6px 13px;border-radius:calc(var(--lf-r) - 3px);
+  font-size:12.5px;font-weight:600;color:var(--lf-tinta-3);text-decoration:none}
+.lf-inv-suc:hover{color:var(--lf-tinta)}
+.lf-inv-suc.on{background:var(--lf-sup);color:var(--lf-tinta);box-shadow:var(--lf-s1)}
+.lf-inv-tipos{flex:0 0 100%;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.lf-inv-tipos .pista{margin:0;font-size:12px;color:var(--lf-tinta-4)}
+.lf-inv-queda{font-size:12.5px;font-weight:600;color:var(--lf-tinta-3)}
+.lf-inv-queda.mal{color:var(--lf-rojo)}
+.lf-inv-check{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:13px;color:var(--lf-tinta-2);cursor:pointer}
+.lf-inv-tabla{min-width:0}
+.lf-inv-nom{display:block;font-weight:600}
+.lf-inv-cod{color:var(--lf-tinta-4);font-size:11.5px}
+.lf-inv-hay{font-weight:700;font-size:14px}
+.lf-inv-hay.mal{color:var(--lf-rojo)}
+.lf-inv-acc{text-align:right;white-space:nowrap}
+.lf-inv-acc .btn + .btn{margin-left:6px}
+.lf-inv-vacio{text-align:center;color:var(--lf-tinta-4);padding:34px!important;line-height:1.6}
+.lf-inv-fecha{white-space:nowrap}
+.lf-inv-fecha small{display:block;color:var(--lf-tinta-4);font-size:11.5px}
+.lf-inv-tipo{display:inline-block;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;
+  background:var(--lf-vidrio);color:var(--lf-tinta-2)}
+.lf-inv-tipo.t-entrada,.lf-inv-tipo.t-inicial,.lf-inv-tipo.t-devolucion{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-inv-tipo.t-salida{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-inv-tipo.t-conteo{background:var(--lf-amb-soft);color:var(--lf-amb)}
+.lf-inv-cant{font-weight:700}
+.lf-inv-cant.mas{color:var(--lf-brand-2)}
+.lf-inv-cant.menos{color:var(--lf-rojo)}
+.lf-inv-det{font-size:12.5px;color:var(--lf-tinta-3)}
+.lf-inv-det > * + *::before{content:' · '}
+/* Caja: cuántas quedan, arriba a la derecha de la tarjeta. */
+.lf-serv-hay{position:absolute;top:7px;right:7px;z-index:1;max-width:calc(100% - 14px);padding:2px 8px;
+  border-radius:999px;background:var(--lf-panel);color:var(--lf-tinta-2);font-family:var(--lf-mono);font-size:11px;
+  font-weight:700;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 1px 4px rgba(0,0,0,.14);pointer-events:none}
+.lf-serv-hay.bajo{background:var(--lf-amb);color:#fff}
+.lf-serv-hay.agotado{background:var(--lf-rojo);color:#fff;font-family:var(--lf-font)}
+.lf-linea-hay,.lf-linea .lf-linea-hay{display:block;margin-top:4px;font-size:11.5px;font-weight:600;color:var(--lf-rojo)}
+.lf-promo-aviso.mal .ico{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+/* Producto: «Lleva existencias». */
+.lf-form > .lf-prod-inv{flex:0 0 100%;padding:12px 14px;border:1px solid var(--lf-linea);border-radius:var(--lf-r)}
+.lf-prod-inv .lf-sw span b{color:var(--lf-tinta);font-weight:600}
+.lf-prod-inv .lf-sw span small{color:var(--lf-tinta-4);font-size:12px}
+.lf-prod-inv .cuerpo{margin-top:12px;display:flex;flex-wrap:wrap;gap:14px 20px;align-items:flex-start}
+.lf-prod-inv-uni{display:flex;flex-direction:column;width:160px}
+.lf-prod-inv-tabla{border-collapse:separate;border-spacing:0 6px;margin-top:-6px}
+.lf-prod-inv-tabla th{font-size:12px;font-weight:600;color:var(--lf-tinta-2);padding:0 12px 0 0;text-align:left}
+.lf-prod-inv-tabla td{padding:0 12px 0 0;vertical-align:middle}
+.lf-prod-inv-tabla td.suc{font-size:13px;color:var(--lf-tinta-2);white-space:nowrap}
+.lf-prod-inv-tabla .form-control{width:130px}
+.lf-prod-inv-tabla b{font-size:14px;margin-right:8px}
+.lf-prod-inv-tabla b.mal{color:var(--lf-rojo)}
+.lf-prod-inv .pista{flex:0 0 100%;margin:0;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-serv:has(.lf-serv-hay) .lf-serv-promo,.lf-serv:has(.lf-serv-promo) .lf-serv-hay{max-width:calc(50% - 10px)}

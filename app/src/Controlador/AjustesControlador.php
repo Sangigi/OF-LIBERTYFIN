@@ -22,6 +22,7 @@ final class AjustesControlador
     const PESTANAS = [
         'empresa'      => 'Empresa',
         'caja'         => 'Caja',
+        'inventario'   => 'Inventario',
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
         'categorias'   => 'Categorías',
@@ -47,7 +48,7 @@ final class AjustesControlador
             'abrir'      => $editar > 0 || Peticion::texto('nuevo') !== '',
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
             'sucursales' => [], 'areas' => [], 'colaboradores' => [], 'categorias' => [],
-            'empresa' => null, 'integraciones' => [], 'caja' => [],
+            'empresa' => null, 'integraciones' => [], 'caja' => [], 'inventario' => [],
         ];
         if ($p === 'integraciones') {
             $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
@@ -68,6 +69,7 @@ final class AjustesControlador
             ];
         }
         if ($p === 'caja') $datos['caja'] = (new ConfigRepo($db))->caja();
+        if ($p === 'inventario') $datos['inventario'] = (new ConfigRepo($db))->inventario();
         if ($p === 'sucursales') $datos['sucursales'] = $repo->sucursales();
         if ($p === 'comisiones') {
             $datos['areas'] = $repo->areas();
@@ -106,6 +108,28 @@ final class AjustesControlador
             } catch (\Throwable $e) {
                 error_log('[LibertyFin] ajustes/caja: ' . $e->getMessage());
                 $this->volver('caja', 'No se pudo guardar.', 'error');
+            }
+        }
+
+        // Inventario: encenderlo y qué hacer si no alcanzan. Igual que Caja.
+        if ($que === 'inventario') {
+            try {
+                $cfg = new ConfigRepo($db);
+                $antes = $cfg->inventario();
+                $cfg->guardarInventario($_POST);
+                $ahora = $cfg->inventario();
+                $cambio = array_diff_assoc($ahora, $antes);
+                if ($cambio) {
+                    \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar', 'Inventario',
+                        json_encode(array_intersect_key($antes, $cambio)), json_encode($cambio));
+                }
+                // Encenderlo o apagarlo cambia el menú: se recarga para verlo.
+                $this->volver('inventario', 'Guardado.', 'ok', isset($cambio['activo']));
+            } catch (\InvalidArgumentException $e) {
+                $this->volver('inventario', $e->getMessage(), 'error');
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] ajustes/inventario: ' . $e->getMessage());
+                $this->volver('inventario', 'No se pudo guardar.', 'error');
             }
         }
 
@@ -260,12 +284,13 @@ final class AjustesControlador
      * método, la misma validación y el mismo mensaje: lo único que
      * cambia es el envoltorio.
      */
-    private function volver($pestana, $texto, $tipo)
+    /** @param bool $recargar  el cambio se ve fuera del formulario (el menú): recargar la página */
+    private function volver($pestana, $texto, $tipo, $recargar = false)
     {
         if ($this->porDetras()) {
             header('Content-Type: application/json; charset=utf-8');
             echo json_encode(['ok' => $tipo !== 'error', 'mensaje' => $texto,
-                              'tipo' => $tipo, 'pestana' => $pestana],
+                              'tipo' => $tipo, 'pestana' => $pestana, 'recargar' => (bool)$recargar],
                              JSON_UNESCAPED_UNICODE);
             exit;
         }

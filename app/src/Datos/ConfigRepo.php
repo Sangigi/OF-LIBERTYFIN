@@ -358,6 +358,43 @@ final class ConfigRepo extends Repo
         return $hecho;
     }
 
+    /**
+     * Inventario (Ajustes → Inventario). La primera opción de cada una es
+     * la que vale si nunca se tocó: APAGADO. Las empresas de servicios no
+     * deben ver existencias, y no se enteran de que existe.
+     */
+    const INVENTARIO = [
+        'activo'         => ['no'       => ['Apagado', 'Para empresas de servicios: nada de existencias en Caja ni en Productos.'],
+                             'si'       => ['Encendido', 'Los productos que lo lleven cuentan existencias; Caja las descuenta al cobrar.']],
+        'sin_existencia' => ['avisar'   => ['Avisar y dejar vender', 'Caja dice que no alcanza, pero cobra. La existencia queda en negativo hasta que registres la entrada.'],
+                             'bloquear' => ['No dejar vender', 'Caja no cobra más de lo que hay. Útil si las existencias siempre están al día.']],
+    ];
+
+    public function inventario()
+    {
+        $r = [];
+        foreach (self::INVENTARIO as $k => $ops) {
+            $v = (string)$this->valorDe('inventario.' . $k, '');
+            $r[$k] = isset($ops[$v]) ? $v : (string)key($ops);
+        }
+        return $r;
+    }
+
+    public function inventarioActivo() { return $this->inventario()['activo'] === 'si'; }
+
+    public function guardarInventario(array $d)
+    {
+        $hecho = 0;
+        foreach (self::INVENTARIO as $k => $ops) {
+            if (!isset($d[$k])) continue;
+            $v = (string)$d[$k];
+            if (!isset($ops[$v])) throw new \InvalidArgumentException('Esa opción no existe.');
+            $this->guardar('inventario.' . $k, $v);
+            $hecho++;
+        }
+        return $hecho;
+    }
+
     public function exigeAprobacion()
     {
         return $this->modoAprobacion() === 'revisar';

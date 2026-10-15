@@ -44,6 +44,7 @@ final class ServiciosControlador
             'abrir'     => $editar > 0 || Peticion::texto('nuevo') !== '',
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'vigentes'  => $this->cuantasVigentes($db),
+            'inventario'=> $this->inventarioDe($db, $editar),
         ]);
         unset($_SESSION['lf_aviso']);
     }
@@ -73,6 +74,7 @@ final class ServiciosControlador
             // La imagen va aparte de los datos: si falla, el servicio ya
             // quedó guardado y solo se avisa de la imagen.
             $msg .= $this->imagen($repo, $id);
+            $msg .= $this->guardarInventario($db, $id);
             $this->volver($msg, 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
@@ -109,6 +111,44 @@ final class ServiciosControlador
         } catch (\Throwable $e) {
             error_log('[LibertyFin] imagen de servicio: ' . $e->getMessage());
             return ' Pero la imagen no se pudo guardar.';
+        }
+    }
+
+    /**
+     * Lo de inventario del formulario, o null si Inventario está apagado
+     * (entonces el formulario ni lo menciona).
+     */
+    private function inventarioDe($db, $productoId)
+    {
+        try {
+            $inv = new \LibertyFin\Servicio\Inventario($db);
+            if (!$inv->activo()) return null;
+            if ($productoId) return ['sucursales' => $inv->deProducto($productoId)];
+            $r = [];
+            foreach ($inv->sucursales() as $s) {
+                $r[(int)$s['id']] = ['nombre' => $s['nombre'], 'existencia' => 0.0, 'minimo' => 0.0, 'puedeInicial' => true];
+            }
+            return ['sucursales' => $r];
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] inventario en Productos: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /** Guarda lo de inventario del producto. Devuelve un texto para el aviso. */
+    private function guardarInventario($db, $id)
+    {
+        if (!array_key_exists('lleva_inventario', $_POST) && empty($_POST['inv_en_form'])) return '';
+        try {
+            $inv = new \LibertyFin\Servicio\Inventario($db);
+            if (!$inv->activo()) return '';
+            $n = $inv->guardarProducto($id, $_POST);
+            return $n ? ' Existencia inicial registrada.' : '';
+        } catch (\InvalidArgumentException $e) {
+            return ' Pero el inventario no se guardó: ' . $e->getMessage();
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] inventario del producto ' . $id . ': ' . $e->getMessage());
+            return ' Pero el inventario no se pudo guardar.';
         }
     }
 

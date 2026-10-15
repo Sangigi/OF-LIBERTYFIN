@@ -101,6 +101,74 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
         </div>
       </div>
     </div>
+    <?php /* ── INVENTARIO ──
+             Solo con Inventario encendido (Ajustes). Un servicio deja la
+             casilla apagada y no ve nada más. La existencia se captura una
+             sola vez; después cambia con ventas, entradas, salidas y
+             conteos, para que cada pieza tenga su rastro. */
+    if (!empty($inventario)):
+      $lleva = !empty($e['lleva_inventario']);
+      $sucs  = $inventario['sucursales'];
+      $uniE  = strtolower(trim((string)($e['unidad_medida'] ?? 'pieza')));
+    ?>
+    <div class="lf-prod-inv">
+      <input type="hidden" name="inv_en_form" value="1">
+      <label class="lf-sw">
+        <input type="checkbox" name="lleva_inventario" value="1" id="pLleva" <?= $lleva ? 'checked' : '' ?>>
+        <i aria-hidden="true"></i>
+        <span><b>Lleva existencias</b> <small>Es un producto físico: Caja descuenta las piezas al venderlo.</small></span>
+      </label>
+      <div class="cuerpo" id="pInv" <?= $lleva ? '' : 'hidden' ?>>
+        <div class="lf-prod-inv-uni">
+          <label class="form-label" for="pUnidad">Se cuenta por</label>
+          <select class="form-select" name="unidad_medida" id="pUnidad">
+            <?php foreach (\LibertyFin\Servicio\Inventario::UNIDADES as $k => $u): ?>
+              <option value="<?= $k ?>" <?= $uniE === $k ? 'selected' : '' ?>><?= P::e($u[0]) ?></option>
+            <?php endforeach; ?>
+            <?php if ($uniE !== '' && !isset(\LibertyFin\Servicio\Inventario::UNIDADES[$uniE])): /* la del sistema anterior: se respeta */ ?>
+              <option value="<?= P::e($e['unidad_medida']) ?>" selected><?= P::e($e['unidad_medida']) ?></option>
+            <?php endif; ?>
+          </select>
+        </div>
+        <table class="lf-prod-inv-tabla">
+          <thead><tr>
+            <?php if (count($sucs) > 1): ?><th>Sucursal</th><?php endif; ?>
+            <th>Existencia</th><th>Avisar cuando queden</th>
+          </tr></thead>
+          <tbody>
+          <?php foreach ($sucs as $sid => $s): ?>
+            <tr>
+              <?php if (count($sucs) > 1): ?><td class="suc"><?= P::e($s['nombre']) ?></td><?php endif; ?>
+              <td>
+                <?php if ($s['puedeInicial']): ?>
+                  <input class="form-control lf-mono" type="number" name="inicial[<?= (int)$sid ?>]" min="0" step="0.001"
+                         placeholder="0" aria-label="Existencia inicial<?= count($sucs) > 1 ? ' en ' . P::e($s['nombre']) : '' ?>">
+                <?php else: ?>
+                  <b class="lf-mono<?= $s['existencia'] <= 0 ? ' mal' : '' ?>"><?= P::e(\LibertyFin\Servicio\Inventario::conUnidad($s['existencia'], $uniE)) ?></b>
+                  <a class="lf-link" href="/inventario?s=<?= (int)$sid ?>&amp;mover=entrada&amp;producto=<?= (int)($e['id'] ?? 0) ?>#invMover">Registrar entrada</a>
+                <?php endif; ?>
+              </td>
+              <td>
+                <input class="form-control lf-mono" type="number" name="minimo[<?= (int)$sid ?>]" min="0" step="0.001"
+                       value="<?= $s['minimo'] > 0 ? P::e(\LibertyFin\Servicio\Inventario::num($s['minimo'])) : '' ?>"
+                       placeholder="Sin aviso" aria-label="Mínimo<?= count($sucs) > 1 ? ' en ' . P::e($s['nombre']) : '' ?>">
+              </td>
+            </tr>
+          <?php endforeach; ?>
+          </tbody>
+        </table>
+        <p class="pista">La existencia inicial se escribe una sola vez. Después cambia sola con las ventas,
+          y con las entradas, salidas y conteos de <a href="/inventario">Inventario</a>.</p>
+      </div>
+    </div>
+    <script>
+    (function(){
+      var c = document.getElementById('pLleva'), b = document.getElementById('pInv');
+      if (c && b) c.addEventListener('change', function(){ b.hidden = !c.checked; });
+    })();
+    </script>
+    <?php endif; ?>
+
     <?php /* Lo de vez en cuando, plegado. La descripción ya se guardaba,
              pero no había campo: al editar un producto se borraba la que
              traía del sistema anterior. */ ?>

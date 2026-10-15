@@ -38,6 +38,9 @@ final class CajaControlador
             // Qué productos tienen promoción: la insignia de la tarjeta y el
             // aviso al agregarlo, antes de que el cajero cobre sin saberlo.
             'promoCaja' => \LibertyFin\Servicio\Promociones::paraCaja($vig, $servicios),
+            // Existencias de esta sucursal (solo con Inventario encendido):
+            // la tarjeta dice cuántas quedan y Caja avisa si no alcanzan.
+            'inventario'=> $this->inventarioCaja($db),
             // Cómo arranca cada venta: anticipo e IVA (Ajustes → Caja).
             'cajaCfg'   => (new \LibertyFin\Datos\ConfigRepo($db))->caja(),
             'titulo'    => 'Caja',
@@ -69,6 +72,22 @@ final class CajaControlador
     }
 
     /** Búsqueda de clientes para el ticket. Devuelve JSON. */
+    /**
+     * Lo que Caja necesita del inventario, o null si está apagado. Si
+     * falla (la base no está al día), Caja vende igual, sin existencias.
+     */
+    private function inventarioCaja($db)
+    {
+        try {
+            $inv = new \LibertyFin\Servicio\Inventario($db);
+            if (!$inv->activo()) return null;
+            return ['existencias' => $inv->existencias($inv->sucursalActual()), 'bloquea' => $inv->bloquea()];
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] inventario en Caja: ' . $e->getMessage());
+            return null;
+        }
+    }
+
     public function clientes()
     {
         $db = Conexion::de($_SESSION['empresa_db']);
@@ -411,6 +430,8 @@ final class CajaControlador
             $r = (new \LibertyFin\Servicio\AmpliarVenta($db))
                  ->agregar($ventaId, $ticket, [
                      'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
+                     // Las existencias salen de la sucursal de quien agrega.
+                     'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
                  ]);
             if ($calc) $this->anotarPromos($db, $r['id'], $calc);
         } catch (\InvalidArgumentException $e) {

@@ -72,6 +72,13 @@ final class RegistrarVenta
                 ]);
             }
 
+            // ── Existencias ──
+            // Dentro de la misma transacción: una venta sin su salida de
+            // inventario (o al revés) es justo lo que luego no cuadra. Con
+            // Inventario apagado no hace nada; con «No dejar vender» y sin
+            // piezas, lanza y la venta no se guarda.
+            (new Inventario($this->db))->descontarVenta($ventaId, $ticket->lineas(), $ctx['sucursal_id'] ?? null);
+
             // ── El área de la venta ──
             //
             // Se guardaba vacía: el INSERT de arriba nunca la escribía, y la

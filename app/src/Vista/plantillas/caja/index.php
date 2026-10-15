@@ -113,6 +113,10 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         $desc = trim((string)($s['descripcion'] ?? ''));
         if ($desc !== '') $titulo .= "\n" . (mb_strlen($desc) > 220 ? mb_substr($desc, 0, 220) . '…' : $desc);
         foreach ($susPromos as $p) $titulo .= "\nPromoción: " . $p['nombre'] . ' (' . $p['texto'] . ')';
+        // Existencias: solo con Inventario encendido y si el producto las lleva.
+        $ex = $inventario['existencias'][(int)$s['id']] ?? null;
+        $hay = $ex !== null ? (float)$ex['existencia'] : null;
+        if ($hay !== null) $titulo .= "\n" . ($hay > 0 ? 'Quedan ' . \LibertyFin\Servicio\Inventario::conUnidad($hay, $s['unidad_medida'] ?? '') : 'Agotado');
       ?>
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= $susPromos ? ' con-promo' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
@@ -120,7 +124,12 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
                 title="<?= P::e($titulo) ?>"
+                <?php if ($hay !== null): ?>data-hay="<?= number_format($hay, 3, '.', '') ?>" data-u="<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'] ?? '')) ?>"<?php endif; ?>
                 data-precio="<?= (float)$s['precio'] ?>">
+          <?php if ($hay !== null): ?>
+            <span class="lf-serv-hay<?= $hay <= 0 ? ' agotado' : ($hay <= (float)$ex['minimo'] ? ' bajo' : '') ?>">
+              <?= $hay > 0 ? P::e(\LibertyFin\Servicio\Inventario::conUnidad($hay, $s['unidad_medida'] ?? '')) : 'Agotado' ?></span>
+          <?php endif; ?>
           <?php if ($susPromos): ?>
             <span class="lf-serv-promo"><?= P::e($susPromos[0]['etiqueta']) ?><?= count($susPromos) > 1
                 ? ' +' . (count($susPromos) - 1) : '' ?></span>
@@ -537,7 +546,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         +   '<button type="button" data-menos="' + i + '" aria-label="Uno menos"'
         +     (l.cantidad <= 1 ? ' disabled' : '') + '>−</button>'
         +   '<span class="n">' + l.cantidad + '</span>'
-        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span></div>'
+        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>'
+        + pistaExistencia(l) + '</div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
         + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>'
@@ -764,10 +774,38 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   ?>
   var PC = <?= $pcJson ?: 'null' ?> || { promos: {}, productos: {}, todo: [] };
   var ICO_PROMO = <?= json_encode(W::icono('pct', '14px')) ?>;
-  var CARTA = {};   // id → nombre y precio de catálogo
+  var ICO_ALERTA = <?= json_encode(W::icono('alerta', '14px')) ?>;
+  var CARTA = {};   // id → nombre, precio de catálogo y, con inventario, cuántas hay
   document.querySelectorAll('.lf-serv').forEach(function(b){
-    CARTA[+b.dataset.id] = { nombre: b.dataset.nombre, precio: +b.dataset.precio };
+    CARTA[+b.dataset.id] = { nombre: b.dataset.nombre, precio: +b.dataset.precio,
+                             hay: b.dataset.hay !== undefined ? parseFloat(b.dataset.hay) : null,
+                             u: b.dataset.u || '' };
   });
+
+  /* ── EXISTENCIAS (solo con Inventario encendido) ──
+     Con «No dejar vender», no se agrega más de lo que hay; con «Avisar»,
+     se agrega y el renglón dice cuántas quedan. Al cobrar, el servidor
+     vuelve a revisar: dos cajas pudieron vender la última. */
+  var INV_BLOQUEA = <?= !empty($inventario['bloquea']) ? 'true' : 'false' ?>;
+  function numInv(n){ return (Math.round(n * 1000) / 1000).toLocaleString('es-MX', {maximumFractionDigits:3}); }
+  function enTicket(id){ return lineas.reduce(function(a, l){ return a + (l.id === id ? l.cantidad : 0); }, 0); }
+  /* ¿Se puede agregar una más? Si no, avisa y dice que no. */
+  function cabeUnaMas(id){
+    var c = CARTA[id];
+    if (!c || c.hay === null || !INV_BLOQUEA) return true;
+    if (enTicket(id) + 1 <= c.hay + 0.0005) return true;
+    mostrarAviso('<b>' + escP(c.nombre) + ': ' + (c.hay > 0 ? 'no hay más' : 'agotado') + '</b>'
+      + '<small>' + (c.hay > 0 ? 'Quedan ' + numInv(c.hay) + (c.u ? ' ' + escP(c.u) : '') + ' y ya están en el ticket.' : 'No quedan existencias en esta sucursal.')
+      + '</small><small>Registra la entrada en Inventario para poder venderlo.</small>', 'mal');
+    return false;
+  }
+  /* Lo que se dice en el renglón cuando no alcanza (modo «Avisar»). */
+  function pistaExistencia(l){
+    var c = CARTA[l.id];
+    if (!c || c.hay === null || l.cantidad <= c.hay + 0.0005) return '';
+    return '<small class="lf-linea-hay">' + (c.hay > 0 ? 'Solo quedan ' + numInv(c.hay) + (c.u ? ' ' + escP(c.u) : '') : 'Agotado en esta sucursal')
+      + '</small>';
+  }
 
   function escP(t){ var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
   function mayus(t){ return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
@@ -867,16 +905,20 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     if (!ids.length) return;
     var l = lineas.filter(function(x){ return x.id === id; })[0];
     var p = PC.promos[ids[0]], f = falta(p, l);
+    mostrarAviso('<b>' + escP(CARTA[id] ? CARTA[id].nombre : 'Este producto') + ' tiene promoción</b>'
+      + '<small><strong>' + escP(p.nombre) + ':</strong> ' + escP(p.texto) + '.</small>'
+      + '<small class="' + (f ? 'falta' : 'ok') + '">' + escP(f ? mayus(f) + '.' : 'Se aplica sola en el ticket.') + '</small>'
+      + (ids.length > 1 ? '<small>Y ' + (ids.length - 1) + ' promoción' + (ids.length > 2 ? 'es' : '') + ' más; se aplica la que más descuenta.</small>' : ''));
+  }
+
+  /* El aviso flotante de Caja (promoción, existencias). Uno a la vez. */
+  function mostrarAviso(html, clase){
     var viejo = document.querySelector('.lf-promo-aviso');
     if (viejo) viejo.remove();
     var t = document.createElement('div');
-    t.className = 'lf-promo-aviso';
-    t.setAttribute('role', 'status');
-    t.innerHTML = '<span class="ico">' + ICO_PROMO + '</span><div class="txt">'
-      + '<b>' + escP(CARTA[id] ? CARTA[id].nombre : 'Este producto') + ' tiene promoción</b>'
-      + '<small><strong>' + escP(p.nombre) + ':</strong> ' + escP(p.texto) + '.</small>'
-      + '<small class="' + (f ? 'falta' : 'ok') + '">' + escP(f ? mayus(f) + '.' : 'Se aplica sola en el ticket.') + '</small>'
-      + (ids.length > 1 ? '<small>Y ' + (ids.length - 1) + ' promoción' + (ids.length > 2 ? 'es' : '') + ' más; se aplica la que más descuenta.</small>' : '')
+    t.className = 'lf-promo-aviso' + (clase ? ' ' + clase : '');
+    t.setAttribute('role', clase === 'mal' ? 'alert' : 'status');
+    t.innerHTML = '<span class="ico">' + (clase === 'mal' ? ICO_ALERTA : ICO_PROMO) + '</span><div class="txt">' + html
       + '</div><button type="button" class="x" aria-label="Cerrar">&times;</button>';
     document.body.appendChild(t);
     var fuera = function(){ t.classList.add('va'); setTimeout(function(){ t.remove(); }, 350); };
@@ -1133,6 +1175,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   document.querySelectorAll('.lf-serv').forEach(function(b){
     b.addEventListener('click', function(){
       var id = +b.dataset.id;
+      if (!cabeUnaMas(id)) return;
       var y = lineas.filter(function(l){ return l.id === id; })[0];
       if (y) y.cantidad++;
       else lineas.push({id:id, nombre:b.dataset.nombre, precio:+b.dataset.precio, cantidad:1});
@@ -1146,6 +1189,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     if (mas || menos) {
       var l = lineas[+(mas || menos).dataset[mas ? 'mas' : 'menos']];
       if (!l) return;
+      if (mas && !cabeUnaMas(l.id)) return;
       l.cantidad = Math.max(1, l.cantidad + (mas ? 1 : -1));
       pintar();
       return;

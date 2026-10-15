@@ -49,9 +49,26 @@ final class PanelControlador
             'viejo'     => $viejo,
             'comisiones'=> $comis,
             'movimientos'=> $movs,
+            'faltantes' => self::faltantes($db),
             'desde'     => $desde,
             'hasta'     => $hasta,
         ]);
+    }
+
+    /**
+     * Cuántos productos se acabaron o están bajo su mínimo, en la sucursal
+     * de quien entra. Null si Inventario está apagado o no le toca verlo.
+     */
+    private static function faltantes($db)
+    {
+        if (!\LibertyFin\Dominio\Permisos::puede('ver.inventario')) return null;
+        try {
+            $inv = new \LibertyFin\Servicio\Inventario($db);
+            if (!$inv->activo()) return null;
+            return $inv->resumen($inv->sucursalActual());
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 
     /**

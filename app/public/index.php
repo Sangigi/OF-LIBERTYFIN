@@ -146,6 +146,8 @@ $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 
 $r->post('/servicios/promociones/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardarPromocion']);
 $r->post('/servicios/promociones/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternarPromocion']);
 $r->post('/servicios/promociones/borrar',   ['LibertyFin\Controlador\ServiciosControlador', 'borrarPromocion']);
+$r->get('/inventario',         ['LibertyFin\Controlador\InventarioControlador', 'index']);
+$r->post('/inventario/mover',  ['LibertyFin\Controlador\InventarioControlador', 'mover']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
 // Ligas de pago: solo con credenciales de SPEI.
 if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
@@ -303,6 +305,8 @@ $permisos = [
   '/servicios/promociones/guardar'  => 'editar.servicios',
   '/servicios/promociones/alternar' => 'editar.servicios',
   '/servicios/promociones/borrar'   => 'editar.servicios',
+  '/inventario'             => 'ver.inventario',
+  '/inventario/mover'       => 'editar.inventario',
   '/reportes'               => 'ver.reportes',
   '/reportes/excel'         => 'ver.reportes',
   '/reportes/imprimir'      => 'ver.reportes',

@@ -96,6 +96,10 @@ final class AmpliarVenta
                 ]);
             }
 
+            // Lo agregado también sale del inventario, de la sucursal de
+            // quien lo agrega (ver RegistrarVenta).
+            (new Inventario($this->db))->descontarVenta($ventaId, $ticket->lineas(), $ctx['sucursal_id'] ?? null);
+
             if ($t['gastos'] > 0) {
                 $this->db->prepare("
                     INSERT INTO gastos (venta_id, concepto, monto, tipo, categoria, fecha)

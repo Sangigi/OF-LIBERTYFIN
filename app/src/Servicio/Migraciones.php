@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 20;
+    const VERSION = 21;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -838,6 +838,84 @@ final class Migraciones
         }
     }
 
+    /**
+     * Inventario: qué productos llevan existencias y cada movimiento.
+     *
+     * Las existencias por sucursal ya tenían tabla (`producto_sucursal`,
+     * del sistema anterior); lo que faltaba era saber cuáles productos
+     * las llevan —un servicio no— y el rastro de cada cambio: sin él, una
+     * existencia que no cuadra no se puede explicar.
+     *
+     * Los productos que ya traían existencias del sistema anterior quedan
+     * marcados: así, al encender Inventario, no empiezan de cero.
+     */
+    private static function v21(PDO $db)
+    {
+        if (!self::hayColumna($db, 'productos', 'lleva_inventario')) {
+            $db->exec("ALTER TABLE productos ADD COLUMN lleva_inventario TINYINT(1) NOT NULL DEFAULT 0");
+            try {
+                $db->exec("
+                    UPDATE productos SET lleva_inventario = 1
+                    WHERE COALESCE(stock,0) <> 0
+                       OR id IN (SELECT producto_id FROM producto_sucursal WHERE COALESCE(stock,0) <> 0)");
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] migración 21 · marcar productos: ' . $e->getMessage());
+            }
+        }
+
+        if (!self::hayTabla($db, 'producto_sucursal')) {
+            $db->exec("
+                CREATE TABLE producto_sucursal (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    producto_id INT NOT NULL,
+                    sucursal_id INT NOT NULL,
+                    stock DECIMAL(10,3) DEFAULT 0,
+                    stock_minimo DECIMAL(10,3) DEFAULT 0,
+                    activo TINYINT DEFAULT 1,
+                    fecha_creacion TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE KEY unique_producto_sucursal (producto_id, sucursal_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
+
+        // El stock que el sistema anterior guardaba solo en `productos`
+        // (sin fila por sucursal) pasa a la matriz: Inventario lee por
+        // sucursal y, sin esto, esas piezas no aparecerían.
+        try {
+            $db->exec("
+                INSERT INTO producto_sucursal (producto_id, sucursal_id, stock, stock_minimo, activo)
+                SELECT p.id,
+                       (SELECT s.id FROM sucursales s ORDER BY COALESCE(s.es_matriz,0) DESC, s.id LIMIT 1),
+                       p.stock, COALESCE(p.stock_minimo,0), 1
+                FROM productos p
+                WHERE p.lleva_inventario = 1 AND COALESCE(p.stock,0) <> 0
+                  AND NOT EXISTS (SELECT 1 FROM producto_sucursal ps WHERE ps.producto_id = p.id)
+                  AND EXISTS (SELECT 1 FROM sucursales)");
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] migración 21 · stock a la matriz: ' . $e->getMessage());
+        }
+
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_inventario_movimientos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                producto_id INT NOT NULL,
+                sucursal_id INT NOT NULL,
+                tipo VARCHAR(12) NOT NULL,
+                cantidad DECIMAL(12,3) NOT NULL,
+                existencia DECIMAL(12,3) NOT NULL,
+                costo DECIMAL(12,2) NULL DEFAULT NULL,
+                proveedor_id INT NULL DEFAULT NULL,
+                proveedor VARCHAR(150) NULL DEFAULT NULL,
+                nota VARCHAR(255) NULL DEFAULT NULL,
+                venta_id INT NULL DEFAULT NULL,
+                usuario_id INT NULL DEFAULT NULL,
+                usuario_nombre VARCHAR(100) NULL DEFAULT NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_im_prod (producto_id, sucursal_id, creado_en),
+                KEY ix_im_venta (venta_id),
+                KEY ix_im_fecha (creado_en)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -859,5 +937,6 @@ final class Migraciones
         18 => 'Historial de «Recalcular comisiones», para poder deshacerlo',
         19 => 'Promociones: descuentos, precios especiales, paquetes y códigos',
         20 => 'Columnas que les faltaban a las empresas nuevas (área e IVA de la venta, complemento de pago)',
+        21 => 'Inventario: productos con existencias y bitácora de movimientos',
     ];
 }
