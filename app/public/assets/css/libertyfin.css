@@ -4920,3 +4920,14 @@ tr.lf-apagado td{opacity:.6}
 .lf-serv.on{border-color:var(--lf-brand);background:var(--lf-brand-glow);box-shadow:0 0 0 3px var(--lf-brand-ring)}
 button.lf-pill{font-family:inherit;cursor:pointer}
 .lf-rc-catalogo .lf-grid-serv{padding-top:4px}
+/* Tarjetas parejas también con logos: la imagen flota dentro de su zona y
+   no puede empujarla. Un logo alto o enorme ya no agranda su tarjeta (y,
+   con ella, toda la fila); la zona mide lo mismo que la del ícono. */
+.lf-serv .e.foto{position:relative;padding:0;overflow:hidden}
+.lf-serv .e.foto img{position:absolute;top:12px;left:14px;width:calc(100% - 28px);height:calc(100% - 24px);
+  max-width:none;max-height:none;object-fit:contain}
+.lf-serv small{line-height:1.4;min-height:1.4em}
+/* Módulos: el aviso de guardado ya no va dentro de la tarjeta (se encimaba
+   con la descripción); sale arriba con lfAvisar. Sin JavaScript no aplica:
+   ahí la página se recarga y el aviso sale arriba de la pestaña. */
+.lf-mod [data-aviso]{display:none!important}

@@ -350,6 +350,9 @@ elseif ($pestana === 'modulos'):
   document.addEventListener('lf:guardado', function (e) {
     var f = e.detail.form, d = e.detail.datos;
     if (!f || !f.classList.contains('lf-mod')) return;
+    /* El aviso va arriba, flotando: dentro de la tarjeta se encimaba con
+       la descripción. El interruptor ya dice cómo quedó. */
+    if (window.lfAvisar && d.mensaje) window.lfAvisar(d.mensaje, d.ok ? 'ok' : 'error');
     if (d.ok && d.modulos) {
       Object.keys(d.modulos).forEach(function (k) { var t = tarjeta(k); if (t) poner(t, !!d.modulos[k]); });
     } else if (!d.ok) {
