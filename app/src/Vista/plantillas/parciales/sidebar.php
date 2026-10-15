@@ -24,7 +24,7 @@ $deEmpresa = [
   ['grupo' => 'Operación'],
   ['ruta' => '/',           'icono' => 'panel',   'texto' => 'Panel',         'p' => 'ver.panel'],
   ['ruta' => '/caja',       'icono' => 'caja',    'texto' => 'Caja',          'p' => 'cobrar'],
-  // Los módulos (ServicioModulos): solo si la empresa los tiene activos.
+  // Los módulos (Servicio\Modulos): solo si la empresa los tiene activos.
   ['ruta' => '/agenda',     'icono' => 'agenda',   'texto' => 'Agenda',        'p' => 'ver.agenda',       'mod' => 'agenda'],
   ['ruta' => '/ventas',     'icono' => 'venta',   'texto' => 'Ventas',        'p' => 'ver.ventas'],
   ['ruta' => '/clientes',   'icono' => 'cliente', 'texto' => 'Clientes',      'p' => 'ver.clientes'],
@@ -88,7 +88,7 @@ try {
     }
     // Los módulos: al revés que las secciones, nacen apagados y la empresa
     // los enciende (Ajustes → Módulos). Comisiones también responde aquí.
-    $modulos = (new LibertyFinServicioModulos($cfg))->activos();
+    $modulos = (new \LibertyFin\Servicio\Modulos($cfg))->activos();
 } catch (\Throwable $e) { /* sin tabla de config, todo encendido */ }
 
 $menu = []; $pendiente = null;
