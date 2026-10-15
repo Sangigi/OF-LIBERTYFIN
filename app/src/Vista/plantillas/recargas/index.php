@@ -105,11 +105,6 @@ $total = (int)($totalCatalogo ?? count($productos));
         <?= W::icono('buscar','15px') ?>
         <input type="search" id="rcBuscar" placeholder="Nombre, compañía o ID" autocomplete="off">
       </div>
-      <form method="post" action="/recargas/catalogo" style="margin:0" id="formBajar">
-        <input type="hidden" name="token" value="<?= P::e($token) ?>">
-        <button class="btn btn-primary btn-sm" type="submit" id="btnBajar"
-                title="Vuelve a pedir el catálogo a Emida. Agrega y actualiza; no quita nada.">Bajar catálogo</button>
-      </form>
     </header>
 
     <?php if ($categorias): ?>
@@ -314,10 +309,6 @@ $total = (int)($totalCatalogo ?? count($productos));
   $('rcGrid').addEventListener('click', function (e) {
     var b = e.target.closest('.lf-rc');
     if (b) elegir(b);
-  });
-
-  $('formBajar').addEventListener('submit', function () {
-    var b = $('btnBajar'); b.disabled = true; b.textContent = 'Bajando…';
   });
 
   $('formVenta').addEventListener('submit', function(e){
