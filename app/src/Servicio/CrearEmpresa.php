@@ -233,6 +233,14 @@ final class CrearEmpresa
         ")->execute([$usuario, password_hash($clave, PASSWORD_DEFAULT),
                      $s['nombre_contacto'], $s['email_admin'], $sucursal]);
 
+        // Estrena: su administrador verá primero las preguntas de la
+        // configuración inicial, con lo que dijo en el registro ya puesto.
+        try {
+            Arranque::marcarPendiente($db, $s['giro_comercial'] ?? null, $s['empleados'] ?? null);
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] arranque pendiente: ' . $e->getMessage());
+        }
+
         // Y el renglón en empresas, ya activa.
         $this->principal->prepare("
             INSERT INTO empresas

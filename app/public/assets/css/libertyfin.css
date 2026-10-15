@@ -4410,3 +4410,191 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-usr-rol:empty{display:none}
 .lf-usr-rol b{color:var(--lf-tinta-2);font-weight:600}
 .lf-serv .p:has(.por){white-space:nowrap}
+/* ══════════════════════════════════════════════════════
+   BIENVENIDA · LA CONFIGURACIÓN INICIAL
+   Una pregunta por pantalla, tarjetas ilustradas y, al lado,
+   la vista previa del menú que se arma con las respuestas.
+   ══════════════════════════════════════════════════════ */
+body.lf-bv-cuerpo{margin:0;min-height:100vh;min-height:100dvh;background:var(--lf-lienzo)}
+.lf-bv{min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;
+  background:radial-gradient(1200px 600px at 100% 0%, color-mix(in srgb, var(--lf-brand) 10%, transparent), transparent 60%)}
+.lf-bv-cab{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:18px;padding:16px clamp(18px,4vw,48px);
+  background:color-mix(in srgb, var(--lf-lienzo) 86%, transparent);backdrop-filter:blur(8px)}
+.lf-bv-marca{font-size:19px;font-weight:800;letter-spacing:-.6px;color:var(--lf-brand-2)}
+.lf-bv-avance{flex:1;max-width:520px;height:6px;margin:0 auto;border-radius:999px;background:var(--lf-linea);overflow:hidden}
+.lf-bv-avance i{display:block;height:100%;width:12%;border-radius:inherit;background:var(--lf-brand);transition:width .35s var(--lf-suave, ease)}
+.lf-bv-num{font-size:12.5px;font-weight:600;color:var(--lf-tinta-3);white-space:nowrap}
+.lf-bv-saltar{border:0;background:none;padding:6px 4px;font-size:13px;font-weight:600;color:var(--lf-tinta-3);
+  text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.lf-bv-saltar:hover{color:var(--lf-tinta)}
+.lf-bv-form{flex:1;display:flex;flex-direction:column}
+.lf-bv-grid{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:clamp(24px,4vw,64px);
+  width:100%;max-width:1180px;margin:0 auto;padding:clamp(18px,4vh,44px) clamp(18px,4vw,48px)}
+/* Los pasos */
+.lf-bv.js .paso{display:none}
+.lf-bv.js .paso.on{display:block;animation:lf-bv-entra .35s var(--lf-suave, ease)}
+@keyframes lf-bv-entra{from{opacity:0;transform:translateY(10px)}}
+.lf-bv:not(.js) .paso{margin-bottom:48px}
+.paso.falta .lf-bv-tarjetas{animation:lf-bv-sacude .4s}
+@keyframes lf-bv-sacude{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+.lf-bv .eyebrow{margin:0;font-size:13px;font-weight:700;letter-spacing:.3px;color:var(--lf-brand-2)}
+.lf-bv h1{margin:8px 0 0;font-size:clamp(26px,3.2vw,36px);line-height:1.12;font-weight:800;letter-spacing:-1px;color:var(--lf-tinta)}
+.lf-bv .sub{margin:10px 0 0;max-width:620px;font-size:15px;line-height:1.55;color:var(--lf-tinta-3)}
+.lf-bv .lf-aviso{margin-bottom:18px}
+/* Las tarjetas */
+.lf-bv-tarjetas{display:grid;gap:14px;margin-top:28px}
+.lf-bv-tarjetas.c3{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.lf-bv-tarjetas.c2{grid-template-columns:repeat(auto-fill,minmax(250px,1fr))}
+.lf-bv-tarjetas .tj{position:relative;display:flex;flex-direction:column;align-items:flex-start;gap:4px;margin:0;
+  padding:18px 18px 16px;border:1.5px solid var(--lf-linea);border-radius:18px;background:var(--lf-sup);cursor:pointer;
+  transition:border-color .15s, box-shadow .15s, transform .15s}
+.lf-bv-tarjetas .tj:hover{border-color:color-mix(in srgb, var(--lf-brand) 55%, var(--lf-linea));transform:translateY(-2px);box-shadow:var(--lf-s2)}
+.lf-bv-tarjetas .tj input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.lf-bv-tarjetas .ilu{display:grid;place-items:center;width:58px;height:58px;margin-bottom:10px;border-radius:16px;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-bv-tarjetas .ilu svg{width:32px;height:32px}
+.lf-bv-tarjetas .ilu.txt b{font-size:19px;font-weight:800;letter-spacing:-.5px;color:var(--lf-brand-2)}
+.lf-bv-tarjetas .tj > b{font-size:15.5px;font-weight:700;color:var(--lf-tinta)}
+.lf-bv-tarjetas .tj > small{font-size:13px;line-height:1.45;color:var(--lf-tinta-3)}
+.lf-bv-tarjetas .ok{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:50%;
+  border:1.5px solid var(--lf-linea-f);transition:all .15s}
+.lf-bv-tarjetas .tj:has(input:checked){border-color:var(--lf-brand);
+  box-shadow:0 0 0 4px var(--lf-brand-ring), var(--lf-s2)}
+.lf-bv-tarjetas .tj:has(input:checked) .ok{border-color:var(--lf-brand);background:var(--lf-brand)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat}
+.lf-bv-tarjetas .tj:has(input:checked) .ilu{background:var(--lf-brand);color:#fff}
+.lf-bv-tarjetas .tj:has(input:checked) .ilu.txt b{color:#fff}
+.lf-bv-tarjetas .tj:has(input:focus-visible){box-shadow:0 0 0 4px var(--lf-brand-ring)}
+/* Próximamente: se ve que viene, no se puede elegir. */
+.lf-bv-tarjetas .tj.prox{cursor:default;border-style:dashed;background:transparent}
+.lf-bv-tarjetas .tj.prox:hover{transform:none;box-shadow:none;border-color:var(--lf-linea)}
+.lf-bv-tarjetas .tj.prox .ilu{background:var(--lf-vidrio);color:var(--lf-tinta-4)}
+.lf-bv-tarjetas .tj.prox > b{color:var(--lf-tinta-3)}
+.lf-bv-tarjetas .tj.prox em{position:absolute;top:14px;right:14px;padding:3px 9px;border-radius:999px;font-style:normal;
+  font-size:11px;font-weight:700;background:var(--lf-amb-soft);color:var(--lf-amb)}
+/* Áreas */
+.lf-bv-areas{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px}
+.lf-bv-areas .chip{position:relative;margin:0;cursor:pointer}
+.lf-bv-areas .chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.lf-bv-areas .chip span{display:inline-flex;align-items:center;gap:8px;height:42px;padding:0 16px;border-radius:999px;
+  border:1.5px solid var(--lf-linea);background:var(--lf-sup);font-size:14px;font-weight:600;color:var(--lf-tinta-3);
+  text-decoration:line-through;transition:all .15s}
+.lf-bv-areas .chip input:checked + span{border-color:var(--lf-brand);background:var(--lf-brand-soft);color:var(--lf-brand-2);text-decoration:none}
+.lf-bv-areas .chip input:checked + span::before{content:'✓';font-weight:800}
+.lf-bv-areas .vacio{margin:0;font-size:14px;color:var(--lf-tinta-3)}
+.lf-bv-otra{display:flex;gap:10px;max-width:480px;margin-top:18px}
+.lf-bv-otra .form-control{flex:1;height:44px}
+.lf-bv .ya{margin:14px 0 0;font-size:13px;color:var(--lf-tinta-4)}
+/* La marca */
+.lf-bv-marca-grid{display:grid;grid-template-columns:minmax(0,260px) minmax(0,1fr);gap:22px;margin-top:28px;align-items:start}
+.lf-bv-logo{position:relative;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;margin:0;
+  padding:24px 18px;border:1.5px dashed var(--lf-linea-f);border-radius:18px;background:var(--lf-sup);cursor:pointer}
+.lf-bv-logo:hover{border-color:var(--lf-brand)}
+.lf-bv-logo input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.lf-bv-logo .vista{display:grid;place-items:center;width:96px;height:96px;margin-bottom:8px;border-radius:22px;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2);overflow:hidden}
+.lf-bv-logo .vista img{max-width:84px;max-height:84px;object-fit:contain}
+.lf-bv-logo b{font-size:15px;font-weight:700;color:var(--lf-tinta)}
+.lf-bv-logo small{font-size:12.5px;line-height:1.45;color:var(--lf-tinta-3);overflow-wrap:anywhere}
+.lf-bv-colores{margin:0;padding:18px;border:1.5px solid var(--lf-linea);border-radius:18px;background:var(--lf-sup)}
+.lf-bv-colores legend{float:left;width:100%;margin-bottom:14px;font-size:15px;font-weight:700;color:var(--lf-tinta)}
+.lf-bv-colores .sw{clear:both;display:flex;flex-wrap:wrap;gap:12px}
+.lf-bv-colores label{position:relative;margin:0;cursor:pointer}
+.lf-bv-colores input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.lf-bv-colores span{display:block;width:42px;height:42px;border-radius:50%;box-shadow:inset 0 0 0 2px rgba(255,255,255,.25);transition:transform .15s}
+.lf-bv-colores label:hover span{transform:scale(1.08)}
+.lf-bv-colores input:checked + span{box-shadow:0 0 0 3px var(--lf-sup), 0 0 0 5px currentColor;color:var(--lf-tinta-2);transform:scale(1.06)}
+/* Resumen */
+.lf-bv-resumen{list-style:none;margin:26px 0 0;padding:0;max-width:640px;border:1.5px solid var(--lf-linea);border-radius:18px;background:var(--lf-sup)}
+.lf-bv-resumen li{display:grid;grid-template-columns:130px minmax(0,1fr);gap:14px;padding:14px 18px}
+.lf-bv-resumen li + li{border-top:1px solid var(--lf-linea)}
+.lf-bv-resumen span{font-size:13px;font-weight:600;color:var(--lf-tinta-3)}
+.lf-bv-resumen b{font-size:14px;font-weight:600;color:var(--lf-tinta)}
+/* La vista previa */
+.lf-bv-vista{position:sticky;top:90px;align-self:start}
+.lf-bv-vista .mini{display:grid;grid-template-columns:130px 1fr;height:380px;border:1px solid var(--lf-linea);border-radius:18px;
+  overflow:hidden;background:var(--lf-sup);box-shadow:var(--lf-s3)}
+.lf-bv-vista .mini-side{padding:14px 10px;background:var(--lf-panel);border-right:1px solid var(--lf-linea)}
+.lf-bv-vista .mini-marca{display:flex;align-items:center;gap:7px;margin-bottom:14px}
+.lf-bv-vista .mini-marca .g{flex:none;display:grid;place-items:center;width:24px;height:24px;border-radius:7px;overflow:hidden;
+  background:var(--lf-brand);color:#fff;font-size:12px;font-weight:800;transition:background .3s}
+.lf-bv-vista .mini-marca .g img{width:100%;height:100%;object-fit:contain;background:#fff}
+.lf-bv-vista .mini-marca b{font-size:11px;font-weight:700;line-height:1.2;color:var(--lf-tinta);overflow:hidden;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.lf-bv-vista ul{list-style:none;margin:0;padding:0}
+.lf-bv-vista li{display:flex;align-items:center;gap:6px;max-height:26px;padding:5px 7px;border-radius:7px;font-size:11px;
+  font-weight:600;color:var(--lf-tinta-3);overflow:hidden;transition:max-height .3s, opacity .3s, padding .3s, margin .3s}
+.lf-bv-vista li:first-child{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-bv-vista li.fuera{max-height:0;opacity:0;padding-top:0;padding-bottom:0}
+.lf-bv-vista .mini-main{padding:16px}
+.lf-bv-vista .mini-main .b{display:block;height:9px;margin-bottom:9px;border-radius:5px;background:var(--lf-linea)}
+.lf-bv-vista .mini-main .b.t{height:7px;opacity:.7;margin-bottom:16px}
+.lf-bv-vista .w35{width:35%}.lf-bv-vista .w60{width:60%}.lf-bv-vista .w75{width:75%}.lf-bv-vista .w80{width:80%}.lf-bv-vista .w90{width:90%}
+.lf-bv-vista .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;margin-bottom:16px}
+.lf-bv-vista .cards i{height:48px;border-radius:9px;background:var(--lf-vidrio)}
+.lf-bv-vista .cards i:first-child{background:var(--lf-brand);transition:background .3s}
+.lf-bv-vista > p{margin:12px 0 0;text-align:center;font-size:12.5px;color:var(--lf-tinta-4)}
+/* El pie */
+.lf-bv-pie{position:sticky;bottom:0;display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:14px clamp(18px,4vw,48px);border-top:1px solid var(--lf-linea);
+  background:color-mix(in srgb, var(--lf-sup) 92%, transparent);backdrop-filter:blur(8px)}
+.lf-bv-pie .lf-rg-boton{width:auto;min-width:220px;padding:0 28px;margin:0}
+.lf-bv-atras{border:1.5px solid var(--lf-linea);background:var(--lf-sup);height:48px;padding:0 22px;border-radius:var(--lf-r);
+  font-family:var(--lf-font);font-size:14.5px;font-weight:600;color:var(--lf-tinta-2);cursor:pointer}
+.lf-bv-atras:hover{border-color:var(--lf-tinta-4)}
+@media(max-width:940px){
+  .lf-bv-grid{grid-template-columns:1fr}
+  .lf-bv-vista{display:none}
+}
+@media(max-width:560px){
+  .lf-bv-cab{gap:12px}
+  .lf-bv-marca{display:none}
+  .lf-bv-tarjetas.c3,.lf-bv-tarjetas.c2{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .lf-bv-tarjetas .tj{padding:14px 12px}
+  .lf-bv-tarjetas .ilu{width:46px;height:46px}
+  .lf-bv-tarjetas .ilu svg{width:26px;height:26px}
+  .lf-bv-tarjetas .tj > small{font-size:12px}
+  .lf-bv-marca-grid{grid-template-columns:1fr}
+  .lf-bv-resumen li{grid-template-columns:1fr;gap:3px}
+  .lf-bv-pie .lf-rg-boton{flex:1;min-width:0}
+}
+
+/* ══════════════════════════════════════════════════════
+   LA ENTRADA AL SISTEMA (después de la bienvenida)
+   La marca a pantalla completa; luego el menú entra pieza
+   por pieza y el contenido sube. Termina y arranca la guía.
+   ══════════════════════════════════════════════════════ */
+.lf-estreno-velo{position:fixed;inset:0;z-index:3000;display:grid;place-items:center;color:#fff;
+  background:var(--lf-brand);
+  background-image:radial-gradient(900px 600px at 50% 40%, color-mix(in srgb, #fff 14%, transparent), transparent 65%);
+  animation:lf-estreno-entra .45s ease both}
+.lf-estreno-velo .c{display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center;padding:24px;
+  animation:lf-estreno-marca .7s var(--lf-rebote, ease) .1s both}
+.lf-estreno-velo .g{display:grid;place-items:center;width:92px;height:92px;margin-bottom:6px;border-radius:26px;
+  background:rgba(255,255,255,.16);box-shadow:0 18px 40px rgba(0,0,0,.18);font-size:42px;font-weight:800;overflow:hidden}
+.lf-estreno-velo .g img{max-width:74px;max-height:74px;object-fit:contain}
+.lf-estreno-velo b{font-size:clamp(24px,3vw,32px);font-weight:800;letter-spacing:-.8px}
+.lf-estreno-velo small{font-size:15px;opacity:.88}
+.lf-estreno-velo small.ojo{font-size:12.5px;opacity:.8}
+.lf-estreno-velo.va{animation:lf-estreno-sale .6s ease forwards}
+@keyframes lf-estreno-entra{from{opacity:0}}
+@keyframes lf-estreno-marca{from{opacity:0;transform:scale(.86) translateY(10px)}}
+@keyframes lf-estreno-sale{to{opacity:0;transform:scale(1.04);visibility:hidden}}
+html.lf-estreno .lf-nav > *,html.lf-estreno .lf-main{opacity:0}
+html.lf-estreno.lf-estreno-menu .lf-nav > *{animation:lf-estreno-item .45s var(--lf-suave, ease) both;
+  animation-delay:calc(var(--i, 0) * 45ms + .1s)}
+html.lf-estreno.lf-estreno-menu .lf-main{animation:lf-estreno-sube .6s var(--lf-suave, ease) .35s both}
+@keyframes lf-estreno-item{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+@keyframes lf-estreno-sube{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){
+  .lf-estreno-velo,.lf-estreno-velo .c,html.lf-estreno.lf-estreno-menu .lf-nav > *,html.lf-estreno.lf-estreno-menu .lf-main{animation-duration:.01s;animation-delay:0s}
+  .lf-bv.js .paso.on{animation:none}
+}
+/* Ajustes → Empresa: repetir la configuración inicial. */
+.lf-ajustes-inicio{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:12px 14px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);background:var(--lf-vidrio)}
+.lf-ajustes-inicio b{display:block;font-size:13px;font-weight:600;color:var(--lf-tinta)}
+.lf-ajustes-inicio small{display:block;margin-top:2px;font-size:11.5px;line-height:1.4;color:var(--lf-tinta-4)}
+.lf-ajustes-inicio .btn{flex:none}
+.lf-bv-tarjetas.c4{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
+@media(max-width:560px){ .lf-bv-tarjetas.c4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px} }

@@ -180,6 +180,13 @@ $em = $empresa; ?>
         cambiarlos dejaría a la empresa sin poder entrar. Eso lo maneja quien
         administra la plataforma.
       </p>
+      <?php /* Las preguntas del primer ingreso, otra vez: no borran nada,
+               vuelven a aplicar giro, inventario, Caja, IVA y comisiones. */ ?>
+      <div class="lf-ajustes-inicio">
+        <div><b>Configuración inicial</b>
+          <small>Tu giro, si llevas inventario, cómo cobras, el IVA y las comisiones.</small></div>
+        <a class="btn btn-secondary btn-sm" href="/bienvenida?repetir=1">Volver a hacerla</a>
+      </div>
     </div>
   </section>
 </div>

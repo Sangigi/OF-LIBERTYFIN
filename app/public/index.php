@@ -147,6 +147,8 @@ $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 
 $r->post('/servicios/promociones/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardarPromocion']);
 $r->post('/servicios/promociones/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternarPromocion']);
 $r->post('/servicios/promociones/borrar',   ['LibertyFin\Controlador\ServiciosControlador', 'borrarPromocion']);
+$r->get('/bienvenida',         ['LibertyFin\Controlador\BienvenidaControlador', 'index']);
+$r->post('/bienvenida',        ['LibertyFin\Controlador\BienvenidaControlador', 'guardar']);
 $r->get('/inventario',         ['LibertyFin\Controlador\InventarioControlador', 'index']);
 $r->post('/inventario/mover',  ['LibertyFin\Controlador\InventarioControlador', 'mover']);
 $r->get('/reportes',     ['LibertyFin\Controlador\ReportesControlador', 'index']);
@@ -306,6 +308,8 @@ $permisos = [
   '/servicios/promociones/guardar'  => 'editar.servicios',
   '/servicios/promociones/alternar' => 'editar.servicios',
   '/servicios/promociones/borrar'   => 'editar.servicios',
+  // La configuración inicial cambia ajustes de la empresa: solo administración.
+  '/bienvenida'             => 'editar.ajustes',
   '/inventario'             => 'ver.inventario',
   '/inventario/mover'       => 'editar.inventario',
   '/reportes'               => 'ver.reportes',

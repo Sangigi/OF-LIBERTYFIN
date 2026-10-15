@@ -1,8 +1,12 @@
 <?php
 use LibertyFin\Vista\Plantilla as P;
 use LibertyFin\Vista\Widget as W;
+// La entrada animada: una sola vez, al terminar la configuración inicial
+// (BienvenidaControlador). Después de ella arranca la guía.
+$estreno = (string)($_SESSION['lf_entrada'] ?? '');
+unset($_SESSION['lf_entrada']);
 ?><!DOCTYPE html>
-<html lang="es" data-theme="light">
+<html lang="es" data-theme="light"<?= $estreno !== '' ? ' class="lf-estreno"' : '' ?>>
 <head>
 <meta charset="utf-8">
 <script>
@@ -87,6 +91,40 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
 <body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>"
       data-lf-soporte="<?= $lfSoporte ? '1' : '0' ?>" data-lf-yo="<?= P::e($_SESSION['usuario_nombre'] ?? '') ?>"
       data-lf-quien="<?= P::e($lfQuien) ?>">
+<?php if ($estreno !== ''):
+  /* LA ENTRADA. La marca de la empresa a pantalla completa, luego el menú
+     entra sección por sección (las que quedaron encendidas) y el
+     contenido sube. Al terminar avisa con `lf:estreno-fin`: la guía lo
+     espera para no encimarse. Con «reducir movimiento», casi inmediata. */
+  $logoE = $_SESSION['lf_marca_logo'] ?? '';
+  $empE  = $_SESSION['empresa_nombre'] ?? 'Libertyfin';
+  $avisoLogo = $_SESSION['lf_aviso_logo'] ?? ''; unset($_SESSION['lf_aviso_logo']); ?>
+<div class="lf-estreno-velo" id="lfEstreno" aria-hidden="true">
+  <div class="c">
+    <span class="g"><?php if ($logoE): ?><img src="<?= P::e($logoE) ?>" alt=""><?php else: ?><?= P::e(mb_strtoupper(mb_substr($empE, 0, 1))) ?><?php endif; ?></span>
+    <b><?= P::e($empE) ?></b>
+    <small><?= $estreno === 'configurado' ? 'Todo listo. Así quedó tu Libertyfin.' : 'Bienvenido a Libertyfin.' ?></small>
+    <?php if ($avisoLogo): ?><small class="ojo"><?= P::e($avisoLogo) ?></small><?php endif; ?>
+  </div>
+</div>
+<script>
+(function(){
+  var raiz = document.documentElement, velo = document.getElementById('lfEstreno');
+  var corto = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  /* Cada pieza del menú con su turno. */
+  document.addEventListener('DOMContentLoaded', function(){
+    document.querySelectorAll('.lf-nav > *').forEach(function(el, i){ el.style.setProperty('--i', i); });
+  });
+  setTimeout(function(){ velo.classList.add('va'); raiz.classList.add('lf-estreno-menu'); }, corto ? 150 : 1150);
+  setTimeout(function(){
+    if (velo.parentNode) velo.parentNode.removeChild(velo);
+    raiz.classList.remove('lf-estreno', 'lf-estreno-menu');
+    window.lfEstrenoFin = true;
+    document.dispatchEvent(new Event('lf:estreno-fin'));
+  }, corto ? 400 : 2500);
+})();
+</script>
+<?php endif; ?>
 <div class="lf-app">
   <?php P::parcial('parciales/sidebar', ['activo' => $icono ?? '']); ?>
   <div class="lf-main">

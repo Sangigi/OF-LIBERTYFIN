@@ -12,6 +12,9 @@ final class PanelControlador
 {
     public function index()
     {
+        // Primer ingreso del administrador de una empresa nueva: antes del
+        // Panel, las preguntas de la configuración inicial.
+        if (!empty($_SESSION['lf_bienvenida'])) { header('Location: /bienvenida'); exit; }
         $db    = Conexion::de($_SESSION['empresa_db']);
         $panel = new PanelRepo($db);
         $ventas= new VentaRepo($db);

@@ -37,6 +37,11 @@ $pasos = [
    'texto'  => 'Da de alta tus productos con su precio. Los que se cotizan por caso '
              . 'déjalos en cero: el precio se pone al vender.'],
 
+  ['ruta' => '/inventario', 'p' => 'ver.inventario', 'inv' => true, 'icono' => 'servicios',
+   'titulo' => 'Tus existencias',
+   'texto'  => 'Cuánto queda de cada producto en cada sucursal. Caja lo descuenta al cobrar '
+             . 'y el Panel te avisa cuando algo se está acabando.'],
+
   ['ruta' => '/clientes', 'p' => 'ver.clientes', 'icono' => 'clientes',
    'titulo' => 'A quién le cobras',
    'texto'  => 'Tus clientes, con su área y su saldo. Aquí ves quién debe y desde cuándo.'],
@@ -52,27 +57,27 @@ $pasos = [
    'texto'  => 'La cifra grande es lo que de verdad entró, no lo facturado. '
              . 'Son cosas distintas y aquí no se confunden.'],
 
-  ['ruta' => '/cobranza', 'p' => 'ver.cobranza', 'icono' => 'cobranza',
+  ['ruta' => '/cobranza', 'p' => 'ver.cobranza', 'sec' => 'cobranza', 'icono' => 'cobranza',
    'titulo' => 'A quién le hablas hoy',
    'texto'  => 'Ordenado por antigüedad del último abono, no por monto. '
              . 'Lo viejo pesa más que lo grande.'],
 
-  ['ruta' => '/corte', 'p' => 'ver.corte', 'icono' => 'corte',
+  ['ruta' => '/corte', 'p' => 'ver.corte', 'sec' => 'corte', 'icono' => 'corte',
    'titulo' => 'Cerrar el turno',
    'texto'  => 'Cuadra el efectivo del cajón. Transferencias y tarjeta se muestran '
              . 'aparte: no pasan por ahí.'],
 
-  ['ruta' => '/comisiones', 'p' => 'ver.comisiones', 'icono' => 'comisiones',
+  ['ruta' => '/comisiones', 'p' => 'ver.comisiones', 'sec' => 'comisiones', 'icono' => 'comisiones',
    'titulo' => 'Comisiones',
    'texto'  => 'Se liberan conforme el cliente paga. Si nunca liquida, esa parte '
              . 'no se devenga.'],
 
-  ['ruta' => '/gastos', 'p' => 'ver.gastos', 'icono' => 'gastos',
+  ['ruta' => '/gastos', 'p' => 'ver.gastos', 'sec' => 'gastos', 'icono' => 'gastos',
    'titulo' => 'Gastos',
    'texto'  => 'Los generales no tocan comisiones. Los de operación sí: cuelgan de '
              . 'una venta y bajan su base.'],
 
-  ['ruta' => '/reportes', 'p' => 'ver.reportes', 'icono' => 'reportes',
+  ['ruta' => '/reportes', 'p' => 'ver.reportes', 'sec' => 'reportes', 'icono' => 'reportes',
    'titulo' => 'Cuánto queda',
    'texto'  => 'Lo cobrado menos gastos y comisiones. La cifra que nadie tenía.'],
 
@@ -154,9 +159,21 @@ if (!empty($_SESSION['plataforma'])) $pasos = [
              . 'apariencia: tema y color.'],
 ];
 
+// Además del permiso, lo que la empresa tiene encendido: si Comisiones
+// quedó apagada en la configuración inicial, no se explica; Inventario,
+// solo si está encendido. Sin empresa (soporte) no aplica.
+$cfgGuia = null;
+try {
+    if (!empty($_SESSION['empresa_db'])) {
+        $cfgGuia = new \LibertyFin\Datos\ConfigRepo(\LibertyFin\Datos\Conexion::de($_SESSION['empresa_db']));
+    }
+} catch (\Throwable $e) { $cfgGuia = null; }
+
 $mios = [];
 foreach ($pasos as $p) {
     if (empty($p['siempre']) && isset($p['p']) && !Permisos::puede($p['p'])) continue;
+    if ($cfgGuia && isset($p['sec']) && !$cfgGuia->seccionActiva($p['sec'])) continue;
+    if (!empty($p['inv']) && (!$cfgGuia || !$cfgGuia->inventarioActivo())) continue;
     $mios[] = $p;
 }
 ?>
@@ -400,8 +417,17 @@ foreach ($pasos as $p) {
   });
   addEventListener('resize', function(){ if (!g.hidden) pinta(); });
 
-  g.hidden = false;
-  document.body.style.overflow = 'hidden';
-  pinta();
+  function arrancar(){
+    g.hidden = false;
+    document.body.style.overflow = 'hidden';
+    pinta();
+  }
+  /* Después de la configuración inicial el sistema entra animado: la guía
+     espera a que termine para no encimarse (ver layout, `lf:estreno-fin`). */
+  if (document.documentElement.classList.contains('lf-estreno') && !window.lfEstrenoFin) {
+    document.addEventListener('lf:estreno-fin', arrancar, { once: true });
+  } else {
+    arrancar();
+  }
 })();
 </script>

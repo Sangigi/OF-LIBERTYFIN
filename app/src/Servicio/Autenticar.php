@@ -241,6 +241,12 @@ final class Autenticar
             if ($foto) $_SESSION['lf_foto'] = $foto;
             // La guía se muestra una sola vez, en el primer ingreso.
             if (!$ur->vioGuia($usuario['id'])) $_SESSION['lf_mostrar_guia'] = true;
+            // Empresa que estrena: su administrador contesta primero las
+            // preguntas de la configuración inicial (ver Servicio\Arranque).
+            if (\LibertyFin\Dominio\Permisos::normalizar($usuario['rol']) === 'admin'
+                && (string)$cfg->valorDe('inicio.pendiente', '') === '1') {
+                $_SESSION['lf_bienvenida'] = true;
+            }
         } catch (\Throwable $e) { /* sin personalización se ve el tema base */ }
 
         // Esta pasa a ser LA sesión de la cuenta; otra que hubiera, sale.
