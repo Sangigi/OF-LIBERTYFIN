@@ -37,7 +37,7 @@ $qs = function ($x = []) use ($estado, $q) {
   <header class="card-header">
     <div><span>Liga lista</span>
       <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-        <?= P::e($r['cliente_nombre'] ?: $r['descripcion']) ?> ·
+        <?= P::e(($r['cliente_nombre'] ?? '') ?: $r['descripcion']) ?> ·
         <?= D::pesos($r['monto']) ?></p></div>
     <a class="btn btn-secondary btn-sm" href="/ligas">Cerrar</a>
   </header>
@@ -166,7 +166,7 @@ $qs = function ($x = []) use ($estado, $q) {
       <div class="lf-row">
         <span style="flex:1;min-width:0">
           <b style="display:block;font-size:13.5px">
-            <?= P::e($a['cliente_nombre'] ?: $a['descripcion']) ?></b>
+            <?= P::e(($a['cliente_nombre'] ?? '') ?: $a['descripcion']) ?></b>
           <small style="color:var(--lf-tinta-4);font-size:11.5px">
             <?= P::e($metodos[$a['metodo']][0] ?? $a['metodo']) ?> ·
             <?= P::e($a['referencia']) ?>
@@ -232,7 +232,7 @@ $qs = function ($x = []) use ($estado, $q) {
         $vencida = $l['estado']==='pendiente' && $l['vence'] && strtotime($l['vence']) < strtotime('today'); ?>
         <tr>
           <td data-label="Cliente">
-            <b style="font-weight:600"><?= P::e($l['cliente_nombre'] ?: '—') ?></b>
+            <b style="font-weight:600"><?= P::e(($l['cliente_nombre'] ?? '') ?: '—') ?></b>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px;font-family:var(--lf-mono)">
               <?= P::e($l['referencia']) ?>
               <?php if ($l['pruebas']): ?> · prueba<?php endif; ?></span></td>
