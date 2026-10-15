@@ -15,6 +15,7 @@ $elegidos = function ($tipo) use ($e) {
     return $r;
 };
 $prodSel = $elegidos('producto');
+if (!$e && !empty($paraProducto)) $prodSel = [(int)$paraProducto => 1];
 $areaSel = $elegidos('area');
 $diasSel = ($e && $e['dias']) ? explode(',', $e['dias']) : [];
 $tipoE   = $e['tipo'] ?? 'porcentaje';

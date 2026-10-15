@@ -49,16 +49,36 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
         <?php endforeach; ?>
       </select>
     </div>
-    <div style="width:130px">
-      <label class="form-label">Precio</label>
-      <input class="form-control lf-mono" type="number" name="precio" step="0.01" min="0" placeholder="0.00"
+    <?php /* ── EL PRECIO ──
+             Precio, costo y utilidad se calculan entre sí, como en el
+             sistema anterior, pero en los dos sentidos: se escribe la
+             utilidad y sale el precio, o se escribe el precio y sale la
+             utilidad. La utilidad no se guarda: sale de los otros dos. */ ?>
+    <div class="lf-salto" aria-hidden="true"></div>
+    <div style="width:140px">
+      <label class="form-label" for="pPrecio">Precio</label>
+      <input class="form-control lf-mono" type="number" name="precio" id="pPrecio" step="0.01" min="0" placeholder="0.00"
              value="<?= P::e($e['subprecio'] ?? $e['precio'] ?? '') ?>" required>
     </div>
-    <div style="width:130px">
-      <label class="form-label">Costo</label>
-      <input class="form-control lf-mono" type="number" name="costo" step="0.01" min="0"
+    <div style="width:140px">
+      <label class="form-label" for="pCosto">Costo <small>(opcional)</small></label>
+      <input class="form-control lf-mono" type="number" name="costo" id="pCosto" step="0.01" min="0"
              value="<?= P::e($e['costo'] ?? '0') ?>">
     </div>
+    <div style="width:120px">
+      <label class="form-label" for="pUtil">Utilidad</label>
+      <div class="lf-sufijo">
+        <input class="form-control lf-mono" type="number" id="pUtil" step="0.01" min="0" placeholder="—"
+               title="Sobre el costo. Escríbela y el precio se calcula solo.">
+        <span>%</span>
+      </div>
+    </div>
+    <div style="flex:1;min-width:200px">
+      <div class="lf-margen" id="pMargen" aria-live="polite">
+        <span class="t">Te queda por venta</span><b class="lf-mono" id="pMargenMonto">—</b>
+      </div>
+    </div>
+    <div class="lf-salto" aria-hidden="true"></div>
     <div style="flex:1;min-width:230px">
       <label class="form-label">Imagen</label>
       <div class="lf-foto">
@@ -81,15 +101,69 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
         </div>
       </div>
     </div>
-    <div style="display:flex;gap:8px">
+    <?php /* Lo de vez en cuando, plegado. La descripción ya se guardaba,
+             pero no había campo: al editar un producto se borraba la que
+             traía del sistema anterior. */ ?>
+    <details class="lf-mas-datos lf-prod-mas" <?= trim((string)($e['descripcion'] ?? '')) !== '' ? 'open' : '' ?>>
+      <summary><span>Más detalles</span><small>descripción</small></summary>
+      <div class="cuerpo">
+        <label class="form-label" for="pDesc">Descripción <small>(opcional)</small></label>
+        <textarea class="form-control" name="descripcion" id="pDesc" rows="2" maxlength="2000"
+                  placeholder="Qué incluye, para quién es, requisitos…"><?= P::e($e['descripcion'] ?? '') ?></textarea>
+        <p class="pista">Se ve en Caja al pasar el mouse sobre el producto.</p>
+      </div>
+    </details>
+    <div style="display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px 14px">
       <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
       <?php if ($e): ?><a class="btn btn-secondary" href="/servicios">Cancelar</a><?php endif; ?>
+      <?php if ($e): ?>
+        <?php /* Los descuentos viven en Promociones (con fechas, solos en
+                 Caja y sin acumularse): aquí no hay campo de descuento. */ ?>
+        <a class="lf-link" href="/servicios?t=promociones&amp;nueva=1&amp;producto=<?= (int)$e['id'] ?>">
+          Ponerle una promoción</a>
+      <?php endif; ?>
     </div>
     <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0">
-      El precio es lo que se cobra al cliente. El costo se resta de la utilidad antes
-      de calcular comisiones, así que no puede ser mayor al precio.
+      Escribe la utilidad y el precio se calcula solo, o al revés. El costo se resta antes de calcular
+      comisiones, así que no puede ser mayor al precio. Para un descuento, usa una promoción.
     </p>
   </form>
+  <script>
+  /* Precio, costo y utilidad: cualquiera de los tres mueve a los otros. */
+  (function(){
+    var P = document.getElementById('pPrecio'), C = document.getElementById('pCosto'),
+        U = document.getElementById('pUtil'), M = document.getElementById('pMargen'),
+        $m = document.getElementById('pMargenMonto');
+    if (!P || !C || !U) return;
+    var num = function(el){ return parseFloat(el.value) || 0; };
+    var pesos = function(n){ return (n < 0 ? '−$' : '$') + Math.abs(n).toLocaleString('es-MX',
+                               {minimumFractionDigits:2, maximumFractionDigits:2}); };
+    var red = function(n){ return Math.round(n * 100) / 100; };
+    function margen(){
+      var p = num(P), c = num(C), t = M.querySelector('.t');
+      M.className = 'lf-margen';
+      U.disabled = c <= 0;
+      U.placeholder = c > 0 ? '0' : '—';
+      if (c <= 0) U.value = '';
+      if (p <= 0) { t.textContent = 'Precio en cero'; $m.textContent = 'se pone al vender'; M.classList.add('neutro'); return; }
+      if (c > p)  { t.textContent = 'El costo es mayor al precio'; $m.textContent = pesos(red(p - c)); M.classList.add('mal'); return; }
+      t.textContent = c > 0 ? 'Te queda por venta' : 'Sin costo: te queda todo';
+      $m.textContent = pesos(red(p - c));
+    }
+    function utilDesdePrecio(){
+      var p = num(P), c = num(C);
+      if (document.activeElement !== U) U.value = (c > 0 && p > 0) ? red((p / c - 1) * 100) : '';
+    }
+    P.addEventListener('input', function(){ utilDesdePrecio(); margen(); });
+    C.addEventListener('input', function(){ utilDesdePrecio(); margen(); });
+    U.addEventListener('input', function(){
+      var c = num(C);
+      if (c > 0 && U.value !== '') P.value = red(c * (1 + num(U) / 100)).toFixed(2);
+      margen();
+    });
+    utilDesdePrecio(); margen();
+  })();
+  </script>
 </details>
 
 <form class="lf-filtros" method="get">

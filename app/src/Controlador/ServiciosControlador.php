@@ -147,6 +147,8 @@ final class ServiciosControlador
             'categorias'=> (new ServicioRepo($db))->categorias(),
             'editando'  => $editar ? $srv->una($editar) : null,
             'abrir'     => $editar > 0 || Peticion::texto('nueva') !== '',
+            // «Ponerle una promoción» desde el producto: llega ya elegido.
+            'paraProducto' => $editar ? 0 : Peticion::entero('producto'),
             'puedeEditar' => \LibertyFin\Dominio\Permisos::puede('editar.servicios'),
             'vigentes'  => count(array_filter($promos, function ($p) {
                 return $p['estado']['clave'] === 'vigente'; })),

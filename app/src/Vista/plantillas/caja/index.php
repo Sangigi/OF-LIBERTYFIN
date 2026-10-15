@@ -110,6 +110,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         $susPromos = array_values(array_filter(array_map(function ($id) use ($pc) {
             return $pc['promos'][$id] ?? null; }, $pc['productos'][(int)$s['id']] ?? [])));
         $titulo = $s['nombre'];
+        $desc = trim((string)($s['descripcion'] ?? ''));
+        if ($desc !== '') $titulo .= "\n" . (mb_strlen($desc) > 220 ? mb_substr($desc, 0, 220) . '…' : $desc);
         foreach ($susPromos as $p) $titulo .= "\nPromoción: " . $p['nombre'] . ' (' . $p['texto'] . ')';
       ?>
         <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= $susPromos ? ' con-promo' : '' ?>"

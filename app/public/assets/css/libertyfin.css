@@ -4293,3 +4293,25 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
    lo ancho del ticket (antes iba en la columna del nombre, junto al precio). */
 .lf-ticket .lf-linea{flex-wrap:wrap;row-gap:8px}
 .lf-ticket .lf-linea > .lf-promo-l{flex:0 0 100%;margin-top:0}
+/* ══════════════════════════════════════════════════════
+   PRODUCTOS · ALTA Y EDICIÓN
+   Precio, costo y utilidad en un renglón, con lo que queda por venta al
+   lado; la descripción plegada. Lo de tienda (marca, caducidad, stock)
+   no va aquí.
+   ══════════════════════════════════════════════════════ */
+.lf-form > .lf-salto{flex:0 0 100%;height:0;padding:0;margin:-8px 0 0}
+.lf-sufijo{position:relative}
+.lf-sufijo .form-control{width:100%;padding-right:28px}
+.lf-sufijo span{position:absolute;right:11px;top:50%;transform:translateY(-50%);font-size:12.5px;
+  color:var(--lf-tinta-4);pointer-events:none}
+.lf-sufijo .form-control:disabled{background:var(--lf-vidrio);cursor:not-allowed}
+.lf-margen{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  min-height:38px;padding:8px 13px;border-radius:var(--lf-r);background:var(--lf-brand-soft)}
+.lf-margen .t{font-size:12px;font-weight:600;color:var(--lf-tinta-2)}
+.lf-margen b{font-size:15px;font-weight:800;color:var(--lf-brand-2)}
+.lf-margen.neutro{background:var(--lf-vidrio)}
+.lf-margen.neutro b{font-family:var(--lf-font);font-size:12px;font-weight:500;color:var(--lf-tinta-3)}
+.lf-margen.mal{background:var(--lf-rojo-soft)}
+.lf-margen.mal .t,.lf-margen.mal b{color:var(--lf-rojo)}
+.lf-form > .lf-prod-mas{flex:0 0 100%;margin:0}
+.lf-prod-mas textarea{width:100%;resize:vertical}
