@@ -81,8 +81,11 @@ final class CajaControlador
             $this->volver('No se pudo verificar el formulario. Intenta de nuevo.', 'error');
         }
 
-        $lineas = json_decode($_POST['lineas'] ?? '[]', true);
-        if (!is_array($lineas) || !$lineas) {
+        // El navegador manda `lineas` en HEXADECIMAL: el JSON crudo (llaves,
+        // corchetes, comillas) lo rechaza ModSecurity con 406 y la petición
+        // ni llega aquí. Mismo patrón que PushControlador::endpoint().
+        $lineas = self::jsonHex('lineas');
+        if (!$lineas) {
             $this->volver('El ticket está vacío.', 'error');
         }
         $validas = $this->lineasValidas($db, $lineas);
@@ -254,8 +257,9 @@ final class CajaControlador
         if (!$this->tokenValido()) {
             $this->json(['ok' => false, 'error' => 'No se pudo verificar el formulario.']);
         }
-        $lineas  = json_decode($_POST['lineas'] ?? '[]', true);
-        $validas = $this->lineasValidas($db, is_array($lineas) ? $lineas : [], false);
+        // Hex, igual que en cobrar(): JSON crudo → 406 de ModSecurity.
+        $lineas  = self::jsonHex('lineas');
+        $validas = $this->lineasValidas($db, $lineas, false);
         $calc = (new \LibertyFin\Servicio\Promociones($db))->paraTicket($validas, [
             'codigo'   => $_POST['promo_codigo'] ?? '',
             'quitadas' => self::quitadas(),
@@ -336,8 +340,49 @@ final class CajaControlador
     /** Las promociones que el cajero quitó del ticket (ids). */
     private static function quitadas()
     {
-        $q = json_decode((string)($_POST['promo_quitadas'] ?? '[]'), true);
-        return is_array($q) ? array_values(array_filter(array_map('intval', $q))) : [];
+        // Hex: JSON crudo → 406 de ModSecurity.
+        $q = self::jsonHex('promo_quitadas');
+        return array_values(array_filter(array_map('intval', $q)));
+    }
+
+    /**
+     * Lee un campo del POST que el navegador mandó en HEXADECIMAL porque
+     * su contenido es JSON (llaves, corchetes, comillas) y ModSecurity lo
+     * rechaza tal cual con "406 Not Acceptable".
+     *
+     * Mismo criterio que PushControlador::endpoint(): en hexadecimal solo
+     * hay 0-9 y a-f, igual que el token del formulario, que siempre pasa.
+     * Se acepta también base64 por si algún día se manda así.
+     *
+     * @return array Arreglo decodificado, o [] si no se pudo.
+     */
+    private static function jsonHex(string $campo): array
+    {
+        $v = trim((string)($_POST[$campo] ?? ''));
+        if ($v === '') return [];
+
+        // 1) Hexadecimal (lo normal).
+        if (strlen($v) % 2 === 0 && ctype_xdigit($v)) {
+            $dec = @hex2bin($v);
+            if ($dec !== false) {
+                $d = json_decode($dec, true);
+                if (is_array($d)) return $d;
+            }
+        }
+
+        // 2) Base64 (por si acaso).
+        $b = strtr($v, '-_', '+/');
+        $b .= str_repeat('=', (4 - strlen($b) % 4) % 4);
+        $dec = base64_decode($b, true);
+        if ($dec !== false) {
+            $d = json_decode($dec, true);
+            if (is_array($d)) return $d;
+        }
+
+        // 3) JSON crudo (compatibilidad hacia atrás: peticiones viejas,
+        //    pruebas, curl). Si ModSecurity no lo bloqueó, se acepta.
+        $d = json_decode($v, true);
+        return is_array($d) ? $d : [];
     }
 
     /**
@@ -388,13 +433,6 @@ final class CajaControlador
         header('Location: /caja'); exit;
     }
 
-    /**
-     * Genera la liga para una venta recién creada.
-     *
-     * Se llama después de registrar la venta, no antes: si la liga
-     * fallara y la venta no existiera, el cliente se iría sin nada y sin
-     * rastro de lo que se intentó cobrarle.
-     */
     /**
      * Mete las líneas nuevas en una venta que ya existe.
      *
