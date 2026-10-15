@@ -165,7 +165,7 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
                  style="height:34px;max-width:100%;object-fit:contain;margin-bottom:6px"
                  onerror="this.style.display='none'">
           <?php else: ?>
-            <span class="lf-prod-ico"><?= W::icono('serv','30px') ?></span>
+            <span class="lf-prod-ico"><?= W::icono('serv','20px') ?></span>
           <?php endif; ?>
           <b><?= P::e($p['nombre']) ?></b>
           <small><?= P::e($p['carrier'] ?: $p['categoria']) ?></small>
