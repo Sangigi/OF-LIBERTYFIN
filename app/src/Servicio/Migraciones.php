@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 22;
+    const VERSION = 23;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -1101,6 +1101,38 @@ final class Migraciones
         }
     }
 
+    /**
+     * Recupera el catálogo de Emida que apagó la descarga automática.
+     *
+     * Guardar el catálogo lo REEMPLAZABA: apagaba todo y encendía solo lo
+     * que llegaba. Con el catálogo pegado desde el portal (completo) eso
+     * estaba bien; cuando la descarga se hizo automática, la conexión trajo
+     * menos productos y apagó todos los demás. No se borró nada: siguen en
+     * la tabla con activo = 0. (Desde ahora la descarga solo agrega.)
+     *
+     * Solo se toca si se ve exactamente eso: hay productos apagados, y
+     * DESPUÉS de que se apagaron hubo una descarga del proveedor (la
+     * bitácora dice «catálogo de Emida»; lo pegado dice «… (pegado)»).
+     * Entonces se vuelve a encender el lote apagado más reciente: el
+     * catálogo completo que había antes de la descarga. Los lotes viejos,
+     * que alguien quitó a propósito al pegar uno nuevo, se quedan apagados.
+     */
+    private static function v23(PDO $db)
+    {
+        if (!self::hayTabla($db, 'lf_emida_productos') || !self::hayTabla($db, 'lf_auditoria')) return;
+        $apagado = $db->query("SELECT MAX(actualizado) FROM lf_emida_productos WHERE activo = 0")->fetchColumn();
+        if (!$apagado) return;
+        $encendido = $db->query("SELECT MAX(actualizado) FROM lf_emida_productos WHERE activo = 1")->fetchColumn();
+        if (!$encendido || $encendido <= $apagado) return;
+        $st = $db->prepare("SELECT COUNT(*) FROM lf_auditoria WHERE sobre = 'catálogo de Emida' AND creado_en >= ?");
+        $st->execute([$apagado]);
+        if ((int)$st->fetchColumn() === 0) return;
+        // El lote: lo que se guardó junto (un pegado tarda segundos).
+        $st = $db->prepare("UPDATE lf_emida_productos SET activo = 1 WHERE activo = 0 AND actualizado >= ?");
+        $st->execute([date('Y-m-d H:i:s', strtotime($apagado) - 1800)]);
+        error_log('[LibertyFin] migración 23: ' . $st->rowCount() . ' productos de Emida vueltos a encender');
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -1124,5 +1156,6 @@ final class Migraciones
         20 => 'Columnas que les faltaban a las empresas nuevas (área e IVA de la venta, complemento de pago)',
         21 => 'Inventario: productos con existencias y bitácora de movimientos',
         22 => 'Módulos por giro: cancelar ventas, expediente, cotizaciones, igualas, seguimiento, compras, agenda y paquetes',
+        23 => 'Recupera los productos de Emida que apagó la descarga automática del catálogo',
     ];
 }

@@ -6,7 +6,7 @@ use LibertyFin\Dominio\Dinero as D;
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
 $h = $hoy;
-$total = count($productos);
+$total = (int)($totalCatalogo ?? count($productos));
 ?>
 
 <?php if ($aviso): ?>

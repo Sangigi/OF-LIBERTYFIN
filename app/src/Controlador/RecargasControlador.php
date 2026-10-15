@@ -23,8 +23,10 @@ use LibertyFin\Vista\Plantilla;
  * NADA A MANO
  *
  * El catálogo se baja solo: la primera vez al entrar, y después por
- * detrás cuando tiene más de CATALOGO_HORAS. El saldo también se consulta
- * solo (por detrás, para que la página no espere al proveedor).
+ * detrás cuando tiene más de CATALOGO_HORAS. Solo AGREGA y actualiza: lo
+ * que no venga en la descarga no se apaga (la conexión puede traer menos
+ * productos que el portal de Emida). El saldo también se consulta solo
+ * (por detrás, para que la página no espere al proveedor).
  */
 final class RecargasControlador
 {
@@ -67,7 +69,8 @@ final class RecargasControlador
             'aceptado'    => !empty($cfg['acepto_sin_cifrar']),
             // Todo el catálogo: se busca y se filtra en el navegador, sin
             // recargar, igual que los productos en Caja.
-            'productos'   => $repo->productos('', '', '', 3000, 0),
+            'productos'   => $repo->productos('', '', '', 5000, 0),
+            'totalCatalogo' => $repo->cuantos(),
             'categorias'  => $repo->categorias(),
             'actualizado' => $actualizado,
             // Viejo: se vuelve a bajar por detrás al abrir la página.
@@ -208,7 +211,9 @@ final class RecargasControlador
                 . 'Puede que la cuenta no tenga ninguno asignado todavía.'];
         }
         try {
-            $n = (new EmidaRepo($db))->guardarCatalogo($r['productos']);
+            // Agregar y actualizar, nunca quitar: lo que no venga en esta
+            // descarga se queda como estaba (ver EmidaRepo::guardarCatalogo).
+            $n = (new EmidaRepo($db))->guardarCatalogo($r['productos'], false);
             Auditoria::anota('ajustes.cambiar', 'catálogo de Emida', null, $n . ' productos');
             return ['ok' => true, 'n' => $n, 'error' => null];
         } catch (\Throwable $e) {

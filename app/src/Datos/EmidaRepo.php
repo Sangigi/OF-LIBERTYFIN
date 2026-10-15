@@ -81,19 +81,24 @@ final class EmidaRepo extends Repo
     /**
      * Guarda el catálogo recibido.
      *
-     * No borra y reinserta: marca todo como inactivo y revive lo que
-     * llegó. Así un producto que el proveedor dejó de ofrecer deja de
+     * Nunca borra. Con $reemplazar, marca todo como inactivo y revive lo
+     * que llegó: un producto que el proveedor dejó de ofrecer deja de
      * venderse pero no desaparece, y las transacciones viejas siguen
      * sabiendo qué se vendió.
+     *
+     * Sin $reemplazar (lo que usa la descarga automática) solo agrega y
+     * actualiza. El catálogo que entrega la conexión con Emida puede traer
+     * menos productos que el del portal: reemplazar con él apagaba todos
+     * los demás.
      */
-    public function guardarCatalogo(array $productos)
+    public function guardarCatalogo(array $productos, $reemplazar = true)
     {
         $this->asegurar();
         if (!$productos) return 0;
 
         $this->db->beginTransaction();
         try {
-            $this->db->exec("UPDATE lf_emida_productos SET activo = 0");
+            if ($reemplazar) $this->db->exec("UPDATE lf_emida_productos SET activo = 0");
             $st = $this->db->prepare("
                 INSERT INTO lf_emida_productos
                     (producto_id, nombre, categoria, carrier, comision, monto,
