@@ -1787,7 +1787,7 @@ body.lf-centro{
 .lf-boton:disabled{opacity:.5;cursor:not-allowed}
 .lf-boton .fl{width:17px;height:17px;flex-shrink:0}
 /* «Regístralo gratis»: la puerta para quien todavía no tiene cuenta. */
-.lf-registrate{margin:22px 0 -26px;padding-top:18px;border-top:1px solid rgba(255,255,255,.14);text-align:center;
+.lf-registrate{padding-top:18px;border-top:1px solid rgba(255,255,255,.14);text-align:center;
   font-size:12.5px;color:color-mix(in srgb,#fff 70%,transparent)}
 .lf-registrate a{color:#fff;font-weight:700;text-decoration:underline;text-underline-offset:2px}
 .lf-boton .giro{display:none;width:16px;height:16px;flex-shrink:0;
