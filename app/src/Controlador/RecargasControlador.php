@@ -36,6 +36,8 @@ final class RecargasControlador
     const REINTENTO = 600;
     /** El saldo consultado vale este rato (segundos): no se pregunta en cada vuelta. */
     const SALDO_VIGENCIA = 60;
+    /** Tarjetas por página del catálogo. */
+    const POR_PAGINA = 18;
 
     public function index()
     {
@@ -69,9 +71,17 @@ final class RecargasControlador
             'aceptado'    => !empty($cfg['acepto_sin_cifrar']),
             // Todo el catálogo: se busca y se filtra en el navegador, sin
             // recargar, igual que los productos en Caja.
-            'productos'   => $repo->productos('', '', '', 5000, 0),
+            // La primera página. Las demás, la búsqueda y las categorías se
+            // piden por detrás (productos()): sin recargar y sin tope, el
+            // catálogo completo esté del tamaño que esté.
+            'productos'   => $repo->productos('', '', '', self::POR_PAGINA, 0),
             'totalCatalogo' => $repo->cuantos(),
+            'porPagina'   => self::POR_PAGINA,
             'categorias'  => $repo->categorias(),
+            // Productos que una descarga dejó de traer: se avisa y se pueden
+            // volver a mostrar (los administradores).
+            'ocultos'     => $repo->ocultos(),
+            'puedeAjustes'=> \LibertyFin\Dominio\Permisos::puede('editar.ajustes'),
             'actualizado' => $actualizado,
             // Viejo: se vuelve a bajar por detrás al abrir la página.
             'refrescar'   => $actualizado && strtotime($actualizado) < time() - self::CATALOGO_HORAS * 3600,
@@ -100,6 +110,34 @@ final class RecargasControlador
         if ($r['ok']) unset($_SESSION['lf_emida_error']); else $_SESSION['lf_emida_error'] = $r['error'];
         if ($json) $this->json(['ok' => $r['ok'], 'n' => $r['n'], 'mensaje' => $r['ok'] ? $r['n'] . ' productos actualizados.' : $r['error']]);
         $this->volver($r['ok'] ? $r['n'] . ' productos actualizados.' : $r['error'], $r['ok'] ? 'ok' : 'error');
+    }
+
+    /**
+     * Una página del catálogo (búsqueda, categoría, página), en JSON con
+     * las tarjetas ya hechas. La pantalla la pide sin recargar.
+     */
+    public function productos()
+    {
+        $repo = new EmidaRepo(Conexion::de($_SESSION['empresa_db']));
+        $q   = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 80);
+        $cat = mb_substr(trim((string)($_GET['cat'] ?? '')), 0, 80);
+        $total = $repo->cuantos($q, $cat);
+        $paginas = max(1, (int)ceil($total / self::POR_PAGINA));
+        $pagina = min($paginas, max(1, (int)($_GET['p'] ?? 1)));
+        ob_start();
+        Plantilla::parcial('recargas/tarjetas', ['productos' => $repo->productos($q, $cat, '', self::POR_PAGINA, ($pagina - 1) * self::POR_PAGINA)]);
+        $html = ob_get_clean();
+        $this->json(['ok' => true, 'html' => $html, 'total' => $total, 'pagina' => $pagina, 'paginas' => $paginas]);
+    }
+
+    /** Vuelve a mostrar los productos que una descarga apagó. Solo administradores. */
+    public function mostrarOcultos()
+    {
+        if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
+        if (!\LibertyFin\Dominio\Permisos::puede('editar.ajustes')) $this->volver('Solo un administrador puede hacerlo.', 'error');
+        $n = (new EmidaRepo(Conexion::de($_SESSION['empresa_db'])))->mostrarOcultos();
+        if ($n) Auditoria::anota('ajustes.cambiar', 'catálogo de Emida (ocultos)', null, $n . ' productos vueltos a mostrar');
+        $this->volver($n ? number_format($n) . ' productos vuelven a estar en el catálogo.' : 'No había productos ocultos.', 'ok');
     }
 
     /** El saldo con el proveedor, en JSON. La página lo pide sola al abrir. */

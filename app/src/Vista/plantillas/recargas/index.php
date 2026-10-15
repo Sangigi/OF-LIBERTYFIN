@@ -74,15 +74,31 @@ $total = (int)($totalCatalogo ?? count($productos));
 </section>
 <?php endif; ?>
 
+<?php if ($ocultos > 0): ?>
+<div class="alert alert-warning lf-rc-ocultos" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b><?= number_format($ocultos) ?> productos del catálogo están ocultos.</b>
+    Son los que una descarga del proveedor dejó de traer.
+    <?php if ($puedeAjustes): ?>Si deben seguir a la venta, vuélvelos a mostrar.<?php else: ?>Un administrador puede volver a mostrarlos.<?php endif; ?></span>
+  <?php if ($puedeAjustes): ?>
+  <form method="post" action="/recargas/ocultos" style="margin:0 0 0 auto;flex-shrink:0">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <button class="btn btn-primary btn-sm" type="submit">Volver a mostrarlos</button>
+  </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="lf-split">
   <section class="card lf-rc-catalogo">
     <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
       <div><span>Catálogo</span>
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
           Elige el producto, no la compañía: cada monto es uno distinto</p></div>
-      <div class="lf-pag-serv" id="rcPag" hidden>
-        <button type="button" id="rcAnt" aria-label="Anterior">&lsaquo;</button>
-        <span><b id="rcPagN">1</b> de <b id="rcPagT">1</b></span>
+      <?php $paginasIni = max(1, (int)ceil($total / max(1, (int)($porPagina ?? 18)))); ?>
+      <div class="lf-pag-serv" id="rcPag" <?= $paginasIni > 1 ? '' : 'hidden' ?>>
+        <button type="button" id="rcAnt" aria-label="Anterior" disabled>&lsaquo;</button>
+        <span><b id="rcPagN">1</b> de <b id="rcPagT"><?= $paginasIni ?></b></span>
         <button type="button" id="rcSig" aria-label="Siguiente">&rsaquo;</button>
       </div>
       <div class="lf-search" style="max-width:240px">
@@ -93,9 +109,9 @@ $total = (int)($totalCatalogo ?? count($productos));
 
     <?php if ($categorias): ?>
     <div class="lf-cat-fila" id="rcCats">
-      <button type="button" class="lf-pill active" data-cat="">Todos</button>
+      <button type="button" class="lf-pill active" data-cat="">Todos <span class="n"><?= number_format($total) ?></span></button>
       <?php foreach ($categorias as $c): ?>
-        <button type="button" class="lf-pill" data-cat="<?= P::e($c['categoria']) ?>"><?= P::e(mb_convert_case(mb_strtolower($c['categoria']), MB_CASE_TITLE)) ?></button>
+        <button type="button" class="lf-pill" data-cat="<?= P::e($c['categoria']) ?>"><?= P::e(mb_convert_case(mb_strtolower($c['categoria']), MB_CASE_TITLE)) ?> <span class="n"><?= number_format((int)$c['n']) ?></span></button>
       <?php endforeach; ?>
     </div>
     <?php endif; ?>
@@ -103,10 +119,11 @@ $total = (int)($totalCatalogo ?? count($productos));
     <?php /* La misma tarjeta de Caja: la imagen del proveedor si la tiene, si
              no el ícono; el nombre, la compañía y el monto. */ ?>
     <div class="lf-grid-serv" id="rcGrid">
-      <p id="rcVacio" <?= $total ? 'hidden' : '' ?>
-         style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
-        <?= $total ? 'Ningún producto coincide.' : 'El catálogo está vacío.' ?></p>
-      <?php foreach ($productos as $p):
+      <?php if (!$total): ?>
+        <p class="lf-rc-vacio">El catálogo está vacío.</p>
+      <?php endif; ?>
+      <?php P::parcial('recargas/tarjetas', ['productos' => $productos]); ?>
+      <?php if (false): foreach ($productos as $p):
         $variable = (float)$p['monto'] <= 0;
         $img = trim((string)($p['imagen'] ?? ''));
         $tieneImg = $img !== '' && strtoupper($img) !== 'NA' && preg_match('#^https?://#i', $img); ?>
@@ -131,7 +148,7 @@ $total = (int)($totalCatalogo ?? count($productos));
           <small><?= P::e($p['carrier'] ?: $p['categoria']) ?></small>
           <span class="p"><?= $variable ? 'Monto variable' : D::pesos($p['monto']) ?></span>
         </button>
-      <?php endforeach; ?>
+      <?php endforeach; endif; ?>
     </div>
   </section>
 

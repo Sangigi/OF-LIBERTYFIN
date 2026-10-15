@@ -130,11 +130,7 @@ final class EmidaRepo extends Repo
     public function productos($buscar = '', $categoria = '', $carrier = '', $limite = 60, $desfase = 0)
     {
         $this->asegurar();
-        $w = ['activo = 1']; $p = [];
-        if ($buscar !== '')    { $w[] = '(nombre LIKE ? OR producto_id = ?)';
-                                 $p[] = '%'.$buscar.'%'; $p[] = $buscar; }
-        if ($categoria !== '') { $w[] = 'categoria = ?'; $p[] = $categoria; }
-        if ($carrier !== '')   { $w[] = 'carrier = ?';   $p[] = $carrier; }
+        list($w, $p) = $this->filtro($buscar, $categoria, $carrier);
         return $this->todos("SELECT * FROM lf_emida_productos WHERE " . implode(' AND ', $w)
             . " ORDER BY categoria, carrier, monto
                LIMIT " . (int)$limite . " OFFSET " . (int)$desfase, $p);
@@ -143,13 +139,48 @@ final class EmidaRepo extends Repo
     public function cuantos($buscar = '', $categoria = '', $carrier = '')
     {
         $this->asegurar();
-        $w = ['activo = 1']; $p = [];
-        if ($buscar !== '')    { $w[] = '(nombre LIKE ? OR producto_id = ?)';
-                                 $p[] = '%'.$buscar.'%'; $p[] = $buscar; }
-        if ($categoria !== '') { $w[] = 'categoria = ?'; $p[] = $categoria; }
-        if ($carrier !== '')   { $w[] = 'carrier = ?';   $p[] = $carrier; }
+        list($w, $p) = $this->filtro($buscar, $categoria, $carrier);
         return (int)$this->valor("SELECT COUNT(*) FROM lf_emida_productos WHERE "
             . implode(' AND ', $w), $p);
+    }
+
+    /**
+     * El WHERE de la búsqueda. Por palabras: «telcel 100» encuentra
+     * «Recarga Telcel $100» (cada palabra en el nombre, la compañía o la
+     * categoría). El identificador, escrito completo, también.
+     */
+    private function filtro($buscar, $categoria, $carrier)
+    {
+        $w = ['activo = 1']; $p = [];
+        $buscar = trim((string)$buscar);
+        if ($buscar !== '') {
+            $y = [];
+            foreach (array_slice(preg_split('/\s+/', $buscar), 0, 6) as $pal) {
+                $y[] = '(nombre LIKE ? OR carrier LIKE ? OR categoria LIKE ?)';
+                $l = '%' . $pal . '%'; $p[] = $l; $p[] = $l; $p[] = $l;
+            }
+            $w[] = '((' . implode(' AND ', $y) . ') OR producto_id = ?)';
+            $p[] = $buscar;
+        }
+        if ($categoria !== '') { $w[] = 'categoria = ?'; $p[] = $categoria; }
+        if ($carrier !== '')   { $w[] = 'carrier = ?';   $p[] = $carrier; }
+        return [$w, $p];
+    }
+
+    /** Cuántos productos hay apagados (dejaron de llegar en una descarga). */
+    public function ocultos()
+    {
+        $this->asegurar();
+        return (int)$this->valor("SELECT COUNT(*) FROM lf_emida_productos WHERE activo = 0");
+    }
+
+    /** Vuelve a mostrar todos los apagados. Devuelve cuántos. */
+    public function mostrarOcultos()
+    {
+        $this->asegurar();
+        $st = $this->db->prepare("UPDATE lf_emida_productos SET activo = 1 WHERE activo = 0");
+        $st->execute();
+        return $st->rowCount();
     }
 
     /** Un producto por su identificador de Emida. */
