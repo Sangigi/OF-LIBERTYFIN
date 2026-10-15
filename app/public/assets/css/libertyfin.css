@@ -4276,3 +4276,5 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 @media(prefers-reduced-motion:reduce){
   .lf-promo-aviso,.lf-promo-tag.nueva,.lf-linea.lf-promo-flash{animation:none}
 }
+/* Promociones: qué hace el código de cupón. */
+.lf-promo-cod::placeholder{text-transform:none;font-family:var(--lf-font)}

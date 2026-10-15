@@ -753,7 +753,13 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
 
   /* Qué productos tienen promoción (sin las de código) y lo necesario
      para decir qué le falta al ticket. Lo arma Promociones::paraCaja. */
-  var PC = <?= json_encode($pc, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  <?php
+  // Un nombre con acentos mal guardados hace fallar json_encode y, con él,
+  // todo este script: se sustituye el carácter roto en vez de romper Caja.
+  $pcJson = json_encode($pc, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP
+          | (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0));
+  ?>
+  var PC = <?= $pcJson ?: 'null' ?> || { promos: {}, productos: {}, todo: [] };
   var ICO_PROMO = <?= json_encode(W::icono('pct', '14px')) ?>;
   var CARTA = {};   // id → nombre y precio de catálogo
   document.querySelectorAll('.lf-serv').forEach(function(b){

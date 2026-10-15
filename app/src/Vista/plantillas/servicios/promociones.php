@@ -165,10 +165,12 @@ $vigencia = function (array $p) {
     </div>
 
     <?php /* ── CONDICIONES ── */ ?>
-    <div style="width:170px">
-      <label class="form-label" for="pCodigo">Código <small>(opcional)</small></label>
-      <input class="form-control lf-mono" name="codigo" id="pCodigo" maxlength="30"
-             style="text-transform:uppercase" value="<?= P::e($e['codigo'] ?? '') ?>" placeholder="Ej. REFERIDO10">
+    <?php /* "Código" a secas se leía como el folio de la promoción: se
+             llenaba y la promoción dejaba de aplicarse sola. */ ?>
+    <div style="width:200px">
+      <label class="form-label" for="pCodigo">Código de cupón <small>(opcional)</small></label>
+      <input class="form-control lf-mono lf-promo-cod" name="codigo" id="pCodigo" maxlength="30"
+             style="text-transform:uppercase" value="<?= P::e($e['codigo'] ?? '') ?>" placeholder="Vacío: se aplica sola">
     </div>
     <div style="width:150px">
       <label class="form-label" for="pMinimo">Compra mínima</label>
@@ -193,8 +195,9 @@ $vigencia = function (array $p) {
     <p class="lf-promo-ayuda" style="width:100%;margin:0">
       Caja la aplica sola mientras esté vigente; el cajero puede quitarla de un renglón si no
       corresponde. Si a un producto le tocan dos, se queda la que más descuenta: no se acumulan.
-      La comisión se calcula sobre el precio con descuento. Con <b>código</b>, solo aplica si en
-      Caja se escribe.
+      La comisión se calcula sobre el precio con descuento. Con <b>código de cupón</b>, solo aplica
+      si el cajero lo escribe en Caja, y Caja no la anuncia en los productos; déjalo vacío para que
+      se aplique sola.
     </p>
   </form>
 </details>
@@ -239,7 +242,7 @@ $vigencia = function (array $p) {
           <td data-label="Cuándo">
             <span style="display:block"><?= P::e($vigencia($p)) ?></span>
             <?php if ($p['dias']): ?><small class="lf-promo-cond"><?= P::e(PR::diasTexto($p['dias'])) ?></small><?php endif; ?>
-            <?php if ($p['codigo']): ?><small class="lf-promo-cond">con el código <b class="lf-mono"><?= P::e($p['codigo']) ?></b></small><?php endif; ?>
+            <?php if ($p['codigo']): ?><small class="lf-promo-cond">solo con el cupón <b class="lf-mono"><?= P::e($p['codigo']) ?></b></small><?php endif; ?>
             <?php if ((float)$p['minimo'] > 0): ?><small class="lf-promo-cond">compra mínima <?= D::pesos($p['minimo']) ?></small><?php endif; ?>
             <?php if ($p['limite'] !== null): ?><small class="lf-promo-cond">hasta <?= (int)$p['limite'] ?> venta<?= (int)$p['limite'] === 1 ? '' : 's' ?></small><?php endif; ?>
           </td>
