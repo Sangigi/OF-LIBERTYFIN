@@ -12,7 +12,7 @@ use LibertyFin\Servicio\CrearEmpresa as CE;
  *
  * Lo que se promete es lo que pasa: se manda una SOLICITUD, alguien la
  * revisa y los accesos llegan por correo (ver Servicio\CrearEmpresa). La
- * prueba dura 30 días, que es lo que se le da al aprobarla.
+ * prueba dura 15 días, que es lo que se le da al aprobarla.
  */
 $token = $_SESSION['lf_token'];
 $prev = $previo ?? [];   // lo ya escrito, o lo que trae el enlace de la landing
@@ -36,7 +36,7 @@ $flecha  = '<svg class="fl" viewBox="0 0 24 24" fill="none" stroke="currentColor
         <?php else: ?>Libertyfin<?php endif; ?>
       </a>
 
-      <span class="lf-rg-chip"><i></i>30 días gratis · Sin tarjeta de crédito</span>
+      <span class="lf-rg-chip"><i></i>15 días gratis · Sin tarjeta de crédito</span>
       <h1>Tu negocio,<br><em>en orden.</em></h1>
       <p class="lf-rg-intro">Cobra en caja, persigue lo que te deben y reparte comisiones desde un solo
         lugar, en la computadora o en el celular.</p>
@@ -54,7 +54,7 @@ $flecha  = '<svg class="fl" viewBox="0 0 24 24" fill="none" stroke="currentColor
       </ul>
 
       <ul class="lf-rg-checks">
-        <?php foreach (['Sin tarjeta de crédito', '30 días para probarlo completo',
+        <?php foreach (['Sin tarjeta de crédito', '15 días para probarlo completo',
                         'Tu información en su propia base de datos', 'Soporte desde el mismo sistema'] as $c): ?>
           <li><?= $check ?><?= P::e($c) ?></li>
         <?php endforeach; ?>
@@ -89,9 +89,9 @@ $flecha  = '<svg class="fl" viewBox="0 0 24 24" fill="none" stroke="currentColor
 
     <?php else: ?>
       <h2>Crea tu cuenta gratis</h2>
-      <p class="lf-rg-sub">30 días de prueba. Sin tarjeta de crédito.</p>
+      <p class="lf-rg-sub">15 días de prueba. Sin tarjeta de crédito.</p>
       <?php if ($plan !== 'prueba' && isset($planes[$plan])): ?>
-        <p class="lf-rg-plan">Elegiste el plan <b><?= P::e($planes[$plan]) ?></b>: empiezas con los 30 días sin costo.</p>
+        <p class="lf-rg-plan">Elegiste el plan <b><?= P::e($planes[$plan]) ?></b>: empiezas con los 15 días sin costo.</p>
       <?php endif; ?>
 
       <?php if ($error): ?>
