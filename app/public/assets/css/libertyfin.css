@@ -4893,3 +4893,30 @@ tr.lf-apagado td{opacity:.6}
 .lf-elige-cli-pista{top:0;right:2px;left:auto;margin-top:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;text-align:right}
 /* En un formulario, el buscador de cliente mide lo mismo que los demás campos. */
 .lf-form .lf-elige-cli .lf-search input{min-height:42px;padding-top:10px;padding-bottom:10px;border-radius:var(--lf-r)}
+/* El menú cambia sin recargar: lo que llega se ilumina un momento. */
+.lf-nav a.lf-nav-nuevo{animation:lf-nav-nuevo 2s ease}
+@keyframes lf-nav-nuevo{0%,35%{background:var(--lf-brand-soft);color:var(--lf-brand-2)}100%{}}
+/* Aviso flotante (lfAvisar). */
+.lf-toast{position:fixed;top:74px;right:16px;z-index:430;display:flex;align-items:center;gap:10px;
+  width:min(380px,calc(100vw - 32px));padding:12px 10px 12px 14px;border-radius:14px;font-size:13px;font-weight:600;
+  background:var(--lf-sup);color:var(--lf-tinta);border:1px solid var(--lf-linea);border-left:4px solid var(--lf-brand);
+  box-shadow:var(--lf-s3, 0 12px 32px rgba(0,0,0,.16));animation:lf-toast-entra .25s ease}
+.lf-toast span{flex:1;min-width:0;line-height:1.45}
+.lf-toast.mal{border-left-color:var(--lf-rojo)}
+.lf-toast .x{border:0;background:none;font-size:18px;line-height:1;color:var(--lf-tinta-4);cursor:pointer;padding:2px 4px}
+.lf-toast.va{opacity:0;transform:translateY(-8px);transition:opacity .4s,transform .4s}
+/* Los filtros por estado (Cotizaciones, Compras): aire antes de lo que sigue. */
+.lf-pills.lf-pills-filtro{margin-bottom:18px}
+.lf-pills.lf-pills-filtro + .lf-filtros{margin-top:0}
+/* Agenda sin recargar: el aviso del formulario y la cita recién guardada. */
+.lf-form > [data-aviso]{flex:0 0 100%;margin:0}
+.lf-ag-cita.nueva{animation:lf-ag-nueva 1.8s ease}
+@keyframes lf-ag-nueva{0%,30%{box-shadow:0 0 0 4px var(--lf-brand-ring), var(--lf-s2)}100%{box-shadow:var(--lf-s1)}}
+/* Recargas: la tarjeta de Caja con el logo del proveedor (entero, sin recortar). */
+.lf-serv .e.foto{flex:0 0 auto;display:flex;align-items:center;justify-content:center;width:calc(100% + 22px);
+  height:auto;aspect-ratio:4 / 3;margin:0 -11px 10px;padding:12px 16px;border-radius:0;background:#fff;
+  border-bottom:1px solid var(--lf-linea)}
+.lf-serv .e.foto img{display:block;max-width:100%;max-height:100%;object-fit:contain}
+.lf-serv.on{border-color:var(--lf-brand);background:var(--lf-brand-glow);box-shadow:0 0 0 3px var(--lf-brand-ring)}
+button.lf-pill{font-family:inherit;cursor:pointer}
+.lf-rc-catalogo .lf-grid-serv{padding-top:4px}

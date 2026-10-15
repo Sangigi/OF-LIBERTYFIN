@@ -325,6 +325,40 @@ elseif ($pestana === 'modulos'):
     <?php endforeach; ?>
   </div>
 <?php endforeach; ?>
+<script>
+/* Encender o apagar sin recargar: la tarjeta cambia al momento y, cuando
+   contesta el servidor, todas quedan como de verdad quedaron (encender
+   Compras enciende Inventario; apagar Inventario apaga Compras). El menú
+   lo cambia el armazón (lfPonerMenu). Una sola vez por pestaña. */
+(function () {
+  if (window.lfModulosJs) return;
+  window.lfModulosJs = true;
+  function tarjeta(clave) {
+    var i = document.querySelector('.lf-mod input[name="clave"][value="' + clave + '"]');
+    return i ? i.closest('.lf-mod') : null;
+  }
+  function poner(t, on) {
+    var cb = t.querySelector('input[type="checkbox"][name="activo"]');
+    if (cb) cb.checked = on;
+    t.classList.toggle('on', on && !t.classList.contains('candado'));
+    var sw = t.querySelector('.lf-sw'); if (sw) sw.title = on ? 'Apagar' : 'Encender';
+  }
+  document.addEventListener('change', function (e) {
+    var t = e.target.closest('.lf-mod');
+    if (t && e.target.matches('input[type="checkbox"][name="activo"]')) poner(t, e.target.checked);
+  });
+  document.addEventListener('lf:guardado', function (e) {
+    var f = e.detail.form, d = e.detail.datos;
+    if (!f || !f.classList.contains('lf-mod')) return;
+    if (d.ok && d.modulos) {
+      Object.keys(d.modulos).forEach(function (k) { var t = tarjeta(k); if (t) poner(t, !!d.modulos[k]); });
+    } else if (!d.ok) {
+      var cb = f.querySelector('input[type="checkbox"][name="activo"]');
+      if (cb) poner(f, !cb.checked);   // no se guardó: vuelve a como estaba
+    }
+  });
+})();
+</script>
 
 <?php /* ═══════════════ INVENTARIO ═══════════════ */ elseif ($pestana === 'inventario'):
   $opInv = \LibertyFin\Datos\ConfigRepo::INVENTARIO;

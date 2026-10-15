@@ -54,28 +54,28 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
 <?php endif; ?>
 
 <?php /* ═══════════ LA SEMANA ═══════════ */ ?>
-<div class="lf-ag-semana">
-  <a class="lf-ag-flecha" href="/agenda?dia=<?= date('Y-m-d', strtotime($lunes . ' -7 days')) ?>" aria-label="Semana anterior">‹</a>
+<div class="lf-ag-semana" data-dia="<?= P::e($dia) ?>">
+  <a class="lf-ag-flecha" data-parcial href="/agenda?dia=<?= date('Y-m-d', strtotime($lunes . ' -7 days')) ?>" aria-label="Semana anterior">‹</a>
   <?php for ($i = 0; $i < 7; $i++): $d = date('Y-m-d', strtotime($lunes . " +$i days")); ?>
-    <a class="lf-ag-dia<?= $d === $dia ? ' on' : '' ?><?= $d === $hoy ? ' hoy' : '' ?>" href="/agenda?dia=<?= $d ?>">
+    <a class="lf-ag-dia<?= $d === $dia ? ' on' : '' ?><?= $d === $hoy ? ' hoy' : '' ?>" data-parcial href="/agenda?dia=<?= $d ?>">
       <small><?= $diasCortos[$i] ?></small><b><?= (int)date('j', strtotime($d)) ?></b>
       <span><?= !empty($porDia[$d]) ? $porDia[$d] . ($porDia[$d] === 1 ? ' cita' : ' citas') : '&nbsp;' ?></span>
     </a>
   <?php endfor; ?>
-  <a class="lf-ag-flecha" href="/agenda?dia=<?= date('Y-m-d', strtotime($lunes . ' +7 days')) ?>" aria-label="Semana siguiente">›</a>
+  <a class="lf-ag-flecha" data-parcial href="/agenda?dia=<?= date('Y-m-d', strtotime($lunes . ' +7 days')) ?>" aria-label="Semana siguiente">›</a>
   <form method="get" action="/agenda" class="lf-ag-ir">
     <input class="form-control form-control-sm" type="date" name="dia" value="<?= P::e($dia) ?>" aria-label="Ir a un día"
-           onchange="this.form.submit()">
-    <?php if ($dia !== $hoy): ?><a class="btn btn-secondary btn-sm" href="/agenda">Hoy</a><?php endif; ?>
+           onchange="if (window.lfIr) lfIr('/agenda?dia=' + this.value); else this.form.submit();">
+    <?php if ($dia !== $hoy): ?><a class="btn btn-secondary btn-sm" data-parcial href="/agenda">Hoy</a><?php endif; ?>
   </form>
 </div>
 
 <?php if ($puedeEditar): ?>
 <details class="lf-alta" id="altaCita" <?= $abrir || $prev ? 'open' : '' ?>>
-  <summary><?= W::icono($edit ? 'agenda' : 'mas','16px') ?> <?= $edit ? 'Mover o cambiar la cita de ' . P::e($edit['cliente_nombre']) : 'Agendar una cita' ?></summary>
+  <summary><?= W::icono('agenda','16px') ?> <span id="citaTitulo"><?= $edit ? 'Mover o cambiar la cita de ' . P::e($edit['cliente_nombre']) : 'Agendar una cita' ?></span></summary>
   <form method="post" action="/agenda/guardar" class="lf-form" id="formCita">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
-    <?php if ($edit): ?><input type="hidden" name="id" value="<?= (int)$edit['id'] ?>"><?php endif; ?>
+    <input type="hidden" name="id" id="citaId" value="<?= $edit ? (int)$edit['id'] : '' ?>">
     <div style="flex:2;min-width:230px">
       <?php P::parcial('parciales/elegir-cliente', ['pref' => 'cita', 'etiqueta' => 'Cliente', 'alElegir' => 'lfCitaCliente',
             'idVal' => (string)($f['cliente_id'] ?? ''), 'nomVal' => (string)($f['cliente_nombre'] ?? '')]); ?>
@@ -121,9 +121,10 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
       <input class="form-control" name="notas" id="citaNotas" maxlength="255" value="<?= P::e($f['notas']) ?>" placeholder="Viene con su hija, alergia al látex…">
     </div>
     <div style="flex-direction:row;gap:10px">
-      <button class="btn btn-primary" type="submit"><?= $edit ? 'Guardar cambios' : 'Agendar' ?></button>
-      <?php if ($edit): ?><a class="btn btn-secondary" href="/agenda?dia=<?= P::e($dia) ?>">Cancelar</a><?php endif; ?>
+      <button class="btn btn-primary" type="submit" id="citaBoton"><?= $edit ? 'Guardar cambios' : 'Agendar' ?></button>
+      <button class="btn btn-secondary" type="button" id="citaCancelar" <?= $edit ? '' : 'hidden' ?>>Cancelar</button>
     </div>
+    <p data-aviso hidden></p>
   </form>
 </details>
 <?php endif; ?>
@@ -150,6 +151,7 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
         <div class="lf-ag-cuerpo">
           <?php if ($puedeEditar): for ($m = $ini; $m < $fin; $m += $paso): ?>
             <a class="lf-ag-hueco" style="top:<?= ($m - $ini) * $PX ?>px;height:<?= $paso * $PX ?>px"
+               data-hora="<?= sprintf('%02d:%02d', intdiv($m, 60), $m % 60) ?>" data-colab="<?= $cid ? (int)$cid : '' ?>"
                href="/agenda?dia=<?= P::e($dia) ?>&amp;nueva=1&amp;hora=<?= sprintf('%02d:%02d', intdiv($m, 60), $m % 60) ?><?= $cid ? '&amp;colab=' . (int)$cid : '' ?>#altaCita"
                aria-label="Agendar a las <?= sprintf('%02d:%02d', intdiv($m, 60), $m % 60) ?>"></a>
           <?php endfor; endif; ?>
@@ -177,8 +179,13 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
   <?php if (!$citas): ?>
     <div class="card-body lf-inv-vacio">No hay citas este día.</div>
   <?php endif; ?>
-  <?php foreach ($citas as $c): ?>
-    <div class="lf-ag-item" id="cita-<?= (int)$c['id'] ?>">
+  <?php foreach ($citas as $c):
+      $datosCita = ['id' => (int)$c['id'], 'cliente_id' => $c['cliente_id'] ? (int)$c['cliente_id'] : '',
+          'cliente_nombre' => (string)$c['cliente_nombre'], 'telefono' => (string)$c['telefono'],
+          'colaborador_id' => $c['colaborador_id'] ? (int)$c['colaborador_id'] : '', 'producto_id' => $c['producto_id'] ? (int)$c['producto_id'] : '',
+          'fecha' => substr($c['inicio'], 0, 10), 'hora' => date('H:i', strtotime($c['inicio'])),
+          'duracion' => (int)round((strtotime($c['fin']) - strtotime($c['inicio'])) / 60), 'notas' => (string)$c['notas']]; ?>
+    <div class="lf-ag-item" id="cita-<?= (int)$c['id'] ?>" data-datos="<?= P::e(json_encode($datosCita, JSON_UNESCAPED_UNICODE)) ?>">
       <div class="h lf-mono"><?= P::e(date('H:i', strtotime($c['inicio']))) ?><small><?= P::e(date('H:i', strtotime($c['fin']))) ?></small></div>
       <div class="q">
         <b><?= $c['cliente_id'] ? '<a href="/clientes/' . (int)$c['cliente_id'] . '">' . P::e($c['cliente_nombre']) . '</a>' : P::e($c['cliente_nombre']) ?></b>
@@ -201,14 +208,14 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
               <div>
                 <?php foreach (['confirmada' => 'Confirmó', 'agendada' => 'Sin confirmar', 'no_vino' => 'No vino', 'cancelada' => 'Cancelar cita'] as $k => $t):
                     if ($k === $c['estado']) continue; ?>
-                  <form method="post" action="/agenda/estado">
+                  <form method="post" action="/agenda/estado" class="lf-ag-f">
                     <input type="hidden" name="token" value="<?= P::e($token) ?>">
                     <input type="hidden" name="id" value="<?= (int)$c['id'] ?>">
                     <input type="hidden" name="estado" value="<?= $k ?>">
                     <button type="submit"><?= P::e($t) ?></button>
                   </form>
                 <?php endforeach; ?>
-                <a href="/agenda?dia=<?= P::e($dia) ?>&amp;editar=<?= (int)$c['id'] ?>#altaCita">Mover o cambiar</a>
+                <a href="/agenda?dia=<?= P::e($dia) ?>&amp;editar=<?= (int)$c['id'] ?>#altaCita" data-editar>Mover o cambiar</a>
               </div>
             </details>
           <?php endif; ?>
@@ -223,7 +230,7 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
 <?php if ($puedeAjustes): ?>
 <details class="lf-alta lf-ag-horario">
   <summary><?= W::icono('reloj','16px') ?> Horario de la agenda: <?= P::e($horario['inicio']) ?> a <?= P::e($horario['fin']) ?>, cada <?= (int)$horario['intervalo'] ?> min</summary>
-  <form method="post" action="/agenda/horario?dia=<?= P::e($dia) ?>" class="lf-form">
+  <form method="post" action="/agenda/horario?dia=<?= P::e($dia) ?>" class="lf-form lf-ag-f">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
     <div style="width:130px"><label class="form-label" for="hIni">Abre</label>
       <input class="form-control" type="time" name="inicio" id="hIni" value="<?= P::e($horario['inicio']) ?>" required></div>
@@ -240,15 +247,6 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
 
 <script>
 (function(){
-  /* Tocar una cita en la cuadrícula lleva a su renglón de la lista, con sus acciones. */
-  document.querySelectorAll('.lf-ag-cita').forEach(function(b){
-    b.addEventListener('click', function(){
-      var it = document.getElementById('cita-' + b.dataset.cita);
-      if (!it) return;
-      it.scrollIntoView({behavior: 'smooth', block: 'center'});
-      it.classList.remove('foco'); void it.offsetWidth; it.classList.add('foco');
-    });
-  });
   /* El servicio trae su duración; el cliente, su teléfono. */
   var serv = document.getElementById('citaServ'), dur = document.getElementById('citaDur');
   if (serv && dur) serv.addEventListener('change', function(){
@@ -270,5 +268,140 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
     var ahora = new Date(), m = ahora.getHours() * 60 + ahora.getMinutes();
     sc.scrollTop = Math.max(0, (m - <?= $ini ?> - 60) * <?= $PX ?>);
   }
+
+  /* ══ SIN RECARGAR ══
+     Agendar, mover, confirmar o cancelar se guardan por detrás y solo se
+     vuelve a pedir lo de la agenda (la semana, la cuadrícula y la lista).
+     Tocar un espacio libre abre el formulario ahí, con su hora y su
+     especialista. Se conecta una sola vez por pestaña: todo va delegado
+     al documento, así sirve también para lo que se vuelve a pintar. */
+  if (window.lfAgendaJs) return;
+  window.lfAgendaJs = true;
+  var $ = function (id) { return document.getElementById(id); };
+  var avisar = function (t, tipo) { if (window.lfAvisar) window.lfAvisar(t, tipo); else alert(t); };
+  function diaActual() { var s = document.querySelector('.lf-ag-semana'); return s ? s.dataset.dia : ''; }
+
+  function abrirForm(c, editando) {
+    var f = $('formCita');
+    if (!f) return;
+    $('citaId').value = editando ? c.id : '';
+    var caja = f.querySelector('[data-elige-cli]');
+    if (caja) {
+      caja.querySelector('input[type="text"]').value = c.cliente_nombre || '';
+      caja.querySelector('input[type="hidden"]').value = c.cliente_id || '';
+      var pista = caja.querySelector('.lf-elige-cli-pista'); if (pista) pista.textContent = c.cliente_id ? '✓ Cliente del catálogo' : '';
+      var sug = caja.querySelector('.lf-sugerencias'); if (sug) sug.hidden = true;
+    }
+    $('citaTel').value = c.telefono || '';
+    $('citaServ').value = c.producto_id || '';
+    $('citaEsp').value = c.colaborador_id || '';
+    $('citaFecha').value = c.fecha || diaActual();
+    $('citaHora').value = c.hora || '';
+    $('citaDur').value = c.duracion || '';
+    $('citaNotas').value = c.notas || '';
+    $('citaTitulo').textContent = editando ? 'Mover o cambiar la cita de ' + c.cliente_nombre : 'Agendar una cita';
+    $('citaBoton').textContent = editando ? 'Guardar cambios' : 'Agendar';
+    $('citaCancelar').hidden = !editando;
+    var av = f.querySelector('[data-aviso]'); if (av) av.hidden = true;
+    var d = $('altaCita');
+    d.open = true;
+    d.scrollIntoView({behavior: 'smooth', block: 'start'});
+    setTimeout(function () { var n = editando ? $('citaHora') : $('citaNombre'); if (n) n.focus({preventScroll: true}); }, 350);
+  }
+
+  /* Vuelve a pedir la agenda del día y cambia solo sus partes. */
+  function refrescar(dia, id) {
+    if (dia && dia !== diaActual() && window.lfIr) { window.lfIr('/agenda?dia=' + dia); return; }
+    var sc = document.querySelector('.lf-ag-scroll'), arriba = sc ? sc.scrollTop : 0;
+    fetch('/agenda?dia=' + encodeURIComponent(dia || diaActual()), {headers: {'X-LF-Parcial': '1'}, credentials: 'same-origin'})
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        ['.lf-ag-semana', '.lf-ag-card', '.lf-ag-lista', '.lf-ag-horario'].forEach(function (s) {
+          var viejo = document.querySelector(s), nuevo = doc.querySelector(s);
+          if (viejo && nuevo) viejo.replaceWith(document.importNode(nuevo, true));
+        });
+        var sc2 = document.querySelector('.lf-ag-scroll');
+        if (sc2) sc2.scrollTop = arriba;
+        var c = id && document.querySelector('.lf-ag-cita[data-cita="' + id + '"]');
+        if (c && sc2) {
+          var top = c.offsetTop, alto = sc2.clientHeight - 40;
+          if (top < sc2.scrollTop || top > sc2.scrollTop + alto) sc2.scrollTop = Math.max(0, top - 60);
+          c.classList.add('nueva');
+        }
+      })
+      .catch(function () { location.reload(); });
+  }
+
+  function enviar(f) {
+    if (f._enviando) return;
+    f._enviando = true;
+    var esCita = f.getAttribute('id') === 'formCita', btn = f.querySelector('[type="submit"]');
+    if (esCita && btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+    fetch(f.action, {method: 'POST', body: new FormData(f), credentials: 'same-origin',
+                     headers: {'X-LF-Json': '1', 'X-Requested-With': 'XMLHttpRequest'}})
+      .then(function (r) { return r.text(); })
+      .then(function (t) {
+        var j = null;
+        try { j = JSON.parse(t); } catch (e) {}
+        if (!j) { location.reload(); return; }
+        if (!j.ok) {
+          if (esCita) {
+            var av = f.querySelector('[data-aviso]');
+            av.className = 'lf-guardado mal'; av.textContent = j.mensaje; av.hidden = false;
+          } else avisar(j.mensaje, 'error');
+          return;
+        }
+        avisar(j.mensaje, 'ok');
+        var mas = f.closest('details'); if (mas && !esCita) mas.open = false;
+        if (esCita) {
+          abrirForm({}, false);
+          $('altaCita').open = false;
+          var card = document.querySelector('.lf-ag-card');
+          if (card) card.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+        refrescar(j.dia, j.id);
+      })
+      .catch(function () { avisar('No se pudo guardar: revisa tu conexión.', 'error'); })
+      .then(function () {
+        f._enviando = false;
+        if (esCita && btn) { btn.disabled = false; btn.textContent = $('citaId').value ? 'Guardar cambios' : 'Agendar'; }
+      });
+  }
+
+  document.addEventListener('submit', function (e) {
+    var f = e.target;
+    if (!f || (f.getAttribute('id') !== 'formCita' && !f.classList.contains('lf-ag-f'))) return;
+    e.preventDefault();
+    enviar(f);
+  });
+
+  document.addEventListener('click', function (e) {
+    /* Un espacio libre: el formulario con esa hora y ese especialista. */
+    var h = e.target.closest('.lf-ag-hueco');
+    if (h && $('formCita')) {
+      e.preventDefault();
+      abrirForm({hora: h.dataset.hora, colaborador_id: h.dataset.colab, fecha: diaActual()}, false);
+      return;
+    }
+    /* «Mover o cambiar»: el formulario con los datos de la cita. */
+    var ed = e.target.closest('[data-editar]');
+    if (ed && $('formCita')) {
+      e.preventDefault();
+      var it = ed.closest('.lf-ag-item'), mas = ed.closest('details');
+      if (mas) mas.open = false;
+      try { abrirForm(JSON.parse(it.dataset.datos), true); } catch (x) { location.href = ed.href; }
+      return;
+    }
+    if (e.target.closest('#citaCancelar')) { abrirForm({}, false); $('altaCita').open = false; return; }
+    /* Tocar una cita en la cuadrícula lleva a su renglón de la lista, con sus acciones. */
+    var b = e.target.closest('.lf-ag-cita');
+    if (b) {
+      var fila = document.getElementById('cita-' + b.dataset.cita);
+      if (!fila) return;
+      fila.scrollIntoView({behavior: 'smooth', block: 'center'});
+      fila.classList.remove('foco'); void fila.offsetWidth; fila.classList.add('foco');
+    }
+  });
 })();
 </script>

@@ -65,8 +65,8 @@ final class AgendaControlador
         if (!$this->tokenValido()) $this->volver($dia, 'No se pudo verificar el formulario.', 'error');
         $db = Conexion::de($_SESSION['empresa_db']);
         try {
-            (new Agenda($db))->guardar($_POST, $id, $_SESSION['usuario_nombre'] ?? '');
-            $this->volver($dia, $id ? 'Cita actualizada.' : 'Cita agendada.', 'ok');
+            $cita = (new Agenda($db))->guardar($_POST, $id, $_SESSION['usuario_nombre'] ?? '');
+            $this->volver($dia, $id ? 'Cita actualizada.' : 'Cita agendada.', 'ok', [], ['id' => $cita]);
         } catch (\InvalidArgumentException $e) {
             $_SESSION['lf_agenda_previo'] = array_intersect_key($_POST, array_flip(
                 ['cliente_id', 'cliente_nombre', 'telefono', 'colaborador_id', 'producto_id', 'hora', 'duracion', 'notas']));
@@ -88,7 +88,7 @@ final class AgendaControlador
         if (!$this->tokenValido()) $this->volver($dia, 'No se pudo verificar el formulario.', 'error');
         try {
             $srv->estado($id, (string)($_POST['estado'] ?? ''));
-            $this->volver($dia, 'Cita de ' . ($c['cliente_nombre'] ?? '') . ': ' . mb_strtolower(Agenda::ESTADOS[$_POST['estado']]) . '.', 'ok');
+            $this->volver($dia, 'Cita de ' . ($c['cliente_nombre'] ?? '') . ': ' . mb_strtolower(Agenda::ESTADOS[$_POST['estado']]) . '.', 'ok', [], ['id' => $id]);
         } catch (\InvalidArgumentException $e) {
             $this->volver($dia, $e->getMessage(), 'error');
         }
@@ -123,8 +123,19 @@ final class AgendaControlador
             && hash_equals($_SESSION['lf_token'], (string)$_POST['token']);
     }
 
-    private function volver($dia, $texto, $tipo, array $extra = [])
+    /**
+     * Guardado por detrás (la agenda no se recarga): contesta JSON con el
+     * día al que hay que ir. Si no, como siempre: aviso y redirección.
+     */
+    private function volver($dia, $texto, $tipo, array $extra = [], array $datos = [])
     {
+        if (!empty($_SERVER['HTTP_X_LF_JSON'])) {
+            unset($_SESSION['lf_agenda_previo']);
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode(['ok' => $tipo !== 'error', 'mensaje' => $texto, 'dia' => $dia] + $datos,
+                             JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+            exit;
+        }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /agenda?' . http_build_query(array_merge(['dia' => $dia], $extra))); exit;
     }

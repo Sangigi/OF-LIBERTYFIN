@@ -419,7 +419,59 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
   window.addEventListener('popstate', function (ev) {
     if (ev.state && ev.state.lfNav) ir(location.href, false);
   });
+
+  /* Para las pantallas que cambian de día, de filtro… desde un script. */
+  window.lfIr = function (url) { ir(url, true); };
 })();
+
+/* ══════════════════════════════════════════════════════
+   EL MENÚ CAMBIA SIN RECARGAR
+   Encender un módulo (Ajustes → Módulos) agrega su sección
+   al menú. Antes se recargaba la página para verla; ahora el
+   servidor manda el menú nuevo y aquí se cambia en su lugar.
+   Lo que aparece se ilumina un momento: que se note qué llegó.
+   ══════════════════════════════════════════════════════ */
+window.lfPonerMenu = function (html) {
+  if (!html) return;
+  var doc = new DOMParser().parseFromString(html, 'text/html');
+  var nav = document.querySelector('.lf-nav'), navNueva = doc.querySelector('.lf-nav');
+  if (nav && navNueva) {
+    var antes = {};
+    nav.querySelectorAll('a').forEach(function (a) { antes[a.getAttribute('href')] = true; });
+    nav.innerHTML = navNueva.innerHTML;
+    nav.querySelectorAll('a').forEach(function (a) {
+      if (!antes[a.getAttribute('href')]) a.classList.add('lf-nav-nuevo');
+    });
+  }
+  /* La barra de abajo (teléfono): solo sus enlaces; el botón «Más»
+     conserva lo que ya tenía conectado. */
+  var dedo = document.querySelector('.lf-dedo'), dedoNuevo = doc.querySelector('.lf-dedo');
+  if (dedo && dedoNuevo) {
+    var mas = dedo.querySelector('button');
+    dedo.querySelectorAll('a').forEach(function (a) { a.remove(); });
+    dedoNuevo.querySelectorAll('a').forEach(function (a) { dedo.insertBefore(document.importNode(a, true), mas); });
+  }
+};
+
+/* ══════════════════════════════════════════════════════
+   UN AVISO QUE NO DEPENDE DE LA PÁGINA
+   Arriba a la derecha, se va solo. Sobrevive a que el centro
+   se cambie (guardar una cita y refrescar la agenda, p. ej.).
+   ══════════════════════════════════════════════════════ */
+window.lfAvisar = function (texto, tipo) {
+  var viejo = document.querySelector('.lf-toast');
+  if (viejo) viejo.remove();
+  var t = document.createElement('div');
+  t.className = 'lf-toast' + (tipo === 'error' ? ' mal' : '');
+  t.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+  var s = document.createElement('span'); s.textContent = texto;
+  var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.setAttribute('aria-label', 'Cerrar'); x.innerHTML = '&times;';
+  t.appendChild(s); t.appendChild(x);
+  document.body.appendChild(t);
+  var fuera = function () { t.classList.add('va'); setTimeout(function () { t.remove(); }, 450); };
+  x.addEventListener('click', fuera);
+  setTimeout(fuera, tipo === 'error' ? 8000 : 4000);
+};
 
 /* ══════════════════════════════════════════════════════
    SELECTOR DE ARCHIVO
@@ -510,6 +562,10 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
         if (j && typeof j.ok !== 'undefined') {
           aviso(form, j.mensaje || j.error || (j.ok ? 'Guardado.' : 'No se pudo guardar.'),
                 j.ok ? 'ok' : 'error');
+          if (j.menu && window.lfPonerMenu) window.lfPonerMenu(j.menu);
+          /* La pantalla puede querer reaccionar (Módulos pone los
+             interruptores como quedaron). */
+          document.dispatchEvent(new CustomEvent('lf:guardado', { detail: { form: form, datos: j } }));
           if (j.ok && j.recargar) location.reload();
           return;
         }

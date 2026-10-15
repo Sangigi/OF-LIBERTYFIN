@@ -136,7 +136,13 @@ final class AjustesControlador
                 $nombre = \LibertyFin\Servicio\Modulos::CATALOGO[$clave]['nombre'] ?? 'Módulo';
                 $extra = count($cambios) > 1 ? ' (también ' . implode(', ', array_map(function ($k) {
                     return \LibertyFin\Servicio\Modulos::CATALOGO[$k]['nombre']; }, array_slice($cambios, 1))) . ')' : '';
-                $this->volver('modulos', $nombre . ($on ? ' encendido' : ' apagado') . $extra . '.', 'ok', true);
+                // Sin recargar: el menú nuevo y cómo quedó cada módulo (encender
+                // uno puede encender o apagar otros), y la página los pone.
+                $mod = new \LibertyFin\Servicio\Modulos(new ConfigRepo($db));
+                $estado = [];
+                foreach (\LibertyFin\Servicio\Modulos::CATALOGO as $k => $_) $estado[$k] = $mod->encendido($k);
+                $this->volver('modulos', $nombre . ($on ? ' encendido' : ' apagado') . $extra . '.', 'ok',
+                              ['menu' => $this->menuHtml(), 'modulos' => $estado]);
             } catch (\InvalidArgumentException $e) {
                 $this->volver('modulos', $e->getMessage(), 'error');
             } catch (\Throwable $e) {
@@ -157,8 +163,8 @@ final class AjustesControlador
                     \LibertyFin\Servicio\Auditoria::anota('ajustes.cambiar', 'Inventario',
                         json_encode(array_intersect_key($antes, $cambio)), json_encode($cambio));
                 }
-                // Encenderlo o apagarlo cambia el menú: se recarga para verlo.
-                $this->volver('inventario', 'Guardado.', 'ok', isset($cambio['activo']));
+                // Encenderlo o apagarlo cambia el menú: va el menú nuevo, sin recargar.
+                $this->volver('inventario', 'Guardado.', 'ok', isset($cambio['activo']) ? ['menu' => $this->menuHtml()] : []);
             } catch (\InvalidArgumentException $e) {
                 $this->volver('inventario', $e->getMessage(), 'error');
             } catch (\Throwable $e) {
@@ -319,17 +325,36 @@ final class AjustesControlador
      * cambia es el envoltorio.
      */
     /** @param bool $recargar  el cambio se ve fuera del formulario (el menú): recargar la página */
-    private function volver($pestana, $texto, $tipo, $recargar = false)
+    /**
+     * @param array|bool $extra  lo que viaja con la respuesta por detrás
+     *                           (menu, modulos…); true = que la página se recargue
+     */
+    private function volver($pestana, $texto, $tipo, $extra = [])
     {
         if ($this->porDetras()) {
             header('Content-Type: application/json; charset=utf-8');
-            echo json_encode(['ok' => $tipo !== 'error', 'mensaje' => $texto,
-                              'tipo' => $tipo, 'pestana' => $pestana, 'recargar' => (bool)$recargar],
-                             JSON_UNESCAPED_UNICODE);
+            echo json_encode(['ok' => $tipo !== 'error', 'mensaje' => $texto, 'tipo' => $tipo, 'pestana' => $pestana,
+                              'recargar' => $extra === true] + (is_array($extra) ? $extra : []),
+                             JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
             exit;
         }
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
         header('Location: /ajustes?t=' . $pestana); exit;
+    }
+
+    /** El menú lateral ya con los cambios, para ponerlo sin recargar. */
+    private function menuHtml()
+    {
+        $nivel = ob_get_level();
+        try {
+            ob_start();
+            Plantilla::parcial('parciales/sidebar', ['activo' => 'serv']);
+            return ob_get_clean();
+        } catch (\Throwable $e) {
+            while (ob_get_level() > $nivel) ob_end_clean();
+            error_log('[LibertyFin] menú para ajustes: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /** ¿Lo pidió el navegador por detrás, sin recargar? */

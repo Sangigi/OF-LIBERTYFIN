@@ -208,10 +208,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
 // Recargas: la ruta solo existe si hay credenciales. Sin ellas, 404.
 if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
-    $r->post('/recargas/consultar',['LibertyFin\Controlador\RecargasControlador', 'consultar']);
-    $r->post('/recargas/probar',  ['LibertyFin\Controlador\RecargasControlador', 'probar']);
+    $r->get('/recargas/saldo',    ['LibertyFin\Controlador\RecargasControlador', 'saldo']);
     $r->post('/recargas/catalogo',['LibertyFin\Controlador\RecargasControlador', 'sincronizar']);
-    $r->post('/recargas/pegar',   ['LibertyFin\Controlador\RecargasControlador', 'pegarCatalogo']);
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
 $r->get('/reportes/excel',    ['LibertyFin\Controlador\ReportesControlador', 'excel']);
@@ -396,10 +394,8 @@ $permisos = [
   '/facturacion'            => 'ver.facturacion',
   '/facturacion/{id}/timbrar' => 'timbrar',
   '/recargas'               => 'ver.recargas',
-  '/recargas/consultar'     => 'ver.recargas',
-  '/recargas/probar'        => 'ver.recargas',
+  '/recargas/saldo'         => 'ver.recargas',
   '/recargas/catalogo'      => 'ver.recargas',
-  '/recargas/pegar'         => 'ver.recargas',
   '/recargas/vender'        => 'vender.recarga',
   '/ayuda'                  => 'abrir.ticket',
   '/ayuda/crear'            => 'abrir.ticket',

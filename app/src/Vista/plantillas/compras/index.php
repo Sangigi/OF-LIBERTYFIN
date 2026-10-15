@@ -129,7 +129,7 @@ $inicial = array_map(function ($s) {
 </details>
 <?php endif; ?>
 
-<div class="lf-pills" role="tablist">
+<div class="lf-pills lf-pills-filtro" role="tablist">
   <?php foreach (['' => 'Todas'] + C::ESTADOS as $k => $t): ?>
     <a class="lf-pill <?= $estado === $k ? 'active' : '' ?>" href="/compras<?= $k !== '' ? '?estado=' . $k : '' ?>"><?= P::e($t) ?></a>
   <?php endforeach; ?>

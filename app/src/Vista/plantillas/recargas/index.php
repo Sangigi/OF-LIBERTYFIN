@@ -6,10 +6,7 @@ use LibertyFin\Dominio\Dinero as D;
 if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 $token = $_SESSION['lf_token'];
 $h = $hoy;
-$qs = function ($c = []) use ($q, $cat, $carrier) {
-    $b = array_filter(['q'=>$q, 'cat'=>$cat, 'carrier'=>$carrier]);
-    return '?' . http_build_query(array_merge($b, array_filter($c, function($v){ return $v !== null; })));
-};
+$total = count($productos);
 ?>
 
 <?php if ($aviso): ?>
@@ -34,12 +31,13 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
 <?php endif; ?>
 
 <div class="lf-stats">
-  <div class="stat-card lf-hero">
+  <?php /* El saldo se pide solo al abrir (por detrás: la página no espera al
+           proveedor). Si se consultó hace menos de un minuto, ya viene. */ ?>
+  <div class="stat-card lf-hero" id="rcSaldo" data-pendiente="<?= $saldo ? '' : '1' ?>">
     <div class="lf-tile"><?= W::icono('cobro','19px') ?></div>
-    <div class="stat-value"><?= $saldo !== null ? D::pesos($saldo) : '—' ?></div>
+    <div class="stat-value" id="rcSaldoValor"><?= $saldo ? D::pesos($saldo['saldo']) : 'Consultando…' ?></div>
     <div class="stat-label">Saldo con el proveedor</div>
-    <div class="stat-meta">
-      <?= $saldo !== null ? 'al momento de consultar' : 'consúltalo para verlo' ?></div>
+    <div class="stat-meta" id="rcSaldoMeta"><?= $saldo ? 'al ' . date('H:i', $saldo['cuando']) : 'preguntando a Emida' ?></div>
   </div>
   <div class="stat-card">
     <div class="lf-tile"><?= W::icono('venta','19px') ?></div>
@@ -57,130 +55,83 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
     <div class="lf-tile <?= $total ? '' : 'a' ?>"><?= W::icono('serv','19px') ?></div>
     <div class="stat-value"><?= number_format($total) ?></div>
     <div class="stat-label">Productos en catálogo</div>
-    <div class="stat-meta">
-      <?= $actualizado ? 'al ' . date('d/m/y H:i', strtotime($actualizado)) : 'nunca se ha bajado' ?></div>
+    <div class="stat-meta" id="rcActualizado">
+      <?= $actualizado ? 'al ' . date('d/m/y H:i', strtotime($actualizado)) . ' · se actualiza solo' : 'se baja solo' ?></div>
   </div>
 </div>
 
-<?php if (!$total): ?>
+<?php if (!$total && $errorCatalogo): ?>
 <section class="card" style="border-color:color-mix(in srgb,var(--lf-amb) 40%,transparent)">
   <div class="card-body" style="text-align:center;padding:30px">
-    <h3 style="font-size:16px;margin-bottom:8px">Falta bajar el catálogo</h3>
-    <p style="font-size:13px;color:var(--lf-tinta-3);max-width:470px;margin:0 auto 18px;line-height:1.6">
-      Emida no vende "una recarga Telcel de $200": vende el producto <b>5077200</b>.
-      Cada compañía y cada monto tienen su propio identificador, y sin el catálogo
-      no se puede vender ninguno.
-    </p>
-    <form method="post" action="/recargas/catalogo" style="margin-bottom:20px">
+    <h3 style="font-size:16px;margin-bottom:8px">No se pudo traer el catálogo</h3>
+    <p style="font-size:13px;color:var(--lf-tinta-3);max-width:520px;margin:0 auto 18px;line-height:1.6">
+      <?= P::e($errorCatalogo) ?><br>Sin él no se puede vender: se vuelve a intentar solo en unos minutos.</p>
+    <form method="post" action="/recargas/catalogo">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
-      <button class="btn btn-primary" type="submit">Bajar el catálogo ahora</button>
+      <button class="btn btn-primary" type="submit">Reintentar ahora</button>
     </form>
   </div>
 </section>
 <?php endif; ?>
 
-<details class="lf-alta" <?= $pegar ? 'open' : '' ?>>
-  <summary><?= W::icono('mas','16px') ?>Cargar el catálogo pegándolo</summary>
-  <div style="padding:0 20px 18px">
-    <p style="font-size:12.5px;color:var(--lf-tinta-3);line-height:1.6;margin-bottom:14px">
-      Entra al portal de Emida, abre su <b>Catálogo de Servicios</b>, selecciona la
-      tabla completa y pégala aquí. Entiende las columnas tal como salen, junta
-      los nombres que la tabla parte en dos renglones, y toma la URL de la imagen
-      si viene incluida.
-    </p>
-    <form method="post" action="/recargas/pegar">
-      <input type="hidden" name="token" value="<?= P::e($token) ?>">
-      <textarea class="form-control lf-mono" name="pegado" rows="7"
-                style="font-size:11.5px;line-height:1.5"
-                placeholder="5077200&#9;Recarga Telcel $200&#9;RECARGAS&#9;Telcel&#9;-&#9;$200.00&#9;-&#9;-&#9;Venta Directa&#9;https://.../telcel.png"></textarea>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
-        <button class="btn btn-primary" type="submit">Cargar</button>
-        <span style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5">
-          Reemplaza el catálogo completo. Los productos que ya no aparezcan dejan de
-          venderse, pero no se borran: las operaciones viejas siguen sabiendo qué fue.
-        </span>
-      </div>
-    </form>
-  </div>
-</details>
-
 <div class="lf-split">
-  <section class="card">
-    <header class="card-header">
+  <section class="card lf-rc-catalogo">
+    <header class="card-header" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center">
       <div><span>Catálogo</span>
         <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
           Elige el producto, no la compañía: cada monto es uno distinto</p></div>
-      <form method="post" action="/recargas/catalogo" style="flex-shrink:0">
-        <input type="hidden" name="token" value="<?= P::e($token) ?>">
-        <button class="btn btn-secondary btn-sm" type="submit" title="Volver a bajarlo del proveedor">
-          <?= W::icono('reloj','14px') ?>Actualizar</button>
-      </form>
+      <div class="lf-pag-serv" id="rcPag" hidden>
+        <button type="button" id="rcAnt" aria-label="Anterior">&lsaquo;</button>
+        <span><b id="rcPagN">1</b> de <b id="rcPagT">1</b></span>
+        <button type="button" id="rcSig" aria-label="Siguiente">&rsaquo;</button>
+      </div>
+      <div class="lf-search" style="max-width:240px">
+        <?= W::icono('buscar','15px') ?>
+        <input type="search" id="rcBuscar" placeholder="Nombre, compañía o ID" autocomplete="off">
+      </div>
     </header>
 
-    <form class="lf-filtros" method="get" style="padding:0 20px">
-      <div class="lf-search" style="max-width:260px">
-        <?= W::icono('buscar','15px') ?>
-        <input class="form-control form-control-sm" type="search" name="q"
-               value="<?= P::e($q) ?>" placeholder="Nombre o ID del producto">
-      </div>
-      <select class="form-select form-select-sm" name="cat" style="width:auto">
-        <option value="">Toda categoría</option>
-        <?php foreach ($categorias as $c): ?>
-          <option value="<?= P::e($c['categoria']) ?>" <?= $cat===$c['categoria']?'selected':'' ?>>
-            <?= P::e($c['categoria']) ?> (<?= (int)$c['n'] ?>)</option>
-        <?php endforeach; ?>
-      </select>
-      <select class="form-select form-select-sm" name="carrier" style="width:auto">
-        <option value="">Todo proveedor</option>
-        <?php foreach ($carriers as $c): ?>
-          <option value="<?= P::e($c['carrier']) ?>" <?= $carrier===$c['carrier']?'selected':'' ?>>
-            <?= P::e($c['carrier']) ?></option>
-        <?php endforeach; ?>
-      </select>
-      <button class="btn btn-secondary btn-sm" type="submit">Filtrar</button>
-      <?php if ($q || $cat || $carrier): ?>
-        <a class="btn btn-secondary btn-sm" href="/recargas">Limpiar</a>
-      <?php endif; ?>
-    </form>
+    <?php if ($categorias): ?>
+    <div class="lf-cat-fila" id="rcCats">
+      <button type="button" class="lf-pill active" data-cat="">Todos</button>
+      <?php foreach ($categorias as $c): ?>
+        <button type="button" class="lf-pill" data-cat="<?= P::e($c['categoria']) ?>"><?= P::e(mb_convert_case(mb_strtolower($c['categoria']), MB_CASE_TITLE)) ?></button>
+      <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
 
-    <div class="lf-prods">
-      <?php if (!$productos && $total): ?>
-        <p style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);
-                  font-size:13px;padding:30px">Ningún producto coincide.</p>
-      <?php endif; ?>
+    <?php /* La misma tarjeta de Caja: la imagen del proveedor si la tiene, si
+             no el ícono; el nombre, la compañía y el monto. */ ?>
+    <div class="lf-grid-serv" id="rcGrid">
+      <p id="rcVacio" <?= $total ? 'hidden' : '' ?>
+         style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
+        <?= $total ? 'Ningún producto coincide.' : 'El catálogo está vacío.' ?></p>
       <?php foreach ($productos as $p):
         $variable = (float)$p['monto'] <= 0;
         $img = trim((string)($p['imagen'] ?? ''));
-        $tieneImg = $img !== '' && strtoupper($img) !== 'NA'; ?>
-        <button type="button" class="lf-prod<?= $variable ? ' var' : '' ?>"
+        $tieneImg = $img !== '' && strtoupper($img) !== 'NA' && preg_match('#^https?://#i', $img); ?>
+        <button type="button" class="lf-serv lf-rc<?= $variable ? ' sin-precio' : '' ?>"
                 data-id="<?= P::e($p['producto_id']) ?>"
+                data-cat="<?= P::e($p['categoria']) ?>"
+                data-b="<?= P::e(mb_strtolower($p['nombre'] . ' ' . $p['carrier'] . ' ' . $p['categoria'])) ?>"
                 data-n="<?= P::e($p['nombre']) ?>"
                 data-monto="<?= (float)$p['monto'] ?>"
                 data-min="<?= (float)$p['monto_min'] ?>"
                 data-max="<?= (float)$p['monto_max'] ?>"
                 data-com="<?= (float)$p['comision'] ?>"
-                data-img="<?= $tieneImg ? P::e($img) : '' ?>">
+                data-img="<?= $tieneImg ? P::e($img) : '' ?>"
+                title="<?= P::e($p['nombre'] . ' · ID ' . $p['producto_id']) ?>">
           <?php if ($tieneImg): ?>
-            <img src="<?= P::e($img) ?>" alt="" loading="lazy"
-                 style="height:34px;max-width:100%;object-fit:contain;margin-bottom:6px"
-                 onerror="this.style.display='none'">
+            <span class="e foto"><img src="<?= P::e($img) ?>" alt="" loading="lazy"
+                  onerror="this.parentNode.classList.remove('foto');this.parentNode.innerHTML=<?= P::e(json_encode(W::icono('bolsa', '17px'))) ?>"></span>
           <?php else: ?>
-            <span class="lf-prod-ico"><?= W::icono('serv','30px') ?></span>
+            <span class="e"><?= W::icono('bolsa','17px') ?></span>
           <?php endif; ?>
           <b><?= P::e($p['nombre']) ?></b>
           <small><?= P::e($p['carrier'] ?: $p['categoria']) ?></small>
-          <span class="m"><?= $variable ? 'Monto variable' : D::pesos($p['monto']) ?></span>
-          <?php if ((float)$p['comision'] > 0): ?>
-            <span class="c">comisión <?= D::pesos($p['comision']) ?></span>
-          <?php endif; ?>
+          <span class="p"><?= $variable ? 'Monto variable' : D::pesos($p['monto']) ?></span>
         </button>
       <?php endforeach; ?>
-    </div>
-
-    <div class="card-footer" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <span><?= count($productos) ?> de <?= number_format($total) ?></span>
-      <?php P::parcial('parciales/paginacion', ['pagina'=>$pagina,'paginas'=>$paginas,
-        'enlace'=>function($n) use ($qs){ return $qs(['p'=>$n]); }]); ?>
     </div>
   </section>
 
@@ -230,45 +181,12 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
             número antes de aplicar.
           </p>
         </div>
-      </div>
-    </form>
-
-    <section class="card">
-      <header class="card-header">El proveedor</header>
-      <div class="card-body">
-        <form method="post" action="/recargas/consultar">
-          <input type="hidden" name="token" value="<?= P::e($token) ?>">
-          <button class="btn btn-secondary btn-sm" type="submit" style="width:100%">
-            <?= W::icono('reloj','14px') ?>Consultar saldo</button>
-        </form>
-        <form method="post" action="/recargas/probar" style="margin-top:8px">
-          <input type="hidden" name="token" value="<?= P::e($token) ?>">
-          <button class="btn btn-secondary btn-sm" type="submit" style="width:100%">
-            <?= W::icono('alerta','14px') ?>Probar la conexión</button>
-        </form>
-        <?php if ($prueba): ?>
-          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lf-linea)">
-            <?php foreach ($prueba as $x):
-              $col = $x['ok'] ? 'var(--lf-brand-2)'
-                   : (empty($x['bloquea']) ? 'var(--lf-amb)' : 'var(--lf-rojo)'); ?>
-              <div style="display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:11.5px">
-                <span style="flex-shrink:0;width:14px;color:<?= $col ?>;font-weight:700">
-                  <?= $x['ok'] ? '✓' : (empty($x['bloquea']) ? '!' : '×') ?></span>
-                <span style="flex:1;min-width:0">
-                  <b style="font-weight:600;display:block"><?= P::e($x['que']) ?></b>
-                  <span style="color:var(--lf-tinta-4);font-size:10.5px;overflow-wrap:anywhere;
-                        line-height:1.45"><?= P::e(mb_substr($x['detalle'], 0, 260)) ?></span>
-                </span>
-              </div>
-            <?php endforeach; ?>
-          </div>
-        <?php endif; ?>
-        <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:12px;line-height:1.5">
-          Las operaciones se pagan de un saldo precargado. Si se agota, se rechazan
-          aunque el cliente ya te haya pagado.
+        <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:14px;line-height:1.5;border-top:1px solid var(--lf-linea);padding-top:12px">
+          Las operaciones se pagan del saldo precargado con el proveedor (arriba). Si se agota,
+          se rechazan aunque el cliente ya te haya pagado.
         </p>
       </div>
-    </section>
+    </form>
   </div>
 </div>
 
@@ -314,60 +232,132 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
   </div>
   <div class="card-footer">
     Una <b>incierta</b> es la que el proveedor no confirmó a tiempo: pudo haber
-    salido. Consulta el saldo antes de reintentarla, nunca la repitas a ciegas.
+    salido. Revisa el saldo (arriba) antes de reintentarla, nunca la repitas a ciegas.
   </div>
 </section>
 
 <script>
 (function(){
-  var sel = null;
+  var $ = function (id) { return document.getElementById(id); };
+  var TOKEN = <?= json_encode($token) ?>;
+  var POR_PAG = 18;
+  var sel = null, cat = '', q = '', pag = 1, visibles = [];
+
+  /* ── El catálogo: categoría y búsqueda en el navegador, como en Caja ── */
+  function tarjetas() { return [].slice.call(document.querySelectorAll('#rcGrid .lf-rc')); }
+  function filtrar() {
+    /* Por palabras: «telcel 100» encuentra «Recarga Telcel $100». El ID, completo. */
+    var palabras = q === '' ? [] : q.split(/\s+/);
+    visibles = tarjetas().filter(function (t) {
+      if (cat !== '' && t.dataset.cat !== cat) return false;
+      if (!palabras.length || t.dataset.id === q) return true;
+      return palabras.every(function (w) { return t.dataset.b.indexOf(w) !== -1; });
+    });
+    pag = 1; pintar();
+  }
+  function pintar() {
+    var total = Math.max(1, Math.ceil(visibles.length / POR_PAG));
+    if (pag > total) pag = total;
+    tarjetas().forEach(function (t) { t.style.display = 'none'; });
+    visibles.slice((pag - 1) * POR_PAG, pag * POR_PAG).forEach(function (t) { t.style.display = ''; });
+    var vacio = $('rcVacio'); if (vacio) vacio.hidden = visibles.length > 0 || !tarjetas().length;
+    $('rcPag').hidden = total <= 1;
+    $('rcPagN').textContent = pag; $('rcPagT').textContent = total;
+    $('rcAnt').disabled = pag === 1; $('rcSig').disabled = pag === total;
+  }
+  $('rcAnt').addEventListener('click', function () { if (pag > 1) { pag--; pintar(); } });
+  $('rcSig').addEventListener('click', function () { if (pag < Math.ceil(visibles.length / POR_PAG)) { pag++; pintar(); } });
+  $('rcBuscar').addEventListener('input', function () { q = this.value.trim().toLowerCase(); filtrar(); });
+  $('rcBuscar').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); if (visibles[(pag - 1) * POR_PAG]) elegir(visibles[(pag - 1) * POR_PAG]); }
+    if (e.key === 'Escape') { this.value = ''; q = ''; filtrar(); }
+  });
+  var cats = $('rcCats');
+  if (cats) cats.addEventListener('click', function (e) {
+    var p = e.target.closest('.lf-pill');
+    if (!p) return;
+    cat = p.dataset.cat;
+    cats.querySelectorAll('.lf-pill').forEach(function (x) { x.classList.toggle('active', x === p); });
+    filtrar();
+  });
+
+  /* ── Elegir un producto ── */
   function elegir(b){
-    document.querySelectorAll('.lf-prod').forEach(function(x){ x.classList.remove('on'); });
+    tarjetas().forEach(function(x){ x.classList.remove('on'); });
     b.classList.add('on');
     sel = b;
-    document.getElementById('prodId').value = b.dataset.id;
-    document.getElementById('prodNombre').textContent = b.dataset.n;
-    document.getElementById('prodId2').textContent = 'ID ' + b.dataset.id
-      + (parseFloat(b.dataset.com) > 0 ? ' · comisión $' + b.dataset.com : '');
-
-    // La imagen del producto elegido, si tiene.
-    var img = document.getElementById('prodImg');
-    if (b.dataset.img) {
-      img.src = b.dataset.img;
-      img.hidden = false;
-    } else {
-      img.hidden = true;
-      img.removeAttribute('src');
-    }
-
-    document.getElementById('sinProd').hidden = true;
-    document.getElementById('conProd').hidden = false;
-
+    $('prodId').value = b.dataset.id;
+    $('prodNombre').textContent = b.dataset.n;
+    $('prodId2').textContent = 'ID ' + b.dataset.id
+      + (parseFloat(b.dataset.com) > 0 ? ' · comisión $' + parseFloat(b.dataset.com).toFixed(2) : '');
+    var img = $('prodImg');
+    if (b.dataset.img) { img.src = b.dataset.img; img.hidden = false; }
+    else { img.hidden = true; img.removeAttribute('src'); }
+    $('sinProd').hidden = true;
+    $('conProd').hidden = false;
     var variable = parseFloat(b.dataset.monto) <= 0;
-    var campo = document.getElementById('campoMonto'), m = document.getElementById('monto');
+    var campo = $('campoMonto'), m = $('monto');
     campo.hidden = !variable;
     m.required = variable;
     if (variable) {
       var min = parseFloat(b.dataset.min), max = parseFloat(b.dataset.max), t = [];
       if (min > 0) { m.min = min; t.push('mínimo $' + min.toFixed(2)); }
       if (max > 0) { m.max = max; t.push('máximo $' + max.toFixed(2)); }
-      document.getElementById('limites').textContent = t.join(' · ');
+      $('limites').textContent = t.join(' · ');
       m.value = '';
     }
-    document.getElementById('cuenta').focus();
-    if (window.innerWidth < 941) {
-      document.getElementById('formVenta').scrollIntoView({behavior:'smooth', block:'start'});
-    }
+    $('cuenta').focus();
+    if (window.innerWidth < 941) $('formVenta').scrollIntoView({behavior:'smooth', block:'start'});
   }
-  document.querySelectorAll('.lf-prod').forEach(function(b){
-    b.addEventListener('click', function(){ elegir(b); });
+  $('rcGrid').addEventListener('click', function (e) {
+    var b = e.target.closest('.lf-rc');
+    if (b) elegir(b);
   });
 
-  document.getElementById('formVenta').addEventListener('submit', function(e){
+  $('formVenta').addEventListener('submit', function(e){
     if (!sel) { e.preventDefault(); return; }
-    var c = document.getElementById('cuenta').value.replace(/\D/g,'');
-    if (!confirm('¿Aplicar "' + sel.dataset.n + '" a ' + c + '?\n\n'
-      + 'Una vez enviada no se puede cancelar.')) e.preventDefault();
+    var c = $('cuenta').value.replace(/\D/g,'');
+    if (!confirm('¿Aplicar "' + sel.dataset.n + '" a ' + c + '?\n\nUna vez enviada no se puede cancelar.')) e.preventDefault();
   });
+
+  /* ── El saldo: siempre a la vista, sin botón ── */
+  if ($('rcSaldo').dataset.pendiente) {
+    fetch('/recargas/saldo', {credentials: 'same-origin', headers: {'X-LF-Json': '1'}})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (j.ok) {
+          $('rcSaldoValor').textContent = '$' + Number(j.saldo).toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+          $('rcSaldoMeta').textContent = 'al ' + j.cuando;
+        } else {
+          $('rcSaldoValor').textContent = '—';
+          $('rcSaldoMeta').textContent = 'No se pudo consultar: ' + (j.mensaje || 'sin respuesta');
+          $('rcSaldoMeta').title = j.mensaje || '';
+        }
+      })
+      .catch(function () { $('rcSaldoValor').textContent = '—'; $('rcSaldoMeta').textContent = 'No se pudo consultar ahora.'; });
+  }
+
+  /* ── El catálogo viejo se actualiza solo, por detrás ──
+     Si nadie ha elegido nada todavía, la rejilla se cambia por la nueva;
+     si ya hay un producto elegido, se respeta lo que se está haciendo. */
+  <?php if ($refrescar): ?>
+  var fd = new FormData(); fd.append('token', TOKEN);
+  fetch('/recargas/catalogo', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-LF-Json': '1'}})
+    .then(function (r) { return r.json(); })
+    .then(function (j) {
+      if (!j.ok) return;
+      $('rcActualizado').textContent = 'recién actualizado · se actualiza solo';
+      if (sel) return;
+      return fetch('/recargas', {credentials: 'same-origin', headers: {'X-LF-Parcial': '1'}})
+        .then(function (r) { return r.text(); })
+        .then(function (html) {
+          var doc = new DOMParser().parseFromString(html, 'text/html'), g = doc.getElementById('rcGrid');
+          if (g && !sel) { $('rcGrid').innerHTML = g.innerHTML; filtrar(); }
+        });
+    })
+    .catch(function () { /* se intentará la próxima vez */ });
+  <?php endif; ?>
+
+  filtrar();
 })();
 </script>

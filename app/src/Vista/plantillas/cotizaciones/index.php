@@ -89,7 +89,7 @@ $renglonesForm = $edit ? array_map(function ($l) {
 </details>
 <?php endif; ?>
 
-<div class="lf-pills" role="tablist">
+<div class="lf-pills lf-pills-filtro" role="tablist">
   <?php foreach ($filtrosEstado as $k => $t): ?>
     <a class="lf-pill <?= $estado === $k ? 'active' : '' ?>" href="/cotizaciones<?= $k !== '' ? '?estado=' . $k : '' ?>"><?= P::e($t) ?></a>
   <?php endforeach; ?>
