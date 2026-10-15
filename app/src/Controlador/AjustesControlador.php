@@ -22,6 +22,7 @@ final class AjustesControlador
     const PESTANAS = [
         'empresa'      => 'Empresa',
         'caja'         => 'Caja',
+        'modulos'      => 'Módulos',
         'inventario'   => 'Inventario',
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
@@ -70,6 +71,17 @@ final class AjustesControlador
         }
         if ($p === 'caja') $datos['caja'] = (new ConfigRepo($db))->caja();
         if ($p === 'inventario') $datos['inventario'] = (new ConfigRepo($db))->inventario();
+        if ($p === 'modulos') {
+            $mod = new \LibertyFin\Servicio\Modulos(new ConfigRepo($db));
+            $datos['modulos'] = [];
+            foreach (\LibertyFin\Servicio\Modulos::CATALOGO as $k => $m) {
+                $datos['modulos'][$k] = $m + [
+                    'encendido' => $mod->encendido($k),
+                    'enPlan'    => \LibertyFin\Servicio\Modulos::enPlan($k),
+                    'planes'    => \LibertyFin\Servicio\Modulos::planesCon($k),
+                ];
+            }
+        }
         if ($p === 'sucursales') $datos['sucursales'] = $repo->sucursales();
         if ($p === 'comisiones') {
             $datos['areas'] = $repo->areas();
@@ -108,6 +120,28 @@ final class AjustesControlador
             } catch (\Throwable $e) {
                 error_log('[LibertyFin] ajustes/caja: ' . $e->getMessage());
                 $this->volver('caja', 'No se pudo guardar.', 'error');
+            }
+        }
+
+        // Módulos: encender o apagar uno. Cambia el menú: se recarga.
+        if ($que === 'modulo') {
+            try {
+                $clave = (string)($_POST['clave'] ?? '');
+                $on = !empty($_POST['activo']);
+                $cambios = (new \LibertyFin\Servicio\Modulos(new ConfigRepo($db)))->poner($clave, $on);
+                if ($cambios) {
+                    \LibertyFin\Servicio\Auditoria::anota('ajustes.modulo', implode(', ', $cambios),
+                        $on ? 'apagado' : 'encendido', $on ? 'encendido' : 'apagado');
+                }
+                $nombre = \LibertyFin\Servicio\Modulos::CATALOGO[$clave]['nombre'] ?? 'Módulo';
+                $extra = count($cambios) > 1 ? ' (también ' . implode(', ', array_map(function ($k) {
+                    return \LibertyFin\Servicio\Modulos::CATALOGO[$k]['nombre']; }, array_slice($cambios, 1))) . ')' : '';
+                $this->volver('modulos', $nombre . ($on ? ' encendido' : ' apagado') . $extra . '.', 'ok', true);
+            } catch (\InvalidArgumentException $e) {
+                $this->volver('modulos', $e->getMessage(), 'error');
+            } catch (\Throwable $e) {
+                error_log('[LibertyFin] ajustes/modulo: ' . $e->getMessage());
+                $this->volver('modulos', 'No se pudo guardar.', 'error');
             }
         }
 

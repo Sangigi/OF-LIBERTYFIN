@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 21;
+    const VERSION = 22;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -916,6 +916,191 @@ final class Migraciones
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    /**
+     * Los módulos por giro (ver Servicio\Modulos) y cancelar ventas.
+     *
+     * Todas las tablas nacen vacías y nada las usa mientras el módulo esté
+     * apagado: una empresa de servicios no paga por la agenda de un spa.
+     * Una sola versión para todo porque llegaron juntos; si una tabla
+     * falla, las demás se crean igual (cada una en su try).
+     */
+    private static function v22(PDO $db)
+    {
+        $columnas = [
+            // Cancelar una venta: quién, cuándo y por qué.
+            ['ventas',    'cancelada_en',       "DATETIME NULL DEFAULT NULL"],
+            ['ventas',    'cancelada_por',      "VARCHAR(100) NULL DEFAULT NULL"],
+            ['ventas',    'motivo_cancelacion', "VARCHAR(255) NULL DEFAULT NULL"],
+            // Agenda: cuánto dura el servicio. Paquetes: N sesiones de otro servicio.
+            ['productos', 'duracion_min',       "INT NULL DEFAULT NULL"],
+            ['productos', 'sesiones',           "INT NULL DEFAULT NULL"],
+            ['productos', 'sesion_de',          "INT NULL DEFAULT NULL"],
+        ];
+        foreach ($columnas as list($tabla, $columna, $def)) {
+            if (!self::hayTabla($db, $tabla) || self::hayColumna($db, $tabla, $columna)) continue;
+            try { $db->exec("ALTER TABLE `$tabla` ADD COLUMN `$columna` $def"); }
+            catch (\Throwable $e) { error_log('[LibertyFin] migración 22 · ' . $tabla . '.' . $columna . ': ' . $e->getMessage()); }
+        }
+
+        $tablas = [
+            // ── Expediente del cliente ──
+            "CREATE TABLE IF NOT EXISTS lf_cliente_ficha (
+                cliente_id INT NOT NULL PRIMARY KEY,
+                texto TEXT NULL,
+                actualizado_en DATETIME NULL,
+                actualizado_por VARCHAR(100) NULL
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS lf_cliente_notas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT NOT NULL,
+                texto TEXT NOT NULL,
+                usuario_nombre VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_cn_cliente (cliente_id, creado_en)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS lf_cliente_archivos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT NOT NULL,
+                nombre VARCHAR(200) NOT NULL,
+                archivo VARCHAR(120) NOT NULL,
+                mime VARCHAR(60) NOT NULL,
+                tamano INT NOT NULL DEFAULT 0,
+                usuario_nombre VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_ca_cliente (cliente_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Cotizaciones ──
+            "CREATE TABLE IF NOT EXISTS lf_cotizaciones (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                folio VARCHAR(20) NOT NULL,
+                cliente_id INT NULL,
+                cliente_nombre VARCHAR(200) NULL,
+                estado VARCHAR(12) NOT NULL DEFAULT 'borrador',
+                vigencia DATE NULL,
+                notas TEXT NULL,
+                total DECIMAL(12,2) NOT NULL DEFAULT 0,
+                venta_id INT NULL,
+                creado_por VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                actualizado_en DATETIME NULL,
+                KEY ix_cot_estado (estado), KEY ix_cot_cliente (cliente_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS lf_cotizacion_lineas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cotizacion_id INT NOT NULL,
+                producto_id INT NULL,
+                nombre VARCHAR(255) NOT NULL,
+                cantidad DECIMAL(12,3) NOT NULL DEFAULT 1,
+                precio DECIMAL(12,2) NOT NULL DEFAULT 0,
+                KEY ix_cl_cot (cotizacion_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Igualas: un cobro que se repite cada mes ──
+            "CREATE TABLE IF NOT EXISTS lf_igualas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT NOT NULL,
+                producto_id INT NOT NULL,
+                concepto VARCHAR(200) NULL,
+                monto DECIMAL(12,2) NOT NULL,
+                dia TINYINT NOT NULL DEFAULT 1,
+                especialista_id INT NULL,
+                desde CHAR(7) NOT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                creado_por VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_ig_cliente (cliente_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // La llave única es la que impide generar dos veces el mismo mes.
+            "CREATE TABLE IF NOT EXISTS lf_iguala_ventas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                iguala_id INT NOT NULL,
+                periodo CHAR(7) NOT NULL,
+                venta_id INT NULL,
+                creado_en DATETIME NOT NULL,
+                UNIQUE KEY ux_iv (iguala_id, periodo)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Seguimiento del trabajo de cada venta ──
+            "CREATE TABLE IF NOT EXISTS lf_trabajos (
+                venta_id INT NOT NULL PRIMARY KEY,
+                estado VARCHAR(12) NOT NULL DEFAULT 'pendiente',
+                responsable_id INT NULL,
+                entrega DATE NULL,
+                nota VARCHAR(255) NULL,
+                actualizado_en DATETIME NULL,
+                actualizado_por VARCHAR(100) NULL,
+                KEY ix_tr_estado (estado)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Compras a proveedor ──
+            "CREATE TABLE IF NOT EXISTS lf_compras (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                folio VARCHAR(20) NOT NULL,
+                proveedor_id INT NULL,
+                proveedor_nombre VARCHAR(200) NULL,
+                sucursal_id INT NOT NULL,
+                estado VARCHAR(12) NOT NULL DEFAULT 'pedida',
+                total DECIMAL(12,2) NOT NULL DEFAULT 0,
+                notas VARCHAR(255) NULL,
+                gasto_id INT NULL,
+                creado_por VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                recibida_en DATETIME NULL,
+                recibida_por VARCHAR(100) NULL,
+                KEY ix_co_estado (estado)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS lf_compra_lineas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                compra_id INT NOT NULL,
+                producto_id INT NOT NULL,
+                cantidad DECIMAL(12,3) NOT NULL,
+                costo DECIMAL(12,2) NOT NULL DEFAULT 0,
+                KEY ix_col_compra (compra_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Agenda de citas ──
+            "CREATE TABLE IF NOT EXISTS lf_citas (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT NULL,
+                cliente_nombre VARCHAR(200) NOT NULL,
+                telefono VARCHAR(30) NULL,
+                colaborador_id INT NULL,
+                producto_id INT NULL,
+                servicio VARCHAR(255) NULL,
+                inicio DATETIME NOT NULL,
+                fin DATETIME NOT NULL,
+                estado VARCHAR(12) NOT NULL DEFAULT 'agendada',
+                notas VARCHAR(255) NULL,
+                venta_id INT NULL,
+                creado_por VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_ci_inicio (inicio), KEY ix_ci_colab (colaborador_id, inicio), KEY ix_ci_cliente (cliente_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            // ── Paquetes de sesiones ──
+            "CREATE TABLE IF NOT EXISTS lf_paquetes_cliente (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                cliente_id INT NOT NULL,
+                producto_id INT NOT NULL,
+                paquete_id INT NOT NULL,
+                total INT NOT NULL,
+                usadas INT NOT NULL DEFAULT 0,
+                venta_id INT NULL,
+                activo TINYINT(1) NOT NULL DEFAULT 1,
+                creado_en DATETIME NOT NULL,
+                KEY ix_pc_cliente (cliente_id, producto_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS lf_paquete_usos (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                paquete_cliente_id INT NOT NULL,
+                venta_id INT NULL,
+                cantidad INT NOT NULL DEFAULT 1,
+                usuario_nombre VARCHAR(100) NULL,
+                creado_en DATETIME NOT NULL,
+                KEY ix_pu_paquete (paquete_cliente_id), KEY ix_pu_venta (venta_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+        ];
+        foreach ($tablas as $sql) {
+            try { $db->exec($sql); }
+            catch (\Throwable $e) { error_log('[LibertyFin] migración 22 · tabla: ' . $e->getMessage()); }
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -938,5 +1123,6 @@ final class Migraciones
         19 => 'Promociones: descuentos, precios especiales, paquetes y códigos',
         20 => 'Columnas que les faltaban a las empresas nuevas (área e IVA de la venta, complemento de pago)',
         21 => 'Inventario: productos con existencias y bitácora de movimientos',
+        22 => 'Módulos por giro: cancelar ventas, expediente, cotizaciones, igualas, seguimiento, compras, agenda y paquetes',
     ];
 }

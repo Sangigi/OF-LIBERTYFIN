@@ -85,7 +85,12 @@ $vigencia = function (array $p) {
         <?php endforeach; ?>
       </select>
     </div>
-    <div style="width:150px" data-ver-tipo="porcentaje monto precio paquete">
+    <div style="width:110px" data-ver-tipo="volumen">
+      <label class="form-label" for="pDesde">Desde (piezas)</label>
+      <input class="form-control lf-mono" type="number" name="desde_piezas" id="pDesde" min="2" max="9999" step="1"
+             value="<?= P::e(($e && $e['tipo'] === 'volumen') ? (int)$e['lleva'] : 6) ?>">
+    </div>
+    <div style="width:150px" data-ver-tipo="porcentaje monto precio paquete volumen">
       <label class="form-label" for="pValor" id="lblValor">Porcentaje</label>
       <input class="form-control lf-mono" type="number" name="valor" id="pValor" step="0.01" min="0"
              value="<?= $e && $e['tipo'] !== 'nxm' ? P::e($num($e['valor'])) : '' ?>" placeholder="0">
@@ -307,7 +312,8 @@ $vigencia = function (array $p) {
   /* Qué se ve según el tipo y a qué aplica. Un precio especial y un
      paquete van siempre sobre productos; "lleva N paga M" no tiene sentido
      sobre todo el ticket. */
-  var ROTULO = {porcentaje:'Porcentaje', monto:'Descuento ($)', precio:'Precio especial ($)', paquete:'Precio del paquete ($)'};
+  var ROTULO = {porcentaje:'Porcentaje', monto:'Descuento ($)', precio:'Precio especial ($)', paquete:'Precio del paquete ($)',
+                volumen:'Precio c/u ($)'};
   var AYUDA = {
     todo: 'Aplica a cualquier producto del ticket.',
     areas: 'Aplica a todos los productos de las áreas que marques.',
@@ -315,7 +321,7 @@ $vigencia = function (array $p) {
   };
   function alcance(){
     var t = tipo.value;
-    if (t === 'precio' || t === 'paquete') return 'productos';
+    if (t === 'precio' || t === 'paquete' || t === 'volumen') return 'productos';
     var r = f.querySelector('input[name="alcance"]:checked');
     var a = r ? r.value : 'productos';
     if (t === 'nxm' && a === 'todo') a = 'productos';
@@ -342,6 +348,7 @@ $vigencia = function (array $p) {
                                           : ' El monto se descuenta por cada pieza.';
     if (t === 'paquete') ay = 'Marca los productos que forman el paquete y cuántos de cada uno. Aplica cuando el ticket los trae todos.';
     if (t === 'precio') ay = 'Los productos que marques se cobran a este precio.';
+    if (t === 'volumen') ay = 'Precio de mayoreo: cuando el ticket lleva esa cantidad o más de un producto marcado, todas sus piezas se cobran a este precio.';
     document.getElementById('ayudaAlcance').textContent = ay;
     contar();
   }

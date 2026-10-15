@@ -284,6 +284,48 @@ $em = $empresa; ?>
   </section>
 </div>
 
+<?php /* ═══════════════ MÓDULOS ═══════════════
+         Lo que se enciende según el giro, encima del núcleo (Servicio\Modulos).
+         Cada uno es su propio formulario: se guarda al mover el interruptor. */
+elseif ($pestana === 'modulos'):
+  $grupos = [];
+  foreach (($modulos ?? []) as $k => $m) $grupos[$m['grupo']][$k] = $m; ?>
+<p class="lf-mod-intro">Caja, ventas, clientes, cobranza, corte, gastos, productos y reportes vienen siempre.
+  Aquí enciendes lo que tu negocio usa además. Puedes apagar algo cuando quieras: lo que ya registraste no se borra.</p>
+<?php foreach ($grupos as $g => $lista): ?>
+  <h3 class="lf-mod-grupo"><?= P::e($g) ?></h3>
+  <div class="lf-mod-grid">
+    <?php foreach ($lista as $k => $m):
+      $req = $m['requiere'] ?? null; ?>
+      <form method="post" action="/ajustes/guardar" class="lf-mod<?= $m['encendido'] && $m['enPlan'] ? ' on' : '' ?><?= !$m['enPlan'] ? ' candado' : '' ?>"
+            data-guardar data-al-elegir>
+        <input type="hidden" name="token" value="<?= P::e($token) ?>">
+        <input type="hidden" name="que" value="modulo">
+        <input type="hidden" name="clave" value="<?= P::e($k) ?>">
+        <span class="ico"><?= W::icono($m['icono'], '19px') ?></span>
+        <div class="txt">
+          <b><?= P::e($m['nombre']) ?></b>
+          <small><?= P::e($m['desc']) ?></small>
+          <?php if (!$m['enPlan']): ?>
+            <small class="plan"><?= W::icono('alerta', '12px') ?> <?= $m['planes'] ? 'Desde el plan ' . P::e($m['planes'][0]) : 'En un plan superior' ?> ·
+              <a href="/cuenta?t=plan">Ver planes</a></small>
+          <?php elseif ($req): ?>
+            <small class="req">Necesita <?= P::e(\LibertyFin\Servicio\Modulos::CATALOGO[$req]['nombre']) ?>: se enciende con él.</small>
+          <?php endif; ?>
+        </div>
+        <?php if ($m['enPlan']): ?>
+          <input type="hidden" name="activo" value="0">
+          <label class="lf-sw" title="<?= $m['encendido'] ? 'Apagar' : 'Encender' ?>">
+            <input type="checkbox" name="activo" value="1" <?= $m['encendido'] ? 'checked' : '' ?> aria-label="<?= P::e($m['nombre']) ?>">
+            <i aria-hidden="true"></i></label>
+        <?php endif; ?>
+        <button class="btn btn-primary btn-sm lf-sin-js" type="submit">Guardar</button>
+        <p data-aviso hidden></p>
+      </form>
+    <?php endforeach; ?>
+  </div>
+<?php endforeach; ?>
+
 <?php /* ═══════════════ INVENTARIO ═══════════════ */ elseif ($pestana === 'inventario'):
   $opInv = \LibertyFin\Datos\ConfigRepo::INVENTARIO;
   $grupoInv = function ($clave) use ($opInv, $inventario, $token) { ?>

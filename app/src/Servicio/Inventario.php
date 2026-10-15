@@ -37,6 +37,7 @@ final class Inventario
         'conteo'     => 'Conteo',
         'venta'      => 'Venta',
         'devolucion' => 'Devolución',
+        'traspaso'   => 'Traspaso',
     ];
 
     /** Unidad => [nombre, abreviatura]. */
@@ -322,6 +323,76 @@ final class Inventario
             }
             $queda = $this->mover($productoId, $suc, $delta, $tipo, $extra);
             return ['existencia' => $queda, 'cambio' => $delta];
+        });
+    }
+
+    /**
+     * Pasar piezas de una sucursal a otra. Son dos movimientos (sale de
+     * una, entra a la otra) dentro de la misma transacción: nunca queda
+     * la mitad. No se manda lo que no hay: el traspaso es físico.
+     *
+     * @return array ['existencia' => lo que quedó en el origen, 'destino' => lo que quedó allá]
+     */
+    public function traspasar($productoId, $origenId, $destinoId, $cantidad, $nota = '')
+    {
+        $cantidad = round((float)str_replace(',', '', (string)$cantidad), 3);
+        if ($cantidad <= 0) throw new \InvalidArgumentException('Escribe cuántas piezas pasan.');
+        $origenId = (int)$origenId; $destinoId = (int)$destinoId;
+        if (!$destinoId || $destinoId === $origenId) throw new \InvalidArgumentException('Elige a qué otra sucursal pasan.');
+        if (!$this->llevan([(int)$productoId])) throw new \InvalidArgumentException('Ese producto no lleva existencias. Márcalo en Productos.');
+        $nombres = [];
+        foreach ($this->sucursales() as $s) $nombres[(int)$s['id']] = $s['nombre'];
+        if (!isset($nombres[$origenId], $nombres[$destinoId])) throw new \InvalidArgumentException('Elige las dos sucursales.');
+        $nota = mb_substr(trim((string)$nota), 0, 200);
+
+        return $this->enTransaccion(function () use ($productoId, $origenId, $destinoId, $cantidad, $nota, $nombres) {
+            $hay = (float)($this->existenciaDe($productoId, $origenId, true) ?? 0);
+            if ($hay + 0.0005 < $cantidad) {
+                throw new \InvalidArgumentException('En ' . $nombres[$origenId] . ' solo hay ' . self::num(max(0, $hay)) . '.');
+            }
+            $sale  = $this->mover($productoId, $origenId, -$cantidad, 'traspaso',
+                                  ['nota' => 'A ' . $nombres[$destinoId] . ($nota !== '' ? ' · ' . $nota : '')]);
+            $llega = $this->mover($productoId, $destinoId, $cantidad, 'traspaso',
+                                  ['nota' => 'De ' . $nombres[$origenId] . ($nota !== '' ? ' · ' . $nota : '')]);
+            return ['existencia' => $sale, 'destino' => $llega, 'cambio' => -$cantidad];
+        });
+    }
+
+    /**
+     * Conteo general: se cuenta todo (o lo que se pudo) y se captura de una
+     * vez. Solo se mueven los renglones que traen número; el resto se
+     * queda como estaba. Todo o nada.
+     *
+     * @param array $contado [producto_id => lo contado]
+     * @return array ['contados' => n, 'diferencias' => n]
+     */
+    public function conteoGeneral($sucursalId, array $contado, $nota = '')
+    {
+        $suc = (int)$sucursalId;
+        if (!$this->uno("SELECT id FROM sucursales WHERE id = ? AND COALESCE(activo,1) = 1", [$suc])) {
+            throw new \InvalidArgumentException('Elige la sucursal.');
+        }
+        $pide = [];
+        foreach ($contado as $id => $c) {
+            $c = trim(str_replace(',', '', (string)$c));
+            if ($c === '') continue;
+            if (!is_numeric($c) || (float)$c < 0) throw new \InvalidArgumentException('Lo contado debe ser un número de cero en adelante.');
+            $pide[(int)$id] = round((float)$c, 3);
+        }
+        if (!$pide) throw new \InvalidArgumentException('No capturaste ningún conteo.');
+        $llevan = $this->llevan(array_keys($pide));
+        $nota = mb_substr(trim((string)$nota), 0, 200);
+        return $this->enTransaccion(function () use ($pide, $llevan, $suc, $nota) {
+            $n = 0; $dif = 0;
+            foreach ($pide as $id => $c) {
+                if (!isset($llevan[$id])) continue;
+                $hay = (float)($this->existenciaDe($id, $suc, true) ?? 0);
+                $delta = round($c - $hay, 3);
+                $this->mover($id, $suc, $delta, 'conteo', ['nota' => $nota !== '' ? $nota : 'Conteo general']);
+                $n++;
+                if (abs($delta) >= 0.0005) $dif++;
+            }
+            return ['contados' => $n, 'diferencias' => $dif];
         });
     }
 

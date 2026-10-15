@@ -24,10 +24,15 @@ $deEmpresa = [
   ['grupo' => 'Operación'],
   ['ruta' => '/',           'icono' => 'panel',   'texto' => 'Panel',         'p' => 'ver.panel'],
   ['ruta' => '/caja',       'icono' => 'caja',    'texto' => 'Caja',          'p' => 'cobrar'],
+  // Los módulos (ServicioModulos): solo si la empresa los tiene activos.
+  ['ruta' => '/agenda',     'icono' => 'agenda',   'texto' => 'Agenda',        'p' => 'ver.agenda',       'mod' => 'agenda'],
   ['ruta' => '/ventas',     'icono' => 'venta',   'texto' => 'Ventas',        'p' => 'ver.ventas'],
   ['ruta' => '/clientes',   'icono' => 'cliente', 'texto' => 'Clientes',      'p' => 'ver.clientes'],
+  ['ruta' => '/cotizaciones','icono' => 'doc',    'texto' => 'Cotizaciones',  'p' => 'ver.cotizaciones', 'mod' => 'cotizaciones'],
+  ['ruta' => '/seguimiento','icono' => 'tablero',  'texto' => 'Trabajos',      'p' => 'ver.seguimiento',  'mod' => 'seguimiento'],
   ['ruta' => '/cobranza',   'icono' => 'reloj',   'texto' => 'Cobranza',      'p' => 'ver.cobranza',
    'sec' => 'cobranza'],
+  ['ruta' => '/igualas',    'icono' => 'repetir',  'texto' => 'Igualas',       'p' => 'ver.igualas',      'mod' => 'igualas'],
   ['ruta' => '/corte',      'icono' => 'caja',    'texto' => 'Corte de caja', 'p' => 'ver.corte',
    'sec' => 'corte'],
   ['ruta' => '/ligas',      'icono' => 'cobro',   'texto' => 'Ligas de pago', 'p' => 'ver.ligas',
@@ -40,9 +45,8 @@ $deEmpresa = [
   ['ruta' => '/gastos',     'icono' => 'baja',    'texto' => 'Gastos',        'p' => 'ver.gastos',
    'sec' => 'gastos'],
   ['ruta' => '/servicios',  'icono' => 'serv',    'texto' => 'Productos', 'p' => 'ver.servicios'],
-  // Solo para las empresas que lo encendieron (Ajustes → Inventario).
-  ['ruta' => '/inventario', 'icono' => 'bolsa',   'texto' => 'Inventario',    'p' => 'ver.inventario',
-   'inv' => true],
+  ['ruta' => '/inventario', 'icono' => 'bolsa',   'texto' => 'Inventario',    'p' => 'ver.inventario',   'mod' => 'inventario'],
+  ['ruta' => '/compras',    'icono' => 'camion',  'texto' => 'Compras',       'p' => 'ver.compras',      'mod' => 'compras'],
   ['ruta' => '/importar',   'icono' => 'bolsa',   'texto' => 'Importar',      'p' => 'importar.ventas'],
   ['ruta' => '/reportes',   'icono' => 'pct',     'texto' => 'Reportes',      'p' => 'ver.reportes',
    'sec' => 'reportes'],
@@ -75,15 +79,16 @@ $secciones = Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '') ? $dePlatafo
 // Qué secciones apagó soporte para esta empresa.
 // Un rol de plataforma no tiene empresa: no hay secciones que apagar.
 $apagadas = [];
-$conInventario = false;
+$modulos = [];
 try {
     if (empty($_SESSION['empresa_db'])) throw new \RuntimeException('sin empresa');
     $cfg = new ConfigRepo(Conexion::de($_SESSION['empresa_db']));
     foreach (ConfigRepo::APAGABLES as $k => $_) {
         if (!$cfg->seccionActiva($k)) $apagadas[$k] = true;
     }
-    // Al revés que las de arriba: nace apagado y la empresa lo enciende.
-    $conInventario = $cfg->inventarioActivo();
+    // Los módulos: al revés que las secciones, nacen apagados y la empresa
+    // los enciende (Ajustes → Módulos). Comisiones también responde aquí.
+    $modulos = (new LibertyFinServicioModulos($cfg))->activos();
 } catch (\Throwable $e) { /* sin tabla de config, todo encendido */ }
 
 $menu = []; $pendiente = null;
@@ -91,7 +96,7 @@ foreach ($secciones as $s) {
     if (isset($s['grupo'])) { $pendiente = $s; continue; }
     if (!Permisos::puede($s['p'])) continue;
     if (isset($s['si']) && !Integraciones::activa($s['si'])) continue;
-    if (!empty($s['inv']) && !$conInventario) continue;
+    if (isset($s['mod']) && empty($modulos[$s['mod']])) continue;
     // Soporte sigue viéndolas aunque estén apagadas: para eso entra.
     if (isset($s['sec']) && isset($apagadas[$s['sec']])
         && ($_SESSION['usuario_rol'] ?? '') !== 'soporte') continue;

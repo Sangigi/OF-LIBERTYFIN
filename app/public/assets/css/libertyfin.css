@@ -4598,3 +4598,298 @@ html.lf-estreno.lf-estreno-menu .lf-main{animation:lf-estreno-sube .6s var(--lf-
 .lf-ajustes-inicio .btn{flex:none}
 .lf-bv-tarjetas.c4{grid-template-columns:repeat(auto-fill,minmax(168px,1fr))}
 @media(max-width:560px){ .lf-bv-tarjetas.c4{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px} }
+
+/* ══════════════════════════════════════════════════════
+   MÓDULOS (Ajustes → Módulos y las pantallas de cada uno)
+   ══════════════════════════════════════════════════════ */
+.lf-mod-intro{margin:0 0 18px;max-width:760px;font-size:13.5px;line-height:1.55;color:var(--lf-tinta-3)}
+.lf-mod-grupo{margin:22px 0 10px;font-size:12px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--lf-tinta-4)}
+.lf-mod-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px}
+.lf-mod{position:relative;display:flex;align-items:flex-start;gap:13px;margin:0;padding:16px 16px 15px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r-lg);background:var(--lf-sup);box-shadow:var(--lf-s1);
+  transition:border-color .15s, box-shadow .15s}
+.lf-mod.on{border-color:color-mix(in srgb, var(--lf-brand) 45%, var(--lf-linea));box-shadow:0 0 0 3px var(--lf-brand-glow), var(--lf-s1)}
+.lf-mod .ico{flex:none;display:grid;place-items:center;width:40px;height:40px;border-radius:12px;
+  background:var(--lf-vidrio);color:var(--lf-tinta-3);transition:background .15s, color .15s}
+.lf-mod.on .ico{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-mod .txt{flex:1;min-width:0}
+.lf-mod .txt b{display:block;font-size:14px;font-weight:700;color:var(--lf-tinta)}
+.lf-mod .txt small{display:block;margin-top:3px;font-size:12.5px;line-height:1.45;color:var(--lf-tinta-3)}
+.lf-mod .txt small.plan{display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px;font-weight:600;color:var(--lf-amb)}
+.lf-mod .txt small.req{margin-top:7px;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-mod .lf-sw{flex:none;margin-top:2px}
+.lf-mod [data-aviso]{position:absolute;right:14px;bottom:8px;margin:0;font-size:11px;color:var(--lf-tinta-4)}
+.lf-mod.candado{background:var(--lf-vidrio);box-shadow:none}
+.lf-mod.candado .ico{opacity:.7}
+.lf-mod.candado .txt b{color:var(--lf-tinta-2)}
+
+/* Botón de lo que no se deshace (cancelar una venta). */
+.lf-btn-peligro{color:var(--lf-rojo)!important;border-color:color-mix(in srgb, var(--lf-rojo) 35%, var(--lf-linea))!important}
+.lf-btn-peligro:hover{background:var(--lf-rojo-soft)!important;border-color:var(--lf-rojo)!important}
+.lf-venta-cancelada b{font-weight:700}
+
+/* Seguimiento del trabajo dentro de una venta. */
+.lf-trab-venta .lf-form{padding:14px 18px;align-items:flex-end}
+.lf-trab-venta .tit{flex:0 0 100%;display:flex;align-items:center;gap:8px;flex-direction:row!important;color:var(--lf-tinta)}
+.lf-trab-venta .tit svg{color:var(--lf-brand)}
+.lf-trab-venta .tit b{font-size:14px}
+.lf-trab-venta .tit small{margin-left:auto;font-size:11.5px;color:var(--lf-tinta-4)}
+
+/* Caja: usar una sesión del paquete del cliente. */
+.lf-paq{display:inline-flex;align-items:center;gap:6px;margin-top:6px;padding:3px 10px;border-radius:999px;cursor:pointer;
+  border:1px dashed color-mix(in srgb, var(--lf-brand) 60%, var(--lf-linea));background:transparent;
+  font-size:11.5px;font-weight:600;color:var(--lf-brand-2);font-family:inherit;line-height:1.5}
+.lf-paq:hover{background:var(--lf-brand-glow)}
+.lf-paq.on{border-style:solid;background:var(--lf-brand-soft)}
+.lf-linea .lf-precio[readonly]{background:var(--lf-vidrio);color:var(--lf-tinta-3)}
+
+/* Inventario: traspasos y conteo general. */
+.lf-inv-tipo.t-traspaso{background:var(--lf-info-soft, var(--lf-vidrio));color:var(--lf-info, var(--lf-tinta-2))}
+.lf-inv-sub{display:block;margin-top:2px;font-size:12px;font-weight:400;line-height:1.45;color:var(--lf-tinta-4)}
+.lf-conteo .lf-conteo-in{width:110px;margin-left:auto;text-align:right}
+.lf-conteo-dif{font-weight:700;color:var(--lf-tinta-4)}
+.lf-conteo-dif.ok{color:var(--lf-brand-2)}
+.lf-conteo-dif.mas{color:var(--lf-brand-2)}
+.lf-conteo-dif.menos{color:var(--lf-rojo)}
+.lf-conteo-pie{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lf-conteo-pie .pista{flex:1;margin:0;font-size:12.5px;color:var(--lf-tinta-3)}
+
+/* Elegir cliente (Cotizaciones, Agenda, Igualas). */
+.lf-elige-cli{position:relative;display:flex;flex-direction:column}
+.lf-elige-cli .lf-search{width:100%}
+.lf-elige-cli .lf-search input{width:100%}
+.lf-elige-cli .lf-sugerencias{position:absolute;top:100%;left:0;right:0;z-index:30;margin-top:4px}
+.lf-elige-cli-pista{min-height:16px;margin-top:4px;font-size:11.5px;color:var(--lf-tinta-4)}
+
+/* Renglones de cotización y de compra. */
+.lf-cot-renglones{flex:0 0 100%;display:flex;flex-direction:column;gap:10px}
+.lf-cot-renglones .form-label{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.lf-cot-renglones .pista{margin:0;font-size:12.5px;color:var(--lf-tinta-4)}
+.lf-cot-agregar{display:flex;gap:10px;flex-wrap:wrap}
+.lf-cot-agregar .form-select{flex:1;min-width:220px;max-width:460px}
+.lf-cot-tabla{width:100%;border-collapse:separate;border-spacing:0}
+.lf-cot-tabla th{padding:6px 8px;font-size:11.5px;font-weight:600;color:var(--lf-tinta-3);border-bottom:1px solid var(--lf-linea);text-align:left}
+.lf-cot-tabla td{padding:6px 8px;vertical-align:middle;border-bottom:1px solid var(--lf-linea)}
+.lf-cot-tabla td .form-control-sm[type="number"]{width:105px;margin-left:auto;text-align:right}
+.lf-cot-tabla tfoot td{border:none;padding-top:10px;font-size:14px;font-weight:700;color:var(--lf-tinta)}
+.lf-co-sug{font-size:12px;font-weight:600}
+@media(max-width:640px){
+  .lf-cot-tabla thead{display:none}
+  .lf-cot-tabla tbody tr{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:6px;padding:8px 0;border-bottom:1px solid var(--lf-linea)}
+  .lf-cot-tabla tbody td{border:none;padding:0}
+  .lf-cot-tabla tbody td:first-child{grid-column:1 / -1}
+  .lf-cot-tabla td .form-control-sm[type="number"]{width:100%}
+}
+
+/* Un documento (cotización, compra). */
+.lf-doc-acciones{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:18px}
+.lf-doc-acciones .esp{flex:1}
+.lf-doc-acciones form{margin:0}
+.lf-doc-cab{display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:20px 22px 14px;border-bottom:1px solid var(--lf-linea)}
+.lf-doc-folio{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--lf-vidrio);font-size:12px;font-weight:700;color:var(--lf-tinta-2)}
+.lf-doc-cab h3{margin:8px 0 2px;font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--lf-tinta)}
+.lf-doc-sub{font-size:12.5px;color:var(--lf-tinta-4)}
+.lf-doc-meta{display:flex;flex-direction:column;align-items:flex-end;gap:10px}
+.lf-doc-meta dl{display:grid;grid-template-columns:auto auto;gap:3px 14px;margin:0;font-size:12.5px}
+.lf-doc-meta dt{font-weight:500;color:var(--lf-tinta-4);text-align:right}
+.lf-doc-meta dd{margin:0;font-weight:600;color:var(--lf-tinta)}
+.lf-doc-total{font-size:17px;font-weight:800;color:var(--lf-tinta)}
+.lf-doc-notas{margin:4px 22px 18px;padding:12px 14px;border-left:3px solid var(--lf-brand);border-radius:0 var(--lf-r) var(--lf-r) 0;background:var(--lf-vidrio)}
+.lf-doc-notas b{font-size:12px;color:var(--lf-tinta-3)}
+.lf-doc-notas p{margin:4px 0 0;font-size:13.5px;line-height:1.55;color:var(--lf-tinta)}
+.lf-co-recibir{display:flex;flex-direction:column;align-items:flex-start;gap:10px;margin:0 22px 20px;padding:16px 18px;
+  border:1px solid color-mix(in srgb, var(--lf-brand) 40%, var(--lf-linea));border-radius:var(--lf-r-lg);background:var(--lf-brand-glow)}
+.lf-co-recibir > b{font-size:14px;color:var(--lf-tinta)}
+@media(max-width:640px){ .lf-doc-meta{align-items:flex-start} .lf-doc-meta dt{text-align:left} }
+
+/* ── Agenda ── */
+.lf-ag-semana{display:flex;align-items:stretch;gap:6px;margin-bottom:18px;flex-wrap:wrap}
+.lf-ag-flecha{display:grid;place-items:center;width:34px;border-radius:var(--lf-r);border:1px solid var(--lf-linea);
+  background:var(--lf-sup);font-size:20px;color:var(--lf-tinta-3);text-decoration:none}
+.lf-ag-flecha:hover{color:var(--lf-tinta);border-color:var(--lf-linea-f)}
+.lf-ag-dia{flex:1 1 0;min-width:58px;display:flex;flex-direction:column;align-items:center;gap:1px;padding:8px 4px;
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);background:var(--lf-sup);text-decoration:none;color:var(--lf-tinta-2)}
+.lf-ag-dia small{font-size:11px;font-weight:600;color:var(--lf-tinta-4);text-transform:uppercase;letter-spacing:.4px}
+.lf-ag-dia b{font-size:18px;font-weight:800;color:var(--lf-tinta)}
+.lf-ag-dia span{font-size:10.5px;color:var(--lf-tinta-4);white-space:nowrap}
+.lf-ag-dia:hover{border-color:var(--lf-linea-f);color:var(--lf-tinta)}
+.lf-ag-dia.hoy b{color:var(--lf-brand-2)}
+.lf-ag-dia.on{border-color:var(--lf-brand);background:var(--lf-brand-soft);box-shadow:0 0 0 3px var(--lf-brand-glow)}
+.lf-ag-dia.on span{color:var(--lf-brand-2);font-weight:600}
+.lf-ag-ir{display:flex;align-items:center;gap:6px;margin:0 0 0 6px}
+.lf-ag-ir .form-control{width:auto}
+.lf-ag-scroll{max-height:620px;overflow:auto;border-top:1px solid var(--lf-linea)}
+.lf-ag-grid{display:grid;grid-template-columns:56px repeat(var(--cols), minmax(150px, 1fr));min-width:min-content}
+.lf-ag-colcab{position:sticky;top:0;z-index:3;height:38px;display:flex;align-items:center;justify-content:center;padding:0 8px;
+  background:var(--lf-sup);border-bottom:1px solid var(--lf-linea);font-size:12.5px;font-weight:700;color:var(--lf-tinta-2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lf-ag-horas{position:sticky;left:0;z-index:4;background:var(--lf-sup)}
+.lf-ag-cuerpo{position:relative;height:var(--alto)}
+.lf-ag-horas .lf-ag-cuerpo span{position:absolute;right:8px;transform:translateY(-50%);font-family:var(--lf-mono);font-size:10.5px;color:var(--lf-tinta-4)}
+.lf-ag-horas .lf-ag-cuerpo span:first-child{transform:none}
+.lf-ag-col{border-left:1px solid var(--lf-linea)}
+.lf-ag-hueco{position:absolute;left:0;right:0;border-bottom:1px dashed var(--lf-linea)}
+.lf-ag-hueco:hover{background:var(--lf-brand-glow)}
+.lf-ag-hueco:hover::after{content:'+ Agendar';position:absolute;left:8px;top:3px;font-size:11px;font-weight:600;color:var(--lf-brand-2)}
+.lf-ag-cita{position:absolute;left:4px;right:4px;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:1px;overflow:hidden;
+  padding:4px 8px;border:none;border-left:3px solid var(--lf-brand);border-radius:8px;background:var(--lf-brand-soft);
+  color:var(--lf-tinta);text-align:left;cursor:pointer;font-family:inherit;box-shadow:var(--lf-s1)}
+.lf-ag-cita b{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lf-ag-cita small{font-size:11px;color:var(--lf-tinta-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.lf-ag-cita:hover{box-shadow:var(--lf-s2);z-index:2}
+.lf-ag-cita.e-co{border-left-color:var(--lf-brand-2);background:color-mix(in srgb, var(--lf-brand) 26%, var(--lf-sup))}
+.lf-ag-cita.e-at{border-left-color:var(--lf-tinta-4);background:var(--lf-vidrio);opacity:.85}
+.lf-ag-cita.e-nv{border-left-color:var(--lf-amb);background:var(--lf-amb-soft);opacity:.75}
+.lf-ag-cita.e-ca{border-left-color:var(--lf-rojo);background:var(--lf-rojo-soft);opacity:.6}
+.lf-ag-cita.e-ca b{text-decoration:line-through}
+.lf-ag-item{display:flex;align-items:center;gap:14px;padding:12px 18px;border-top:1px solid var(--lf-linea)}
+.lf-ag-item.foco{animation:lf-ag-foco 1.6s ease}
+@keyframes lf-ag-foco{0%,40%{background:var(--lf-brand-glow)}100%{background:transparent}}
+.lf-ag-item .h{flex:none;width:52px;font-size:14px;font-weight:700;color:var(--lf-tinta)}
+.lf-ag-item .h small{display:block;font-size:11px;font-weight:500;color:var(--lf-tinta-4)}
+.lf-ag-item .q{flex:1;min-width:0}
+.lf-ag-item .q b{display:block;font-size:14px;font-weight:600}
+.lf-ag-item .q small{display:block;font-size:12px;color:var(--lf-tinta-3)}
+.lf-ag-item .acc{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.lf-ag-estado{flex:none;padding:2px 9px;border-radius:999px;font-size:11.5px;font-weight:600;background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-ag-estado.e-co{background:var(--lf-brand);color:#fff}
+.lf-ag-estado.e-at{background:var(--lf-vidrio);color:var(--lf-tinta-3)}
+.lf-ag-estado.e-nv{background:var(--lf-amb-soft);color:var(--lf-amb)}
+.lf-ag-estado.e-ca{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-ag-wa svg{color:#25a35a}
+.lf-ag-mas{position:relative}
+.lf-ag-mas > summary{list-style:none}
+.lf-ag-mas > summary::-webkit-details-marker{display:none}
+.lf-ag-mas > div{position:absolute;right:0;top:calc(100% + 4px);z-index:20;min-width:170px;padding:5px;border:1px solid var(--lf-linea);
+  border-radius:var(--lf-r);background:var(--lf-sup);box-shadow:var(--lf-s2)}
+.lf-ag-mas form{margin:0}
+.lf-ag-mas button,.lf-ag-mas a{display:block;width:100%;padding:8px 10px;border:none;border-radius:7px;background:none;text-align:left;
+  font-size:13px;color:var(--lf-tinta-2);text-decoration:none;cursor:pointer;font-family:inherit}
+.lf-ag-mas button:hover,.lf-ag-mas a:hover{background:var(--lf-vidrio);color:var(--lf-tinta)}
+.lf-ag-horario{margin-top:4px}
+@media(max-width:720px){
+  .lf-ag-card .lf-ag-scroll{max-height:460px}
+  .lf-ag-item{flex-wrap:wrap}
+  .lf-ag-item .acc{flex:0 0 100%;justify-content:flex-start;padding-left:66px}
+  .lf-ag-ir{margin:6px 0 0;flex:0 0 100%}
+  .lf-ag-dia{min-width:40px}
+  .lf-ag-dia span{display:none}
+}
+
+/* Renglones apagados (igualas en pausa, ventas canceladas en la ficha). */
+tr.lf-apagado td{opacity:.6}
+
+/* ── Seguimiento de trabajos: el tablero ── */
+.lf-tab-tablero{display:grid;grid-template-columns:repeat(4,minmax(240px,1fr));gap:14px;overflow-x:auto;padding-bottom:6px;align-items:start}
+.lf-tab-col{display:flex;flex-direction:column;gap:10px;min-width:0;padding:12px;border-radius:var(--lf-r-lg);background:var(--lf-vidrio)}
+.lf-tab-col header{display:flex;align-items:center;justify-content:space-between;padding:2px 4px}
+.lf-tab-col header b{font-size:13px;font-weight:700;color:var(--lf-tinta)}
+.lf-tab-col header b::before{content:'';display:inline-block;width:8px;height:8px;margin-right:7px;border-radius:50%;background:var(--lf-tinta-4);vertical-align:1px}
+.lf-tab-col.t-proceso header b::before{background:var(--lf-amb)}
+.lf-tab-col.t-listo header b::before{background:var(--lf-brand)}
+.lf-tab-col.t-entregado header b::before{background:var(--lf-brand-2)}
+.lf-tab-col header span{min-width:24px;padding:1px 8px;border-radius:999px;background:var(--lf-sup);font-size:12px;font-weight:700;text-align:center;color:var(--lf-tinta-3)}
+.lf-tab-vacio{margin:4px;font-size:12.5px;color:var(--lf-tinta-4)}
+.lf-tab-tarjeta{display:flex;flex-direction:column;gap:4px;padding:12px 13px;border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+  background:var(--lf-sup);box-shadow:var(--lf-s1)}
+.lf-tab-tarjeta.atrasado{border-color:color-mix(in srgb, var(--lf-rojo) 45%, var(--lf-linea))}
+.lf-tab-tarjeta .cab{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px}
+.lf-tab-tarjeta .entrega{padding:1px 8px;border-radius:999px;background:var(--lf-vidrio);font-size:11px;font-weight:600;color:var(--lf-tinta-3)}
+.lf-tab-tarjeta .entrega.mal{background:var(--lf-rojo-soft);color:var(--lf-rojo)}
+.lf-tab-tarjeta .cli{font-size:14px;font-weight:700;color:var(--lf-tinta)}
+.lf-tab-tarjeta .cli a{color:inherit}
+.lf-tab-tarjeta .que{font-size:12.5px;line-height:1.4;color:var(--lf-tinta-3)}
+.lf-tab-tarjeta .nota{font-size:12px;font-style:italic;color:var(--lf-tinta-3)}
+.lf-tab-tarjeta .pie{display:flex;justify-content:space-between;gap:8px;margin-top:4px;font-size:12px;color:var(--lf-tinta-3)}
+.lf-tab-tarjeta .pie em{font-style:normal;font-weight:600;color:var(--lf-amb)}
+.lf-tab-mover{display:flex;flex-direction:column;gap:6px;margin:6px 0 0;padding-top:8px;border-top:1px solid var(--lf-linea)}
+.lf-tab-mover details summary{font-size:12px;font-weight:600;color:var(--lf-tinta-3);cursor:pointer}
+.lf-tab-mover details[open]{display:flex;flex-direction:column;gap:6px}
+.lf-tab-mover label{display:flex;flex-direction:column;gap:3px;margin:0;font-size:11.5px;font-weight:600;color:var(--lf-tinta-3)}
+.lf-tab-mover .btn{align-self:flex-start}
+@media(max-width:1100px){ .lf-tab-tablero{grid-template-columns:repeat(4,260px)} }
+
+/* ── La ficha del cliente ── */
+.lf-cli-nombre{color:inherit}
+.lf-cli-nombre:hover b{color:var(--lf-brand-2);text-decoration:underline}
+.lf-cf-cab .card-body{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:18px 20px}
+.lf-cf-cab .lf-av{width:52px;height:52px;border-radius:15px;font-size:18px}
+.lf-cf-cab .quien{flex:1;min-width:200px}
+.lf-cf-cab h3{margin:0;font-size:20px;font-weight:800;letter-spacing:-.4px;color:var(--lf-tinta)}
+.lf-cf-cab .quien span{font-size:13px;color:var(--lf-tinta-3)}
+.lf-cf-cab .acc{display:flex;gap:8px;flex-wrap:wrap}
+.lf-cf-cols{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;align-items:start}
+@media(max-width:980px){ .lf-cf-cols{grid-template-columns:1fr} }
+.lf-cf-ficha,.lf-cf-nota{display:flex;flex-direction:column;gap:10px;padding:0 20px 18px}
+.lf-cf-ficha > div{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.lf-cf-ficha small{font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-cf-nota .btn{align-self:flex-end}
+.lf-cf-notas{list-style:none;margin:0;padding:0 20px 10px}
+.lf-cf-notas li{padding:12px 0;border-top:1px solid var(--lf-linea)}
+.lf-cf-notas p{margin:0;font-size:13.5px;line-height:1.55;color:var(--lf-tinta)}
+.lf-cf-notas small{display:block;margin-top:4px;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-cf-borrar{margin-left:6px;padding:0;border:none;background:none;font-size:11.5px;color:var(--lf-rojo);cursor:pointer;font-family:inherit}
+.lf-cf-borrar:hover{text-decoration:underline}
+.lf-cf-lista{list-style:none;margin:0;padding:0 18px 12px}
+.lf-cf-lista li{padding:9px 0;border-top:1px solid var(--lf-linea)}
+.lf-cf-lista li:first-child{border-top:none}
+.lf-cf-lista b{display:block;font-size:13.5px;font-weight:600;color:var(--lf-tinta)}
+.lf-cf-lista small{display:block;margin-top:2px;font-size:12px;color:var(--lf-tinta-3)}
+.lf-cf-lista li.futura b{color:var(--lf-brand-2)}
+.lf-cf-sesiones{display:block;height:6px;margin:6px 0 4px;border-radius:99px;background:var(--lf-vidrio);overflow:hidden}
+.lf-cf-sesiones i{display:block;height:100%;border-radius:99px;background:var(--lf-brand)}
+.lf-cf-subir{display:flex;gap:8px;padding:0 18px 12px}
+.lf-cf-subir .form-control{flex:1;min-width:0}
+
+/* Productos: lo de los módulos (duración, paquete). */
+.lf-form > .lf-prod-mods{flex:0 0 100%;display:flex;flex-direction:row;flex-wrap:wrap;gap:14px 22px;padding:12px 14px;border:1px solid var(--lf-linea);border-radius:var(--lf-r)}
+.lf-prod-mod{display:flex;flex-direction:column}
+.lf-prod-mod .pista{margin:5px 0 0;font-size:11.5px;color:var(--lf-tinta-4)}
+.lf-prod-dur{display:flex;align-items:center;gap:7px}
+.lf-prod-dur .form-control{width:100px}
+.lf-prod-dur span{font-size:13px;color:var(--lf-tinta-3)}
+.lf-prod-paq{flex:1;min-width:280px}
+.lf-prod-paq .lf-sw span b{color:var(--lf-tinta);font-weight:600}
+.lf-prod-paq .lf-sw span small{color:var(--lf-tinta-4);font-size:12px}
+.lf-prod-paq .cuerpo{display:flex;flex-wrap:wrap;gap:12px 14px;margin-top:12px}
+.lf-prod-paq .cuerpo > div{display:flex;flex-direction:column}
+.lf-prod-paq .cuerpo .pista{flex:0 0 100%;margin:0}
+
+/* Bienvenida: el paso «Herramientas». */
+.lf-bv-mods{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:26px}
+.lf-bv-mod{position:relative;display:flex;align-items:flex-start;gap:12px;margin:0;padding:15px 44px 14px 15px;
+  border:1.5px solid var(--lf-linea);border-radius:16px;background:var(--lf-sup);cursor:pointer;transition:border-color .15s, box-shadow .15s}
+.lf-bv-mod:hover{border-color:color-mix(in srgb, var(--lf-brand) 55%, var(--lf-linea))}
+.lf-bv-mod input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.lf-bv-mod .ico{flex:none;display:grid;place-items:center;width:42px;height:42px;border-radius:12px;background:var(--lf-vidrio);color:var(--lf-tinta-3)}
+.lf-bv-mod .txt b{display:block;font-size:14.5px;font-weight:700;color:var(--lf-tinta)}
+.lf-bv-mod .txt small{display:block;margin-top:2px;font-size:12.5px;line-height:1.45;color:var(--lf-tinta-3)}
+.lf-bv-mod .txt em{display:inline-block;margin-top:7px;padding:2px 9px;border-radius:999px;font-style:normal;font-size:11px;font-weight:700;
+  background:var(--lf-amb-soft);color:var(--lf-amb)}
+.lf-bv-mod .ok{position:absolute;top:14px;right:14px;width:22px;height:22px;border-radius:7px;border:1.5px solid var(--lf-linea-f);transition:all .15s}
+.lf-bv-mod:has(input:checked){border-color:var(--lf-brand);box-shadow:0 0 0 4px var(--lf-brand-ring)}
+.lf-bv-mod:has(input:checked) .ico{background:var(--lf-brand);color:#fff}
+.lf-bv-mod:has(input:checked) .ok{border-color:var(--lf-brand);background:var(--lf-brand)
+  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 12.5 4 4 8-9'/%3E%3C/svg%3E") center/14px no-repeat}
+.lf-bv-mod:has(input:focus-visible){box-shadow:0 0 0 4px var(--lf-brand-ring)}
+.lf-bv-mod.candado,.lf-bv-mod.apagado{cursor:default;border-style:dashed;background:transparent}
+.lf-bv-mod.candado .ico,.lf-bv-mod.apagado .ico{opacity:.6}
+.lf-bv-mod.candado .ok,.lf-bv-mod.apagado .ok{display:none}
+.lf-bv-mod.candado input,.lf-bv-mod.apagado input{cursor:default}
+.lf-bv-vista .mini{height:auto;min-height:380px}
+/* Ajustes tras revisar las capturas. */
+.lf-cot-tabla th.text-end{text-align:right}
+.lf-cot-tabla td:first-child{width:46%}
+.lf-cot-tabla td:first-child .form-control,.lf-cot-tabla td:first-child .form-select{width:100%}
+.lf-elige-cli-pista{position:absolute;top:100%;left:2px;margin-top:3px;white-space:nowrap}
+.lf-elige-cli .lf-sugerencias{top:auto}
+.lf-form > p.pista,.lf-form > .pista{font-size:12px;line-height:1.5;color:var(--lf-tinta-4)}
+.lf-cf-lista small b{display:inline;font-size:inherit}
+.lf-cf-subir{flex-wrap:wrap}
+.lf-conteo-pie .form-control{flex:0 1 340px;min-width:180px}
+.lf-co-recibir input[type="checkbox"],.lf-inv-check input{accent-color:var(--lf-brand)}
+.lf-mod .txt small.plan{display:block;line-height:1.5}
+.lf-mod .txt small.plan svg{display:inline-block!important;vertical-align:-2px;margin-right:2px}
+.lf-elige-cli-pista{top:0;right:2px;left:auto;margin-top:1px;max-width:60%;overflow:hidden;text-overflow:ellipsis;text-align:right}
+/* En un formulario, el buscador de cliente mide lo mismo que los demás campos. */
+.lf-form .lf-elige-cli .lf-search input{min-height:42px;padding-top:10px;padding-bottom:10px;border-radius:var(--lf-r)}

@@ -14,6 +14,9 @@
  *   usuarios   cuántos usuarios incluye (informativo)
  *   popular    true marca la tarjeta como "Más popular"
  *   grupos     características agrupadas: 'Título' => ['renglón', ...]
+ *   modulos    los módulos que incluye (ver ServicioModulos). Sin esta llave,
+ *              el plan incluye todos. La prueba gratis siempre los incluye todos.
+ *              Inventario y Comisiones van en todos los planes.
  *
  * `descuento_anual`: % que se descuenta al pagar los 12 meses juntos.
  * `cuenta`: a dónde se transfiere.
@@ -27,6 +30,7 @@ return [
             'precio'   => 0.00,          // ← precio real por mes
             'usuarios' => 1,
             'grupos'   => ['Punto de venta' => ['1 caja registradora', '100 productos']],
+            'modulos'  => ['cotizaciones', 'expediente'],
         ],
         'premium' => [
             'nombre'   => 'Premium',
@@ -34,6 +38,7 @@ return [
             'usuarios' => 5,
             'popular'  => true,
             'grupos'   => ['Punto de venta' => ['3 cajas registradoras'], 'Pagos' => ['SPEI']],
+            'modulos'  => ['cotizaciones', 'expediente', 'igualas', 'seguimiento', 'agenda', 'paquetes', 'compras'],
         ],
     ],
 

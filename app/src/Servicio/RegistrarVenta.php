@@ -35,28 +35,43 @@ final class RegistrarVenta
         $this->db->beginTransaction();
         try {
             // ── La venta. `total` es lo VENDIDO, nunca lo cobrado. ──
-            $st = $this->db->prepare("
+            $sqlVenta = "
                 INSERT INTO ventas
                     (codigo_venta, cliente_id, usuario_id, especialista_id, especialista_nombre,
                      sucursal_id, caja_id,
                      subtotal, descuento, iva, total, iva_modo,
                      metodo_pago, estado, descripcion, fecha)
                 VALUES (?,?,?,?,?, ?,?, ?,?,?,?,?, ?,'completada',?,NOW())
-            ");
-            $st->execute([
-                $codigo,
-                $ctx['cliente_id'] ?: null,
-                $ctx['usuario_id'] ?: null,
-                // Quién va a hacer el trabajo, no quién cobró.
-                $ctx['especialista_id'] ?: null,
-                $ctx['especialista_nombre'] ?: null,
-                $ctx['sucursal_id'] ?: null,
-                $ctx['caja_id'] ?: null,
-                $t['subtotal'], 0, $t['iva'], $t['total'],
-                $t['iva_modo'] === 'sumar' ? 'sumar' : 'incluido',
-                $ctx['metodo_pago'] ?? 'efectivo',
-                trim($ctx['descripcion'] ?? ''),
-            ]);
+            ";
+            // El folio es la fecha y hora, y es único: dos ventas en el mismo
+            // segundo (dos cajas, o las igualas del mes generándose juntas)
+            // chocaban y la segunda no se guardaba. Si ya existe, el segundo
+            // que sigue. (Se prepara cada vez: reusar una sentencia que falló
+            // no lo admiten todos los motores.)
+            for ($intento = 0; ; $intento++) {
+                try {
+                    $this->db->prepare($sqlVenta)->execute([
+                        $codigo,
+                        $ctx['cliente_id'] ?: null,
+                        $ctx['usuario_id'] ?: null,
+                        // Quién va a hacer el trabajo, no quién cobró.
+                        $ctx['especialista_id'] ?: null,
+                        $ctx['especialista_nombre'] ?: null,
+                        $ctx['sucursal_id'] ?: null,
+                        $ctx['caja_id'] ?: null,
+                        $t['subtotal'], 0, $t['iva'], $t['total'],
+                        $t['iva_modo'] === 'sumar' ? 'sumar' : 'incluido',
+                        $ctx['metodo_pago'] ?? 'efectivo',
+                        trim($ctx['descripcion'] ?? ''),
+                    ]);
+                    break;
+                } catch (\PDOException $e) {
+                    $repetido = (int)($e->errorInfo[1] ?? 0) === 1062
+                             || stripos($e->getMessage(), 'UNIQUE') !== false;
+                    if (!$repetido || $intento >= 60) throw $e;
+                    $codigo = date('YmdHis', \DateTime::createFromFormat('YmdHis', $codigo)->getTimestamp() + 1);
+                }
+            }
             $ventaId = (int)$this->db->lastInsertId();
 
             // ── Las líneas ──
@@ -78,6 +93,9 @@ final class RegistrarVenta
             // Inventario apagado no hace nada; con «No dejar vender» y sin
             // piezas, lanza y la venta no se guarda.
             (new Inventario($this->db))->descontarVenta($ventaId, $ticket->lineas(), $ctx['sucursal_id'] ?? null);
+            // Paquetes de sesiones: los que se venden quedan a nombre del
+            // cliente; las sesiones que se usan, se gastan. Misma transacción.
+            (new Paquetes($this->db))->registrarVenta($ventaId, $ticket->lineas(), $ctx);
 
             // ── El área de la venta ──
             //

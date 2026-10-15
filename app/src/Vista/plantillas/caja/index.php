@@ -125,6 +125,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
                 data-area="<?= (int)($s['categoria_id'] ?? 0) ?>"
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
+                data-codigo="<?= P::e(mb_strtolower(trim((string)$s['codigo']))) ?>"
                 title="<?= P::e($titulo) ?>"
                 <?php if ($hay !== null): ?>data-hay="<?= number_format($hay, 3, '.', '') ?>"<?php endif; ?>
                 data-u="<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'] ?? '')) ?>"
@@ -165,6 +166,11 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
              cobrar, el servidor las vuelve a calcular y, si no da lo mismo,
              no cobra (ver CajaControlador::cobrar). */ ?>
     <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="[]">
+    <?php /* Lo que la venta cierra en otros módulos (ver CajaControlador::despuesDeCobrar)
+             y las sesiones de paquete que usa: {renglón: paquete}. */ ?>
+    <input type="hidden" name="cotizacion_id" id="cotizacionId" value="">
+    <input type="hidden" name="cita_id" id="citaId" value="">
+    <input type="hidden" name="paquetes" id="paquetesIn" value="{}">
     <input type="hidden" name="promo_esperado" id="promoEsperado" value="0">
     <?php /* El porcentaje que se manda: la tasa de Ajustes con el interruptor
              encendido, 0 apagado. El cajero ya no teclea un número. */ ?>
@@ -558,9 +564,9 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
           + '<span class="n">' + l.cantidad + '</span>'
           + '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>';
       d.innerHTML = '<div style="flex:1;min-width:0"><b>' + l.nombre + '</b>'
-        + cant + pistaExistencia(l) + '</div>'
+        + cant + pistaExistencia(l) + opcionPaquete(l, i) + '</div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
-        +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
+        +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio"' + (l.paquete ? ' readonly' : '') + '>'
         + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>'
         // La promoción va abajo, a todo lo ancho: junto al precio no cabía.
         + '<div class="lf-promo-l" data-promo-i="' + i + '"></div>';
@@ -595,6 +601,9 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
        bien: "El ticket suma cero" con el precio puesto. */
     $('lineas').value = JSON.stringify(lineas.map(function(l){
       return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
+    var paqs = {};
+    lineas.forEach(function(l, i){ if (l.paquete) paqs[i] = l.paquete; });
+    $('paquetesIn').value = JSON.stringify(paqs);
 
     /* El descuento de las promociones ya viene por renglón (ver
        pedirPromos): el total es lo capturado menos eso. */
@@ -786,6 +795,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   var PC = <?= $pcJson ?: 'null' ?> || { promos: {}, productos: {}, todo: [] };
   var ICO_PROMO = <?= json_encode(W::icono('pct', '14px')) ?>;
   var ICO_ALERTA = <?= json_encode(W::icono('alerta', '14px')) ?>;
+  var ICO_INFO = <?= json_encode(W::icono('doc', '14px')) ?>;
   var CARTA = {};   // id → nombre, precio de catálogo y, con inventario, cuántas hay
   document.querySelectorAll('.lf-serv').forEach(function(b){
     CARTA[+b.dataset.id] = { nombre: b.dataset.nombre, precio: +b.dataset.precio,
@@ -839,6 +849,9 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       if (p.tipo === 'nxm' && l.cantidad < p.lleva) {
         var n = p.lleva - l.cantidad;
         return 'agrega ' + n + ' más para que aplique';
+      }
+      if (p.tipo === 'volumen' && l.cantidad < p.lleva) {
+        return 'desde ' + p.lleva + ' piezas; agrega ' + (Math.round((p.lleva - l.cantidad) * 1000) / 1000) + ' más';
       }
     }
     if (p.tipo === 'paquete') {
@@ -922,6 +935,41 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       + (ids.length > 1 ? '<small>Y ' + (ids.length - 1) + ' promoción' + (ids.length > 2 ? 'es' : '') + ' más; se aplica la que más descuenta.</small>' : ''));
   }
 
+  /* ── PAQUETES DE SESIONES (módulo «paquetes») ──
+     Si el cliente elegido tiene sesiones de un servicio, el renglón de ese
+     servicio ofrece usarlas: va en $0 y el servidor descuenta la sesión al
+     cobrar. Cambiar de cliente las quita. */
+  var CON_PAQUETES = <?= !empty($conPaquetes) ? 'true' : 'false' ?>;
+  var PAQ = {};   // producto_id → {id, quedan, paquete}
+  function opcionPaquete(l, i){
+    var p = PAQ[l.id];
+    if (!CON_PAQUETES || !p) return '';
+    var quedan = p.quedan - (l.paquete ? l.cantidad : 0);
+    return '<button type="button" class="lf-paq' + (l.paquete ? ' on' : '') + '" data-paq="' + i + '">'
+      + (l.paquete ? '✓ Sesión de paquete · le quedarán ' + Math.max(0, quedan)
+                   : 'Usar sesión de su paquete (le quedan ' + p.quedan + ')') + '</button>';
+  }
+  function cargarPaquetes(cliente){
+    PAQ = {};
+    if (!CON_PAQUETES || !cliente) { soltarPaquetes(); return; }
+    fetch('/caja/paquetes?cliente=' + encodeURIComponent(cliente), {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){ PAQ = (d && d.paquetes) || {}; soltarPaquetes(true); pintar(); })
+      .catch(function(){ PAQ = {}; });
+  }
+  /* Quita las sesiones marcadas que ya no corresponden (otro cliente). */
+  function soltarPaquetes(conservarValidas){
+    var cambio = false;
+    lineas.forEach(function(l){
+      if (l.paquete && !(conservarValidas && PAQ[l.id] && PAQ[l.id].id === l.paquete)) {
+        l.precio = l.precioAntes != null ? l.precioAntes : (CARTA[l.id] ? CARTA[l.id].precio : 0);
+        l.paquete = null; cambio = true;
+      }
+    });
+    if (cambio) pintar();
+  }
+  window.lfCajaCliente = function(id){ cargarPaquetes(id); };
+
   /* El aviso flotante de Caja (promoción, existencias). Uno a la vez. */
   function mostrarAviso(html, clase){
     var viejo = document.querySelector('.lf-promo-aviso');
@@ -929,7 +977,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     var t = document.createElement('div');
     t.className = 'lf-promo-aviso' + (clase ? ' ' + clase : '');
     t.setAttribute('role', clase === 'mal' ? 'alert' : 'status');
-    t.innerHTML = '<span class="ico">' + (clase === 'mal' ? ICO_ALERTA : ICO_PROMO) + '</span><div class="txt">' + html
+    var ico = clase === 'mal' ? ICO_ALERTA : (clase === 'info' ? ICO_INFO : ICO_PROMO);
+    t.innerHTML = '<span class="ico">' + ico + '</span><div class="txt">' + html
       + '</div><button type="button" class="x" aria-label="Cerrar">&times;</button>';
     document.body.appendChild(t);
     var fuera = function(){ t.classList.add('va'); setTimeout(function(){ t.remove(); }, 350); };
@@ -1090,6 +1139,10 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       campoQ.addEventListener('keydown', function(ev){
         if (ev.key === 'Enter') {
           ev.preventDefault();
+          // Un código exacto (lo que manda un lector de barras) gana al primero de la lista.
+          var exacto = campoQ.value.trim().toLowerCase();
+          var porCodigo = exacto && document.querySelector('.lf-serv[data-codigo="' + exacto.replace(/"/g, '') + '"]');
+          if (porCodigo) { porCodigo.click(); campoQ.value = ''; q = ''; filtrar(); direccion(); return; }
           var primero = visibles[(actual - 1) * POR_PAG];
           if (primero) { primero.click(); campoQ.select(); }
         } else if (ev.key === 'Escape' && campoQ.value) {
@@ -1112,6 +1165,28 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         if (!c || !c.offsetParent) return;
         ev.preventDefault();
         c.focus(); c.select();
+      });
+
+      /* LECTOR DE CÓDIGO DE BARRAS sin tener el foco en el buscador: el
+         lector "teclea" el código muy rápido y cierra con Enter. Si lo
+         tecleado así coincide con el código de un producto, se agrega. */
+      var lector = '', ultima = 0;
+      document.addEventListener('keydown', function(ev){
+        var t = document.activeElement;
+        if (t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable)) { lector = ''; return; }
+        if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        var ahora = Date.now();
+        if (ahora - ultima > 60) lector = '';
+        ultima = ahora;
+        if (ev.key === 'Enter') {
+          var cod = lector.trim().toLowerCase();
+          lector = '';
+          if (cod.length < 3) return;
+          var tarjeta = document.querySelector('.lf-serv[data-codigo="' + cod.replace(/"/g, '') + '"]');
+          if (tarjeta) { ev.preventDefault(); tarjeta.click(); }
+          return;
+        }
+        if (ev.key.length === 1) lector += ev.key;
       });
     }
 
@@ -1201,6 +1276,16 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   });
 
   $('lista').addEventListener('click', function(e){
+    var pq = e.target.closest('[data-paq]');
+    if (pq) {
+      var lp = lineas[+pq.dataset.paq], p = PAQ[lp && lp.id];
+      if (!lp || !p) return;
+      if (lp.paquete) { lp.precio = lp.precioAntes != null ? lp.precioAntes : lp.precio; lp.paquete = null; }
+      else if (lp.cantidad > p.quedan) { mostrarAviso('<b>No alcanzan las sesiones</b><small>Al paquete le quedan ' + p.quedan + '.</small>', 'mal'); return; }
+      else { lp.precioAntes = lp.precio; lp.precio = 0; lp.paquete = p.id; }
+      pintar();
+      return;
+    }
     var mas = e.target.closest('[data-mas]'), menos = e.target.closest('[data-menos]');
     if (mas || menos) {
       var l = lineas[+(mas || menos).dataset[mas ? 'mas' : 'menos']];
@@ -1286,6 +1371,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   $('buscaCliente').addEventListener('input', function(){
     var q = this.value.trim();
     $('cliente_id').value = '';
+    if (window.lfCajaCliente) window.lfCajaCliente('');
     clearTimeout(t);
     if (q.length < 2) { $('sugerencias').hidden = true; return; }
     t = setTimeout(function(){
@@ -1303,6 +1389,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
               $('cliente_id').value = c.id;
               $('buscaCliente').value = c.nombre;
               s.hidden = true;
+              if (window.lfCajaCliente) window.lfCajaCliente(c.id);
             });
             s.appendChild(d);
           });
@@ -1339,7 +1426,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         ref: $('refTransf') ? $('refTransf').value : '',
         banco: $('bancoPago') ? $('bancoPago').value : '',
         quitadas: promo.quitadas,
-        codigo: $('promoCodigo') ? $('promoCodigo').value : ''
+        codigo: $('promoCodigo') ? $('promoCodigo').value : '',
+        cotizacion: $('cotizacionId').value || 0, cita: $('citaId').value || 0
       }));
     } catch (e) { /* sin sessionStorage se opera igual, solo que sin guardar */ }
   };
@@ -1361,7 +1449,8 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     return {
       lineas: lineas.map(function(l){ return {nombre:l.nombre, cantidad:l.cantidad, precio:l.precio,
                                               u: CARTA[l.id] && CARTA[l.id].frac ? CARTA[l.id].u : '',
-                                              desc:l.desc || 0, promo:l.promo ? l.promo.nombre : ''}; }),
+                                              desc:l.desc || 0, promo:l.promo ? l.promo.nombre : '',
+                                              paquete: !!l.paquete}; }),
       descuento: desc,
       total: cap, anticipo: ant, saldo: cap - ant,
       // Lo que el resumen de confirmación también dice.
@@ -1393,10 +1482,18 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       else g = JSON.parse(sessionStorage.getItem(CLAVE_TICKET) || 'null');
     } catch (e) { g = null; }
 
+    /* Solo el cliente (llega desde su ficha, sin renglones). */
+    if (g && g.clienteId && !(g.lineas && g.lineas.length)) {
+      $('cliente_id').value = g.clienteId;
+      $('buscaCliente').value = g.cliente || '';
+    }
     if (g && g.lineas && g.lineas.length) {
       lineas = g.lineas.map(function(l){
-        return {id:l.id, nombre:l.nombre, precio:+l.precio, cantidad:+l.cantidad || 1};
+        return {id:l.id, nombre:l.nombre, precio:+l.precio, cantidad:+l.cantidad || 1,
+                paquete: l.paquete || null, precioAntes: l.precioAntes != null ? +l.precioAntes : null};
       });
+      $('cotizacionId').value = +g.cotizacion || '';
+      $('citaId').value = +g.cita || '';
       /* El IVA vuelve como interruptor, con la tasa de hoy. */
       $('conIva').checked = parseFloat(g.iva) > 0;
       $('ivaPct').value = $('conIva').checked ? TASA_IVA : 0;
@@ -1442,7 +1539,17 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   /* Y siempre que se recalcula (agregar, quitar, cambiar un precio). */
   document.addEventListener('lf-recalcular', function(){ window.lfGuardarTicket(); });
 
+  /* LO QUE LLEGA ARMADO (cotización, cita o cliente desde su ficha): se
+     guarda como el ticket del navegador y se restaura igual que siempre.
+     La dirección se limpia: recargar no debe volver a cargarlo encima. */
+  var PRECARGA = <?= json_encode($precarga ?? null, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  if (PRECARGA) {
+    try { sessionStorage.setItem(CLAVE_TICKET, JSON.stringify(PRECARGA)); } catch (e) {}
+    try { history.replaceState(null, '', '/caja'); } catch (e) {}
+  }
   restaurarTicket();
+  if (PRECARGA && PRECARGA.aviso) mostrarAviso('<b>' + escP(PRECARGA.aviso) + '</b>', 'info');
+  if (CON_PAQUETES && $('cliente_id').value) cargarPaquetes($('cliente_id').value);
   pintar();
 })();
 </script>
@@ -1775,6 +1882,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
            + (l.u ? '<small class="lf-conf-pu">' + money(l.precio) + '/' + esc(l.u) + '</small>'
                   : (l.cantidad > 1 ? '<small class="lf-conf-pu">' + money(l.precio) + ' c/u</small>' : ''))
            + (l.promo ? '<small class="lf-conf-promo">' + esc(l.promo) + ' · −' + money(l.desc) + '</small>' : '')
+           + (l.paquete ? '<small class="lf-conf-promo">Sesión de su paquete</small>' : '')
            + '</span><b class="lf-mono">' + money(l.precio * l.cantidad - (l.desc || 0)) + '</b></li>';
     }).join('');
     if (r.lineas.length > 6) items += '<li class="mas">y ' + (r.lineas.length - 6) + ' más…</li>';

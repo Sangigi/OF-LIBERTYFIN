@@ -42,23 +42,32 @@ final class Arranque
     const PERFILES = [
         'profesional' => ['nombre' => 'Servicios profesionales', 'ejemplo' => 'Contabilidad, legal, consultoría, marketing',
                           'ilu' => 'maletin', 'vende' => 'servicios', 'cobro' => 'anticipo', 'iva' => '16', 'comisiones' => 'si',
-                          'areas' => ['Contabilidad', 'Fiscal', 'Legal', 'Consultoría']],
+                          'areas' => ['Contabilidad', 'Fiscal', 'Legal', 'Consultoría'],
+                          'modulos' => ['cotizaciones', 'igualas', 'seguimiento', 'expediente']],
         'belleza'     => ['nombre' => 'Salud y belleza', 'ejemplo' => 'Spa, estética, barbería, consultorio',
                           'ilu' => 'tijeras', 'vende' => 'ambos', 'cobro' => 'completo', 'iva' => '16', 'comisiones' => 'si',
-                          'areas' => ['Tratamientos', 'Cortes y peinados', 'Productos']],
+                          'areas' => ['Tratamientos', 'Cortes y peinados', 'Productos'],
+                          'modulos' => ['agenda', 'paquetes', 'expediente']],
         'tienda'      => ['nombre' => 'Tienda o comercio', 'ejemplo' => 'Abarrotes, ropa, papelería, refacciones',
                           'ilu' => 'tienda', 'vende' => 'productos', 'cobro' => 'completo', 'iva' => '16', 'comisiones' => 'no',
-                          'areas' => ['General']],
+                          'areas' => ['General'],
+                          'modulos' => ['compras']],
         // Sin educación: escuelas y academias no son mercado de Libertyfin.
         'otro'        => ['nombre' => 'Otro giro', 'ejemplo' => 'Lo ajustamos con tus respuestas',
                           'ilu' => 'estrella', 'vende' => 'servicios', 'cobro' => 'completo', 'iva' => 'sin', 'comisiones' => 'no',
-                          'areas' => []],
+                          'areas' => [], 'modulos' => []],
         // ── Próximamente: el sistema todavía no está pensado para ellos ──
         'restaurante' => ['nombre' => 'Restaurante o cafetería', 'ilu' => 'cubiertos',
                           'proximamente' => 'Mesas, comandas y propinas'],
         'hotel'       => ['nombre' => 'Hotelería', 'ilu' => 'cama',
                           'proximamente' => 'Habitaciones, reservas y estancias'],
     ];
+
+    /**
+     * Los módulos que se ofrecen en la pregunta «Herramientas». Inventario y
+     * Comisiones no van aquí: los deciden «¿Qué vendes?» y «¿Pagas comisiones?».
+     */
+    const MODULOS = ['agenda', 'paquetes', 'cotizaciones', 'igualas', 'seguimiento', 'expediente', 'compras'];
 
     const VENDE      = ['servicios', 'productos', 'ambos'];
     const COBRO      = ['completo', 'anticipo'];
@@ -109,6 +118,7 @@ final class Arranque
                 'cobro'      => $caja['anticipo'] === 'vacio' ? 'anticipo' : 'completo',
                 'iva'        => $caja['iva_inicio'] === 'con' ? ($caja['iva_tasa'] === '8' ? '8' : '16') : 'sin',
                 'comisiones' => $this->cfg->seccionActiva('comisiones') ? 'si' : 'no',
+                'modulos'    => $this->modulosEncendidos(),
                 'repite'     => true,
             ];
         }
@@ -116,7 +126,9 @@ final class Arranque
         $perfil = self::DEL_REGISTRO[$giro] ?? 'otro';
         $p = self::PERFILES[$perfil];
         return ['perfil' => $perfil, 'vende' => $p['vende'], 'cobro' => $p['cobro'],
-                'iva' => $p['iva'], 'comisiones' => $p['comisiones'], 'repite' => false];
+                'iva' => $p['iva'], 'comisiones' => $p['comisiones'],
+                'modulos' => array_values(array_filter($p['modulos'] ?? [], function ($k) { return Modulos::enPlan($k); })),
+                'repite' => false];
     }
 
     /**
@@ -150,15 +162,51 @@ final class Arranque
 
         $areas = $this->crearAreas((array)($r['areas'] ?? []));
 
+        // Las herramientas (módulos). Solo si la pregunta llegó: sin ella
+        // (un formulario viejo) se quedan como estaban.
+        $modulos = null;
+        if (!empty($r['modulos_paso']) || isset($r['modulos'])) {
+            $modulos = $this->ponerModulos((array)($r['modulos'] ?? []), $r['vende'] !== 'servicios');
+        }
+
         $c->guardar('inicio.pendiente', '0');
         $c->guardar('inicio.hecho_en', date('Y-m-d H:i:s'));
         try {
             Auditoria::anota('inicio.configurar', self::PERFILES[$perfil]['nombre'], null,
                 json_encode(['vende' => $r['vende'], 'cobro' => $r['cobro'], 'iva' => $r['iva'],
-                             'comisiones' => $r['comisiones'], 'areas' => $areas], JSON_UNESCAPED_UNICODE));
+                             'comisiones' => $r['comisiones'], 'areas' => $areas, 'modulos' => $modulos], JSON_UNESCAPED_UNICODE));
         } catch (\Throwable $e) { /* sin bitácora se configura igual */ }
 
-        return ['perfil' => $perfil, 'areas' => $areas];
+        return ['perfil' => $perfil, 'areas' => $areas, 'modulos' => $modulos];
+    }
+
+    /**
+     * Enciende los elegidos y apaga los demás de la pregunta. Lo que el plan
+     * no incluye no se enciende (el paso lo muestra con candado). Compras
+     * necesita Inventario: si solo vende servicios, no se enciende.
+     *
+     * @return array los que quedaron encendidos
+     */
+    private function ponerModulos(array $elegidos, $conInventario)
+    {
+        $m = new Modulos($this->cfg);
+        $on = [];
+        foreach (self::MODULOS as $k) {
+            $quiere = in_array($k, $elegidos, true) && Modulos::enPlan($k)
+                   && ($k !== 'compras' || $conInventario);
+            try {
+                $m->poner($k, $quiere);
+                if ($quiere) $on[] = $k;
+            } catch (\InvalidArgumentException $e) { /* fuera del plan: se queda apagado */ }
+        }
+        return $on;
+    }
+
+    /** Los de la pregunta que ya están encendidos (al repetir las preguntas). */
+    private function modulosEncendidos()
+    {
+        $m = new Modulos($this->cfg);
+        return array_values(array_filter(self::MODULOS, function ($k) use ($m) { return $m->encendido($k); }));
     }
 
     /** Saltar: se queda como está (los valores de siempre) y no vuelve a salir. */

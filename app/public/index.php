@@ -147,6 +147,39 @@ $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 
 $r->post('/servicios/promociones/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardarPromocion']);
 $r->post('/servicios/promociones/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternarPromocion']);
 $r->post('/servicios/promociones/borrar',   ['LibertyFin\Controlador\ServiciosControlador', 'borrarPromocion']);
+// ── Núcleo: cancelar una venta y la ficha del cliente (con su expediente) ──
+$r->post('/ventas/{id}/cancelar',        ['LibertyFin\Controlador\VentasControlador', 'cancelar']);
+$r->post('/ventas/{id}/trabajo',         ['LibertyFin\Controlador\SeguimientoControlador', 'guardarDesdeVenta']);
+$r->get('/clientes/{id}',                ['LibertyFin\Controlador\ExpedienteControlador', 'ver']);
+$r->post('/clientes/{id}/ficha',         ['LibertyFin\Controlador\ExpedienteControlador', 'ficha']);
+$r->post('/clientes/{id}/nota',          ['LibertyFin\Controlador\ExpedienteControlador', 'nota']);
+$r->post('/clientes/{id}/nota/{nid}/borrar', ['LibertyFin\Controlador\ExpedienteControlador', 'borrarNota']);
+$r->post('/clientes/{id}/archivo',       ['LibertyFin\Controlador\ExpedienteControlador', 'subir']);
+$r->get('/clientes/{id}/archivo/{aid}',  ['LibertyFin\Controlador\ExpedienteControlador', 'bajar']);
+$r->post('/clientes/{id}/archivo/{aid}/borrar', ['LibertyFin\Controlador\ExpedienteControlador', 'borrarArchivo']);
+// ── Módulos (Servicio\Modulos) ──
+$r->get('/cotizaciones',                 ['LibertyFin\Controlador\CotizacionesControlador', 'index']);
+$r->post('/cotizaciones/guardar',        ['LibertyFin\Controlador\CotizacionesControlador', 'guardar']);
+$r->get('/cotizaciones/{id}',            ['LibertyFin\Controlador\CotizacionesControlador', 'ver']);
+$r->post('/cotizaciones/{id}/estado',    ['LibertyFin\Controlador\CotizacionesControlador', 'estado']);
+$r->get('/cotizaciones/{id}/imprimir',   ['LibertyFin\Controlador\CotizacionesControlador', 'imprimir']);
+$r->get('/igualas',                      ['LibertyFin\Controlador\IgualasControlador', 'index']);
+$r->post('/igualas/guardar',             ['LibertyFin\Controlador\IgualasControlador', 'guardar']);
+$r->post('/igualas/alternar',            ['LibertyFin\Controlador\IgualasControlador', 'alternar']);
+$r->post('/igualas/generar',             ['LibertyFin\Controlador\IgualasControlador', 'generar']);
+$r->get('/seguimiento',                  ['LibertyFin\Controlador\SeguimientoControlador', 'index']);
+$r->post('/seguimiento/guardar',         ['LibertyFin\Controlador\SeguimientoControlador', 'guardar']);
+$r->get('/compras',                      ['LibertyFin\Controlador\ComprasControlador', 'index']);
+$r->post('/compras/guardar',             ['LibertyFin\Controlador\ComprasControlador', 'guardar']);
+$r->get('/compras/{id}',                 ['LibertyFin\Controlador\ComprasControlador', 'ver']);
+$r->post('/compras/{id}/recibir',        ['LibertyFin\Controlador\ComprasControlador', 'recibir']);
+$r->post('/compras/{id}/cancelar',       ['LibertyFin\Controlador\ComprasControlador', 'cancelar']);
+$r->post('/inventario/conteo',           ['LibertyFin\Controlador\InventarioControlador', 'conteo']);
+$r->get('/agenda',                       ['LibertyFin\Controlador\AgendaControlador', 'index']);
+$r->post('/agenda/guardar',              ['LibertyFin\Controlador\AgendaControlador', 'guardar']);
+$r->post('/agenda/estado',               ['LibertyFin\Controlador\AgendaControlador', 'estado']);
+$r->post('/agenda/horario',              ['LibertyFin\Controlador\AgendaControlador', 'horario']);
+$r->get('/caja/paquetes',                ['LibertyFin\Controlador\CajaControlador', 'paquetes']);
 $r->get('/bienvenida',         ['LibertyFin\Controlador\BienvenidaControlador', 'index']);
 $r->post('/bienvenida',        ['LibertyFin\Controlador\BienvenidaControlador', 'guardar']);
 $r->get('/inventario',         ['LibertyFin\Controlador\InventarioControlador', 'index']);
@@ -310,6 +343,37 @@ $permisos = [
   '/servicios/promociones/borrar'   => 'editar.servicios',
   // La configuración inicial cambia ajustes de la empresa: solo administración.
   '/bienvenida'             => 'editar.ajustes',
+  '/ventas/{id}/cancelar'   => 'cancelar.venta',
+  '/ventas/{id}/trabajo'    => 'editar.seguimiento',
+  '/clientes/{id}'          => 'ver.clientes',
+  '/clientes/{id}/ficha'    => 'editar.expediente',
+  '/clientes/{id}/nota'     => 'editar.expediente',
+  '/clientes/{id}/nota/{nid}/borrar' => 'editar.expediente',
+  '/clientes/{id}/archivo'  => 'editar.expediente',
+  '/clientes/{id}/archivo/{aid}' => 'ver.expediente',
+  '/clientes/{id}/archivo/{aid}/borrar' => 'editar.expediente',
+  '/cotizaciones'           => 'ver.cotizaciones',
+  '/cotizaciones/guardar'   => 'editar.cotizaciones',
+  '/cotizaciones/{id}'      => 'ver.cotizaciones',
+  '/cotizaciones/{id}/estado' => 'editar.cotizaciones',
+  '/cotizaciones/{id}/imprimir' => 'ver.cotizaciones',
+  '/igualas'                => 'ver.igualas',
+  '/igualas/guardar'        => 'editar.igualas',
+  '/igualas/alternar'       => 'editar.igualas',
+  '/igualas/generar'        => 'editar.igualas',
+  '/seguimiento'            => 'ver.seguimiento',
+  '/seguimiento/guardar'    => 'editar.seguimiento',
+  '/compras'                => 'ver.compras',
+  '/compras/guardar'        => 'editar.compras',
+  '/compras/{id}'           => 'ver.compras',
+  '/compras/{id}/recibir'   => 'editar.compras',
+  '/compras/{id}/cancelar'  => 'editar.compras',
+  '/inventario/conteo'      => 'editar.inventario',
+  '/agenda'                 => 'ver.agenda',
+  '/agenda/guardar'         => 'editar.agenda',
+  '/agenda/estado'          => 'editar.agenda',
+  '/agenda/horario'         => 'editar.ajustes',
+  '/caja/paquetes'          => 'cobrar',
   '/inventario'             => 'ver.inventario',
   '/inventario/mover'       => 'editar.inventario',
   '/reportes'               => 'ver.reportes',

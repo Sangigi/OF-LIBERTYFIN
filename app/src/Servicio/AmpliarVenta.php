@@ -99,6 +99,9 @@ final class AmpliarVenta
             // Lo agregado también sale del inventario, de la sucursal de
             // quien lo agrega (ver RegistrarVenta).
             (new Inventario($this->db))->descontarVenta($ventaId, $ticket->lineas(), $ctx['sucursal_id'] ?? null);
+            // Paquetes: con el cliente de la venta que se amplía.
+            (new Paquetes($this->db))->registrarVenta($ventaId, $ticket->lineas(),
+                ['cliente_id' => $v['cliente_id'] ?? null, 'paquetes' => $ctx['paquetes'] ?? []]);
 
             if ($t['gastos'] > 0) {
                 $this->db->prepare("

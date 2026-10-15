@@ -66,6 +66,9 @@ final class PlanRepo
                 'usuarios' => (int)($p['usuarios'] ?? 0),
                 'popular'  => !empty($p['popular']),
                 'grupos'   => $grupos,
+                // Los módulos que incluye (Servicio\Modulos). Sin la llave,
+                // todos: así se comportaba antes de que hubiera módulos.
+                'modulos'  => isset($p['modulos']) ? array_values((array)$p['modulos']) : null,
                 'periodos' => [
                     'mensual' => ['monto' => $mensual, 'meses' => 1,  'por_mes' => $mensual],
                     'anual'   => ['monto' => $anual,   'meses' => 12, 'por_mes' => round($anual / 12, 2)],

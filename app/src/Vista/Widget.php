@@ -296,6 +296,16 @@ final class Widget
             'luna'   => '<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/>',
             'sol'    => '<circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/>',
             'campana'=> '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+            // Los de los módulos (Servicio\Modulos).
+            'agenda' => '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M8 13.5h2.5M13.5 13.5H16M8 17h2.5"/>',
+            'doc'    => '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/>',
+            'tablero'=> '<rect x="3.5" y="4" width="5" height="16" rx="1.5"/><rect x="10.5" y="4" width="5" height="11" rx="1.5"/><rect x="17.5" y="4" width="3" height="7" rx="1.2"/>',
+            'repetir'=> '<path d="M4 11.5V10a4 4 0 0 1 4-4h11"/><path d="m16 3 3 3-3 3"/><path d="M20 12.5V14a4 4 0 0 1-4 4H5"/><path d="m8 21-3-3 3-3"/>',
+            'camion' => '<path d="M2.5 6h11v10h-11z"/><path d="M13.5 9.5h4l3 3.2V16h-7"/><circle cx="6.5" cy="17.5" r="1.8"/><circle cx="16.8" cy="17.5" r="1.8"/>',
+            'paquete'=> '<rect x="3.5" y="8" width="17" height="12.5" rx="2"/><path d="M3.5 12h17M12 8v12.5"/><path d="M12 8c-1.5-3.5-5.5-4-5.5-1.5S10 8 12 8c2 0 5.5-.5 5.5-1.5S13.5 4.5 12 8z"/>',
+            'atras'  => '<path d="M19 12H5M11 6l-6 6 6 6"/>',
+            'ok'     => '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
+            'chat'   => '<path d="M20 11.5a8 8 0 0 1-11.7 7.1L4 20l1.4-4.1A8 8 0 1 1 20 11.5z"/>',
         ];
         $d = isset($p[$n]) ? $p[$n] : $p['panel'];
         return '<svg viewBox="0 0 24 24" style="width:' . $tam . ';height:' . $tam . ';fill:none;stroke:currentColor;'

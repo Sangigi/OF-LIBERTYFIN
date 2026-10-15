@@ -16,6 +16,8 @@ final class PanelControlador
         // Panel, las preguntas de la configuración inicial.
         if (!empty($_SESSION['lf_bienvenida'])) { header('Location: /bienvenida'); exit; }
         $db    = Conexion::de($_SESSION['empresa_db']);
+        // Las igualas del mes, si ya toca (una vez al día; ver Servicio\Igualas).
+        \LibertyFin\Servicio\Igualas::alDia($db);
         $panel = new PanelRepo($db);
         $ventas= new VentaRepo($db);
 

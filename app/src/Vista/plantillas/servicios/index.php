@@ -169,6 +169,48 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     </script>
     <?php endif; ?>
 
+    <?php if (!empty($modProducto)): $mp = $modProducto; ?>
+    <?php /* Lo que piden los módulos encendidos (Ajustes → Módulos). */ ?>
+    <div class="lf-prod-mods">
+      <?php if ($mp['agenda']): ?>
+        <input type="hidden" name="mod_agenda" value="1">
+        <div class="lf-prod-mod">
+          <label class="form-label" for="pDur">Duración <small>(Agenda)</small></label>
+          <div class="lf-prod-dur">
+            <input class="form-control lf-mono" type="number" name="duracion_min" id="pDur" min="5" max="720" step="5"
+                   value="<?= P::e($e['duracion_min'] ?? '') ?>" placeholder="—"><span>min</span>
+          </div>
+          <p class="pista">Lo que ocupa en la agenda. Vacío si no se agenda.</p>
+        </div>
+      <?php endif; ?>
+      <?php if ($mp['paquetes']): $esPaq = (int)($e['sesiones'] ?? 0) > 0; ?>
+        <input type="hidden" name="mod_paquetes" value="1">
+        <div class="lf-prod-mod lf-prod-paq">
+          <label class="lf-sw"><input type="checkbox" name="es_paquete" value="1" id="pEsPaq" <?= $esPaq ? 'checked' : '' ?>>
+            <i aria-hidden="true"></i><span><b>Es un paquete de sesiones</b><small>Ej. «10 masajes»: el cliente lo paga una vez y las usa en sus visitas.</small></span></label>
+          <div class="cuerpo" id="pPaq" <?= $esPaq ? '' : 'hidden' ?>>
+            <div style="width:110px"><label class="form-label" for="pSes">Sesiones</label>
+              <input class="form-control lf-mono" type="number" name="sesiones" id="pSes" min="2" max="200" value="<?= P::e($esPaq ? (int)$e['sesiones'] : 10) ?>"></div>
+            <div style="flex:1;min-width:200px"><label class="form-label" for="pSesDe">De qué servicio</label>
+              <select class="form-select" name="sesion_de" id="pSesDe">
+                <option value="">Elige…</option>
+                <?php foreach ($mp['servicios'] as $s): if ($e && (int)$s['id'] === (int)$e['id']) continue; ?>
+                  <option value="<?= (int)$s['id'] ?>" <?= (int)($e['sesion_de'] ?? 0) === (int)$s['id'] ? 'selected' : '' ?>><?= P::e($s['nombre']) ?></option>
+                <?php endforeach; ?>
+              </select></div>
+            <p class="pista">El precio de arriba es el del paquete completo. En Caja, cuando el cliente vuelve, el servicio se cobra en $0 y se descuenta una sesión.</p>
+          </div>
+        </div>
+        <script>
+        (function(){
+          var c = document.getElementById('pEsPaq'), b = document.getElementById('pPaq');
+          if (c && b) c.addEventListener('change', function(){ b.hidden = !c.checked; });
+        })();
+        </script>
+      <?php endif; ?>
+    </div>
+    <?php endif; ?>
+
     <?php /* Lo de vez en cuando, plegado. La descripción ya se guardaba,
              pero no había campo: al editar un producto se borraba la que
              traía del sistema anterior. */ ?>

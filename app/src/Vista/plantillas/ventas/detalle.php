@@ -32,13 +32,72 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
 </div>
 <?php endif; ?>
 
+<?php if ($v['estado'] === 'cancelada'): ?>
+<div class="alert alert-danger lf-venta-cancelada" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b>Venta cancelada</b><?= !empty($v['cancelada_en']) ? ' el ' . P::e(date('d/m/Y H:i', strtotime($v['cancelada_en']))) : '' ?>
+    <?= !empty($v['cancelada_por']) ? ' por ' . P::e($v['cancelada_por']) : '' ?>.
+    <?= !empty($v['motivo_cancelacion']) ? 'Motivo: ' . P::e($v['motivo_cancelacion']) . '.' : '' ?>
+    No cuenta en reportes, cobranza ni comisiones.</span>
+</div>
+<?php endif; ?>
+
 <div style="display:flex;gap:9px;margin-bottom:18px;flex-wrap:wrap">
   <a class="btn btn-secondary btn-sm" href="/ventas/<?= (int)$v['id'] ?>/ticket" target="_blank">
     <?= W::icono('venta','15px') ?>Ver ticket</a>
   <a class="btn btn-secondary btn-sm" href="/ventas/<?= (int)$v['id'] ?>/ticket?auto=1" target="_blank">
     <?= W::icono('baja','15px') ?>Imprimir</a>
   <a class="btn btn-secondary btn-sm" href="/ventas">Volver al listado</a>
+  <?php if (\LibertyFin\Dominio\Permisos::puede('cancelar.venta') && $v['estado'] !== 'cancelada'): ?>
+    <span style="flex:1"></span>
+    <button type="button" class="btn btn-secondary btn-sm lf-btn-peligro" id="btnCancelarVenta">Cancelar venta</button>
+  <?php endif; ?>
 </div>
+<?php if (\LibertyFin\Dominio\Permisos::puede('cancelar.venta') && $v['estado'] !== 'cancelada'): ?>
+<form method="post" action="/ventas/<?= (int)$v['id'] ?>/cancelar" id="formCancelarVenta" hidden>
+  <input type="hidden" name="token" value="<?= P::e($token) ?>">
+  <input type="hidden" name="motivo" id="cancVentaMotivo">
+</form>
+<script>
+(function(){
+  var b = document.getElementById('btnCancelarVenta');
+  if (!b) return;
+  b.addEventListener('click', function(){
+    var m = prompt('Cancelar la venta <?= P::e($v['codigo_venta']) ?>.\n\n'
+      + 'Se cancelan sus cobros (<?= P::e(D::pesos($cobrado)) ?>), sus comisiones, y lo que se llevó regresa al inventario.'
+      + ' No se puede deshacer.\n\n¿Por qué se cancela?');
+    if (m === null) return;
+    if (m.trim().length < 5) { alert('Escribe el motivo (al menos unas palabras).'); return; }
+    document.getElementById('cancVentaMotivo').value = m.trim();
+    document.getElementById('formCancelarVenta').submit();
+  });
+})();
+</script>
+<?php endif; ?>
+
+<?php if (!empty($trabajo)): $tr = $trabajo['t']; $estT = \LibertyFin\Servicio\Trabajos::ESTADOS; ?>
+<section class="card lf-trab-venta">
+  <form method="post" action="/ventas/<?= (int)$v['id'] ?>/trabajo" class="lf-form">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <div class="tit"><?= W::icono('tablero','16px') ?><b>Trabajo</b>
+      <?php if ($tr['actualizado_en']): ?><small>Cambió <?= P::e($tr['actualizado_por'] ?: '') ?> el <?= P::e(date('d/m H:i', strtotime($tr['actualizado_en']))) ?></small><?php endif; ?></div>
+    <div style="width:190px"><label class="form-label" for="trEstado">Estado</label>
+      <select class="form-select form-select-sm" name="estado" id="trEstado" <?= $trabajo['puede'] ? '' : 'disabled' ?>>
+        <?php foreach ($estT as $k => $t): ?><option value="<?= $k ?>" <?= $tr['estado'] === $k ? 'selected' : '' ?>><?= P::e($t) ?></option><?php endforeach; ?>
+      </select></div>
+    <div style="width:180px"><label class="form-label" for="trResp">Responsable</label>
+      <select class="form-select form-select-sm" name="responsable_id" id="trResp" <?= $trabajo['puede'] ? '' : 'disabled' ?>>
+        <option value="">—</option>
+        <?php foreach ($trabajo['equipo'] as $p): ?><option value="<?= (int)$p['id'] ?>" <?= (int)$tr['responsable_id'] === (int)$p['id'] ? 'selected' : '' ?>><?= P::e($p['nombre']) ?></option><?php endforeach; ?>
+      </select></div>
+    <div style="width:150px"><label class="form-label" for="trEnt">Entrega</label>
+      <input class="form-control form-control-sm" type="date" name="entrega" id="trEnt" value="<?= P::e($tr['entrega'] ?? '') ?>" <?= $trabajo['puede'] ? '' : 'disabled' ?>></div>
+    <div style="flex:1;min-width:180px"><label class="form-label" for="trNota">Nota</label>
+      <input class="form-control form-control-sm" name="nota" id="trNota" maxlength="255" value="<?= P::e($tr['nota'] ?? '') ?>" <?= $trabajo['puede'] ? '' : 'disabled' ?>></div>
+    <?php if ($trabajo['puede']): ?><button class="btn btn-secondary btn-sm" type="submit">Guardar</button><?php endif; ?>
+  </form>
+</section>
+<?php endif; ?>
 
 <div class="lf-stats">
   <div class="stat-card lf-hero">

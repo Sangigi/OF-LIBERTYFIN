@@ -164,7 +164,7 @@ $ant = $antiguedad;
               <span class="lf-av gris" style="width:30px;height:30px;font-size:11px">
                 <?= P::e($ini($c['nombre'])) ?></span>
               <span style="min-width:0">
-                <b style="display:block;font-weight:600"><?= P::e($c['nombre']) ?></b>
+                <a href="/clientes/<?= (int)$c['id'] ?>" class="lf-cli-nombre"><b style="display:block;font-weight:600"><?= P::e($c['nombre']) ?></b></a>
                 <?php if ($c['telefono']): ?>
                   <small style="color:var(--lf-tinta-4);font-size:11.5px"><?= P::e($c['telefono']) ?></small>
                 <?php endif; ?>

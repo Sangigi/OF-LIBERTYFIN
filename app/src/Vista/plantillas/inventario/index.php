@@ -41,12 +41,16 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
        href="/inventario?s=<?= (int)$sucursal ?>">Existencias</a>
     <a class="lf-pill <?= $pestana === 'movimientos' ? 'active' : '' ?>" role="tab"
        href="/inventario?t=movimientos&amp;s=<?= (int)$sucursal ?>">Movimientos</a>
+    <?php if ($puedeEditar): ?>
+    <a class="lf-pill <?= $pestana === 'conteo' ? 'active' : '' ?>" role="tab"
+       href="/inventario?t=conteo&amp;s=<?= (int)$sucursal ?>">Conteo general</a>
+    <?php endif; ?>
   </div>
-  <?php if ($varias && $pestana === 'existencias'): ?>
+  <?php if ($varias && $pestana !== 'movimientos'): ?>
     <div class="lf-segmento" aria-label="Sucursal">
       <?php foreach ($sucursales as $s): ?>
         <a class="lf-inv-suc<?= (int)$s['id'] === (int)$sucursal ? ' on' : '' ?>"
-           href="/inventario?s=<?= (int)$s['id'] ?>"><?= P::e($s['nombre']) ?></a>
+           href="/inventario?<?= $pestana === 'conteo' ? 't=conteo&amp;' : '' ?>s=<?= (int)$s['id'] ?>"><?= P::e($s['nombre']) ?></a>
       <?php endforeach; ?>
     </div>
   <?php endif; ?>
@@ -83,7 +87,8 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
     <div class="lf-inv-tipos">
       <span class="form-label" id="etTipo">¿Qué pasó?</span>
       <div class="lf-segmento" role="radiogroup" aria-labelledby="etTipo">
-        <?php foreach (['entrada' => 'Llegó mercancía', 'salida' => 'Salió sin venderse', 'conteo' => 'Lo conté'] as $k => $t): ?>
+        <?php foreach (['entrada' => 'Llegó mercancía', 'salida' => 'Salió sin venderse', 'conteo' => 'Lo conté']
+                       + ($varias ? ['traspaso' => 'Pasó a otra sucursal'] : []) as $k => $t): ?>
           <label><input type="radio" name="tipo" value="<?= $k ?>" <?= $tipoSel === $k ? 'checked' : '' ?>><?= P::e($t) ?></label>
         <?php endforeach; ?>
       </div>
@@ -108,6 +113,16 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
       <select class="form-select" name="sucursal_id" id="mSuc">
         <?php foreach ($sucursales as $s): ?>
           <option value="<?= (int)$s['id'] ?>" <?= (int)$s['id'] === (int)$sucursal ? 'selected' : '' ?>><?= P::e($s['nombre']) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <?php endif; ?>
+    <?php if ($varias): ?>
+    <div style="width:170px" data-ver-tipo="traspaso">
+      <label class="form-label" for="mDest">A qué sucursal</label>
+      <select class="form-select" name="destino_id" id="mDest">
+        <?php foreach ($sucursales as $s): ?>
+          <option value="<?= (int)$s['id'] ?>" <?= (int)$s['id'] === (int)$sucursal ? 'disabled' : '' ?>><?= P::e($s['nombre']) ?></option>
         <?php endforeach; ?>
       </select>
     </div>
@@ -206,9 +221,10 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
   var AYUDA = {
     entrada: 'Compras o devoluciones de proveedor. Suma a lo que hay.',
     salida:  'Dañado, caducado, regalo o uso interno. Resta y pide el motivo.',
-    conteo:  'Escribe cuántas hay de verdad: el sistema se ajusta a tu conteo y anota la diferencia.'
+    conteo:  'Escribe cuántas hay de verdad: el sistema se ajusta a tu conteo y anota la diferencia.',
+    traspaso:'Salen de esta sucursal y entran a la otra, en un solo paso.'
   };
-  var CANT = { entrada: 'Cuántas llegaron', salida: 'Cuántas salen', conteo: 'Cuántas hay' };
+  var CANT = { entrada: 'Cuántas llegaron', salida: 'Cuántas salen', conteo: 'Cuántas hay', traspaso: 'Cuántas pasan' };
   var prod = document.getElementById('mProd'), cant = document.getElementById('mCant'),
       nota = document.getElementById('mNota'), queda = document.getElementById('mQueda');
   function tipo(){ var r = f.querySelector('input[name="tipo"]:checked'); return r ? r.value : 'entrada'; }
@@ -225,7 +241,7 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
     var o = prod.options[prod.selectedIndex], c = parseFloat(cant.value);
     if (!o || !o.value || isNaN(c)) { queda.textContent = ''; return; }
     var hay = parseFloat(String(o.dataset.hay).replace(/,/g, '')) || 0, u = o.dataset.u ? ' ' + o.dataset.u : '';
-    var fin = t === 'entrada' ? hay + c : (t === 'salida' ? hay - c : c);
+    var fin = t === 'entrada' ? hay + c : ((t === 'salida' || t === 'traspaso') ? hay - c : c);
     queda.textContent = 'Hay ' + num(hay) + u + ' → quedarán ' + num(fin) + u;
     queda.classList.toggle('mal', fin < 0);
   }
@@ -236,6 +252,81 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
 })();
 </script>
 <?php endif; ?>
+
+<?php elseif ($pestana === 'conteo'): /* ═══════════ CONTEO GENERAL ═══════════ */ ?>
+
+<section class="card">
+  <div class="card-header"><span>
+    <h3 class="card-title">Conteo general<?= $varias ? ' · ' . P::e($subtitulo) : '' ?></h3>
+    <small class="lf-inv-sub">Cuenta lo que hay en el anaquel y escríbelo. Lo que dejes vacío no se toca.
+      Al guardar, el sistema se ajusta a tu conteo y anota cada diferencia en Movimientos.</small>
+  </span></div>
+  <?php if (!$listado): ?>
+    <div class="card-body lf-inv-vacio">Ningún producto lleva existencias todavía.</div>
+  <?php else: ?>
+  <form method="post" action="/inventario/conteo" id="formConteo">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <input type="hidden" name="sucursal_id" value="<?= (int)$sucursal ?>">
+    <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+      <table class="table lf-inv-tabla lf-conteo">
+        <thead><tr><th>Producto</th><th class="text-end">El sistema dice</th><th class="text-end">Contaste</th><th class="text-end">Diferencia</th></tr></thead>
+        <tbody>
+        <?php foreach ($listado as $p): ?>
+          <tr data-hay="<?= P::e(I::num($p['existencia'])) ?>">
+            <td data-label="Producto"><b class="lf-inv-nom"><?= P::e($p['nombre']) ?></b>
+              <small class="lf-inv-cod"><?= P::e($p['codigo']) ?></small></td>
+            <td data-label="Sistema" class="text-end lf-mono"><?= P::e($conU($p['existencia'], $p['unidad_medida'])) ?></td>
+            <td data-label="Contaste" class="text-end">
+              <input class="form-control form-control-sm lf-mono lf-conteo-in" type="number" step="0.001" min="0"
+                     name="contado[<?= (int)$p['id'] ?>]" inputmode="decimal" aria-label="Contaste de <?= P::e($p['nombre']) ?>"></td>
+            <td data-label="Diferencia" class="text-end lf-mono lf-conteo-dif">–</td>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer lf-conteo-pie">
+      <input class="form-control" name="nota" maxlength="200" placeholder="Nota (opcional): inventario de fin de mes…" style="max-width:340px">
+      <span id="conteoCuenta" class="pista">Nada capturado todavía.</span>
+      <button class="btn btn-primary" type="submit">Guardar conteo</button>
+    </div>
+  </form>
+  <script>
+  (function(){
+    var f = document.getElementById('formConteo');
+    if (!f) return;
+    function num(n){ return (Math.round(n * 1000) / 1000).toLocaleString('es-MX', {maximumFractionDigits:3}); }
+    function pintar(){
+      var n = 0, d = 0;
+      f.querySelectorAll('tr[data-hay]').forEach(function(tr){
+        var i = tr.querySelector('.lf-conteo-in'), c = tr.querySelector('.lf-conteo-dif');
+        if (i.value === '') { c.textContent = '–'; c.className = 'text-end lf-mono lf-conteo-dif'; return; }
+        var dif = (parseFloat(i.value) || 0) - (parseFloat(String(tr.dataset.hay).replace(/,/g, '')) || 0);
+        n++; if (Math.abs(dif) >= 0.0005) d++;
+        c.textContent = Math.abs(dif) < 0.0005 ? 'Cuadra' : (dif > 0 ? '+' : '−') + num(Math.abs(dif));
+        c.className = 'text-end lf-mono lf-conteo-dif ' + (Math.abs(dif) < 0.0005 ? 'ok' : (dif > 0 ? 'mas' : 'menos'));
+      });
+      document.getElementById('conteoCuenta').textContent = n
+        ? n + (n === 1 ? ' producto contado' : ' productos contados') + (d ? ' · ' + d + ' con diferencia' : ' · todo cuadra')
+        : 'Nada capturado todavía.';
+    }
+    f.addEventListener('input', pintar);
+    // Enter pasa al siguiente: se cuenta con el teclado, sin mouse.
+    f.addEventListener('keydown', function(e){
+      if (e.key !== 'Enter' || !e.target.classList.contains('lf-conteo-in')) return;
+      e.preventDefault();
+      var todos = [].slice.call(f.querySelectorAll('.lf-conteo-in')), i = todos.indexOf(e.target);
+      if (todos[i + 1]) todos[i + 1].focus();
+    });
+    f.addEventListener('submit', function(e){
+      var n = [].filter.call(f.querySelectorAll('.lf-conteo-in'), function(i){ return i.value !== ''; }).length;
+      if (!n) { e.preventDefault(); alert('Captura al menos un conteo.'); return; }
+      if (!confirm('¿Guardar el conteo de ' + n + (n === 1 ? ' producto' : ' productos') + '? Las existencias se ajustan a lo que contaste.')) e.preventDefault();
+    });
+  })();
+  </script>
+  <?php endif; ?>
+</section>
 
 <?php else: /* ═══════════ MOVIMIENTOS ═══════════ */ ?>
 

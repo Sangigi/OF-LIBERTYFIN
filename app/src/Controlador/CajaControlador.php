@@ -41,6 +41,10 @@ final class CajaControlador
             // Existencias de esta sucursal (solo con Inventario encendido):
             // la tarjeta dice cuántas quedan y Caja avisa si no alcanzan.
             'inventario'=> $this->inventarioCaja($db),
+            // Lo que llega armado: cotización, cita o cliente desde su ficha.
+            'precarga'  => $this->precarga($db, (new \LibertyFin\Datos\ConfigRepo($db))->caja()),
+            // Los paquetes de sesiones solo se ofrecen con el módulo encendido.
+            'conPaquetes' => $this->moduloActivo('paquetes'),
             // Cómo arranca cada venta: anticipo e IVA (Ajustes → Caja).
             'cajaCfg'   => (new \LibertyFin\Datos\ConfigRepo($db))->caja(),
             'titulo'    => 'Caja',
@@ -71,7 +75,97 @@ final class CajaControlador
         unset($_SESSION['lf_aviso'], $_SESSION['lf_liga']);
     }
 
-    /** Búsqueda de clientes para el ticket. Devuelve JSON. */
+    /**
+     * Lo que la venta cierra en otros módulos: la cotización que se aceptó
+     * y la cita que se atendió. Si falla, la venta ya quedó: solo se anota.
+     */
+    private function despuesDeCobrar($db, $ventaId)
+    {
+        $cot = (int)($_POST['cotizacion_id'] ?? 0);
+        if ($cot) {
+            try { (new \LibertyFin\Servicio\Cotizaciones($db))->aceptar($cot, $ventaId); }
+            catch (\Throwable $e) { error_log('[LibertyFin] cotización ' . $cot . ' → venta ' . $ventaId . ': ' . $e->getMessage()); }
+        }
+        $cita = (int)($_POST['cita_id'] ?? 0);
+        if ($cita) {
+            try { (new \LibertyFin\Servicio\Agenda($db))->atendida($cita, $ventaId); }
+            catch (\Throwable $e) { error_log('[LibertyFin] cita ' . $cita . ' → venta ' . $ventaId . ': ' . $e->getMessage()); }
+        }
+    }
+
+    /**
+     * Lo que llega ya armado a Caja: una cotización que se acepta, una cita
+     * que se cobra o el cliente desde su ficha. Se devuelve con la forma del
+     * ticket guardado en el navegador, para que Caja lo cargue igual.
+     */
+    private function precarga($db, array $cajaCfg)
+    {
+        $base = ['lineas' => [], 'iva' => $cajaCfg['iva_inicio'] === 'con' ? $cajaCfg['iva_tasa'] : '0',
+                 'gastos' => '0', 'anticipo' => '', 'manual' => '', 'sigue' => '', 'clienteId' => '', 'cliente' => '',
+                 'esp' => '', 'desc' => '', 'metodo' => '', 'sinLiga' => null, 'ref' => '', 'banco' => '',
+                 'quitadas' => [], 'codigo' => '', 'cotizacion' => 0, 'cita' => 0, 'aviso' => ''];
+        try {
+            if (($id = Peticion::entero('cotizacion')) > 0) {
+                $c = (new \LibertyFin\Servicio\Cotizaciones($db))->una($id);
+                if (!$c || !in_array($c['estado'], ['borrador', 'enviada'], true)) return null;
+                foreach ($c['lineas'] as $l) {
+                    if (!$l['producto_id']) continue;
+                    $base['lineas'][] = ['id' => (int)$l['producto_id'], 'nombre' => $l['nombre'],
+                                         'precio' => (float)$l['precio'], 'cantidad' => (float)$l['cantidad']];
+                }
+                $base['clienteId'] = $c['cliente_id'] ? (string)$c['cliente_id'] : '';
+                $base['cliente'] = (string)$c['cliente_nombre'];
+                $base['cotizacion'] = $id;
+                $base['aviso'] = 'Cotización ' . $c['folio'] . ' cargada. Revisa y cobra.';
+                return $base;
+            }
+            if (($id = Peticion::entero('cita')) > 0) {
+                $c = (new \LibertyFin\Servicio\Agenda($db))->una($id);
+                if (!$c || in_array($c['estado'], ['cancelada', 'atendida'], true)) return null;
+                if ($c['producto_id']) {
+                    $st = $db->prepare("SELECT id, nombre, COALESCE(NULLIF(subprecio,0), precio) AS precio FROM productos WHERE id = ?");
+                    $st->execute([(int)$c['producto_id']]);
+                    if ($p = $st->fetch(\PDO::FETCH_ASSOC)) {
+                        $base['lineas'][] = ['id' => (int)$p['id'], 'nombre' => $p['nombre'], 'precio' => (float)$p['precio'], 'cantidad' => 1];
+                    }
+                }
+                $base['clienteId'] = $c['cliente_id'] ? (string)$c['cliente_id'] : '';
+                $base['cliente'] = (string)$c['cliente_nombre'];
+                $base['esp'] = $c['colaborador_id'] ? (string)$c['colaborador_id'] : '';
+                $base['cita'] = $id;
+                $base['aviso'] = 'Cita de ' . $c['cliente_nombre'] . ' cargada.';
+                return $base;
+            }
+            if (($id = Peticion::entero('cliente')) > 0) {
+                $st = $db->prepare("SELECT id, nombre FROM clientes WHERE id = ?");
+                $st->execute([$id]);
+                if ($cl = $st->fetch(\PDO::FETCH_ASSOC)) {
+                    $base['clienteId'] = (string)$cl['id']; $base['cliente'] = $cl['nombre'];
+                    return $base;
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] precarga de Caja: ' . $e->getMessage());
+        }
+        return null;
+    }
+
+    private function moduloActivo($k)
+    {
+        try { return \LibertyFin\Servicio\Modulos::deSesion()->activo($k); }
+        catch (\Throwable $e) { return false; }
+    }
+
+    /** Las sesiones de paquete de un cliente, para ofrecerlas en Caja. JSON. */
+    public function paquetes()
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        try {
+            $r = (new \LibertyFin\Servicio\Paquetes($db))->paraCaja(Peticion::entero('cliente'));
+        } catch (\Throwable $e) { $r = []; }
+        $this->json(['ok' => true, 'paquetes' => (object)$r]);
+    }
+
     /**
      * Lo que Caja necesita del inventario, o null si está apagado. Si
      * falla (la base no está al día), Caja vende igual, sin existencias.
@@ -88,6 +182,7 @@ final class CajaControlador
         }
     }
 
+    /** Búsqueda de clientes para el ticket. Devuelve JSON. */
     public function clientes()
     {
         $db = Conexion::de($_SESSION['empresa_db']);
@@ -110,6 +205,34 @@ final class CajaControlador
         }
         $validas = $this->lineasValidas($db, $lineas);
         if (!$validas) $this->volver('El ticket está vacío.', 'error');
+
+        // ── PAQUETES DE SESIONES ──
+        // Un renglón que usa una sesión del paquete del cliente va en $0. Se
+        // valida aquí para dar un buen mensaje; la sesión se gasta dentro de
+        // la transacción de la venta (Servicio\Paquetes).
+        $usaPaquete = [];   // índice del renglón => id del paquete del cliente
+        $pedidos = json_decode((string)($_POST['paquetes'] ?? '{}'), true);
+        if (is_array($pedidos) && $pedidos) {
+            $cli = (int)($_POST['cliente_id'] ?? 0);
+            if ((int)($_POST['ampliar_venta'] ?? 0) > 0) {
+                $st = $db->prepare("SELECT cliente_id FROM ventas WHERE id = ?");
+                $st->execute([(int)$_POST['ampliar_venta']]);
+                $cli = (int)$st->fetchColumn();
+            }
+            $paq = new \LibertyFin\Servicio\Paquetes($db);
+            foreach ($validas as $k => $v) {
+                if (empty($pedidos[$v['i']])) continue;
+                try {
+                    $paq->validar((int)$pedidos[$v['i']], $cli, $v['id'], max(1, (int)round($v['cantidad'])));
+                } catch (\InvalidArgumentException $e) {
+                    $this->volver($v['nombre'] . ': ' . $e->getMessage(), 'error');
+                }
+                $validas[$k]['precio'] = 0.0;
+                $usaPaquete[$k] = (int)$pedidos[$v['i']];
+            }
+        }
+        // Un ticket hecho solo de sesiones de paquete sí puede sumar cero.
+        $todoPaquete = $usaPaquete && count($usaPaquete) === count($validas);
 
         // ── PROMOCIONES ──
         //
@@ -143,10 +266,10 @@ final class CajaControlador
 
         // Un ticket entero en cero casi siempre es un dedazo, no una cortesía.
         $bruto = array_sum(array_map(function ($v) { return $v['precio'] * $v['cantidad']; }, $validas));
-        if ($bruto <= 0) {
+        if ($bruto <= 0 && !$todoPaquete) {
             $this->volver('El ticket suma cero. Pon el precio de cada producto antes de cobrar.', 'error');
         }
-        if ($ticket->subtotalCapturado() <= 0) {
+        if ($ticket->subtotalCapturado() <= 0 && !$todoPaquete) {
             $this->volver('Con las promociones el ticket queda en $0. Quita alguna antes de cobrar.', 'error');
         }
         $ticket->gastosOperacion((float)($_POST['gastos'] ?? 0));
@@ -162,7 +285,7 @@ final class CajaControlador
         // agrega lo vendido y se abre saldo, que es lo que de verdad
         // pasó. El dinero entra después por donde entra siempre.
         $ampliar = (int)($_POST['ampliar_venta'] ?? 0);
-        if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket, $calc);
+        if ($ampliar > 0) return $this->ampliar($db, $ampliar, $ticket, $calc, $usaPaquete);
 
         // EL CLIENTE. Se eligió de la lista (id), o se escribió un nombre.
         // Un nombre escrito se enlaza al cliente que ya tenga ese nombre
@@ -230,6 +353,8 @@ final class CajaControlador
                                     ? mb_substr(trim($_POST['banco'] ?? ''), 0, 100) : '',
                 'descripcion'    => trim($_POST['descripcion'] ?? ''),
                 'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
+                // Las sesiones de paquete que usa (Servicio\Paquetes).
+                'paquetes'       => $usaPaquete,
             ]);
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
@@ -238,6 +363,7 @@ final class CajaControlador
             $this->volver('No se pudo registrar la venta. Quedó anotado el error.', 'error');
         }
         $this->anotarPromos($db, $r['id'], $calc);
+        $this->despuesDeCobrar($db, $r['id']);
 
         // Pago en linea: se genera el cobro y se devuelven los datos
         // para el modal, sin salir de la caja.
@@ -428,7 +554,7 @@ final class CajaControlador
      * No cobra. Agrega lo vendido y deja el saldo abierto, porque eso es
      * lo que pasó: el cliente pidió más, no pagó más.
      */
-    private function ampliar($db, $ventaId, $ticket, array $calc = [])
+    private function ampliar($db, $ventaId, $ticket, array $calc = [], array $paquetes = [])
     {
         try {
             $r = (new \LibertyFin\Servicio\AmpliarVenta($db))
@@ -436,8 +562,10 @@ final class CajaControlador
                      'concepto_gasto' => trim($_POST['concepto_gasto'] ?? ''),
                      // Las existencias salen de la sucursal de quien agrega.
                      'sucursal_id'    => $_SESSION['sucursal_id'] ?? null,
+                     'paquetes'       => $paquetes,
                  ]);
             if ($calc) $this->anotarPromos($db, $r['id'], $calc);
+            $this->despuesDeCobrar($db, $r['id']);
         } catch (\InvalidArgumentException $e) {
             if ($this->pideJson()) {
                 $this->json(['ok' => false, 'error' => $e->getMessage()]);

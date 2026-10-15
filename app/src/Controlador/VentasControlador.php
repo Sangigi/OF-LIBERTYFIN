@@ -107,9 +107,28 @@ final class VentasControlador
             'catalogo'   => (new ComisionRepo($db))->catalogo(),
             'sugeridos'  => (new ComisionRepo($db))->porcentajesUsados(),
             'nueva'      => Peticion::entero('nueva') === 1,
+            // Con «Seguimiento de trabajos» encendido: en qué va el trabajo.
+            'trabajo'    => $venta['estado'] !== 'cancelada' ? $this->trabajo($db, $id) : null,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
         ]);
         unset($_SESSION['lf_aviso']);
+    }
+
+    /** El seguimiento de la venta y el equipo, o null con el módulo apagado. */
+    private function trabajo($db, $id)
+    {
+        try {
+            if (!\LibertyFin\Servicio\Modulos::deSesion()->activo('seguimiento')) return null;
+            return [
+                't'      => (new \LibertyFin\Servicio\Trabajos($db))->deVenta($id),
+                'equipo' => $db->query("SELECT id, nombre FROM comision_colaboradores WHERE COALESCE(activo,1) = 1 ORDER BY nombre")
+                               ->fetchAll(\PDO::FETCH_ASSOC),
+                'puede'  => \LibertyFin\Dominio\Permisos::puede('editar.seguimiento'),
+            ];
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] seguimiento en venta ' . $id . ': ' . $e->getMessage());
+            return null;
+        }
     }
 
     /** Registra un abono. */
@@ -168,6 +187,31 @@ final class VentasControlador
         } catch (\Throwable $e) {
             error_log('[LibertyFin] cancelarPago: ' . $e->getMessage());
             $this->volver($id, 'No se pudo cancelar el pago.', 'error');
+        }
+    }
+
+    /**
+     * Cancela la venta completa: cobros, comisiones, inventario, paquetes y
+     * promociones (ver Servicio\CancelarVenta). Solo admin; pide el motivo.
+     */
+    public function cancelar($id)
+    {
+        $db = Conexion::de($_SESSION['empresa_db']);
+        if (!$this->tokenValido()) $this->volver($id, 'No se pudo verificar el formulario.', 'error');
+        try {
+            $r = (new \LibertyFin\Servicio\CancelarVenta($db))->cancelar($id, $_POST['motivo'] ?? '');
+            $msg = 'Venta ' . $r['folio'] . ' cancelada.';
+            if ($r['cobros']) {
+                $msg .= ' Se cancelaron ' . $r['cobros'] . ' cobro' . ($r['cobros'] === 1 ? '' : 's') . ' por '
+                      . \LibertyFin\Dominio\Dinero::pesos($r['devuelto']) . ': devuélvele ese dinero al cliente.';
+            }
+            if ($r['facturada']) $msg .= ' Tiene factura: cancélala también en Facturación.';
+            $this->volver($id, $msg, 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver($id, $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] cancelar venta ' . $id . ': ' . $e->getMessage());
+            $this->volver($id, 'No se pudo cancelar la venta.', 'error');
         }
     }
 

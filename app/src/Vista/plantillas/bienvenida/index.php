@@ -55,7 +55,9 @@ $tarjetas = function ($campo, array $ops, $cols = 3) use ($ini, $svg) {
   }
   echo '</div>';
 };
-$pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus áreas', 'Tu marca', 'Listo'];
+$pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Herramientas', 'Tus áreas', 'Tu marca', 'Listo'];
+$modsIni = (array)($ini['modulos'] ?? []);
+$MC = \LibertyFin\Servicio\Modulos::CATALOGO;
 ?>
 <?php /* El color va en :root: de él salen los tonos suaves y los anillos. */ ?>
 <style>:root{--lf-brand:<?= P::e($color) ?>}</style>
@@ -150,8 +152,31 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
           ], 2); ?>
         </section>
 
-        <?php /* ── 6 · Áreas ── */ ?>
-        <section class="paso" data-paso="5">
+        <?php /* ── 6 · Herramientas (módulos) ── */ ?>
+        <section class="paso" data-paso="5" data-modulos>
+          <input type="hidden" name="modulos_paso" value="1">
+          <p class="eyebrow">Herramientas</p>
+          <h1>¿Qué más te ayudaría?</h1>
+          <p class="sub">Te marcamos las que suelen usar negocios como el tuyo. Enciende solo lo que vas a usar: el menú queda más limpio. Se cambian cuando quieras en Ajustes → Módulos.</p>
+          <div class="lf-bv-mods">
+            <?php foreach (A::MODULOS as $k): $m = $MC[$k]; $enPlan = \LibertyFin\Servicio\Modulos::enPlan($k); ?>
+              <label class="lf-bv-mod<?= $enPlan ? '' : ' candado' ?>" data-mod="<?= P::e($k) ?>">
+                <input type="checkbox" name="modulos[]" value="<?= P::e($k) ?>" <?= $enPlan && in_array($k, $modsIni, true) ? 'checked' : '' ?> <?= $enPlan ? '' : 'disabled' ?>>
+                <span class="ico"><?= W::icono($m['icono'], '20px') ?></span>
+                <span class="txt"><b><?= P::e($m['nombre']) ?></b><small><?= P::e($m['desc']) ?></small>
+                  <?php if (!$enPlan): $pl = \LibertyFin\Servicio\Modulos::planesCon($k); ?>
+                    <em><?= $pl ? 'Desde el plan ' . P::e($pl[0]) : 'En un plan superior' ?></em>
+                  <?php elseif ($k === 'compras'): ?>
+                    <em class="req" hidden>Necesita que vendas productos</em>
+                  <?php endif; ?></span>
+                <i class="ok" aria-hidden="true"></i>
+              </label>
+            <?php endforeach; ?>
+          </div>
+        </section>
+
+        <?php /* ── 7 · Áreas ── */ ?>
+        <section class="paso" data-paso="6" data-areas>
           <p class="eyebrow">Tu catálogo</p>
           <h1>¿Cómo ordenamos lo que vendes?</h1>
           <p class="sub">Las áreas agrupan tus productos en Caja y en los reportes. Te sugerimos estas; quita o agrega las que quieras.</p>
@@ -165,8 +190,8 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
           <?php endif; ?>
         </section>
 
-        <?php /* ── 7 · La marca ── */ ?>
-        <section class="paso" data-paso="6">
+        <?php /* ── 8 · La marca ── */ ?>
+        <section class="paso" data-paso="7">
           <p class="eyebrow">Tu marca</p>
           <h1>Que se vea como tu negocio</h1>
           <p class="sub">Tu logotipo y tu color aparecen en el menú, en los tickets y en todo el sistema.</p>
@@ -188,8 +213,8 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
           </div>
         </section>
 
-        <?php /* ── 8 · Resumen ── */ ?>
-        <section class="paso" data-paso="7">
+        <?php /* ── 9 · Resumen ── */ ?>
+        <section class="paso" data-paso="8">
           <p class="eyebrow">Todo listo</p>
           <h1>Así quedó tu Libertyfin</h1>
           <p class="sub">Puedes cambiar cualquier cosa después en Ajustes.</p>
@@ -207,13 +232,14 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
               <b><?= P::e($emp) ?></b></div>
             <ul id="bvMenu">
               <?php foreach ([
-                ['panel', 'panel', 'Panel'], ['caja', 'caja', 'Caja'], ['ventas', 'venta', 'Ventas'],
-                ['clientes', 'cliente', 'Clientes'], ['cobranza', 'reloj', 'Cobranza'],
+                ['panel', 'panel', 'Panel'], ['caja', 'caja', 'Caja'], ['agenda', 'agenda', 'Agenda'], ['ventas', 'venta', 'Ventas'],
+                ['clientes', 'cliente', 'Clientes'], ['cotizaciones', 'doc', 'Cotizaciones'], ['seguimiento', 'tablero', 'Trabajos'],
+                ['cobranza', 'reloj', 'Cobranza'], ['igualas', 'repetir', 'Igualas'],
                 ['comisiones', 'comi', 'Comisiones'], ['gastos', 'baja', 'Gastos'],
-                ['productos', 'serv', 'Productos'], ['inventario', 'bolsa', 'Inventario'],
+                ['productos', 'serv', 'Productos'], ['inventario', 'bolsa', 'Inventario'], ['compras', 'camion', 'Compras'],
                 ['reportes', 'pct', 'Reportes'], ['ajustes', 'serv', 'Ajustes'],
               ] as $m): ?>
-                <li data-k="<?= $m[0] ?>"><?= W::icono($m[1], '13px') ?><span><?= P::e($m[2]) ?></span></li>
+                <li data-k="<?= $m[0] ?>"<?= in_array($m[0], A::MODULOS, true) ? ' data-mod' : '' ?>><?= W::icono($m[1], '13px') ?><span><?= P::e($m[2]) ?></span></li>
               <?php endforeach; ?>
             </ul>
           </div>
@@ -250,10 +276,29 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
   var pasos = [].slice.call(f.querySelectorAll('.paso')), n = pasos.length, i = 0;
   var PERFILES = <?= json_encode(array_map(function ($p) {
       return ['nombre' => $p['nombre'], 'vende' => $p['vende'] ?? null, 'cobro' => $p['cobro'] ?? null,
-              'iva' => $p['iva'] ?? null, 'comisiones' => $p['comisiones'] ?? null, 'areas' => $p['areas'] ?? []];
+              'iva' => $p['iva'] ?? null, 'comisiones' => $p['comisiones'] ?? null, 'areas' => $p['areas'] ?? [],
+              'modulos' => $p['modulos'] ?? []];
   }, A::elegibles()), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
   var YA = <?= json_encode(array_map('mb_strtolower', $areasYa), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
-  var tocado = {}, areasTocadas = false, logoCambio = false;
+  var tocado = {}, areasTocadas = false, logoCambio = false, modsTocados = <?= $repite ? 'true' : 'false' ?>;
+  var NOMBRE_MOD = <?= json_encode(array_map(function ($m) { return $m['nombre']; }, $MC), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?>;
+  function modOn(k){ var c = f.querySelector('input[name="modulos[]"][value="' + k + '"]'); return !!(c && c.checked && !c.disabled); }
+  /* Los módulos que sugiere el giro (los que el plan permite). */
+  function sugerirMods(){
+    var p = PERFILES[val('perfil')] || {modulos: []};
+    f.querySelectorAll('input[name="modulos[]"]').forEach(function(c){ if (!c.disabled || c.dataset.req) c.checked = p.modulos.indexOf(c.value) !== -1 && !c.closest('.candado'); });
+    reqCompras();
+  }
+  /* Compras necesita Inventario: con solo servicios no se puede. */
+  function reqCompras(){
+    var c = f.querySelector('input[name="modulos[]"][value="compras"]');
+    if (!c || c.closest('.candado')) return;
+    var sinInv = val('vende') === 'servicios';
+    c.disabled = sinInv; c.dataset.req = '1';
+    if (sinInv) c.checked = false;
+    var em = c.closest('label').querySelector('.req'); if (em) em.hidden = !sinInv;
+    c.closest('label').classList.toggle('apagado', sinInv);
+  }
   function val(campo){ var r = f.querySelector('input[name="' + campo + '"]:checked'); return r ? r.value : ''; }
   function marcar(campo, v){ var r = f.querySelector('input[name="' + campo + '"][value="' + v + '"]'); if (r) r.checked = true; }
   function esc(t){ var d = document.createElement('div'); d.textContent = t; return d.innerHTML; }
@@ -291,6 +336,7 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
       var k = li.dataset.k, ver = true;
       if (k === 'inventario') ver = vende === 'productos' || vende === 'ambos';
       if (k === 'comisiones') ver = com !== 'no';
+      if (li.hasAttribute('data-mod')) ver = modOn(k);
       li.classList.toggle('fuera', !ver);
     });
     var c = val('marca_color'); if (c) document.documentElement.style.setProperty('--lf-brand', c);
@@ -307,6 +353,7 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
       ['Caja', val('cobro') === 'anticipo' ? 'Empieza con el anticipo vacío; el saldo queda pendiente' : 'Empieza cobrando la venta completa'],
       ['IVA', iva === 'sin' ? 'Apagado al empezar cada venta' : 'Encendido, ' + iva + '% (tus precios ya lo incluyen)'],
       ['Comisiones', val('comisiones') === 'si' ? 'Encendidas' : 'Ocultas'],
+      ['Herramientas', [].slice.call(f.querySelectorAll('input[name="modulos[]"]:checked:not(:disabled)')).map(function(c){ return NOMBRE_MOD[c.value]; }).join(', ') || 'Ninguna por ahora'],
       ['Áreas', areas.length ? areas.join(', ') : 'Ninguna nueva'],
       ['Marca', (logoCambio ? 'Logotipo nuevo · ' : '') + 'Color ' + colorNombre()]
     ];
@@ -325,9 +372,9 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
     var ultimo = i === n - 1;
     $('bvSigTxt').textContent = ultimo ? 'Entrar a Libertyfin' : 'Siguiente';
     if (ultimo) resumen();
-    if (i === 5 && !areasTocadas) pintarAreas();
+    if (pasos[i].hasAttribute('data-areas') && !areasTocadas) pintarAreas();
     window.scrollTo(0, 0);
-    var foco = pasos[i].querySelector('input:checked, input, button'); if (foco && i < 5) foco.focus({preventScroll: true});
+    var foco = pasos[i].querySelector('input:checked, input, button'); if (foco && pasos[i].dataset.campo) foco.focus({preventScroll: true});
   }
   function completo(){
     var campo = pasos[i].dataset.campo;
@@ -349,9 +396,13 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
       var p = PERFILES[t.value];
       ['vende', 'cobro', 'iva', 'comisiones'].forEach(function(c){ if (!tocado[c] && p && p[c]) marcar(c, p[c]); });
       if (!areasTocadas) pintarAreas();
+      if (!modsTocados) sugerirMods();
     } else if (['vende', 'cobro', 'iva', 'comisiones'].indexOf(t.name) !== -1) {
       tocado[t.name] = true;
+    } else if (t.name === 'modulos[]') {
+      modsTocados = true;
     }
+    if (t.name === 'vende' || t.name === 'perfil') reqCompras();
     vista();
     if (t.type === 'radio' && t.name !== 'marca_color' && pasos[i].dataset.campo === t.name) {
       setTimeout(function(){ ir(i + 1); }, 260);
@@ -377,6 +428,6 @@ $pasos = ['Tu giro', 'Qué vendes', 'Cómo te pagan', 'IVA', 'Comisiones', 'Tus 
     if (e.key === 'Enter' && e.target.id !== 'bvOtra' && e.target.tagName !== 'BUTTON') { e.preventDefault(); $('bvSig').click(); }
   });
 
-  pintarAreas(); vista(); ir(0);
+  pintarAreas(); reqCompras(); vista(); ir(0);
 })();
 </script>

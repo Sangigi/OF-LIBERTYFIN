@@ -20,7 +20,8 @@ final class InventarioControlador
     {
         $db  = Conexion::de($_SESSION['empresa_db']);
         $inv = new Inventario($db);
-        $t   = Peticion::opcion('t', ['existencias', 'movimientos'], 'existencias');
+        $t   = Peticion::opcion('t', ['existencias', 'movimientos', 'conteo'], 'existencias');
+        if ($t === 'conteo' && !Permisos::puede('editar.inventario')) $t = 'existencias';
 
         $sucursales = $inv->sucursales();
         $ids = array_map('intval', array_column($sucursales, 'id'));
@@ -58,6 +59,8 @@ final class InventarioControlador
             ];
             $datos['filtros'] = $f;
             $datos['movimientos'] = $inv->movimientos($f);
+        } elseif ($t === 'conteo') {
+            $datos['listado'] = $inv->listado($suc);
         } else {
             $buscar = Peticion::texto('q');
             $bajos  = Peticion::texto('bajos') !== '';
@@ -67,7 +70,7 @@ final class InventarioControlador
             $datos['listado']  = $inv->listado($suc, $buscar, $bajos);
             // Para el formulario: todos, sin el filtro de la tabla.
             $datos['productos'] = ($buscar === '' && !$bajos) ? $datos['listado'] : $inv->listado($suc);
-            $datos['mover']     = Peticion::opcion('mover', ['entrada', 'salida', 'conteo'], '');
+            $datos['mover']     = Peticion::opcion('mover', ['entrada', 'salida', 'conteo', 'traspaso'], '');
             $datos['producto']  = Peticion::entero('producto');
             try {
                 $datos['proveedores'] = (new \LibertyFin\Datos\GastoRepo($db))->proveedoresActivos();
@@ -89,7 +92,10 @@ final class InventarioControlador
 
         $tipo = (string)($_POST['tipo'] ?? '');
         try {
-            $r = $inv->registrar($tipo, (int)($_POST['producto_id'] ?? 0), $suc, $_POST['cantidad'] ?? 0, $_POST);
+            $r = $tipo === 'traspaso'
+                ? $inv->traspasar((int)($_POST['producto_id'] ?? 0), $suc, (int)($_POST['destino_id'] ?? 0),
+                                  $_POST['cantidad'] ?? 0, $_POST['nota'] ?? '')
+                : $inv->registrar($tipo, (int)($_POST['producto_id'] ?? 0), $suc, $_POST['cantidad'] ?? 0, $_POST);
             $p = $db->prepare("SELECT nombre, unidad_medida FROM productos WHERE id = ?");
             $p->execute([(int)($_POST['producto_id'] ?? 0)]);
             $p = $p->fetch(\PDO::FETCH_ASSOC) ?: ['nombre' => 'El producto', 'unidad_medida' => ''];
@@ -99,6 +105,9 @@ final class InventarioControlador
                     ? 'Conteo anotado: ' . $p['nombre'] . ' cuadra (' . $queda . ').'
                     : 'Conteo anotado: ' . $p['nombre'] . ' queda en ' . $queda . ' ('
                       . ($r['cambio'] > 0 ? '+' : '−') . Inventario::num(abs($r['cambio'])) . ' contra el sistema).';
+            } elseif ($tipo === 'traspaso') {
+                $msg = 'Traspaso registrado: ' . $p['nombre'] . ' queda en ' . $queda . ' aquí y '
+                     . Inventario::conUnidad($r['destino'], $p['unidad_medida']) . ' en la otra sucursal.';
             } else {
                 $msg = ($tipo === 'entrada' ? 'Entrada' : 'Salida') . ' registrada: ' . $p['nombre'] . ' queda en ' . $queda . '.';
             }
@@ -108,6 +117,29 @@ final class InventarioControlador
         } catch (\Throwable $e) {
             error_log('[LibertyFin] inventario/mover: ' . $e->getMessage());
             $this->volver('No se pudo registrar el movimiento.', 'error', $suc);
+        }
+    }
+
+    /** Conteo general: todo lo capturado de una sucursal, de una vez. */
+    public function conteo()
+    {
+        $db  = Conexion::de($_SESSION['empresa_db']);
+        $inv = new Inventario($db);
+        $suc = (int)($_POST['sucursal_id'] ?? 0);
+        if (!$this->tokenValido()) $this->volver('No se pudo verificar el formulario.', 'error', $suc);
+        if (!$inv->activo()) $this->volver('El inventario está apagado (Ajustes → Inventario).', 'error', $suc);
+        try {
+            $r = $inv->conteoGeneral($suc, (array)($_POST['contado'] ?? []), $_POST['nota'] ?? '');
+            \LibertyFin\Servicio\Auditoria::anota('inventario.conteo', 'sucursal ' . $suc, null,
+                $r['contados'] . ' productos contados, ' . $r['diferencias'] . ' con diferencia', $db);
+            $this->volver('Conteo guardado: ' . $r['contados'] . ($r['contados'] === 1 ? ' producto' : ' productos')
+                . ($r['diferencias'] ? ', ' . $r['diferencias'] . ' con diferencia (ver Movimientos).' : '; todo cuadró.'), 'ok', $suc);
+        } catch (\InvalidArgumentException $e) {
+            $_SESSION['lf_aviso'] = ['texto' => $e->getMessage(), 'tipo' => 'error'];
+            header('Location: /inventario?t=conteo&s=' . $suc); exit;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] inventario/conteo: ' . $e->getMessage());
+            $this->volver('No se pudo guardar el conteo.', 'error', $suc);
         }
     }
 

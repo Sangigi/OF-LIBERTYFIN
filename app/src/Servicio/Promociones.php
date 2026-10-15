@@ -44,6 +44,8 @@ final class Promociones
         'precio'     => 'Precio especial',
         'nxm'        => 'Lleva N, paga M',
         'paquete'    => 'Paquete a precio especial',
+        // Mayoreo: desde N piezas, cada una a $X. Se guarda en lleva (N) y valor ($X).
+        'volumen'    => 'Precio de mayoreo',
     ];
 
     const ALCANCES = ['todo' => 'Todo el ticket', 'areas' => 'Áreas', 'productos' => 'Productos'];
@@ -353,6 +355,11 @@ final class Promociones
                     $gratis = floor($l['cantidad'] / $lleva) * ($lleva - $paga);
                     $out[$i] = $gratis * $l['precio'];
                     break;
+                case 'volumen':         // todas las piezas a $X, si llega al mínimo
+                    if ($l['cantidad'] + 0.0005 >= max(2, (int)$p['lleva']) && $l['precio'] > $valor) {
+                        $out[$i] = ($l['precio'] - $valor) * $l['cantidad'];
+                    }
+                    break;
             }
         }
         return $out;
@@ -513,7 +520,8 @@ final class Promociones
         if (!isset(self::ALCANCES[$alc])) $alc = 'productos';
         // Un precio especial y un paquete hablan de productos concretos: "el
         // precio especial de toda el área" no significa nada.
-        if (in_array($tipo, ['precio', 'paquete'], true)) $alc = 'productos';
+        if (in_array($tipo, ['precio', 'paquete', 'volumen'], true)) $alc = 'productos';
+        if ($tipo === 'volumen') $lleva = (int)($d['desde_piezas'] ?? $lleva);
         if ($tipo === 'nxm' && $alc === 'todo') $alc = 'productos';
 
         switch ($tipo) {
@@ -529,6 +537,10 @@ final class Promociones
             case 'paquete':
                 if ($valor <= 0) throw new \InvalidArgumentException('Ponle precio al paquete.');
                 break;
+            case 'volumen':
+                if ($lleva < 2) throw new \InvalidArgumentException('El mayoreo empieza desde 2 piezas o más.');
+                if ($valor <= 0) throw new \InvalidArgumentException('Escribe el precio de mayoreo por pieza.');
+                break;
             case 'nxm':
                 if ($lleva < 2 || $paga < 1 || $paga >= $lleva) {
                     throw new \InvalidArgumentException('En «lleva N, paga M», N va de 2 en adelante y M es menor que N (por ejemplo, lleva 3 paga 2).');
@@ -536,7 +548,8 @@ final class Promociones
                 $valor = 0;
                 break;
         }
-        if ($tipo !== 'nxm') { $lleva = null; $paga = null; }
+        if ($tipo !== 'nxm') { $paga = null; }
+        if (!in_array($tipo, ['nxm', 'volumen'], true)) { $lleva = null; }
 
         // ── A qué aplica ──
         $objetivos = [];
@@ -731,6 +744,7 @@ final class Promociones
             case 'precio':     return 'A ' . $corto($v);
             case 'nxm':        return (int)$p['lleva'] . '×' . (int)$p['paga'];
             case 'paquete':    return 'Paquete';
+            case 'volumen':    return 'Mayoreo';
         }
         return 'Promo';
     }
@@ -746,6 +760,7 @@ final class Promociones
             case 'precio':     $que = 'a ' . Dinero::pesos($v); break;
             case 'nxm':        $que = 'lleva ' . (int)$p['lleva'] . ', paga ' . (int)$p['paga']; break;
             case 'paquete':    $que = 'paquete por ' . Dinero::pesos($v); break;
+            case 'volumen':    $que = 'desde ' . (int)$p['lleva'] . ' piezas, a ' . Dinero::pesos($v) . ' c/u'; break;
             default:           $que = '';
         }
         return $que;

@@ -37,20 +37,41 @@ $pasos = [
    'texto'  => 'Da de alta tus productos con su precio. Los que se cotizan por caso '
              . 'déjalos en cero: el precio se pone al vender.'],
 
-  ['ruta' => '/inventario', 'p' => 'ver.inventario', 'inv' => true, 'icono' => 'servicios',
+  ['ruta' => '/inventario', 'p' => 'ver.inventario', 'mod' => 'inventario', 'icono' => 'servicios',
    'titulo' => 'Tus existencias',
    'texto'  => 'Cuánto queda de cada producto en cada sucursal. Caja lo descuenta al cobrar '
              . 'y el Panel te avisa cuando algo se está acabando.'],
 
+  ['ruta' => '/compras', 'p' => 'ver.compras', 'mod' => 'compras', 'icono' => 'servicios',
+   'titulo' => 'Compras a proveedor',
+   'texto'  => 'Haz el pedido y, cuando llegue, dale «Recibir»: la mercancía entra sola al '
+             . 'inventario con su costo, y si quieres, queda el gasto registrado.'],
+
   ['ruta' => '/clientes', 'p' => 'ver.clientes', 'icono' => 'clientes',
    'titulo' => 'A quién le cobras',
-   'texto'  => 'Tus clientes, con su área y su saldo. Aquí ves quién debe y desde cuándo.'],
+   'texto'  => 'Tus clientes, con su área y su saldo. Toca un nombre para abrir su ficha: '
+             . 'sus compras, lo que debe y todo lo que sabes de él.'],
+
+  ['ruta' => '/cotizaciones', 'p' => 'ver.cotizaciones', 'mod' => 'cotizaciones', 'icono' => 'ventas',
+   'titulo' => 'Cotizaciones',
+   'texto'  => 'Arma el presupuesto, imprímelo o guárdalo en PDF, y cuando el cliente acepte, '
+             . '«Cobrar en Caja» lo vuelve venta sin capturarlo otra vez.'],
+
+  ['ruta' => '/seguimiento', 'p' => 'ver.seguimiento', 'mod' => 'seguimiento', 'icono' => 'reportes',
+   'titulo' => 'En qué va cada trabajo',
+   'texto'  => 'Cada venta aparece como un trabajo pendiente. Muévelo a «En proceso», '
+             . '«Listo» y «Entregado», con responsable y fecha de entrega.'],
 
   ['ruta' => '/caja', 'p' => 'cobrar', 'icono' => 'caja',
    'titulo' => 'Cobrar',
    'texto'  => 'Tu pantalla del día a día. Puedes cobrar completo o dejar un anticipo: '
              . 'el saldo queda persiguiéndose solo. En Ajustes → Caja eliges con qué '
              . 'empieza cada venta (cobro completo o vacío, con IVA o sin IVA).'],
+
+  ['ruta' => '/agenda', 'p' => 'ver.agenda', 'mod' => 'agenda', 'icono' => 'clientes',
+   'titulo' => 'Tu agenda',
+   'texto'  => 'Las citas del día por especialista. Toca un espacio libre para agendar; '
+             . 'manda el recordatorio por WhatsApp y cobra la cita en Caja con un clic.'],
 
   ['ruta' => '/ventas', 'p' => 'ver.ventas', 'icono' => 'ventas',
    'titulo' => 'Cobrado, no vendido',
@@ -61,6 +82,11 @@ $pasos = [
    'titulo' => 'A quién le hablas hoy',
    'texto'  => 'Ordenado por antigüedad del último abono, no por monto. '
              . 'Lo viejo pesa más que lo grande.'],
+
+  ['ruta' => '/igualas', 'p' => 'ver.igualas', 'mod' => 'igualas', 'icono' => 'cobranza',
+   'titulo' => 'Igualas',
+   'texto'  => 'Lo que un cliente te paga cada mes. El día de cobro se genera sola la venta '
+             . 'y aparece en Cobranza: nadie tiene que acordarse.'],
 
   ['ruta' => '/corte', 'p' => 'ver.corte', 'sec' => 'corte', 'icono' => 'corte',
    'titulo' => 'Cerrar el turno',
@@ -169,11 +195,15 @@ try {
     }
 } catch (\Throwable $e) { $cfgGuia = null; }
 
+// Los módulos (Ajustes → Módulos): solo se explica lo que está encendido.
+$modsGuia = [];
+try { if ($cfgGuia) $modsGuia = (new \LibertyFin\Servicio\Modulos($cfgGuia))->activos(); } catch (\Throwable $e) { $modsGuia = []; }
+
 $mios = [];
 foreach ($pasos as $p) {
     if (empty($p['siempre']) && isset($p['p']) && !Permisos::puede($p['p'])) continue;
     if ($cfgGuia && isset($p['sec']) && !$cfgGuia->seccionActiva($p['sec'])) continue;
-    if (!empty($p['inv']) && (!$cfgGuia || !$cfgGuia->inventarioActivo())) continue;
+    if (isset($p['mod']) && empty($modsGuia[$p['mod']])) continue;
     $mios[] = $p;
 }
 ?>

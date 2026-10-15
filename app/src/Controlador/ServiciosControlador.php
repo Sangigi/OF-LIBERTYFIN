@@ -45,8 +45,58 @@ final class ServiciosControlador
             'aviso'     => $_SESSION['lf_aviso'] ?? null,
             'vigentes'  => $this->cuantasVigentes($db),
             'inventario'=> $this->inventarioDe($db, $editar),
+            // Lo que piden los módulos encendidos: duración (Agenda) y
+            // sesiones de qué servicio (Paquetes).
+            'modProducto' => $this->modProducto($db),
         ]);
         unset($_SESSION['lf_aviso']);
+    }
+
+    /** ['agenda' => bool, 'paquetes' => bool, 'servicios' => [...]] o null si ninguno. */
+    private function modProducto($db)
+    {
+        try {
+            $m = \LibertyFin\Servicio\Modulos::deSesion();
+            $r = ['agenda' => $m->activo('agenda'), 'paquetes' => $m->activo('paquetes'), 'servicios' => []];
+            if (!$r['agenda'] && !$r['paquetes']) return null;
+            if ($r['paquetes']) {
+                $r['servicios'] = $db->query("SELECT id, nombre FROM productos WHERE COALESCE(activo,1) = 1
+                                              AND COALESCE(sesiones,0) = 0 ORDER BY nombre")->fetchAll(\PDO::FETCH_ASSOC);
+            }
+            return $r;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /** Guarda lo de los módulos (duración, paquete). Devuelve un texto para el aviso. */
+    private function guardarModulos($db, $id)
+    {
+        $id = (int)$id;
+        try {
+            if (isset($_POST['mod_agenda'])) {
+                $dur = (int)($_POST['duracion_min'] ?? 0);
+                $db->prepare("UPDATE productos SET duracion_min = ? WHERE id = ?")
+                   ->execute([$dur >= 5 && $dur <= 720 ? $dur : null, $id]);
+            }
+            if (isset($_POST['mod_paquetes'])) {
+                $ses = (int)($_POST['sesiones'] ?? 0);
+                $de  = (int)($_POST['sesion_de'] ?? 0);
+                if (empty($_POST['es_paquete'])) { $ses = 0; $de = 0; }
+                if ($ses) {
+                    if ($ses < 2 || $ses > 200) return ' Pero el paquete no se guardó: las sesiones van de 2 a 200.';
+                    $st = $db->prepare("SELECT 1 FROM productos WHERE id = ? AND id <> ? AND COALESCE(sesiones,0) = 0");
+                    $st->execute([$de, $id]);
+                    if (!$de || !$st->fetchColumn()) return ' Pero el paquete no se guardó: elige de qué servicio son las sesiones.';
+                }
+                $db->prepare("UPDATE productos SET sesiones = ?, sesion_de = ? WHERE id = ?")
+                   ->execute([$ses ?: null, $ses ? $de : null, $id]);
+            }
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] módulos del producto ' . $id . ': ' . $e->getMessage());
+            return ' Pero la duración o el paquete no se pudieron guardar (¿la base está al día?).';
+        }
+        return '';
     }
 
     public function guardar()
@@ -75,6 +125,7 @@ final class ServiciosControlador
             // quedó guardado y solo se avisa de la imagen.
             $msg .= $this->imagen($repo, $id);
             $msg .= $this->guardarInventario($db, $id);
+            $msg .= $this->guardarModulos($db, $id);
             $this->volver($msg, 'ok');
         } catch (\InvalidArgumentException $e) {
             $this->volver($e->getMessage(), 'error');
