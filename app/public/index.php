@@ -34,6 +34,8 @@ Plantilla::base($raiz . '/src/Vista/plantillas');
 \LibertyFin\Servicio\Integraciones::cargar($raiz);
 \LibertyFin\Servicio\Archivos::destino($raiz . '/public/assets/subidas');
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
+// Landing, términos y privacidad (config.php → sitio), para el registro.
+$GLOBALS['lf_sitio'] = (array)($cfg['sitio'] ?? []);
 
 // ── Cookie de sesión ──
 // httponly: el JavaScript no puede leerla, así que un XSS no se lleva la
@@ -64,13 +66,12 @@ $r->post('/push/probar',       ['LibertyFin\Controlador\PushControlador', 'proba
 $r->post('/push/pendiente',    ['LibertyFin\Controlador\PushControlador', 'pendiente']);
 $r->get('/salir',  ['LibertyFin\Controlador\LoginControlador', 'salir']);
 $r->get('/ayuda-acceso', ['LibertyFin\Controlador\LoginControlador', 'ayudaAcceso']);
-// El registro solo existe si hay credenciales de cPanel: sin ellas no se
-// puede crear la base de una empresa nueva, y un formulario que no lleva
-// a ningún lado es peor que no tenerlo.
-if (\LibertyFin\Servicio\Integraciones::activa('cpanel')) {
-    $r->get('/registro',  ['LibertyFin\Controlador\RegistroControlador', 'formulario']);
-    $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
-}
+// El registro existe siempre: es a donde lleva la landing. Lo que guarda es
+// una SOLICITUD, que se ve en Mantenimiento aunque cPanel no esté
+// configurado; sin cPanel solo no se puede APROBAR (lo dice al intentarlo).
+// Antes la ruta dependía de cPanel y, sin él, la landing llevaba a un 404.
+$r->get('/registro',  ['LibertyFin\Controlador\RegistroControlador', 'formulario']);
+$r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
 
 // ── Los avisos de Paga de Todo ──
 // Son públicas porque el proveedor pega desde sus servidores: no trae

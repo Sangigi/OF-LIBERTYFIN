@@ -34,5 +34,7 @@
 $hojaLimpia = __DIR__ . '/../../../public/assets/css/libertyfin.css'; ?>
 <link rel="stylesheet" href="/assets/css/libertyfin.css?v=<?= is_file($hojaLimpia) ? filemtime($hojaLimpia) : '1' ?>">
 </head>
-<body class="lf-centro"><?= $contenido ?></body>
+<?php /* `cuerpo`: el registro trae su propia composición (dos columnas);
+         el login y lo demás, el verde centrado de siempre. */ ?>
+<body class="<?= P::e($cuerpo ?? 'lf-centro') ?>"><?= $contenido ?></body>
 </html>

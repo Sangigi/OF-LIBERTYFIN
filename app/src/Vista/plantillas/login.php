@@ -123,6 +123,9 @@ $token = $_SESSION['lf_token'];
         <span class="giro" aria-hidden="true"></span>
       </button>
     </form>
+    <?php /* La puerta para quien todavía no tiene cuenta. Antes no había:
+             a /registro solo se llegaba sabiendo la dirección. */ ?>
+    <p class="lf-registrate">¿Tu negocio aún no usa Libertyfin? <a href="/registro">Regístralo gratis</a></p>
   <?php endif; ?>
   </div>
 

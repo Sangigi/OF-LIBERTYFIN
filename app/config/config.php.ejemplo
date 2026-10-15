@@ -14,5 +14,13 @@ return [
     'zona'     => 'America/Mexico_City',
     'zona_sql' => '-06:00',
 
+    // La página pública (landing) y sus documentos legales. El registro
+    // enlaza aquí; vacíos, simplemente no aparecen los enlaces.
+    'sitio' => [
+        'landing'    => '',   // https://libertyfin.mx
+        'terminos'   => '',   // https://libertyfin.mx/terminos
+        'privacidad' => '',   // https://libertyfin.mx/privacidad
+    ],
+
     'depurar' => false,   // true solo en local
 ];

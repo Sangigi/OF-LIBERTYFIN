@@ -101,11 +101,17 @@ foreach ($empresas as $e) if ($e['version'] !== null && $e['version'] < $esquema
           <td data-label="Negocio"><b style="font-weight:600"><?= P::e($s['nombre_empresa']) ?></b>
             <span style="display:block;color:var(--lf-tinta-4);font-size:11px">
               <?= P::e($s['giro_comercial'] ?: 'sin giro') ?>
-              <?= $s['rfc'] ? ' · ' . P::e($s['rfc']) : '' ?></span></td>
+              <?= !empty($s['empleados']) ? ' · ' . P::e(\LibertyFin\Servicio\CrearEmpresa::EMPLEADOS[$s['empleados']] ?? $s['empleados'])
+                  . ($s['empleados'] === '1' ? '' : ' personas') : '' ?>
+              <?= $s['rfc'] ? ' · ' . P::e($s['rfc']) : '' ?>
+              <?= !empty($s['plan']) && $s['plan'] !== 'prueba' ? ' · plan ' . P::e($s['plan']) : '' ?></span></td>
           <td data-label="Contacto" style="font-size:12.5px">
             <?= P::e($s['nombre_contacto']) ?>
             <a style="display:block;font-size:11.5px" href="mailto:<?= P::e($s['email_admin']) ?>">
-              <?= P::e($s['email_admin']) ?></a></td>
+              <?= P::e($s['email_admin']) ?></a>
+            <?php if (!empty($s['telefono'])): ?>
+              <a style="display:block;font-size:11.5px" href="tel:<?= P::e($s['telefono']) ?>"><?= P::e($s['telefono']) ?></a>
+            <?php endif; ?></td>
           <td data-label="Distribuidor" style="font-size:12px">
             <?= $s['no_distribuidor'] ? P::e($s['no_distribuidor'])
                 : '<span style="color:var(--lf-tinta-4)">directo</span>' ?></td>

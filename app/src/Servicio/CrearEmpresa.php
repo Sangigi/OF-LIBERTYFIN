@@ -28,6 +28,17 @@ use PDO;
  */
 final class CrearEmpresa
 {
+    /** Los giros que se ofrecen en el registro. «Otro» deja escribirlo. */
+    const GIROS = [
+        'Contabilidad y fiscal', 'Despacho legal', 'Marketing y publicidad', 'Consultoría',
+        'Salud y bienestar', 'Belleza y estética', 'Educación y cursos',
+        'Tienda o comercio', 'Restaurante o alimentos', 'Otro',
+    ];
+
+    /** Cuántas personas trabajan en el negocio: sirve para acompañar el alta. */
+    const EMPLEADOS = ['1' => 'Solo yo', '2-5' => 'De 2 a 5', '6-20' => 'De 6 a 20',
+                       '21-50' => 'De 21 a 50', '50+' => 'Más de 50'];
+
     private $principal;
     public function __construct(PDO $principal) { $this->principal = $principal; }
 
@@ -78,6 +89,14 @@ final class CrearEmpresa
         if ($rfc !== '' && !preg_match('/^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/', $rfc)) {
             throw new \InvalidArgumentException('El RFC no tiene el formato correcto');
         }
+        // El teléfono: es por donde se le acompaña en el alta. Al menos los
+        // 10 dígitos de un número en México; la lada internacional, opcional.
+        $tel = preg_replace('/[^0-9+]/', '', (string)($d['telefono'] ?? ''));
+        if (strlen(preg_replace('/\D/', '', $tel)) < 10) {
+            throw new \InvalidArgumentException('Escribe un teléfono de 10 dígitos');
+        }
+        $empleados = (string)($d['empleados'] ?? '');
+        if ($empleados !== '' && !isset(self::EMPLEADOS[$empleados])) $empleados = '';
 
         // Un correo, una solicitud pendiente. Sin esto, recargar el
         // formulario llena la tabla de duplicados y quien revisa no sabe
@@ -100,20 +119,38 @@ final class CrearEmpresa
             throw new \InvalidArgumentException('Demasiadas solicitudes. Inténtalo más tarde.');
         }
 
+        $conEmpleados = $this->asegurarEmpleados();
         $this->principal->prepare("
             INSERT INTO solicitudes_empresa
                 (nombre_empresa, giro_comercial, rfc, nombre_contacto, email_admin,
-                 telefono, no_distribuidor, plan, estado, ip, creada_en)
-            VALUES (?,?,?,?,?,?,?,?, 'pendiente', ?, NOW())
-        ")->execute([
-            $nombre, trim($d['giro_comercial'] ?? '') ?: null, $rfc ?: null,
-            $contacto, $email,
-            preg_replace('/[^0-9+]/', '', (string)($d['telefono'] ?? '')) ?: null,
-            trim($d['no_distribuidor'] ?? '') ?: null,
+                 telefono, no_distribuidor, plan, estado, ip, creada_en"
+                 . ($conEmpleados ? ", empleados" : "") . ")
+            VALUES (?,?,?,?,?,?,?,?, 'pendiente', ?, NOW()" . ($conEmpleados ? ",?" : "") . ")
+        ")->execute(array_merge([
+            $nombre, mb_substr(trim($d['giro_comercial'] ?? ''), 0, 200) ?: null, $rfc ?: null,
+            $contacto, $email, $tel,
+            mb_substr(trim($d['no_distribuidor'] ?? ''), 0, 50) ?: null,
             trim($d['plan'] ?? '') ?: 'prueba',
             $ip,
-        ]);
+        ], $conEmpleados ? [$empleados ?: null] : []));
         return (int)$this->principal->lastInsertId();
+    }
+
+    /**
+     * La columna `empleados` llegó después que la tabla: se agrega si falta.
+     * Si no se puede (permisos), la solicitud se guarda igual, sin ese dato.
+     */
+    private function asegurarEmpleados()
+    {
+        try {
+            $st = $this->principal->query("SHOW COLUMNS FROM solicitudes_empresa LIKE 'empleados'");
+            if ($st->fetch()) return true;
+            $this->principal->exec("ALTER TABLE solicitudes_empresa ADD COLUMN empleados VARCHAR(10) NULL");
+            return true;
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] solicitudes.empleados: ' . $e->getMessage());
+            return false;
+        }
     }
 
     public function pendientes()
