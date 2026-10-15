@@ -644,6 +644,67 @@ document.querySelectorAll('[data-copiar]').forEach(function (b) {
 });
 </script>
 
+<?php elseif (in_array($estPago, ['por_pagar','rechazado'], true)): ?>
+<section class="card" style="border-color:color-mix(in srgb,var(--lf-brand) 45%,transparent)">
+  <header class="card-header">
+    <div><span><?= $estPago === 'rechazado' ? 'Tu comprobante no se pudo validar' : 'Paga tu ' . P::e($ultimo['nombre_plan']) ?></span>
+      <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+        Transferencia por <b class="lf-mono"><?= D::pesos($ultimo['monto']) ?></b>
+        · <?= (int)$ultimo['meses'] ?> mes<?= (int)$ultimo['meses']===1?'':'es' ?></p></div>
+    <span class="badge <?= $etiqueta[$estPago][1] ?>"><?= $etiqueta[$estPago][0] ?></span>
+  </header>
+  <div class="card-body">
+    <?php if ($estPago === 'rechazado' && !empty($ultimo['motivo_rechazo'])): ?>
+      <p style="font-size:12.5px;color:var(--lf-rojo);background:var(--lf-rojo-soft);
+                padding:10px 12px;border-radius:var(--lf-r);margin-bottom:14px;line-height:1.5">
+        <b>Motivo:</b> <?= P::e($ultimo['motivo_rechazo']) ?></p>
+    <?php endif; ?>
+
+    <div class="lf-split" style="align-items:start">
+      <div>
+        <?php foreach ([
+          'Banco'      => $cu['banco']   ?? '',
+          'Titular'    => $cu['titular'] ?? '',
+          'CLABE'      => $cu['clabe']   ?? '',
+          'Monto'      => D::pesos($ultimo['monto']),
+          'Referencia' => $ultimo['referencia'],
+        ] as $k => $v): if ($v === '') continue; ?>
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:7px 0;
+                      border-bottom:1px solid var(--lf-linea);font-size:13px">
+            <span style="color:var(--lf-tinta-3)"><?= P::e($k) ?></span>
+            <b class="lf-mono" style="font-weight:600;text-align:right;word-break:break-all"><?= P::e($v) ?></b>
+          </div>
+        <?php endforeach; ?>
+        <p style="font-size:11.5px;color:var(--lf-tinta-4);margin-top:12px;line-height:1.55">
+          Pon la <b>referencia</b> en el concepto de la transferencia: así sabemos que es tuya.
+        </p>
+      </div>
+
+      <form method="post" action="/cuenta/plan/comprobante" enctype="multipart/form-data">
+        <input type="hidden" name="token" value="<?= P::e($token) ?>">
+        <input type="hidden" name="id" value="<?= (int)$ultimo['id'] ?>">
+        <label class="form-label">Comprobante de la transferencia</label>
+        <input type="file" name="archivo" required
+               accept="image/png,image/jpeg,image/webp,application/pdf"
+               style="font-size:11.5px;width:100%;margin-bottom:10px">
+        <button class="btn btn-primary" type="submit" style="width:100%">Enviar comprobante</button>
+        <p style="font-size:11px;color:var(--lf-tinta-4);margin-top:8px">
+          JPG, PNG o PDF, máximo 10 MB. Lo revisamos en un día hábil.</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<?php elseif ($estPago === 'en_revision'): ?>
+<div class="alert alert-info" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span><b>Estamos revisando tu pago</b> de <?= D::pesos($ultimo['monto']) ?>
+    (<?= P::e($ultimo['nombre_plan']) ?>, ref. <span class="lf-mono"><?= P::e($ultimo['referencia']) ?></span>).
+    En cuanto lo aprobemos, tu plan se renueva y lo verás aquí.
+    <a href="<?= P::e($ultimo['comprobante']) ?>" target="_blank" rel="noopener">Ver comprobante</a></span>
+</div>
+<?php endif; ?>
+
 <?php /* ═══ PLANES ═══
    Tarjetas de planes con selector Mensual / Anual.
 
