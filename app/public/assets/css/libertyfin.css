@@ -1552,8 +1552,8 @@ body.lf-rg-cuerpo{margin:0;min-height:100vh;min-height:100dvh;background:var(--l
   background-image:radial-gradient(900px 560px at 0% 0%, color-mix(in srgb, var(--lf-brand) 34%, transparent) 0%, transparent 60%),
                    radial-gradient(700px 500px at 100% 100%, color-mix(in srgb, var(--lf-brand) 16%, transparent) 0%, transparent 65%)}
 .lf-rg-lado-in{position:sticky;top:0;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;
-  justify-content:center;padding:56px clamp(28px,6vw,84px);max-width:680px}
-.lf-rg-logo{display:inline-block;margin-bottom:46px;color:#fff;text-decoration:none;
+  justify-content:flex-start;padding:clamp(36px,7vh,72px) clamp(28px,6vw,84px) 48px;max-width:680px}
+.lf-rg-logo{display:inline-block;margin-bottom:34px;color:#fff;text-decoration:none;
   font-size:24px;font-weight:800;letter-spacing:-.8px}
 .lf-rg-logo img{display:block;max-width:170px;height:auto}
 .lf-rg-chip{align-self:flex-start;display:inline-flex;align-items:center;gap:8px;padding:6px 14px;border-radius:999px;
@@ -1575,7 +1575,7 @@ body.lf-rg-cuerpo{margin:0;min-height:100vh;min-height:100dvh;background:var(--l
 .lf-rg-checks li{display:flex;align-items:center;gap:8px;font-size:13px;color:rgba(255,255,255,.72)}
 .lf-rg-checks svg{flex:none;width:16px;height:16px;color:color-mix(in srgb, var(--lf-brand) 70%, #9ef09e)}
 /* El formulario */
-.lf-rg-form-lado{display:flex;justify-content:center;align-items:center;padding:56px clamp(22px,5vw,72px)}
+.lf-rg-form-lado{display:flex;justify-content:center;align-items:flex-start;padding:clamp(36px,7vh,72px) clamp(22px,5vw,72px) 56px}
 .lf-rg-caja{width:100%;max-width:560px}
 .lf-rg-logo-movil{display:none}
 .lf-rg-caja h2{margin:0;font-size:28px;font-weight:800;letter-spacing:-.8px;color:var(--lf-tinta)}
