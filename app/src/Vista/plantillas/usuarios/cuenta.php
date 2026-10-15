@@ -1006,7 +1006,7 @@ $pe = function ($n) { return D::pesos($n); };
 
       <div class="todo">
         <label class="form-label">Tipo de persona</label>
-        <div style="display:flex;gap:9px;flex-wrap:wrap">
+        <div style="display:flex;gap:9px;flex-wrap:wrap" id="fiscTipo">
           <?php foreach (['fisica'=>'Persona física','moral'=>'Persona moral'] as $k=>$v): ?>
             <label class="lf-pill <?= ($fiscales['tipo_persona'] ?? '')===$k ? 'active':'' ?>"
                    style="cursor:pointer">
@@ -1015,6 +1015,20 @@ $pe = function ($n) { return D::pesos($n); };
           <?php endforeach; ?>
         </div>
       </div>
+      <script>
+      /* Los radios van ocultos: sin esto, al elegir una opción no se veía
+         marcada y parecía que no dejaba seleccionar. */
+      (function () {
+        var caja = document.getElementById('fiscTipo');
+        if (!caja) return;
+        caja.addEventListener('change', function () {
+          caja.querySelectorAll('.lf-pill').forEach(function (l) {
+            var r = l.querySelector('input');
+            l.classList.toggle('active', !!(r && r.checked));
+          });
+        });
+      })();
+      </script>
 
       <div><label class="form-label">RFC</label>
         <input class="form-control lf-mono" name="rfc_fiscal" style="text-transform:uppercase"
