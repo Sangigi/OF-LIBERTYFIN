@@ -1100,7 +1100,13 @@ $grupos = [
   ]],
 ];
 ?>
-<form method="post" action="/cuenta/comercio">
+<div id="comAviso" role="alert" hidden style="margin-bottom:18px"></div>
+<div id="comBorrador" hidden class="alert alert-info" style="margin-bottom:18px">
+  <?= W::icono('alerta','18px') ?>
+  <span>Recuperamos lo que habías escrito y no se había guardado.
+    <a href="#" id="comDescartar" style="font-weight:600">Descartar borrador</a></span>
+</div>
+<form method="post" action="/cuenta/comercio" id="formComercio">
   <input type="hidden" name="token" value="<?= P::e($token) ?>">
   <?php foreach ($grupos as $g): ?>
     <section class="card">
@@ -1149,6 +1155,76 @@ $grupos = [
     </div>
   </section>
 </form>
+
+<script>
+(function () {
+  var form = document.getElementById('formComercio');
+  if (!form) return;
+  var aviso = document.getElementById('comAviso'),
+      nota  = document.getElementById('comBorrador'),
+      boton = form.querySelector('button[type="submit"]'),
+      CLAVE = 'lf-comercio-borrador';
+
+  /* ── Borrador: cada cambio se guarda en este navegador ──
+     Si la página se recarga o algo sale mal, lo escrito sigue ahí. El token
+     no se guarda; las casillas ya aceptadas (disabled) tampoco. */
+  function campos() {
+    return [].slice.call(form.elements).filter(function (e) {
+      return e.name && e.name !== 'token' && !e.disabled && e.type !== 'submit';
+    });
+  }
+  function guardarBorrador() {
+    try {
+      var d = {};
+      campos().forEach(function (e) { d[e.name] = e.type === 'checkbox' ? e.checked : e.value; });
+      localStorage.setItem(CLAVE, JSON.stringify(d));
+    } catch (x) { /* sin almacenamiento, se opera igual */ }
+  }
+  function borrarBorrador() { try { localStorage.removeItem(CLAVE); } catch (x) {} }
+
+  try {
+    var g = JSON.parse(localStorage.getItem(CLAVE) || 'null'), cambio = false;
+    if (g) campos().forEach(function (e) {
+      if (!(e.name in g)) return;
+      if (e.type === 'checkbox') { if (e.checked !== g[e.name]) { e.checked = g[e.name]; cambio = true; } }
+      else if (e.value !== g[e.name]) { e.value = g[e.name]; cambio = true; }
+    });
+    if (cambio) nota.hidden = false; else borrarBorrador();
+  } catch (x) {}
+
+  var espera = null;
+  form.addEventListener('input', function () { clearTimeout(espera); espera = setTimeout(guardarBorrador, 400); });
+  form.addEventListener('change', guardarBorrador);
+  document.getElementById('comDescartar').addEventListener('click', function (ev) {
+    ev.preventDefault(); borrarBorrador(); location.reload();
+  });
+
+  /* ── Guardar sin recargar: si algo está mal, se dice aquí y no se pierde nada ── */
+  function decir(texto, ok) {
+    aviso.className = 'alert alert-' + (ok ? 'success' : 'danger');
+    aviso.textContent = texto; aviso.hidden = false;
+    aviso.scrollIntoView({behavior: 'smooth', block: 'center'});
+  }
+  form.addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    if (boton.disabled) return;
+    guardarBorrador();
+    var original = boton.textContent;
+    boton.disabled = true; boton.textContent = 'Guardando…';
+    fetch(form.action, {method: 'POST', body: new FormData(form), credentials: 'same-origin',
+                        headers: {'X-LF-Ajax': '1', 'Accept': 'application/json'}})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        decir(j.texto || (j.ok ? 'Datos de comercio guardados.' : 'No se pudieron guardar.'), !!j.ok);
+        if (j.ok) { borrarBorrador(); nota.hidden = true; }
+      })
+      .catch(function () {
+        decir('No se pudo guardar (sin conexión o la sesión caducó). Lo que escribiste sigue aquí: vuelve a intentarlo.', false);
+      })
+      .then(function () { boton.disabled = false; boton.textContent = original; });
+  });
+})();
+</script>
 
 
 <?php /* ═══════ DOCUMENTOS ═══════ */ else: ?>
