@@ -535,11 +535,12 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         +   '<button type="button" data-menos="' + i + '" aria-label="Uno menos"'
         +     (l.cantidad <= 1 ? ' disabled' : '') + '>−</button>'
         +   '<span class="n">' + l.cantidad + '</span>'
-        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span>'
-        + '<div class="lf-promo-l" data-promo-i="' + i + '"></div></div>'
+        +   '<button type="button" data-mas="' + i + '" aria-label="Uno más">+</button></span></div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio">'
-        + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>';
+        + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>'
+        // La promoción va abajo, a todo lo ancho: junto al precio no cabía.
+        + '<div class="lf-promo-l" data-promo-i="' + i + '"></div>';
       lista.appendChild(d);
     });
     $('vacio').hidden = lineas.length > 0;
@@ -822,12 +823,16 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
       } else if (promosDe(l.id).length) {
         /* Tiene promoción y todavía no aplica: se dice cuál y qué falta,
            para que el cajero se lo ofrezca al cliente. */
+        // Dos renglones: cuál es y qué le falta. En uno solo, con el
+        // ticket angosto, el nombre y la condición quedaban revueltos.
         var p = PC.promos[promosDe(l.id)[0]];
         var por = falta(p, l);
         if (!por && !promo.esperando) por = 'no aplica en este ticket';
-        c.innerHTML = '<span class="lf-promo-tag disp" title="' + escP(p.texto) + '">' + ICO_PROMO
-          + '<b>' + escP(p.etiqueta) + '</b>&nbsp;· ' + escP(p.nombre) + '</span>'
-          + (por ? '<small class="lf-promo-falta">' + escP(mayus(por)) + '</small>' : '');
+        c.innerHTML = '<div class="lf-promo-disp" title="' + escP(p.texto) + '">'
+          + '<span class="i">' + ICO_PROMO + '</span>'
+          + '<span class="n">' + escP(p.nombre) + '</span>'
+          + '<span class="d"><span class="e">' + escP(p.etiqueta) + '</span>'
+          +   escP(por ? ' · ' + mayus(por) : ' · ' + p.texto) + '</span></div>';
       } else {
         c.innerHTML = '';
       }
