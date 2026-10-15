@@ -9,6 +9,10 @@ $token = $_SESSION['lf_token'];
 $cfgCaja = $cajaCfg ?? ['anticipo' => 'total', 'iva_inicio' => 'sin', 'iva_tasa' => '16'];
 $tasaIva = (string)$cfgCaja['iva_tasa'];
 $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
+// Qué productos tienen promoción hoy (sin las de código).
+$pc      = $promoCaja ?? ['promos' => [], 'productos' => [], 'todo' => []];
+$pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
+    return $pc['promos'][$id] ?? null; }, $pc['todo'])));
 ?>
 
 <?php if ($aviso): ?>
@@ -91,18 +95,34 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
       <?php endforeach; ?>
     </div>
 
+    <?php /* Las de toda la compra no van en cada tarjeta (serían todas):
+             se dicen una vez, arriba del catálogo. */ ?>
+    <?php foreach ($pcTodo as $p): ?>
+      <p class="lf-promo-hoy"><?= W::icono('pct', '15px') ?>
+        <span><b><?= P::e($p['nombre']) ?>:</b> <?= P::e($p['texto']) ?>.</span></p>
+    <?php endforeach; ?>
+
     <div class="lf-grid-serv">
       <p id="catVacio" <?= $servicios ? 'hidden' : '' ?>
          style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">
         No hay productos que coincidan.</p>
-      <?php foreach ($servicios as $s): ?>
-        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?>"
+      <?php foreach ($servicios as $s):
+        $susPromos = array_values(array_filter(array_map(function ($id) use ($pc) {
+            return $pc['promos'][$id] ?? null; }, $pc['productos'][(int)$s['id']] ?? [])));
+        $titulo = $s['nombre'];
+        foreach ($susPromos as $p) $titulo .= "\nPromoción: " . $p['nombre'] . ' (' . $p['texto'] . ')';
+      ?>
+        <button type="button" class="lf-serv<?= (float)$s['precio'] <= 0 ? ' sin-precio' : '' ?><?= $susPromos ? ' con-promo' : '' ?>"
                 data-id="<?= (int)$s['id'] ?>"
                 data-area="<?= (int)($s['categoria_id'] ?? 0) ?>"
                 data-b="<?= P::e(mb_strtolower($s['nombre'] . ' ' . $s['codigo'])) ?>"
                 data-nombre="<?= P::e($s['nombre']) ?>"
-                title="<?= P::e($s['nombre']) ?>"
+                title="<?= P::e($titulo) ?>"
                 data-precio="<?= (float)$s['precio'] ?>">
+          <?php if ($susPromos): ?>
+            <span class="lf-serv-promo"><?= P::e($susPromos[0]['etiqueta']) ?><?= count($susPromos) > 1
+                ? ' +' . (count($susPromos) - 1) : '' ?></span>
+          <?php endif; ?>
           <span class="e"<?= !empty($s['imagen'])
               ? ' style="background-image:url(\''.P::e($s['imagen']).'\');background-size:cover"' : '' ?>>
             <?= !empty($s['imagen']) ? '' : W::icono('serv','17px') ?></span>
@@ -207,6 +227,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     </div>
 
     <div id="lista"></div>
+    <div id="promoPistas" class="lf-promo-pistas" aria-live="polite" hidden></div>
     <p id="vacio" class="lf-ticket-vacio">
       Toca un producto para agregarlo.<small>Atajo: <kbd>/</kbd> para buscar y <kbd>Enter</kbd> para agregar.</small></p>
 
@@ -730,23 +751,124 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
   var HAY_PROMOS = <?= !empty($promos['hay']) ? 'true' : 'false' ?>;
   var promo = { quitadas: [], esperando: false, n: 0, t: null };
 
+  /* Qué productos tienen promoción (sin las de código) y lo necesario
+     para decir qué le falta al ticket. Lo arma Promociones::paraCaja. */
+  var PC = <?= json_encode($pc, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP) ?>;
+  var ICO_PROMO = <?= json_encode(W::icono('pct', '14px')) ?>;
+  var CARTA = {};   // id → nombre y precio de catálogo
+  document.querySelectorAll('.lf-serv').forEach(function(b){
+    CARTA[+b.dataset.id] = { nombre: b.dataset.nombre, precio: +b.dataset.precio };
+  });
+
   function escP(t){ var d = document.createElement('div'); d.textContent = t == null ? '' : t; return d.innerHTML; }
+  function mayus(t){ return t ? t.charAt(0).toUpperCase() + t.slice(1) : t; }
+  function yLista(a){ return a.length < 2 ? a.join('') : a.slice(0, -1).join(', ') + ' y ' + a[a.length - 1]; }
+
+  /* Las promociones de un producto, sin las que el cajero quitó. */
+  function promosDe(id){
+    return (PC.productos[id] || []).filter(function(pid){
+      return PC.promos[pid] && promo.quitadas.indexOf(+pid) === -1;
+    });
+  }
+
+  /* Qué le falta al ticket para que la promoción aplique; '' si nada.
+     Son las mismas reglas que Promociones::calcular(), dichas al revés. */
+  function falta(p, l){
+    if (l) {
+      var c = CARTA[l.id], lista = c ? c.precio : 0;
+      if (lista > 0 && Math.abs(l.precio - lista) > 0.005) return 'con el precio cambiado a mano no aplica';
+      if (l.precio <= 0) return 'se aplica al escribir el precio';
+      if (p.tipo === 'nxm' && l.cantidad < p.lleva) {
+        var n = p.lleva - l.cantidad;
+        return 'agrega ' + n + ' más para que aplique';
+      }
+    }
+    if (p.tipo === 'paquete') {
+      var faltan = [];
+      Object.keys(p.piezas).forEach(function(pid){
+        var y = lineas.filter(function(x){ return x.id === +pid; })[0];
+        var n = p.piezas[pid] - (y ? y.cantidad : 0);
+        if (n > 0) faltan.push((n > 1 ? n + ' × ' : '') + (CARTA[pid] ? CARTA[pid].nombre : 'un producto que no está en Caja'));
+      });
+      if (faltan.length) return 'falta agregar ' + yLista(faltan);
+    }
+    var bruto = totales().bruto;
+    if (p.minimo > 0 && bruto + 0.005 < p.minimo) return 'faltan ' + pesos(p.minimo - bruto) + ' para la compra mínima';
+    return '';
+  }
 
   function pintarPromos(){
     lineas.forEach(function(l, i){
       var c = document.querySelector('[data-promo-i="' + i + '"]');
       if (!c) return;
       if (l.promo) {
-        c.innerHTML = '<span class="lf-promo-tag"><b>−' + pesos(l.desc) + '</b>&nbsp;· ' + escP(l.promo.nombre) + '</span>'
+        c.innerHTML = '<span class="lf-promo-tag' + (l.nueva ? ' nueva' : '') + '"><b>−' + pesos(l.desc) + '</b>&nbsp;· ' + escP(l.promo.nombre) + '</span>'
           + '<button type="button" class="lf-promo-x" data-promo-quitar="' + l.promo.id + '"'
           + ' title="No aplicar esta promoción a este ticket">quitar</button>';
+        if (l.nueva) {
+          var fila = c.closest('.lf-linea');
+          if (fila) fila.classList.add('lf-promo-flash');
+          l.nueva = false;
+        }
       } else if (l.quitada) {
         c.innerHTML = '<span class="lf-promo-tag off">' + escP(l.quitada.nombre) + ' · quitada</span>'
           + '<button type="button" class="lf-promo-x" data-promo-volver="' + l.quitada.id + '">aplicar</button>';
+      } else if (promosDe(l.id).length) {
+        /* Tiene promoción y todavía no aplica: se dice cuál y qué falta,
+           para que el cajero se lo ofrezca al cliente. */
+        var p = PC.promos[promosDe(l.id)[0]];
+        var por = falta(p, l);
+        if (!por && !promo.esperando) por = 'no aplica en este ticket';
+        c.innerHTML = '<span class="lf-promo-tag disp" title="' + escP(p.texto) + '">' + ICO_PROMO
+          + '<b>' + escP(p.etiqueta) + '</b>&nbsp;· ' + escP(p.nombre) + '</span>'
+          + (por ? '<small class="lf-promo-falta">' + escP(mayus(por)) + '</small>' : '');
       } else {
         c.innerHTML = '';
       }
     });
+    pintarPistas();
+  }
+
+  /* Las de toda la compra que piden un mínimo: una sola vez, abajo de la
+     lista, no en cada renglón. */
+  function pintarPistas(){
+    var box = $('promoPistas');
+    if (!box) return;
+    var h = [];
+    if (lineas.length) PC.todo.forEach(function(pid){
+      var p = PC.promos[pid];
+      if (!p || promo.quitadas.indexOf(+pid) !== -1) return;
+      if (lineas.some(function(l){ return l.promo && l.promo.id === +pid; })) return;
+      var f = falta(p, null);
+      if (f) h.push('<p>' + ICO_PROMO + '<span><b>' + escP(p.nombre) + '</b> (' + escP(p.texto) + '): '
+                    + escP(f) + '.</span></p>');
+    });
+    box.innerHTML = h.join('');
+    box.hidden = !h.length;
+  }
+
+  /* Al agregar un producto con promoción, se avisa aunque el ticket
+     quede lejos (en el teléfono queda abajo del catálogo). */
+  function avisarPromo(id){
+    var ids = promosDe(id);
+    if (!ids.length) return;
+    var l = lineas.filter(function(x){ return x.id === id; })[0];
+    var p = PC.promos[ids[0]], f = falta(p, l);
+    var viejo = document.querySelector('.lf-promo-aviso');
+    if (viejo) viejo.remove();
+    var t = document.createElement('div');
+    t.className = 'lf-promo-aviso';
+    t.setAttribute('role', 'status');
+    t.innerHTML = '<span class="ico">' + ICO_PROMO + '</span><div class="txt">'
+      + '<b>' + escP(CARTA[id] ? CARTA[id].nombre : 'Este producto') + ' tiene promoción</b>'
+      + '<small><strong>' + escP(p.nombre) + ':</strong> ' + escP(p.texto) + '.</small>'
+      + '<small class="' + (f ? 'falta' : 'ok') + '">' + escP(f ? mayus(f) + '.' : 'Se aplica sola en el ticket.') + '</small>'
+      + (ids.length > 1 ? '<small>Y ' + (ids.length - 1) + ' promoción' + (ids.length > 2 ? 'es' : '') + ' más; se aplica la que más descuenta.</small>' : '')
+      + '</div><button type="button" class="x" aria-label="Cerrar">&times;</button>';
+    document.body.appendChild(t);
+    var fuera = function(){ t.classList.add('va'); setTimeout(function(){ t.remove(); }, 350); };
+    t.querySelector('.x').addEventListener('click', fuera);
+    setTimeout(fuera, 6500);
   }
 
   function mensajeCodigo(c){
@@ -779,6 +901,8 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
         .then(function(r){ return r.json(); })
         .then(function(d){
           if (n !== promo.n) return;          // ya se pidió otra más nueva
+          // Para saber cuáles se acaban de aplicar y hacerlas notar.
+          var antes = lineas.map(function(l){ return l.promo ? l.promo.id : 0; });
           sinPromos();
           if (d && d.ok) {
             d.lineas.forEach(function(r){
@@ -787,6 +911,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
               l.desc = +r.descuento || 0;
               l.promo = r.promo_id ? {id:r.promo_id, nombre:r.nombre} : null;
               l.quitada = r.quitada || null;
+              l.nueva = !!l.promo && l.promo.id !== antes[r.i];
             });
             mensajeCodigo(d.codigo);
           }
@@ -999,6 +1124,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
       if (y) y.cantidad++;
       else lineas.push({id:id, nombre:b.dataset.nombre, precio:+b.dataset.precio, cantidad:1});
       pintar();
+      if (!y) avisarPromo(id);
     });
   });
 

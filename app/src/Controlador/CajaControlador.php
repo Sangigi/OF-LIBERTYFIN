@@ -31,9 +31,13 @@ final class CajaControlador
         // no las usan no pagan una consulta por cada producto que se agrega.
         $vig = (new \LibertyFin\Servicio\Promociones($db))->vigentes();
         $conCodigo = array_filter($vig, function ($p) { return !empty($p['codigo']); });
+        $servicios = $cat->servicios($suc, '', '', 1500);
 
         Plantilla::pagina('caja/index', [
             'promos'    => ['hay' => (bool)$vig, 'codigos' => (bool)$conCodigo],
+            // Qué productos tienen promoción: la insignia de la tarjeta y el
+            // aviso al agregarlo, antes de que el cajero cobre sin saberlo.
+            'promoCaja' => \LibertyFin\Servicio\Promociones::paraCaja($vig, $servicios),
             // Cómo arranca cada venta: anticipo e IVA (Ajustes → Caja).
             'cajaCfg'   => (new \LibertyFin\Datos\ConfigRepo($db))->caja(),
             'titulo'    => 'Caja',
@@ -41,7 +45,7 @@ final class CajaControlador
             'subtitulo' => 'Venta nueva · ' . ($_SESSION['sucursal_nombre'] ?? 'Matriz'),
             // Se cargan TODOS: la categoría y la búsqueda filtran en el navegador,
             // sin recargar, para no perder el ticket que se va armando.
-            'servicios' => $cat->servicios($suc, '', '', 1500),
+            'servicios' => $servicios,
             'areas'     => $cat->areas(),
             'metodos'   => (new \LibertyFin\Datos\ConfigRepo($db))->metodosDisponibles(),
             // Quien va a HACER el trabajo: los COLABORADORES, agrupados

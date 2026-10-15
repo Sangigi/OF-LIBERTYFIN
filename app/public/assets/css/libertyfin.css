@@ -4224,3 +4224,55 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-conf-items li span:has(.lf-conf-pu){white-space:normal}
 .lf-conf-iva{display:flex;justify-content:space-between;padding:8px 0 0;font-size:12.5px;color:var(--lf-tinta-3)}
 .lf-conf-cambio{color:var(--lf-brand-2)}
+/* ══════════════════════════════════════════════════════
+   CAJA · AVISO DE PROMOCIÓN
+   La insignia de la tarjeta, la franja de las de toda la compra, el
+   aviso al agregar y la pista de lo que le falta al ticket.
+   ══════════════════════════════════════════════════════ */
+.lf-serv{position:relative}
+.lf-serv-promo{position:absolute;top:7px;left:7px;z-index:1;max-width:calc(100% - 14px);padding:2px 8px;
+  border-radius:999px;background:var(--lf-brand-d);color:#fff;font-family:var(--lf-mono);font-size:11px;
+  font-weight:800;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  box-shadow:0 2px 6px rgba(0,0,0,.18);pointer-events:none}
+.lf-serv.con-promo{border-color:var(--lf-brand-ring)}
+.lf-promo-hoy{display:flex;align-items:flex-start;gap:8px;margin:0 20px 12px;padding:9px 12px;
+  border-radius:var(--lf-r);background:var(--lf-brand-soft);color:var(--lf-tinta-2);font-size:12.5px;line-height:1.45}
+.lf-promo-hoy svg{flex:none;margin-top:1px;color:var(--lf-brand-2)}
+.lf-promo-hoy b{color:var(--lf-tinta)}
+@media(max-width:560px){ .lf-promo-hoy{margin:0 14px 12px} }
+/* En el renglón: disponible pero sin aplicar todavía. */
+.lf-promo-tag.disp{display:inline-flex;align-items:center;gap:5px;color:var(--lf-amb);
+  background:var(--lf-amb-soft);text-decoration:none}
+.lf-promo-tag.disp svg{flex:none}
+.lf-promo-falta,.lf-linea .lf-promo-falta{flex-basis:100%;font-size:11px;line-height:1.4;color:var(--lf-tinta-3)}
+.lf-promo-tag.nueva{animation:lf-promo-sale .5s var(--lf-rebote, ease) both}
+@keyframes lf-promo-sale{from{transform:scale(.7);opacity:0}}
+.lf-linea.lf-promo-flash{animation:lf-promo-flash 1.4s ease}
+@keyframes lf-promo-flash{0%,30%{background:var(--lf-brand-soft)}}
+/* Las de toda la compra con mínimo: abajo de la lista. */
+.lf-promo-pistas{margin:8px 20px 0;display:flex;flex-direction:column;gap:6px}
+.lf-promo-pistas p{display:flex;align-items:flex-start;gap:7px;margin:0;padding:8px 11px;border-radius:var(--lf-r);
+  background:var(--lf-amb-soft);color:var(--lf-tinta-2);font-size:12px;line-height:1.45}
+.lf-promo-pistas svg{flex:none;margin-top:2px;color:var(--lf-amb)}
+.lf-promo-pistas b{color:var(--lf-tinta)}
+/* El aviso al agregar. */
+.lf-promo-aviso{position:fixed;top:74px;right:16px;z-index:430;display:flex;align-items:flex-start;gap:11px;
+  width:340px;max-width:calc(100vw - 32px);padding:12px 12px 12px 14px;border:1px solid var(--lf-linea);
+  border-radius:16px;background:var(--lf-panel);color:var(--lf-tinta);box-shadow:var(--lf-s3);
+  animation:lf-promo-entra .4s var(--lf-rebote, ease) both}
+.lf-promo-aviso .ico{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
+  background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+.lf-promo-aviso .ico svg{width:19px;height:19px}
+.lf-promo-aviso .txt{flex:1;min-width:0}
+.lf-promo-aviso b{display:block;font-size:13px;font-weight:700;line-height:1.35}
+.lf-promo-aviso small{display:block;margin-top:3px;font-size:12px;line-height:1.45;color:var(--lf-tinta-3)}
+.lf-promo-aviso small strong{color:var(--lf-tinta-2);font-weight:600}
+.lf-promo-aviso small.ok{color:var(--lf-brand-2);font-weight:600}
+.lf-promo-aviso small.falta{color:var(--lf-amb);font-weight:600}
+.lf-promo-aviso .x{flex:none;border:0;background:none;font-size:18px;line-height:1;color:var(--lf-tinta-4);cursor:pointer;padding:2px 4px}
+.lf-promo-aviso.va{opacity:0;transform:translateX(24px);transition:opacity .3s,transform .3s}
+@keyframes lf-promo-entra{from{opacity:0;transform:translateX(28px) scale(.96)}}
+@media(max-width:940px){ .lf-promo-aviso{top:64px;right:8px;left:8px;width:auto;max-width:none} }
+@media(prefers-reduced-motion:reduce){
+  .lf-promo-aviso,.lf-promo-tag.nueva,.lf-linea.lf-promo-flash{animation:none}
+}

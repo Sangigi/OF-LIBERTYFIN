@@ -647,6 +647,93 @@ final class Promociones
         $this->db->prepare("DELETE FROM lf_promociones WHERE id = ?")->execute([(int)$id]);
     }
 
+    /**
+     * Lo que Caja enseña ANTES de cobrar: qué productos tienen promoción
+     * (la insignia de la tarjeta y el aviso al agregarlo) y lo necesario
+     * para decir "te falta poco" (paquetes, lleva-paga, compra mínima).
+     *
+     * Las de CÓDIGO no salen: son para quien trae el código, y anunciarlas
+     * en la tarjeta las regalaría a todos.
+     *
+     * @param array $vigentes   las de vigentes(), con objetivos
+     * @param array $productos  los de Caja: id y categoria_id
+     * @return array ['promos' => {id: {...}}, 'productos' => {producto: [ids]}, 'todo' => [ids]]
+     */
+    public static function paraCaja(array $vigentes, array $productos)
+    {
+        $porArea = [];
+        foreach ($productos as $p) $porArea[(int)($p['categoria_id'] ?? 0)][] = (int)$p['id'];
+        $out = ['promos' => [], 'productos' => [], 'todo' => []];
+        foreach ($vigentes as $p) {
+            if (self::normalizarCodigo($p['codigo'] ?? '') !== '') continue;
+            $id = (int)$p['id'];
+            $ids = []; $piezas = [];
+            foreach ($p['objetivos'] ?? [] as $o) {
+                if ($o['tipo'] === 'producto') {
+                    $ids[] = (int)$o['ref_id'];
+                    $piezas[(string)(int)$o['ref_id']] = max(1, (int)$o['cantidad']);
+                } else {
+                    foreach ($porArea[(int)$o['ref_id']] ?? [] as $pid) $ids[] = $pid;
+                }
+            }
+            // "10% de descuento en compras desde $5,000.00 (hasta el 31/10)"
+            $texto = self::describir($p);
+            $minimo = (float)$p['minimo'] > 0 ? Dinero::pesos($p['minimo']) : '';
+            $cond = [];
+            if ($p['alcance'] === 'todo') {
+                $texto = str_replace(' en la compra', '', $texto)
+                       . ($minimo ? ' en compras desde ' . $minimo : ' en toda la compra');
+            } elseif ($minimo) {
+                $cond[] = 'compra mínima de ' . $minimo;
+            }
+            if (!empty($p['dias']))  $cond[] = 'solo ' . self::diasTexto($p['dias']);
+            if (!empty($p['hasta'])) $cond[] = 'hasta el ' . date('d/m', strtotime($p['hasta']));
+            $out['promos'][(string)$id] = [
+                'nombre'   => $p['nombre'],
+                'tipo'     => $p['tipo'],
+                'alcance'  => $p['alcance'],
+                'etiqueta' => self::etiqueta($p),
+                'texto'    => $texto . ($cond ? ' (' . implode(', ', $cond) . ')' : ''),
+                'valor'    => (float)$p['valor'],
+                'lleva'    => (int)$p['lleva'],
+                'paga'     => (int)$p['paga'],
+                'minimo'   => (float)$p['minimo'],
+                'piezas'   => $p['tipo'] === 'paquete' ? $piezas : [],
+            ];
+            if ($p['alcance'] === 'todo') { $out['todo'][] = $id; continue; }
+            foreach (array_unique($ids) as $pid) $out['productos'][$pid][] = $id;
+        }
+        // Los paquetes al final: la insignia y el aviso dicen primero la que
+        // aplica con ese producto solo; un paquete depende de otros.
+        foreach ($out['productos'] as &$ids) {
+            $sueltas = $paquetes = [];
+            foreach ($ids as $pid) {
+                if ($out['promos'][(string)$pid]['tipo'] === 'paquete') $paquetes[] = $pid; else $sueltas[] = $pid;
+            }
+            $ids = array_merge($sueltas, $paquetes);
+        }
+        unset($ids);
+        // Las llaves son ids (desde 1): en el JSON salen como objeto, que es
+        // lo que Caja lee. Vacío sale `[]`, y buscar en él tampoco falla.
+        return $out;
+    }
+
+    /** La insignia corta de la tarjeta: "−20%", "−$500", "A $6,500", "3×2", "Paquete". */
+    public static function etiqueta(array $p)
+    {
+        $v = (float)$p['valor'];
+        $num = function ($x) { return rtrim(rtrim(number_format($x, 2, '.', ''), '0'), '.'); };
+        $corto = function ($x) { return '$' . number_format($x, (floor($x) == $x) ? 0 : 2); };
+        switch ($p['tipo']) {
+            case 'porcentaje': return '−' . $num($v) . '%';
+            case 'monto':      return '−' . $corto($v);
+            case 'precio':     return 'A ' . $corto($v);
+            case 'nxm':        return (int)$p['lleva'] . '×' . (int)$p['paga'];
+            case 'paquete':    return 'Paquete';
+        }
+        return 'Promo';
+    }
+
     /** Cómo se lee una promoción en una línea: "20% en Declaración anual". */
     public static function describir(array $p)
     {
