@@ -555,7 +555,6 @@ final class FacturacionControlador
 
         $this->aviso(
             'Complemento de pago emitido (parcialidad ' . $parcialidad . '). '
-            . 'UUID: ' . ($d['uuid'] ?? 'pendiente') . '. '
             . 'Saldo restante: ' . number_format($saldoDespues, 2) . '.',
             'ok'
         );
