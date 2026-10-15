@@ -209,6 +209,8 @@ if (\LibertyFin\Servicio\Integraciones::activa('facturapi')) {
 if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
     $r->get('/recargas',          ['LibertyFin\Controlador\RecargasControlador', 'index']);
     $r->get('/recargas/saldo',    ['LibertyFin\Controlador\RecargasControlador', 'saldo']);
+    $r->get('/recargas/productos',['LibertyFin\Controlador\RecargasControlador', 'productos']);
+    $r->post('/recargas/ocultos', ['LibertyFin\Controlador\RecargasControlador', 'mostrarOcultos']);
     $r->post('/recargas/catalogo',['LibertyFin\Controlador\RecargasControlador', 'sincronizar']);
     $r->post('/recargas/vender',  ['LibertyFin\Controlador\RecargasControlador', 'vender']);
 }
@@ -396,6 +398,8 @@ $permisos = [
   '/recargas'               => 'ver.recargas',
   '/recargas/saldo'         => 'ver.recargas',
   '/recargas/catalogo'      => 'ver.recargas',
+  '/recargas/productos'     => 'ver.recargas',
+  '/recargas/ocultos'       => 'editar.ajustes',
   '/recargas/vender'        => 'vender.recarga',
   '/ayuda'                  => 'abrir.ticket',
   '/ayuda/crear'            => 'abrir.ticket',

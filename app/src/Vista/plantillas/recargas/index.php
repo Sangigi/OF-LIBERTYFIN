@@ -123,32 +123,6 @@ $total = (int)($totalCatalogo ?? count($productos));
         <p class="lf-rc-vacio">El catálogo está vacío.</p>
       <?php endif; ?>
       <?php P::parcial('recargas/tarjetas', ['productos' => $productos]); ?>
-      <?php if (false): foreach ($productos as $p):
-        $variable = (float)$p['monto'] <= 0;
-        $img = trim((string)($p['imagen'] ?? ''));
-        $tieneImg = $img !== '' && strtoupper($img) !== 'NA' && preg_match('#^https?://#i', $img); ?>
-        <button type="button" class="lf-serv lf-rc<?= $variable ? ' sin-precio' : '' ?>"
-                data-id="<?= P::e($p['producto_id']) ?>"
-                data-cat="<?= P::e($p['categoria']) ?>"
-                data-b="<?= P::e(mb_strtolower($p['nombre'] . ' ' . $p['carrier'] . ' ' . $p['categoria'])) ?>"
-                data-n="<?= P::e($p['nombre']) ?>"
-                data-monto="<?= (float)$p['monto'] ?>"
-                data-min="<?= (float)$p['monto_min'] ?>"
-                data-max="<?= (float)$p['monto_max'] ?>"
-                data-com="<?= (float)$p['comision'] ?>"
-                data-img="<?= $tieneImg ? P::e($img) : '' ?>"
-                title="<?= P::e($p['nombre'] . ' · ID ' . $p['producto_id']) ?>">
-          <?php if ($tieneImg): ?>
-            <span class="e foto"><img src="<?= P::e($img) ?>" alt="" loading="lazy"
-                  onerror="this.parentNode.classList.remove('foto');this.parentNode.innerHTML=<?= P::e(json_encode(W::icono('bolsa', '17px'))) ?>"></span>
-          <?php else: ?>
-            <span class="e"><?= W::icono('bolsa','17px') ?></span>
-          <?php endif; ?>
-          <b><?= P::e($p['nombre']) ?></b>
-          <small><?= P::e($p['carrier'] ?: $p['categoria']) ?></small>
-          <span class="p"><?= $variable ? 'Monto variable' : D::pesos($p['monto']) ?></span>
-        </button>
-      <?php endforeach; endif; ?>
     </div>
   </section>
 
@@ -257,36 +231,42 @@ $total = (int)($totalCatalogo ?? count($productos));
 (function(){
   var $ = function (id) { return document.getElementById(id); };
   var TOKEN = <?= json_encode($token) ?>;
-  var POR_PAG = 18;
-  var sel = null, cat = '', q = '', pag = 1, visibles = [];
+  var sel = null, cat = '', q = '', pag = 1, paginas = <?= (int)$paginasIni ?>, pedido = 0, temporizador = null;
 
-  /* ── El catálogo: categoría y búsqueda en el navegador, como en Caja ── */
+  /* ── El catálogo: búsqueda, categoría y páginas se piden al servidor ──
+     Así se consulta la base completa, sea del tamaño que sea. */
   function tarjetas() { return [].slice.call(document.querySelectorAll('#rcGrid .lf-rc')); }
-  function filtrar() {
-    /* Por palabras: «telcel 100» encuentra «Recarga Telcel $100». El ID, completo. */
-    var palabras = q === '' ? [] : q.split(/\s+/);
-    visibles = tarjetas().filter(function (t) {
-      if (cat !== '' && t.dataset.cat !== cat) return false;
-      if (!palabras.length || t.dataset.id === q) return true;
-      return palabras.every(function (w) { return t.dataset.b.indexOf(w) !== -1; });
-    });
-    pag = 1; pintar();
+  function pintarPag() {
+    $('rcPag').hidden = paginas <= 1;
+    $('rcPagN').textContent = pag; $('rcPagT').textContent = paginas;
+    $('rcAnt').disabled = pag <= 1; $('rcSig').disabled = pag >= paginas;
   }
-  function pintar() {
-    var total = Math.max(1, Math.ceil(visibles.length / POR_PAG));
-    if (pag > total) pag = total;
-    tarjetas().forEach(function (t) { t.style.display = 'none'; });
-    visibles.slice((pag - 1) * POR_PAG, pag * POR_PAG).forEach(function (t) { t.style.display = ''; });
-    var vacio = $('rcVacio'); if (vacio) vacio.hidden = visibles.length > 0 || !tarjetas().length;
-    $('rcPag').hidden = total <= 1;
-    $('rcPagN').textContent = pag; $('rcPagT').textContent = total;
-    $('rcAnt').disabled = pag === 1; $('rcSig').disabled = pag === total;
+  function cargar() {
+    var mio = ++pedido;
+    var url = '/recargas/productos?p=' + pag + '&cat=' + encodeURIComponent(cat) + '&q=' + encodeURIComponent(q);
+    $('rcGrid').style.opacity = '.55';
+    fetch(url, {credentials: 'same-origin', headers: {'X-LF-Json': '1'}})
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        if (mio !== pedido || !j.ok) return;
+        $('rcGrid').innerHTML = j.html.trim() !== '' ? j.html
+          : '<p class="lf-rc-vacio" style="grid-column:1/-1;text-align:center;color:var(--lf-tinta-4);padding:30px;font-size:13px">Ningún producto coincide.</p>';
+        pag = j.pagina; paginas = j.paginas; pintarPag();
+        /* Si el producto elegido sigue en esta página, se conserva marcado. */
+        if (sel) tarjetas().forEach(function (t) { if (t.dataset.id === sel.dataset.id) t.classList.add('on'); });
+      })
+      .catch(function () { /* se queda lo que había */ })
+      .then(function () { if (mio === pedido) $('rcGrid').style.opacity = ''; });
   }
-  $('rcAnt').addEventListener('click', function () { if (pag > 1) { pag--; pintar(); } });
-  $('rcSig').addEventListener('click', function () { if (pag < Math.ceil(visibles.length / POR_PAG)) { pag++; pintar(); } });
-  $('rcBuscar').addEventListener('input', function () { q = this.value.trim().toLowerCase(); filtrar(); });
+  function filtrar() { pag = 1; cargar(); }
+  $('rcAnt').addEventListener('click', function () { if (pag > 1) { pag--; cargar(); } });
+  $('rcSig').addEventListener('click', function () { if (pag < paginas) { pag++; cargar(); } });
+  $('rcBuscar').addEventListener('input', function () {
+    q = this.value.trim();
+    clearTimeout(temporizador); temporizador = setTimeout(filtrar, 250);
+  });
   $('rcBuscar').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); if (visibles[(pag - 1) * POR_PAG]) elegir(visibles[(pag - 1) * POR_PAG]); }
+    if (e.key === 'Enter') { e.preventDefault(); var t = tarjetas()[0]; if (t) elegir(t); }
     if (e.key === 'Escape') { this.value = ''; q = ''; filtrar(); }
   });
   var cats = $('rcCats');
@@ -364,17 +344,11 @@ $total = (int)($totalCatalogo ?? count($productos));
     .then(function (j) {
       if (!j.ok) return;
       $('rcActualizado').textContent = 'recién actualizado · se actualiza solo';
-      if (sel) return;
-      return fetch('/recargas', {credentials: 'same-origin', headers: {'X-LF-Parcial': '1'}})
-        .then(function (r) { return r.text(); })
-        .then(function (html) {
-          var doc = new DOMParser().parseFromString(html, 'text/html'), g = doc.getElementById('rcGrid');
-          if (g && !sel) { $('rcGrid').innerHTML = g.innerHTML; filtrar(); }
-        });
+      if (!sel) cargar();
     })
     .catch(function () { /* se intentará la próxima vez */ });
   <?php endif; ?>
 
-  filtrar();
+  pintarPag();
 })();
 </script>
