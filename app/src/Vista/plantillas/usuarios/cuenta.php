@@ -1275,6 +1275,11 @@ $grupos = [
               <span>·</span><span><?= round($doc['tamano_bytes']/1024) ?> KB</span>
             <?php endif; ?>
           </div>
+        <?php else: ?>
+          <?php /* Misma altura que con archivo: al subir, la tarjeta no crece
+                   y no desacomoda las demás de la fila. */ ?>
+          <div style="display:flex;align-items:center;gap:9px;font-size:11.5px;
+               color:var(--lf-tinta-4);margin-bottom:12px">Sin archivo todavía</div>
         <?php endif; ?>
 
         <?php if ($est !== 'aprobado'): ?>
@@ -1312,16 +1317,22 @@ $grupos = [
     var txt = btn.textContent;
     btn.disabled = true; btn.textContent = 'Subiendo…';
 
+    /* El aviso flota fuera de la rejilla: meterlo dentro de la tarjeta la
+       hacía crecer y desacomodaba toda la fila. */
     function msj(t, ok) {
-      var p = f.querySelector('.lf-msj-doc');
-      if (!p) {
-        p = document.createElement('p');
-        p.className = 'lf-msj-doc';
-        p.style.cssText = 'font-size:11.5px;margin:8px 0 0;line-height:1.45';
-        f.appendChild(p);
+      var a = document.getElementById('lfAvisoDoc');
+      if (!a) {
+        a = document.createElement('div');
+        a.id = 'lfAvisoDoc'; a.setAttribute('role', 'status');
+        a.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);'
+          + 'z-index:500;max-width:min(92vw,460px);padding:12px 18px;border-radius:14px;'
+          + 'font-size:13px;line-height:1.45;font-weight:600;color:#fff;'
+          + 'box-shadow:0 12px 32px rgba(0,0,0,.18)';
+        document.body.appendChild(a);
       }
-      p.style.color = ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)';
-      p.textContent = t;
+      a.style.background = ok ? 'var(--lf-brand-2)' : 'var(--lf-rojo)';
+      a.textContent = t; a.hidden = false;
+      clearTimeout(a._t); a._t = setTimeout(function () { a.hidden = true; }, 6000);
     }
 
     fetch(f.action, { method: 'POST', body: new FormData(f), credentials: 'same-origin',
@@ -1338,10 +1349,7 @@ $grupos = [
             if (nueva) tarjeta.replaceWith(nueva);
             var r0 = document.getElementById('resumenDocs'), r1 = doc.getElementById('resumenDocs');
             if (r0 && r1) r0.replaceWith(r1);
-            var n = document.querySelector('.lf-doc[data-doc="' + tarjeta.dataset.doc + '"] form');
-            if (n) { var p = document.createElement('p');
-              p.style.cssText = 'font-size:11.5px;margin:8px 0 0;color:var(--lf-brand-2)';
-              p.textContent = j.texto; n.appendChild(p); }
+            msj(j.texto || 'Documento subido.', true);
           });
       })
       .catch(function () {
