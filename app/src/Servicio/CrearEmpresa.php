@@ -31,7 +31,7 @@ final class CrearEmpresa
     /** Los giros que se ofrecen en el registro. «Otro» deja escribirlo. */
     const GIROS = [
         'Contabilidad y fiscal', 'Despacho legal', 'Marketing y publicidad', 'Consultoría',
-        'Salud y bienestar', 'Belleza y estética', 'Educación y cursos',
+        'Salud y bienestar', 'Belleza y estética',
         'Tienda o comercio', 'Restaurante o alimentos', 'Otro',
     ];
 

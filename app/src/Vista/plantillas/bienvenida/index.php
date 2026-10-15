@@ -29,7 +29,6 @@ $ilu = [
   'maletin'  => '<rect x="3" y="7" width="18" height="13" rx="2.5"/><path d="M8.5 7V5.5A2 2 0 0 1 10.5 3.5h3a2 2 0 0 1 2 2V7"/><path d="M3 13h18"/><path d="M11 13v2h2v-2"/>',
   'tijeras'  => '<circle cx="6" cy="6.5" r="3"/><circle cx="6" cy="17.5" r="3"/><path d="M20 4 8.3 15.4"/><path d="M14.5 13.2 20 20"/><path d="M8.3 8.6 11.5 11.6"/>',
   'tienda'   => '<path d="M4 10v10h16V10"/><path d="M2.5 10 4.5 4h15l2 6"/><path d="M2.5 10a3.2 3.2 0 0 0 6.3 0 3.2 3.2 0 0 0 6.4 0 3.2 3.2 0 0 0 6.3 0"/><path d="M10 20v-5h4v5"/>',
-  'birrete'  => '<path d="M22 9.5 12 4.5 2 9.5l10 5 10-5Z"/><path d="M6 11.5v5c3.5 2.5 8.5 2.5 12 0v-5"/><path d="M22 9.5v6"/>',
   'estrella' => '<path d="M12 3.5 14.6 9l6 .7-4.5 4.1 1.2 5.9L12 16.8l-5.3 2.9 1.2-5.9L3.4 9.7l6-.7Z"/>',
   'cubiertos'=> '<path d="M7 3v18"/><path d="M4 3v5.5a3 3 0 0 0 6 0V3"/><path d="M17.5 21V3c-2.5 1-4 3.6-4 7.5V14h4"/>',
   'cama'     => '<path d="M2.5 19V6"/><path d="M2.5 15h19v4"/><path d="M21.5 19v-5a4 4 0 0 0-4-4h-7v5"/><circle cx="6.5" cy="11.5" r="2"/>',

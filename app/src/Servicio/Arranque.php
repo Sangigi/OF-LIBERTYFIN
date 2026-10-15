@@ -49,9 +49,7 @@ final class Arranque
         'tienda'      => ['nombre' => 'Tienda o comercio', 'ejemplo' => 'Abarrotes, ropa, papelería, refacciones',
                           'ilu' => 'tienda', 'vende' => 'productos', 'cobro' => 'completo', 'iva' => '16', 'comisiones' => 'no',
                           'areas' => ['General']],
-        'educacion'   => ['nombre' => 'Educación y cursos', 'ejemplo' => 'Escuelas, academias, talleres',
-                          'ilu' => 'birrete', 'vende' => 'servicios', 'cobro' => 'anticipo', 'iva' => 'sin', 'comisiones' => 'no',
-                          'areas' => ['Inscripciones', 'Colegiaturas', 'Cursos']],
+        // Sin educación: escuelas y academias no son mercado de Libertyfin.
         'otro'        => ['nombre' => 'Otro giro', 'ejemplo' => 'Lo ajustamos con tus respuestas',
                           'ilu' => 'estrella', 'vende' => 'servicios', 'cobro' => 'completo', 'iva' => 'sin', 'comisiones' => 'no',
                           'areas' => []],
@@ -72,7 +70,7 @@ final class Arranque
         'Contabilidad y fiscal' => 'profesional', 'Despacho legal' => 'profesional',
         'Marketing y publicidad' => 'profesional', 'Consultoría' => 'profesional',
         'Salud y bienestar' => 'belleza', 'Belleza y estética' => 'belleza',
-        'Educación y cursos' => 'educacion', 'Tienda o comercio' => 'tienda',
+        'Tienda o comercio' => 'tienda',
     ];
 
     private $db;
