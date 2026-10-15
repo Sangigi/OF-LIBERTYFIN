@@ -84,14 +84,15 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
   <div style="padding:0 20px 18px">
     <p style="font-size:12.5px;color:var(--lf-tinta-3);line-height:1.6;margin-bottom:14px">
       Entra al portal de Emida, abre su <b>Catálogo de Servicios</b>, selecciona la
-      tabla completa y pégala aquí. Entiende las columnas tal como salen, y junta
-      los nombres que la tabla parte en dos renglones.
+      tabla completa y pégala aquí. Entiende las columnas tal como salen, junta
+      los nombres que la tabla parte en dos renglones, y toma la URL de la imagen
+      si viene incluida.
     </p>
     <form method="post" action="/recargas/pegar">
       <input type="hidden" name="token" value="<?= P::e($token) ?>">
       <textarea class="form-control lf-mono" name="pegado" rows="7"
                 style="font-size:11.5px;line-height:1.5"
-                placeholder="5077200&#9;Recarga Telcel $200&#9;RECARGAS&#9;Telcel&#9;-&#9;$200.00&#9;-&#9;-&#9;Venta Directa"></textarea>
+                placeholder="5077200&#9;Recarga Telcel $200&#9;RECARGAS&#9;Telcel&#9;-&#9;$200.00&#9;-&#9;-&#9;Venta Directa&#9;https://.../telcel.png"></textarea>
       <div style="display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap">
         <button class="btn btn-primary" type="submit">Cargar</button>
         <span style="font-size:11.5px;color:var(--lf-tinta-4);line-height:1.5">
@@ -148,14 +149,22 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
                   font-size:13px;padding:30px">Ningún producto coincide.</p>
       <?php endif; ?>
       <?php foreach ($productos as $p):
-        $variable = (float)$p['monto'] <= 0; ?>
+        $variable = (float)$p['monto'] <= 0;
+        $img = trim((string)($p['imagen'] ?? ''));
+        $tieneImg = $img !== '' && strtoupper($img) !== 'NA'; ?>
         <button type="button" class="lf-prod<?= $variable ? ' var' : '' ?>"
                 data-id="<?= P::e($p['producto_id']) ?>"
                 data-n="<?= P::e($p['nombre']) ?>"
                 data-monto="<?= (float)$p['monto'] ?>"
                 data-min="<?= (float)$p['monto_min'] ?>"
                 data-max="<?= (float)$p['monto_max'] ?>"
-                data-com="<?= (float)$p['comision'] ?>">
+                data-com="<?= (float)$p['comision'] ?>"
+                data-img="<?= $tieneImg ? P::e($img) : '' ?>">
+          <?php if ($tieneImg): ?>
+            <img src="<?= P::e($img) ?>" alt="" loading="lazy"
+                 style="height:34px;max-width:100%;object-fit:contain;margin-bottom:6px"
+                 onerror="this.style.display='none'">
+          <?php endif; ?>
           <b><?= P::e($p['nombre']) ?></b>
           <small><?= P::e($p['carrier'] ?: $p['categoria']) ?></small>
           <span class="m"><?= $variable ? 'Monto variable' : D::pesos($p['monto']) ?></span>
@@ -187,6 +196,9 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
         <div id="conProd" hidden>
           <div style="padding:13px 15px;border-radius:var(--lf-r);background:var(--lf-brand-soft);
                margin-bottom:16px">
+            <img id="prodImg" src="" alt="" hidden
+                 style="height:40px;max-width:100%;object-fit:contain;margin-bottom:8px"
+                 onerror="this.hidden=true">
             <b id="prodNombre" style="display:block;font-size:13.5px;color:var(--lf-brand-2);
                line-height:1.4"></b>
             <small id="prodId2" style="font-size:11px;color:var(--lf-tinta-4);
@@ -315,12 +327,20 @@ $qs = function ($c = []) use ($q, $cat, $carrier) {
     document.getElementById('prodNombre').textContent = b.dataset.n;
     document.getElementById('prodId2').textContent = 'ID ' + b.dataset.id
       + (parseFloat(b.dataset.com) > 0 ? ' · comisión $' + b.dataset.com : '');
+
+    // La imagen del producto elegido, si tiene.
+    var img = document.getElementById('prodImg');
+    if (b.dataset.img) {
+      img.src = b.dataset.img;
+      img.hidden = false;
+    } else {
+      img.hidden = true;
+      img.removeAttribute('src');
+    }
+
     document.getElementById('sinProd').hidden = true;
     document.getElementById('conProd').hidden = false;
 
-    // El monto solo se pide cuando el producto NO lo trae fijo. Pedirlo
-    // siempre invita a escribir uno distinto al del producto, que es lo
-    // que Emida rechaza con el código 51.
     var variable = parseFloat(b.dataset.monto) <= 0;
     var campo = document.getElementById('campoMonto'), m = document.getElementById('monto');
     campo.hidden = !variable;

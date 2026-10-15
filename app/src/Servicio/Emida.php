@@ -1,6 +1,8 @@
 <?php
 namespace LibertyFin\Servicio;
 
+use LibertyFin\Datos\EmidaRepo;
+
 /**
  * Recargas telefónicas · Emida.
  *
@@ -18,6 +20,13 @@ namespace LibertyFin\Servicio;
  *  · `verify_peer => false`. Eso convierte HTTPS en decoración: cualquiera
  *    en medio puede presentar su propio certificado. Aquí se verifica, y
  *    si el certificado falla la recarga no sale.
+ *
+ * SOBRE LA IMAGEN DEL PRODUCTO
+ *
+ * Emida manda la URL de la imagen dentro de <Reference1><URLImage>, no
+ * como un campo del producto. Puede venir como "NA" cuando no hay. Aquí
+ * se extrae y se normaliza (Dropbox con ?dl=0 no sirve dentro de un
+ * <img>; se convierte a ?raw=1 en EmidaRepo::normalizarImagen).
  */
 final class Emida
 {
@@ -81,10 +90,6 @@ final class Emida
         $metodo = strtoupper($forzarMetodo ?: 'POST');
         $seg    = max(5, (int)($this->cfg['timeout'] ?? 30));
 
-        // ── LOG DE SALIDA · qué se manda ──
-        // Sin esto no se puede saber si el terminalId que sale es el
-        // de la config o si algún fallback lo está pisando. Aparece en
-        // el error_log de PHP, buscable por "proxy ".
         error_log('[LibertyFin] proxy ' . $script . ' → '
             . json_encode($params, JSON_UNESCAPED_UNICODE));
 
@@ -99,9 +104,6 @@ final class Emida
                 CURLOPT_USERAGENT      => 'LibertyFin/1.0',
             ];
             if ($metodo === 'POST') {
-                // JSON, no form-encoded. pinDistSale.php hace
-                // json_decode(file_get_contents('php://input')) y con
-                // form-encoded contesta "Datos no válidos".
                 $opts[CURLOPT_URL]        = $url;
                 $opts[CURLOPT_POST]       = true;
                 $opts[CURLOPT_POSTFIELDS] = json_encode($params, JSON_UNESCAPED_UNICODE);
@@ -119,15 +121,9 @@ final class Emida
 
         list($cuerpo, $codigo, $error) = $intenta($metodo);
 
-        // ── LOG DE ENTRADA · qué respondió ──
-        // Si el intermediario rechaza la petición, aquí se ve el JSON
-        // exacto que devolvió. Si la mandó a Emida, aquí se ve el XML
-        // (o el JSON con los códigos) que devolvió el proveedor. En
-        // ambos casos es lo que hay que mirar cuando algo falla.
         error_log('[LibertyFin] proxy ' . $script . ' ← '
             . mb_substr(is_string($cuerpo) ? $cuerpo : json_encode($cuerpo), 0, 800));
 
-        // Si el script rechaza el método, se prueba el otro.
         if (is_string($cuerpo) && $cuerpo !== '') {
             $j = json_decode($cuerpo, true);
             if (is_array($j) && !empty($j['message'])
@@ -147,14 +143,11 @@ final class Emida
 
         $j = json_decode($cuerpo, true);
 
-        // No es JSON. Probablemente HTML de debug, como get_products.php.
         if ($j === null) {
             return ['ok' => true, 'datos' => $cuerpo, 'crudo' => $cuerpo];
         }
 
         if (is_array($j) && isset($j['success']) && $j['success'] === false) {
-            // ¿Trae códigos de Emida? Entonces la transacción SÍ llegó
-            // al proveedor y el llamador tiene que interpretarla.
             $tieneCodigos = false;
             foreach (['responseCode','ResponseCode','h2hResultCode','H2HResultCode'] as $c) {
                 if (!empty($j[$c])) { $tieneCodigos = true; break; }
@@ -166,12 +159,9 @@ final class Emida
             }
 
             if ($tieneCodigos) {
-                // No es pre-flight. Se deja pasar tal cual.
                 return ['ok' => true, 'datos' => $j, 'crudo' => $cuerpo];
             }
 
-            // Pre-flight del intermediario. La transacción NO llegó a
-            // Emida. Se busca el mensaje en varios campos posibles.
             $msj = null;
             foreach (['message','mensaje','error','errorMessage','msg'] as $k) {
                 if (!empty($j[$k]) && is_string($j[$k])) { $msj = $j[$k]; break; }
@@ -606,6 +596,30 @@ final class Emida
         return [];
     }
 
+    /**
+     * Saca la URL de la imagen del producto.
+     *
+     * En el XML de Emida la imagen vive dentro de ReferenceParameters →
+     * Reference1 → URLImage. También puede aparecer como "NA" cuando no
+     * hay. Se busca en varias formas porque el proveedor cambia de
+     * mayúsculas según el endpoint (URLImage vs urlImage), y a veces la
+     * manda como campo propio del producto.
+     */
+    private static function imagenDe(array $p)
+    {
+        if (isset($p['ReferenceParameters']['Reference1']['URLImage'])) {
+            return (string)$p['ReferenceParameters']['Reference1']['URLImage'];
+        }
+        foreach ([
+            'URLImage', 'urlImage', 'Urlimage', 'Image', 'image',
+            'UrlImagen', 'urlImagen', 'Imagen', 'imagen',
+        ] as $k) {
+            if (isset($p[$k]) && !is_array($p[$k])) return (string)$p[$k];
+        }
+        $encontrado = self::buscar($p, ['URLImage', 'urlImage', 'Image', 'image']);
+        return $encontrado === null ? '' : (string)$encontrado;
+    }
+
     private static function normalizar($datos)
     {
         $lista = [];
@@ -631,6 +645,8 @@ final class Emida
                 else $tipo = (self::num($min) > 0 || self::num($max) > 0 || self::num($monto) <= 0)
                              ? 'consulta' : 'directa';
 
+                $imagen = EmidaRepo::normalizarImagen(self::imagenDe($p));
+
                 $lista[] = [
                     'producto_id' => (string)$id,
                     'nombre'      => (string)self::campo($p, ['ProductName','productName','nombre','Description','Name']),
@@ -641,6 +657,7 @@ final class Emida
                     'monto_min'   => self::num($min),
                     'monto_max'   => self::num($max),
                     'tipo'        => $tipo,
+                    'imagen'      => $imagen,
                 ];
             }
         }
@@ -724,12 +741,6 @@ final class Emida
      *   invoiceNo       → salesId (nuestro identificador de duplicados;
      *                     el script lo llama "invoiceNo", no "salesId")
      *   tipo_operacion  → "recarga"
-     *
-     * El processor del intermediario solo usa terminalId y clerkId para
-     * autenticarse contra Emida (mira EmidaTransactionProcessor.php:
-     * no recibe usuario ni contraseña). Por eso los cambios de
-     * `usuario`/`clave`/`merchant_id` en la config no mueven nada en el
-     * camino de venta.
      */
     public function recargar($numero, $productoId, $monto, $salesId)
     {

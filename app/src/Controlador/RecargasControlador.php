@@ -20,10 +20,6 @@ use LibertyFin\Vista\Plantilla;
  *      mandar otra cosa da el código 51.
  *   2. Se envía al proveedor.
  *   3. Y solo si sale, se registra el cobro.
- *
- * Cobrar primero parece más natural —el cliente ya te dio el dinero—
- * pero deja el caso donde la recarga falla y hay que devolver efectivo
- * de una caja que ya cuadró. Al revés, lo peor que pasa es no vender.
  */
 final class RecargasControlador
 {
@@ -69,13 +65,6 @@ final class RecargasControlador
               $_SESSION['lf_prueba_emida'], $_SESSION['lf_pegar']);
     }
 
-    /**
-     * Baja el catálogo del proveedor y lo guarda.
-     *
-     * Son más de mil productos: pedirlos en cada carga de la pantalla la
-     * haría tardar segundos y no vendería nada si el proveedor no
-     * contesta. Se baja a mano, cuando alguien lo pide.
-     */
     public function sincronizar()
     {
         if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
@@ -86,8 +75,6 @@ final class RecargasControlador
         ob_end_clean();
 
         if (!$r['ok']) {
-            // Si el intermediario no tiene el script, se dice qué hacer
-            // mientras tanto en vez de dejarlo en "no se pudo".
             $_SESSION['lf_pegar'] = !empty($r['sin_script']);
             $this->volver('No se pudo bajar el catálogo: ' . $r['error'], 'error');
         }
@@ -133,9 +120,6 @@ final class RecargasControlador
         $db   = Conexion::de($_SESSION['empresa_db']);
         $repo = new EmidaRepo($db);
 
-        // El producto sale del CATÁLOGO, no del formulario: así nadie
-        // puede vender un identificador que no existe o uno que el
-        // proveedor dejó de ofrecer.
         $p = $repo->porId($_POST['producto'] ?? '');
         if (!$p) $this->volver('Ese producto ya no está en el catálogo. Actualízalo.', 'error');
 
@@ -144,7 +128,6 @@ final class RecargasControlador
             $this->volver('Escribe el número o la referencia completa.', 'error');
         }
 
-        // El monto: fijo si el producto lo trae, capturado si es variable.
         if ((float)$p['monto'] > 0) {
             $monto = (float)$p['monto'];
         } else {
@@ -160,8 +143,6 @@ final class RecargasControlador
             if ($monto <= 0) $this->volver('Escribe el monto a pagar.', 'error');
         }
 
-        // Identificador propio. Si la red se cae y se reintenta con el
-        // mismo, Emida devuelve 294 en vez de cobrar dos veces.
         $salesId = date('YmdHis') . substr(bin2hex(random_bytes(3)), 0, 4);
 
         $repo->registrar([
@@ -178,7 +159,6 @@ final class RecargasControlador
         ob_end_clean();
 
         if (!empty($r['incierta'])) {
-            // El peor caso: no se sabe si salió. NUNCA se reintenta solo.
             $repo->registrar(['sales_id' => $salesId, 'producto_id' => $p['producto_id'],
                 'producto_nombre' => $p['nombre'], 'cuenta' => $cuenta, 'monto' => $monto,
                 'comision' => $p['comision'], 'estado' => 'incierta',
@@ -199,37 +179,18 @@ final class RecargasControlador
         $repo->registrar(['sales_id' => $salesId, 'producto_id' => $p['producto_id'],
             'producto_nombre' => $p['nombre'], 'cuenta' => $cuenta, 'monto' => $monto,
             'comision' => $p['comision'], 'estado' => 'exitosa',
-            'folio' => $r['folio'] ?? null, 'mensaje' => $r['duplicada'] ? 'duplicada' : '']);
+            'folio' => $r['folio'] ?? null, 'mensaje' => !empty($r['duplicada']) ? 'duplicada' : '']);
 
         Auditoria::anota('pago.registrar', 'recarga ' . $p['nombre'] . ' · ' . $cuenta,
             null, Dinero::pesos($monto));
 
         $this->volver(
-            ($r['duplicada']
+            (!empty($r['duplicada'])
                 ? 'Esa misma operación ya se había hecho hace unos minutos, no se cobró dos veces. '
                 : $p['nombre'] . ' aplicado a ' . $cuenta . ' por ' . Dinero::pesos($monto) . '. ')
             . (!empty($r['folio']) ? 'Folio ' . $r['folio'] . '.' : ''), 'ok');
     }
 
-    private function token()
-    {
-        return !empty($_SESSION['lf_token']) && !empty($_POST['token'])
-            && hash_equals($_SESSION['lf_token'], $_POST['token']);
-    }
-
-    private function volver($texto, $tipo)
-    {
-        $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
-        header('Location: /recargas'); exit;
-    }
-
-    /**
-     * Carga el catálogo pegado desde el portal del proveedor.
-     *
-     * No reemplaza a bajarlo por API: es lo que permite trabajar mientras
-     * el intermediario no tenga el script. Un sistema que no se puede
-     * usar hasta que un tercero suba un archivo no sirve de nada.
-     */
     public function pegarCatalogo()
     {
         if (!$this->token()) $this->volver('No se pudo verificar el formulario.', 'error');
@@ -250,5 +211,17 @@ final class RecargasControlador
             error_log('[LibertyFin] pegar catálogo: ' . $e->getMessage());
             $this->volver('No se pudo guardar: ' . $e->getMessage(), 'error');
         }
+    }
+
+    private function token()
+    {
+        return !empty($_SESSION['lf_token']) && !empty($_POST['token'])
+            && hash_equals($_SESSION['lf_token'], $_POST['token']);
+    }
+
+    private function volver($texto, $tipo)
+    {
+        $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
+        header('Location: /recargas'); exit;
     }
 }

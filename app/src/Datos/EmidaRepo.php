@@ -13,6 +13,12 @@ namespace LibertyFin\Datos;
  * Así que se baja una vez, se guarda, y se refresca cuando alguien lo
  * pide. Los precios de Emida cambian poco; lo que cambia es qué
  * productos están disponibles, y eso tampoco a cada minuto.
+ *
+ * SOBRE LA IMAGEN
+ *
+ * Emida manda la URL de la imagen dentro de <Reference1><URLImage>, y
+ * muchas veces manda "NA". Dropbox con ?dl=0 no carga dentro de un <img>;
+ * se convierte a ?raw=1 en normalizarImagen().
  */
 final class EmidaRepo extends Repo
 {
@@ -30,12 +36,21 @@ final class EmidaRepo extends Repo
                     monto_min DECIMAL(12,2) NOT NULL DEFAULT 0,
                     monto_max DECIMAL(12,2) NOT NULL DEFAULT 0,
                     tipo VARCHAR(12) NOT NULL DEFAULT 'directa',
+                    imagen VARCHAR(500) NULL,
                     activo TINYINT(1) NOT NULL DEFAULT 1,
                     actualizado DATETIME NULL,
                     KEY ix_ep_cat (categoria),
                     KEY ix_ep_carrier (carrier),
                     KEY ix_ep_activo (activo, categoria)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            // Migración suave: bases creadas antes de que existiera la
+            // columna. Si ya está, el ALTER falla y se ignora.
+            try {
+                $this->db->exec("ALTER TABLE lf_emida_productos
+                                 ADD COLUMN imagen VARCHAR(500) NULL AFTER tipo");
+            } catch (\Throwable $e) { /* ya existe */ }
+
             $this->db->exec("
                 CREATE TABLE IF NOT EXISTS lf_emida_transacciones (
                     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -82,18 +97,20 @@ final class EmidaRepo extends Repo
             $st = $this->db->prepare("
                 INSERT INTO lf_emida_productos
                     (producto_id, nombre, categoria, carrier, comision, monto,
-                     monto_min, monto_max, tipo, activo, actualizado)
-                VALUES (?,?,?,?,?,?,?,?,?,1,NOW())
+                     monto_min, monto_max, tipo, imagen, activo, actualizado)
+                VALUES (?,?,?,?,?,?,?,?,?,?,1,NOW())
                 ON DUPLICATE KEY UPDATE
                     nombre=VALUES(nombre), categoria=VALUES(categoria), carrier=VALUES(carrier),
                     comision=VALUES(comision), monto=VALUES(monto), monto_min=VALUES(monto_min),
-                    monto_max=VALUES(monto_max), tipo=VALUES(tipo), activo=1, actualizado=NOW()");
+                    monto_max=VALUES(monto_max), tipo=VALUES(tipo), imagen=VALUES(imagen),
+                    activo=1, actualizado=NOW()");
             $n = 0;
             foreach ($productos as $p) {
                 $st->execute([
                     $p['producto_id'], mb_substr($p['nombre'], 0, 220),
                     mb_substr((string)$p['categoria'], 0, 80), mb_substr((string)$p['carrier'], 0, 80),
                     $p['comision'], $p['monto'], $p['monto_min'], $p['monto_max'], $p['tipo'],
+                    mb_substr((string)($p['imagen'] ?? ''), 0, 500),
                 ]);
                 $n++;
             }
@@ -141,9 +158,8 @@ final class EmidaRepo extends Repo
     public function categorias()
     {
         $this->asegurar();
-        $r = $this->todos("SELECT categoria, COUNT(*) n FROM lf_emida_productos
+        return $this->todos("SELECT categoria, COUNT(*) n FROM lf_emida_productos
             WHERE activo = 1 AND categoria <> '' GROUP BY categoria ORDER BY categoria");
-        return $r;
     }
 
     public function carriers($categoria = '')
@@ -205,30 +221,17 @@ final class EmidaRepo extends Repo
     /**
      * Lee un catálogo pegado desde la pantalla del proveedor.
      *
-     * POR QUÉ EXISTE
-     *
-     * El intermediario no tiene script de catálogo, y pedírselo a Emida
-     * puede tardar. Mientras tanto, su portal sí muestra la tabla y se
-     * puede copiar completa. Esto la entiende.
-     *
      * Acepta columnas separadas por tabulador —que es lo que sale al
-     * copiar de una tabla web— o por coma. Y se salta los renglones que
-     * no empiezan con un identificador numérico, que son los títulos y
-     * los botones que se copian de más.
+     * copiar de una tabla web— o por coma. Se salta los renglones que
+     * no empiezan con un identificador numérico, y junta los nombres
+     * que la tabla parte en dos renglones.
+     *
+     * La imagen se detecta buscando cualquier celda que empiece con
+     * http:// o https://, porque en el portal la columna de la imagen
+     * no siempre cae en la misma posición.
      */
     public static function leerPegado($texto)
     {
-        // PRIMERO SE JUNTAN LAS LÍNEAS PARTIDAS.
-        //
-        // En la tabla del proveedor hay nombres de dos renglones:
-        //
-        //     5094900  Pago INFONAVIT
-        //     Creditos y financieras   PAGO SERVICIOS   INFONAVIT  ...
-        //
-        // Al copiar, eso llega como dos líneas. Un renglón que NO empieza
-        // con un identificador es la continuación del anterior, así que se
-        // pega en vez de descartarse. Sin esto se perdía uno de cada tres
-        // productos, y justo los de pago de servicios.
         $lineas = [];
         foreach (preg_split('/\r\n|\r|\n/', (string)$texto) as $cruda) {
             if (trim($cruda) === '') continue;
@@ -251,14 +254,12 @@ final class EmidaRepo extends Repo
             if (count($c) < 4) continue;
 
             $id = preg_replace('/\D/', '', $c[0]);
-            if ($id === '' || strlen($id) < 4) continue;   // encabezado o basura
+            if ($id === '' || strlen($id) < 4) continue;
 
             $num = function ($v) {
                 $v = preg_replace('/[^0-9.]/', '', (string)$v);
                 return $v === '' ? 0.0 : (float)$v;
             };
-            // El nombre puede traer un salto adentro, de los que la tabla
-            // parte en dos líneas: se aplana.
             $nombre = preg_replace('/\s+/', ' ', (string)($c[1] ?? ''));
 
             $monto = $num($c[5] ?? '');
@@ -266,6 +267,16 @@ final class EmidaRepo extends Repo
             $max   = $num($c[7] ?? '');
             $tipo  = stripos((string)($c[8] ?? ''), 'consulta') !== false ? 'consulta'
                    : (($min > 0 || $max > 0 || $monto <= 0) ? 'consulta' : 'directa');
+
+            // La imagen: cualquier celda que sea una URL.
+            $imagen = '';
+            foreach ($c as $celda) {
+                if (preg_match('#^https?://#i', trim($celda))) {
+                    $imagen = trim($celda);
+                    break;
+                }
+            }
+            $imagen = self::normalizarImagen($imagen);
 
             $productos[] = [
                 'producto_id' => $id,
@@ -277,8 +288,27 @@ final class EmidaRepo extends Repo
                 'monto_min'   => $min,
                 'monto_max'   => $max,
                 'tipo'        => $tipo,
+                'imagen'      => mb_substr($imagen, 0, 500),
             ];
         }
         return $productos;
+    }
+
+    /**
+     * Las URLs de Dropbox que trae Emida vienen con ?dl=0, que abre la
+     * página de descarga en vez de servir la imagen. Con ?raw=1 sí
+     * carga dentro de un <img>. También se limpia el "NA".
+     */
+    public static function normalizarImagen($url)
+    {
+        $url = trim((string)$url);
+        if ($url === '' || strtoupper($url) === 'NA') return '';
+
+        if (stripos($url, 'dropbox.com') !== false) {
+            $url = preg_replace('/[?&]dl=0\b/', '?raw=1', $url);
+            $url = preg_replace('/[?&]raw=0\b/', '?raw=1', $url);
+            if (strpos($url, '?') === false) $url .= '?raw=1';
+        }
+        return $url;
     }
 }
