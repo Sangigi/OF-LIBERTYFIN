@@ -15,6 +15,7 @@ use LibertyFin\Vista\Barras;
 use LibertyFin\Dominio\Dinero as D;
 
 $compacto = !empty($compacto);
+$lid = (int)($l['id'] ?? 0);
 ?>
 <div class="lf-pagar<?= $compacto ? ' compacto' : '' ?>">
 
@@ -28,9 +29,9 @@ $compacto = !empty($compacto);
       <?php endif; ?>
       <div class="copiar">
         <input type="text" readonly value="<?= P::e($l['liga']) ?>"
-               id="pgL<?= (int)$l['id'] ?>">
+               id="pgL<?= $lid ?>">
         <button type="button" class="btn btn-secondary btn-sm"
-                data-copiar="pgL<?= (int)$l['id'] ?>">Copiar</button>
+                data-copiar="pgL<?= $lid ?>">Copiar</button>
       </div>
       <a class="abrir" href="<?= P::e($l['liga']) ?>" target="_blank" rel="noopener">
         Abrirla en otra pestaña</a>
@@ -44,9 +45,9 @@ $compacto = !empty($compacto);
       <div class="dato lf-mono"><?= P::e($l['clabe']) ?></div>
       <div class="copiar">
         <input type="text" readonly value="<?= P::e($l['clabe']) ?>"
-               id="pgC<?= (int)$l['id'] ?>" class="lf-mono">
+               id="pgC<?= $lid ?>" class="lf-mono">
         <button type="button" class="btn btn-secondary btn-sm"
-                data-copiar="pgC<?= (int)$l['id'] ?>">Copiar</button>
+                data-copiar="pgC<?= $lid ?>">Copiar</button>
       </div>
       <p class="ind">
         Por <b><?= D::pesos($l['monto']) ?></b> exactos. Una cantidad distinta no
@@ -68,8 +69,10 @@ $compacto = !empty($compacto);
         En OXXO y tiendas participantes. Si no pueden escanear, que capturen
         la referencia.
       </p>
-      <a class="abrir" href="/ligas/<?= (int)$l['id'] ?>/documento" target="_blank">
-        <?= W::icono('baja','14px') ?>Imprimir el comprobante</a>
+      <?php if ($lid > 0): ?>
+        <a class="abrir" href="/ligas/<?= $lid ?>/documento" target="_blank">
+          <?= W::icono('baja','14px') ?>Imprimir el comprobante</a>
+      <?php endif; ?>
     </div>
   <?php endif; ?>
 </div>
