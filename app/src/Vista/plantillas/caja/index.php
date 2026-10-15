@@ -121,15 +121,16 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
        en una laptop quedaban 650 px abajo y cada venta era bajar a buscarlos. */ ?>
   <form class="card lf-ticket" method="post" action="/caja/cobrar" id="ticket" style="align-self:start">
     <input type="hidden" name="token" value="<?= P::e($token) ?>">
-    <input type="hidden" name="lineas" id="lineas" value="[]">
+    <input type="hidden" name="lineas" id="lineas" value="">
     <input type="hidden" name="cliente_id" id="cliente_id" value="">
     <?php /* Con valor, las lineas entran a ESA venta en vez de abrir
              una nueva. Ver Servicio\AmpliarVenta. */ ?>
     <input type="hidden" name="ampliar_venta" id="ampliarVenta" value="">
     <?php /* Promociones: las que el cajero quitó y el descuento que vio. Al
              cobrar, el servidor las vuelve a calcular y, si no da lo mismo,
-             no cobra (ver CajaControlador::cobrar). */ ?>
-    <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="[]">
+             no cobra (ver CajaControlador::cobrar). Los dos van en HEX
+             porque ModSecurity rechaza el JSON crudo (ver PushControlador). */ ?>
+    <input type="hidden" name="promo_quitadas" id="promoQuitadas" value="">
     <input type="hidden" name="promo_esperado" id="promoEsperado" value="0">
     <?php /* El porcentaje que se manda: la tasa de Ajustes con el interruptor
              encendido, 0 apagado. El cajero ya no teclea un número. */ ?>
@@ -374,6 +375,24 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
 
 <script>
 /* ══════════════════════════════════════════════════════
+   HEX PARA LO QUE MODSECURITY BLOQUEA
+   El hosting (ModSecurity) rechaza con "406 Not Acceptable" los campos
+   que llevan JSON crudo (llaves, corchetes, comillas). Es el mismo muro
+   que ya se documentó en PushControlador::endpoint(). Se manda el JSON
+   en hexadecimal —solo 0-9 y a-f—, igual que el token del formulario,
+   que siempre pasa. El servidor lo decodifica con `jsonHex()`.
+   ══════════════════════════════════════════════════════ */
+function lfAHex(s){
+  var h = '';
+  for (var i = 0; i < s.length; i++) {
+    h += ('0' + s.charCodeAt(i).toString(16)).slice(-2);
+  }
+  return h;
+}
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════
    AGREGAR A UNA VENTA QUE YA EXISTE
    Elegir una venta cambia el destino del ticket: en vez de
    abrir un folio nuevo, las lineas entran a esa.
@@ -547,9 +566,11 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
        escritura— y por eso el campo oculto conservaba los precios
        originales. Con los servicios de precio libre, que van en cero,
        el servidor recibía un ticket de cero aunque en pantalla se viera
-       bien: "El ticket suma cero" con el precio puesto. */
-    $('lineas').value = JSON.stringify(lineas.map(function(l){
-      return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }));
+       bien: "El ticket suma cero" con el precio puesto.
+
+       Va en HEX: el JSON crudo lo rechaza ModSecurity (ver PushControlador). */
+    $('lineas').value = lfAHex(JSON.stringify(lineas.map(function(l){
+      return {id:l.id, cantidad:l.cantidad, precio:l.precio}; })));
 
     /* El descuento de las promociones ya viene por renglón (ver
        pedirPromos): el total es lo capturado menos eso. */
@@ -770,12 +791,13 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
       var n = ++promo.n;
       var fd = new FormData();
       fd.append('token', document.querySelector('#ticket input[name="token"]').value);
-      fd.append('lineas', JSON.stringify(lineas.map(function(l){
-        return {id:l.id, cantidad:l.cantidad, precio:l.precio}; })));
+      // En HEX: el JSON crudo lo rechaza ModSecurity (ver PushControlador).
+      fd.append('lineas', lfAHex(JSON.stringify(lineas.map(function(l){
+        return {id:l.id, cantidad:l.cantidad, precio:l.precio}; }))));
       fd.append('promo_codigo', $('promoCodigo') ? $('promoCodigo').value : '');
-      fd.append('promo_quitadas', JSON.stringify(promo.quitadas));
-      fetch('/caja/promociones', { method:'POST', body:fd, credentials:'same-origin',
-                                   headers:{'Accept':'application/json'} })
+      fd.append('promo_quitadas', lfAHex(JSON.stringify(promo.quitadas)));
+      // SIN Accept: application/json a propósito. Ver nota del módulo.
+      fetch('/caja/promociones', { method:'POST', body:fd, credentials:'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(d){
           if (n !== promo.n) return;          // ya se pidió otra más nueva
@@ -814,7 +836,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
       var id2 = +v.dataset.promoVolver;
       promo.quitadas = promo.quitadas.filter(function(x){ return x !== id2; });
     }
-    $('promoQuitadas').value = JSON.stringify(promo.quitadas);
+    $('promoQuitadas').value = lfAHex(JSON.stringify(promo.quitadas));
     pedirPromos();
   });
   if ($('promoCodigo')) $('promoCodigo').addEventListener('input', function(){
@@ -1141,7 +1163,6 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
                                               desc:l.desc || 0, promo:l.promo ? l.promo.nombre : ''}; }),
       descuento: desc,
       total: cap, anticipo: ant, saldo: cap - ant,
-      // Lo que el resumen de confirmación también dice.
       ivaPct: ivaPct, iva: ivaPct > 0 ? cap - cap / (1 + ivaPct / 100) : 0,
       pagaCon: pc, cambio: pc > 0 ? pc - cobra : 0,
       gastos: parseFloat($('gastos').value) || 0,
@@ -1195,7 +1216,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
       /* Las promociones quitadas y el código; el descuento se vuelve a
          pedir al servidor al pintar (pudo cambiar desde que se guardó). */
       promo.quitadas = (g.quitadas || []).map(Number);
-      $('promoQuitadas').value = JSON.stringify(promo.quitadas);
+      $('promoQuitadas').value = lfAHex(JSON.stringify(promo.quitadas));
       if ($('promoCodigo')) $('promoCodigo').value = g.codigo || '';
       $('anticipo').value = g.anticipo;
       $('anticipo').dataset.manual = g.manual || '';
@@ -1299,7 +1320,7 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     var espera = document.getElementById('mEspera');
     if (reloj) clearInterval(reloj);
     reloj = setInterval(function(){
-      fetch('/caja/estado/' + id, { headers: {'Accept':'application/json'}, credentials:'same-origin' })
+      fetch('/caja/estado/' + id, { credentials:'same-origin' })
         .then(function(r){ return r.json(); })
         .then(function(d){
           if (!d || !d.pagado) return;
@@ -1464,8 +1485,9 @@ $ivaOn   = $cfgCaja['iva_inicio'] === 'con';
     var datos = new FormData(form);
     datos.append('json', '1');
     var recibido = false;   // ¿ya contestó el servidor? Si sí, la venta YA existe.
-    fetch(form.action, { method:'POST', body:datos,
-                         headers:{'Accept':'application/json'}, credentials:'same-origin' })
+    // SIN Accept: application/json a propósito: combinado con el payload,
+    // ModSecurity dispara reglas del CRS. El navegador pone el suyo.
+    fetch(form.action, { method:'POST', body:datos, credentials:'same-origin' })
       .then(function(r){ return r.json(); })
       .then(function(d){
         recibido = true;
