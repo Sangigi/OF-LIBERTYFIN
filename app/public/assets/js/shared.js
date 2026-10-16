@@ -57,9 +57,6 @@ const NAV_HTML = `
       <!-- Precios -->
       <li><a href="BASEPATHpages/precios">Precios</a></li>
 
-      <!-- Tutorial -->
-      <li><a href="/tutorial">Tutorial</a></li>
-
       <!-- Clientes -->
       <li><a href="BASEPATHpages/clientes-casos">Clientes</a></li>
 

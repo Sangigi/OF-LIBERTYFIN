@@ -306,6 +306,8 @@ final class Widget
             'atras'  => '<path d="M19 12H5M11 6l-6 6 6 6"/>',
             'ok'     => '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
             'chat'   => '<path d="M20 11.5a8 8 0 0 1-11.7 7.1L4 20l1.4-4.1A8 8 0 1 1 20 11.5z"/>',
+            // El tutorial: un libro abierto.
+            'libro'  => '<path d="M12 6.5C10.3 5 7.6 4.5 4 4.8v13.4c3.6-.3 6.3.2 8 1.8 1.7-1.6 4.4-2.1 8-1.8V4.8c-3.6-.3-6.3.2-8 1.7z"/><path d="M12 6.5V20"/>',
         ];
         $d = isset($p[$n]) ? $p[$n] : $p['panel'];
         // El "+" va en rojo, igual que las "×" (ver .lf-signo en libertyfin.css).

@@ -57,6 +57,7 @@ $deEmpresa = [
   ['ruta' => '/auditoria',  'icono' => 'alerta',  'texto' => 'Auditoría',     'p' => 'ver.auditoria'],
   ['ruta' => '/ajustes',    'icono' => 'serv',    'texto' => 'Ajustes',       'p' => 'ver.ajustes'],
   ['grupo' => 'Soporte'],
+  ['ruta' => '/tutorial',   'icono' => 'libro',   'texto' => 'Tutorial',      'p' => 'abrir.ticket'],
   ['ruta' => '/ayuda',      'icono' => 'alerta',  'texto' => 'Ayuda',         'p' => 'abrir.ticket'],
 ];
 

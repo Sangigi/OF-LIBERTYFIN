@@ -134,11 +134,11 @@ $comoVa = [
 
 <?php else: ?>
 
-<?php /* El tutorial completo: el mismo que ven los prospectos en /tutorial. */ ?>
+<?php /* El tutorial completo vive en su propia sección (menú → Tutorial). */ ?>
 <div class="alert alert-success" style="margin-bottom:18px">
-  <?= W::icono('doc','18px') ?>
+  <?= W::icono('libro','18px') ?>
   <span><b>¿Primera vez en LibertyFin?</b> El
-    <a href="/tutorial" target="_blank" rel="noopener">tutorial completo</a>
+    <a href="/tutorial" data-parcial>tutorial completo</a>
     te lleva paso a paso, de tu primera venta al corte del día.</span>
 </div>
 

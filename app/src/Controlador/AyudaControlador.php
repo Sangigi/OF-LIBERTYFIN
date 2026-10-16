@@ -21,6 +21,34 @@ use LibertyFin\Vista\Plantilla;
  */
 final class AyudaControlador
 {
+    /**
+     * El tutorial completo, paso a paso. Lo ve cualquiera con sesión.
+     *
+     * Se le pasan los módulos encendidos y las secciones apagadas para que
+     * los atajos «Ir a…» de cada capítulo solo aparezcan si esa persona
+     * puede entrar ahí: un botón que lleva a «Esta sección no es para tu
+     * rol» enseña lo contrario de lo que se quiere.
+     */
+    public function tutorial()
+    {
+        $modulos = []; $apagadas = [];
+        try {
+            $cfg = new \LibertyFin\Datos\ConfigRepo(Conexion::de($_SESSION['empresa_db'] ?? ''));
+            foreach (\LibertyFin\Datos\ConfigRepo::APAGABLES as $k => $_) {
+                if (!$cfg->seccionActiva($k)) $apagadas[$k] = true;
+            }
+            $modulos = (new \LibertyFin\Servicio\Modulos($cfg))->activos();
+        } catch (\Throwable $e) { /* sin empresa: el tutorial se lee igual, sin atajos de módulos */ }
+
+        Plantilla::pagina('ayuda/tutorial', [
+            'titulo'    => 'Tutorial',
+            'icono'     => 'libro',
+            'subtitulo' => 'Aprende LibertyFin paso a paso',
+            'modulos'   => $modulos,
+            'apagadas'  => $apagadas,
+        ]);
+    }
+
     public function index()
     {
         $repo = new TicketRepo($this->principal());

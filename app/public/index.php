@@ -67,7 +67,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         '/inicio'         => '/panel',
         '/dashboard'      => '/panel',
         '/pages/registro' => '/registro',
-        '/tutoriales'     => '/tutorial',
     ];
     $minusculas = strtolower($rutaActual);
     if (isset($alias[$minusculas]) && $rutaActual !== $alias[$minusculas]) {
@@ -75,11 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    // Las páginas públicas del sitio: la landing y el tutorial para
-    // prospectos. HTML fijo, con el menú y el pie que pone shared.js.
-    $paginas = ['/' => 'index.html', '/tutorial' => 'tutorial.html'];
-    if (isset($paginas[$rutaActual])) {
-        $archivo = $raiz . '/src/Vista/plantillas/' . $paginas[$rutaActual];
+    if ($rutaActual === '/') {
+        $archivo = $raiz . '/src/Vista/plantillas/index.html';
         if (!is_file($archivo)) {
             // Sin landing, al menos que se pueda entrar al sistema.
             header('Location: /login', true, 302);
@@ -297,6 +293,7 @@ if (\LibertyFin\Servicio\Integraciones::activa('emida')) {
 $r->get('/reportes/excel',    ['LibertyFin\Controlador\ReportesControlador', 'excel']);
 $r->get('/reportes/imprimir', ['LibertyFin\Controlador\ReportesControlador', 'imprimir']);
 $r->get('/ayuda',                 ['LibertyFin\Controlador\AyudaControlador', 'index']);
+$r->get('/tutorial',              ['LibertyFin\Controlador\AyudaControlador', 'tutorial']);
 $r->post('/ayuda/crear',          ['LibertyFin\Controlador\AyudaControlador', 'crear']);
 $r->post('/ayuda/{id}/responder', ['LibertyFin\Controlador\AyudaControlador', 'responder']);
 // El chat: mensajes nuevos de un ticket y novedades de soporte (JSON).
@@ -482,6 +479,7 @@ $permisos = [
   '/recargas/ocultos'       => 'editar.ajustes',
   '/recargas/vender'        => 'vender.recarga',
   '/ayuda'                  => 'abrir.ticket',
+  '/tutorial'               => 'abrir.ticket',
   '/ayuda/crear'            => 'abrir.ticket',
   '/ayuda/{id}/responder'   => 'abrir.ticket',
   '/ayuda/novedades'        => 'abrir.ticket',
