@@ -830,6 +830,21 @@ prueba o de verdad son las credenciales. Por eso:
   misma puerta. `secreto_webhook_prueba` quedó solo como un segundo
   secreto aceptado.
 
+### Las direcciones del sistema anterior
+
+La cuenta de **producción** de Paga de Todo seguía avisando a las rutas del
+sistema viejo (`/Service/ConsultaClabe`, `/Service/PagoClabe`,
+`/Service/CancelaPago`, `/Service/PagoLinea`). Sin ellas el aviso caía al
+login, el proveedor no recibía su JSON y **rebotaba el SPEI sin dejar nada en
+el registro**.
+
+Ahora se atienden, con el mismo código que `/pagadetodo/...`. Como no llevan
+secreto, solo pasan las llamadas desde las IPs de Paga de Todo
+(`PagosEntrantesControlador::IPS_PROVEEDOR`, más `ips_proveedor` en
+`config/integraciones.php`). Las demás se rechazan y quedan en el registro
+con su IP. Cuando el proveedor cambie las direcciones de producción a
+`/pagadetodo/SECRETO/...`, estas rutas se pueden quitar.
+
 `php app/bin/revisar-pagos.php` avisa si algo de esto quedó a medias.
 
 ### Tres reglas que no se negocian en los avisos

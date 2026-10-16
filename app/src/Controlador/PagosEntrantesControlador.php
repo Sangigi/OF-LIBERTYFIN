@@ -91,6 +91,51 @@ final class PagosEntrantesControlador
      */
     private $avisoDePrueba = false;
 
+    /**
+     * LAS DIRECCIONES DEL SISTEMA ANTERIOR.
+     *
+     * La cuenta de PRODUCCIÓN de Paga de Todo sigue avisando a las rutas
+     * que dejó dadas de alta el sistema viejo (liber/.htaccess). Sin
+     * ellas el aviso caía al login, el proveedor no recibía su JSON y
+     * rebotaba el SPEI sin dejar una sola línea en el registro.
+     *
+     * No llevan secreto: las protege la IP de origen (IPS_PROVEEDOR).
+     * Cuando el proveedor cambie sus direcciones a /pagadetodo/SECRETO/...
+     * se pueden quitar de aquí y de public/index.php.
+     */
+    const RUTAS_ANTERIORES = [
+        '/Service/ConsultaClabe',      '/Service/PagoClabe',
+        '/Service/ConsultaReferencia', '/Service/PagoReferencia',
+        '/Service/PagoLinea',          '/Service/EntregarPagoLiga',
+        '/Service/CancelaPago',
+    ];
+
+    /**
+     * Desde dónde llama Paga de Todo. La lista la mandó el proveedor.
+     * Si agrega una, va en `ips_proveedor` de config/integraciones.php,
+     * sin tocar código.
+     */
+    const IPS_PROVEEDOR = [
+        '208.98.35.191',  '13.86.1.59',     '13.89.114.191',  '52.141.210.15',
+        '52.141.212.172', '52.154.152.87',  '52.154.153.183', '52.154.154.122',
+        '52.154.154.185', '52.154.154.232', '52.154.154.248', '52.154.154.66',
+        '52.154.154.73',  '52.173.139.138', '52.173.140.232', '52.173.141.204',
+        '52.173.141.231', '52.176.61.128',  '52.242.208.16',
+    ];
+
+    public static function esRutaAnterior($ruta)
+    {
+        return in_array('/' . trim((string)$ruta, '/'), self::RUTAS_ANTERIORES, true);
+    }
+
+    /** Las IPs del proveedor: las de fábrica más las de la configuración. */
+    private static function ipsProveedor(array $cfg)
+    {
+        $propias = $cfg['ips_proveedor'] ?? [];
+        if (is_string($propias)) $propias = preg_split('/[\s,]+/', $propias, -1, PREG_SPLIT_NO_EMPTY);
+        return array_merge(self::IPS_PROVEEDOR, array_map('trim', (array)$propias));
+    }
+
     // ════════════════════════════════════════════════════════════
     //  CONSULTA · ¿es válida y cuánto debe?
     // ════════════════════════════════════════════════════════════
@@ -722,6 +767,24 @@ public function pagoLiga()
         }
 
         $cfg = Integraciones::de('spei') ?: [];
+
+        // LAS DIRECCIONES DEL SISTEMA ANTERIOR no traen secreto: pasa
+        // solo quien llama desde una IP de Paga de Todo. REMOTE_ADDR y no
+        // X-Forwarded-For: esa cabecera la escribe quien quiera.
+        if (self::esRutaAnterior(parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH))) {
+            $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+            if (!in_array($ip, self::ipsProveedor($cfg), true)) {
+                error_log('[LibertyFin] pagadetodo RECHAZA ' . $este
+                    . ' · dirección del sistema anterior llamada desde una IP que no es de '
+                    . 'Paga de Todo. Si es suya, agrégala a `ips_proveedor` en config/integraciones.php.');
+                http_response_code(403);
+                $this->json(['codigo' => self::NO_RECONOCIDA, 'mensaje' => 'No autorizado']);
+            }
+            error_log('[LibertyFin] pagadetodo ABRE ' . $este
+                . ' · dirección del sistema anterior, IP de Paga de Todo');
+            return;
+        }
+
         $esperado = trim((string)($cfg['secreto_webhook'] ?? ''));
         // El del panel del Sandbox. Igual al de producción no separa nada,
         // así que se ignora.

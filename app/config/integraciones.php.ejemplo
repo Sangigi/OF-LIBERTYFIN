@@ -247,6 +247,14 @@ return [
         // rechazar por ambiente rebotaba depósitos reales.
         'secreto_webhook_prueba' => '',
 
+        // LAS DIRECCIONES DEL SISTEMA ANTERIOR (/Service/ConsultaClabe,
+        // /Service/PagoClabe, /Service/CancelaPago, /Service/PagoLinea…)
+        // también se atienden, para la cuenta que todavía las tenga dadas
+        // de alta. No llevan secreto: solo pasan las IPs de Paga de Todo,
+        // que ya vienen en el código. Si el proveedor agrega una, va aquí,
+        // separadas por coma. El registro dice cuál se rechazó.
+        'ips_proveedor' => '',
+
         // Y da de alta ESTAS direcciones en el panel del Sandbox, en la
         // pestaña EndPoint, con tu secreto DENTRO DE LA RUTA (no como
         // ?k=: el proveedor le añade «/?r=REFERENCIA» al final y detrás

@@ -154,6 +154,18 @@ $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
     // La cancelación llega por DELETE o por POST: el proveedor decide.
     $r->post  ('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
     $r->delete('/pagadetodo/cancela-pago', [$pdt, 'cancelaPago']);
+
+    // Y LAS DEL SISTEMA ANTERIOR, que la cuenta de producción del
+    // proveedor todavía tiene dadas de alta. Sin secreto: las protege la
+    // IP de origen. Ver PagosEntrantesControlador::RUTAS_ANTERIORES.
+    $r->get   ('/Service/ConsultaClabe',      [$pdt, 'consultaClabe']);
+    $r->post  ('/Service/PagoClabe',          [$pdt, 'pagoClabe']);
+    $r->get   ('/Service/ConsultaReferencia', [$pdt, 'consultaReferencia']);
+    $r->post  ('/Service/PagoReferencia',     [$pdt, 'pagoReferencia']);
+    $r->post  ('/Service/PagoLinea',          [$pdt, 'pagoLiga']);
+    $r->post  ('/Service/EntregarPagoLiga',   [$pdt, 'pagoLiga']);
+    $r->post  ('/Service/CancelaPago',        [$pdt, 'cancelaPago']);
+    $r->delete('/Service/CancelaPago',        [$pdt, 'cancelaPago']);
 }
 
 // Privadas
@@ -536,7 +548,8 @@ $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH),
 // ruta o en `?k=`. Comparar la ruta exacta dejaba fuera la forma nueva
 // —/pagadetodo/SECRETO/pago-referencia— y la mandaba al login: el
 // proveedor recibía una redirección, no un 200, y revertía el cobro.
-$esAviso = strncmp($ruta, '/pagadetodo/', 12) === 0;
+$esAviso = strncmp($ruta, '/pagadetodo/', 12) === 0
+        || \LibertyFin\Controlador\PagosEntrantesControlador::esRutaAnterior($ruta);
 
 // El portero: una sola línea decide quién pasa, en vez de repetir la
 // comprobación al inicio de cada archivo como hacía el sistema anterior.
@@ -671,7 +684,7 @@ try {
     // tienda hizo y que nadie reconoce. Se contesta el código 50 que su
     // documentación pide para esto, con HTTP 200, y el error queda en
     // el log para revisarlo con calma.
-    if (strncmp($ruta, '/pagadetodo/', 12) === 0) {
+    if ($esAviso) {
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
         echo json_encode(['codigo' => 50, 'mensaje' => 'Error de sistema',
