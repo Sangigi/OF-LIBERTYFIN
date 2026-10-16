@@ -1,0 +1,1245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutorial Libertyfin</title>
+<meta name="description" content="Aprende a usar Libertyfin paso a paso: de crear tu cuenta a tu primera venta, tu corte de caja y tus reportes. Sin tecnicismos.">
+<link rel="stylesheet" href="/assets/css/main.css">
+<style>
+  /* ═══════════════════════════════════════════════════
+     TUTORIAL · todo con prefijo tu- para no chocar con
+     main.css, que pone el menú, el pie y las fuentes.
+     ═══════════════════════════════════════════════════ */
+  :root{
+    --tu-ancho:1180px;
+    --tu-ambar:#92400e; --tu-ambar-bg:#fffbeb; --tu-ambar-borde:#fcd34d;
+    --tu-azul:#1e40af;  --tu-azul-bg:#eff6ff;  --tu-azul-borde:#bfdbfe;
+  }
+  body{background:var(--surface)}
+  .tu-cap, .tu-seccion{scroll-margin-top:84px}
+
+  /* ── HERO ───────────────────────────────────── */
+  .tu-hero{
+    padding:120px 20px 64px;text-align:center;
+    background:
+      radial-gradient(900px 380px at 50% -40px, var(--green-mid), transparent 70%),
+      linear-gradient(180deg, var(--green-light), var(--surface));
+  }
+  .tu-eyebrow{
+    display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:1.6px;color:var(--green-dd);
+    background:var(--surface);border:1px solid var(--green-mid);padding:6px 12px;border-radius:999px;
+  }
+  .tu-hero h1{
+    font-family:'Nunito',sans-serif;font-weight:900;letter-spacing:-1.5px;line-height:1.08;
+    font-size:clamp(34px,5.4vw,58px);color:var(--ink);margin:18px auto 14px;max-width:820px;
+  }
+  .tu-hero h1 em{font-style:normal;color:var(--green-d)}
+  .tu-hero-sub{font-size:clamp(15px,1.9vw,18px);color:var(--ink2);max-width:640px;margin:0 auto}
+  .tu-hero-datos{display:flex;flex-wrap:wrap;justify-content:center;gap:10px;margin:26px 0 30px}
+  .tu-dato{
+    display:inline-flex;align-items:center;gap:8px;background:var(--surface);
+    border:1px solid var(--border);border-radius:999px;padding:7px 14px;font-size:13.5px;color:var(--ink2);
+  }
+  .tu-dato b{color:var(--ink);font-weight:700}
+  .tu-hero-ctas{display:flex;flex-wrap:wrap;gap:12px;justify-content:center}
+  .tu-btn{
+    display:inline-flex;align-items:center;gap:8px;border-radius:999px;padding:13px 26px;
+    font-weight:600;font-size:15px;text-decoration:none;transition:transform .15s, background .15s, box-shadow .15s;
+    border:1px solid transparent;cursor:pointer;font-family:inherit;
+  }
+  .tu-btn-verde{background:var(--green);color:#fff;box-shadow:0 4px 14px rgba(34,197,94,.32)}
+  .tu-btn-verde:hover{background:var(--green-d);transform:translateY(-1px)}
+  .tu-btn-claro{background:var(--surface);color:var(--ink);border-color:var(--border2)}
+  .tu-btn-claro:hover{border-color:var(--green);color:var(--green-dd)}
+  .tu-btn:focus-visible, .tu-visto:focus-visible, .tu-indice a:focus-visible{outline:3px solid var(--green);outline-offset:2px}
+
+  /* ── BLOQUES DE SECCIÓN ─────────────────────── */
+  .tu-seccion{max-width:var(--tu-ancho);margin:0 auto;padding:64px 24px 8px}
+  .tu-sec-tit{
+    font-family:'Nunito',sans-serif;font-weight:900;letter-spacing:-1px;line-height:1.15;
+    font-size:clamp(26px,3.4vw,38px);color:var(--ink);margin-top:10px;
+  }
+  .tu-sec-tit em{font-style:normal;color:var(--green-d)}
+  .tu-sec-sub{font-size:16px;color:var(--ink3);max-width:660px;margin-top:10px}
+
+  /* 6 ideas */
+  .tu-ideas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:28px}
+  .tu-idea{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px}
+  .tu-idea-num{
+    width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-weight:800;
+    font-family:'Nunito',sans-serif;background:var(--green-light);color:var(--green-dd);margin-bottom:12px;
+  }
+  .tu-idea h3{font-size:16.5px;font-weight:700;color:var(--ink);line-height:1.35;margin-bottom:6px}
+  .tu-idea p{font-size:14px;color:var(--ink2)}
+
+  /* rutas por perfil */
+  .tu-rutas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:26px}
+  .tu-ruta-card{
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;
+    display:flex;flex-direction:column;gap:10px;
+  }
+  .tu-ruta-card h3{font-size:15px;font-weight:700;color:var(--ink)}
+  .tu-ruta-card p{font-size:13px;color:var(--ink3);flex:1}
+  .tu-ruta-caps{display:flex;flex-wrap:wrap;gap:6px}
+  .tu-ruta-caps a{
+    font-size:12.5px;font-weight:700;text-decoration:none;color:var(--green-dd);background:var(--surface);
+    border:1px solid var(--green-mid);border-radius:8px;padding:4px 9px;
+  }
+  .tu-ruta-caps a:hover{background:var(--green-light)}
+
+  /* ── LAYOUT: índice + capítulos ─────────────── */
+  .tu-layout{
+    max-width:var(--tu-ancho);margin:0 auto;padding:56px 24px 40px;
+    display:grid;grid-template-columns:260px minmax(0,1fr);gap:48px;align-items:start;
+  }
+  .tu-indice-caja{position:sticky;top:84px;max-height:calc(100vh - 104px);overflow:auto;padding-bottom:12px}
+  .tu-indice-caja > summary{display:none}
+  .tu-avance{background:var(--bg);border:1px solid var(--border);border-radius:var(--r);padding:14px;margin-bottom:14px}
+  .tu-avance-txt{font-size:13px;color:var(--ink2);display:flex;justify-content:space-between;gap:8px}
+  .tu-avance-txt b{color:var(--ink)}
+  .tu-barra{height:8px;border-radius:99px;background:var(--border);margin-top:9px;overflow:hidden}
+  .tu-barra > i{display:block;height:100%;width:0;background:var(--green);border-radius:99px;transition:width .35s}
+  .tu-indice ol{list-style:none;display:flex;flex-direction:column;gap:2px}
+  .tu-indice a{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;text-decoration:none;
+    color:var(--ink2);font-size:13.5px;line-height:1.3;
+  }
+  .tu-indice a:hover{background:var(--bg);color:var(--ink)}
+  .tu-indice a.actual{background:var(--green-light);color:var(--green-dd);font-weight:600}
+  .tu-indice .n{
+    flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;
+    font-weight:700;border:1.5px solid var(--border2);color:var(--ink3);background:var(--surface);
+  }
+  .tu-indice a.visto .n{background:var(--green);border-color:var(--green);color:#fff;font-size:0}
+  .tu-indice a.visto .n::after{content:'✓';font-size:12px}
+  .tu-indice-extra{margin-top:10px;padding-top:10px;border-top:1px solid var(--border)}
+
+  /* ── CAPÍTULO ───────────────────────────────── */
+  .tu-caps{display:flex;flex-direction:column;gap:28px;min-width:0}
+  .tu-cap{
+    background:var(--surface);border:1px solid var(--border);border-radius:20px;
+    padding:30px 32px;box-shadow:var(--shadow-sm);transition:border-color .3s;
+  }
+  .tu-cap.visto{border-color:var(--green-mid)}
+  .tu-cap-cab{display:flex;gap:16px;align-items:flex-start}
+  .tu-cap-num{
+    flex:none;width:52px;height:52px;border-radius:15px;display:grid;place-items:center;
+    background:var(--ink);color:#fff;font-family:'Nunito',sans-serif;font-weight:900;font-size:22px;
+  }
+  .tu-cap.visto .tu-cap-num{background:var(--green)}
+  .tu-cap-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px}
+  .tu-pill{
+    font-size:11.5px;font-weight:700;letter-spacing:.3px;border-radius:999px;padding:3px 10px;
+    background:var(--bg);color:var(--ink3);border:1px solid var(--border);
+  }
+  .tu-pill.op{background:var(--tu-azul-bg);color:var(--tu-azul);border-color:var(--tu-azul-borde)}
+  .tu-cap h2{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(22px,2.6vw,28px);
+    letter-spacing:-.6px;line-height:1.2;color:var(--ink)}
+  .tu-para{font-size:15.5px;color:var(--ink2);margin-top:6px}
+  .tu-cap h3{font-size:16px;font-weight:700;color:var(--ink);margin:26px 0 10px}
+  .tu-cap > p, .tu-cap .tu-txt{font-size:15px;color:var(--ink2);margin-top:10px}
+
+  /* dónde */
+  .tu-donde{
+    display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:18px;font-size:13px;color:var(--ink3);
+  }
+  .tu-donde > span:first-child{font-weight:700;color:var(--ink2);margin-right:2px}
+  .tu-migas{display:inline-flex;flex-wrap:wrap;align-items:center;gap:4px}
+  .tu-migas b{
+    font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--border);
+    border-radius:7px;padding:3px 8px;font-size:12.5px;
+  }
+  .tu-migas i{font-style:normal;color:var(--ink4)}
+
+  /* texto de la interfaz */
+  .ui{
+    display:inline-block;font-weight:600;font-size:.92em;color:var(--ink);background:var(--bg);
+    border:1px solid var(--border2);border-bottom-width:2px;border-radius:7px;padding:0 7px;line-height:1.7;
+    white-space:nowrap;
+  }
+  .ui.verde{background:var(--green);border-color:var(--green-d);color:#fff}
+  .q{color:var(--ink);font-weight:600}
+  kbd{
+    font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--surface);
+    border:1px solid var(--border2);border-bottom-width:2px;border-radius:5px;padding:1px 6px;color:var(--ink);
+  }
+
+  /* pasos */
+  .tu-pasos{list-style:none;counter-reset:paso;margin-top:16px;display:flex;flex-direction:column;gap:4px}
+  .tu-pasos > li{
+    counter-increment:paso;position:relative;padding:12px 0 12px 50px;font-size:15px;color:var(--ink2);
+    border-bottom:1px dashed var(--border);
+  }
+  .tu-pasos > li:last-child{border-bottom:0}
+  .tu-pasos > li::before{
+    content:counter(paso);position:absolute;left:0;top:10px;width:32px;height:32px;border-radius:50%;
+    display:grid;place-items:center;background:var(--green-light);color:var(--green-dd);
+    font-weight:800;font-size:14px;border:1.5px solid var(--green-mid);
+  }
+  .tu-pasos > li > strong:first-child{color:var(--ink);display:block;margin-bottom:2px;font-size:15.5px}
+  .tu-sub{list-style:none;margin-top:8px;display:flex;flex-direction:column;gap:6px}
+  .tu-sub li{position:relative;padding-left:18px;font-size:14.5px}
+  .tu-sub li::before{content:'';position:absolute;left:4px;top:.65em;width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+  /* avisos */
+  .tu-nota{
+    display:flex;gap:12px;border-radius:var(--r);padding:14px 16px;margin-top:16px;font-size:14.5px;
+    color:var(--ink2);border:1px solid;
+  }
+  .tu-nota > .ic{flex:none;width:26px;height:26px;border-radius:8px;display:grid;place-items:center;font-size:14px;font-weight:800}
+  .tu-nota b.t{display:block;color:var(--ink);margin-bottom:2px}
+  .tu-nota.tip{background:var(--green-light);border-color:var(--green-mid)}
+  .tu-nota.tip > .ic{background:var(--green);color:#fff}
+  .tu-nota.ojo{background:var(--tu-ambar-bg);border-color:var(--tu-ambar-borde)}
+  .tu-nota.ojo > .ic{background:#f59e0b;color:#fff}
+  .tu-nota.info{background:var(--tu-azul-bg);border-color:var(--tu-azul-borde)}
+  .tu-nota.info > .ic{background:var(--tu-azul);color:#fff}
+
+  /* pie del capítulo */
+  .tu-cap-pie{
+    display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px;
+    margin-top:24px;padding-top:18px;border-top:1px solid var(--border);
+  }
+  .tu-listo{font-size:14px;color:var(--ink2);display:flex;gap:8px;align-items:baseline}
+  .tu-listo b{color:var(--ink)}
+  .tu-visto{
+    display:inline-flex;align-items:center;gap:8px;border:1.5px solid var(--border2);background:var(--surface);
+    color:var(--ink2);border-radius:999px;padding:9px 16px;font-weight:600;font-size:13.5px;cursor:pointer;
+    font-family:inherit;transition:all .15s;
+  }
+  .tu-visto::before{
+    content:'';width:16px;height:16px;border-radius:50%;border:1.5px solid var(--border2);box-sizing:border-box;
+  }
+  .tu-visto:hover{border-color:var(--green);color:var(--green-dd)}
+  .tu-visto[aria-pressed="true"]{background:var(--green);border-color:var(--green);color:#fff}
+  .tu-visto[aria-pressed="true"]::before{content:'✓';border:0;display:grid;place-items:center;font-size:13px;line-height:16px}
+
+  /* tablas */
+  .tu-tabla-env{overflow-x:auto;margin-top:14px;border:1px solid var(--border);border-radius:var(--r)}
+  .tu-tabla{width:100%;border-collapse:collapse;font-size:14px;min-width:560px}
+  .tu-tabla th{background:var(--bg);text-align:left;font-weight:700;color:var(--ink);padding:10px 12px;font-size:13px}
+  .tu-tabla td{padding:10px 12px;border-top:1px solid var(--border);color:var(--ink2);vertical-align:top}
+  .tu-tabla td:first-child{font-weight:600;color:var(--ink)}
+
+  /* mini tarjetas (bienvenida, herramientas) */
+  .tu-rejilla{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:14px}
+  .tu-mini{border:1px solid var(--border);border-radius:var(--r);padding:14px;background:var(--surface)}
+  .tu-mini .k{font-size:11.5px;font-weight:700;color:var(--green-dd);letter-spacing:.4px;text-transform:uppercase}
+  .tu-mini h4{font-size:14.5px;font-weight:700;color:var(--ink);margin:4px 0 4px;line-height:1.35}
+  .tu-mini p{font-size:13.5px;color:var(--ink2)}
+  .tu-herr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:16px}
+  .tu-herr .tu-mini{padding:18px}
+  .tu-herr .tu-mini h4{font-size:16px}
+  .tu-herr ol{margin:8px 0 0 18px;font-size:13.5px;color:var(--ink2);display:flex;flex-direction:column;gap:4px}
+
+  /* ── MAQUETAS ───────────────────────────────── */
+  .tu-maqueta{margin-top:20px;border:1px solid var(--border2);border-radius:16px;overflow:hidden;background:var(--bg);box-shadow:var(--shadow)}
+  .tu-mq-barra{display:flex;align-items:center;gap:6px;padding:10px 14px;background:var(--surface);border-bottom:1px solid var(--border)}
+  .tu-mq-barra > span{width:10px;height:10px;border-radius:50%;background:var(--border2)}
+  .tu-mq-barra > b{margin-left:10px;font-size:12.5px;color:var(--ink2);font-weight:600}
+  .tu-maqueta figcaption{font-size:13px;color:var(--ink3);padding:10px 14px;background:var(--surface);border-top:1px solid var(--border)}
+  .mk{
+    display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ink);
+    color:#fff;font-size:11px;font-weight:800;flex:none;vertical-align:middle;
+  }
+  .tu-mq-caja{display:grid;grid-template-columns:1.35fr 1fr;gap:14px;padding:14px}
+  .tu-mq-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px}
+  .tu-mq-fila{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .tu-mq-busca{flex:1;font-size:12px;color:var(--ink4);border:1px solid var(--border);border-radius:8px;padding:7px 10px}
+  .tu-mq-prods{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .tu-mq-prod{border:1px solid var(--border);border-radius:9px;padding:9px;font-size:12px;color:var(--ink2);background:var(--surface)}
+  .tu-mq-prod b{display:block;color:var(--ink);font-size:12.5px;margin-top:2px}
+  .tu-mq-prod.sel{border-color:var(--green);background:var(--green-light)}
+  .tu-mq-ticket{display:flex;flex-direction:column;gap:8px;font-size:12.5px}
+  .tu-mq-ln{display:flex;justify-content:space-between;gap:8px;color:var(--ink2)}
+  .tu-mq-ln b{color:var(--ink)}
+  .tu-mq-campo{border:1px solid var(--border);border-radius:8px;padding:6px 9px;color:var(--ink3);font-size:12px}
+  .tu-mq-pagos{display:flex;gap:6px;flex-wrap:wrap}
+  .tu-mq-pagos span{border:1px solid var(--border);border-radius:8px;padding:5px 9px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+  .tu-mq-pagos span.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .tu-mq-total{display:flex;justify-content:space-between;font-family:'Nunito',sans-serif;font-weight:900;font-size:18px;color:var(--ink);border-top:1px solid var(--border);padding-top:8px}
+  .tu-mq-cobrar{background:var(--green);color:#fff;text-align:center;border-radius:10px;padding:10px;font-weight:700;font-size:13.5px}
+
+  /* folios */
+  .tu-folio{padding:18px 16px;display:flex;flex-direction:column;gap:10px}
+  .tu-folio-venta{display:flex;flex-wrap:wrap;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .tu-folio-venta code{font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;font-size:14px;color:var(--ink)}
+  .tu-folio-pagos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding-left:22px;position:relative}
+  .tu-folio-pagos::before{content:'';position:absolute;left:8px;top:-10px;bottom:50%;border-left:2px solid var(--border2);border-bottom:2px solid var(--border2);width:10px;border-bottom-left-radius:8px}
+  .tu-folio-p{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px 12px;font-size:12.5px;color:var(--ink2)}
+  .tu-folio-p code{display:block;font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;color:var(--green-dd);font-size:13px}
+  .tu-folio-p.cancel{opacity:.6;text-decoration:line-through}
+  .tu-folio-p.fin{border-color:var(--green);background:var(--green-light)}
+
+  /* ecuación (corte) */
+  .tu-ecu{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;padding:16px}
+  .tu-ecu-c{flex:1 1 150px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .tu-ecu-c small{display:block;font-size:12px;color:var(--ink3)}
+  .tu-ecu-c b{font-family:'Nunito',sans-serif;font-size:22px;font-weight:900;color:var(--ink)}
+  .tu-ecu-c.res{border-color:var(--green);background:var(--green-light)}
+  .tu-ecu-op{display:grid;place-items:center;font-size:22px;font-weight:800;color:var(--ink4);flex:none}
+
+  /* cascada (reportes) */
+  .tu-cascada{padding:16px;display:flex;flex-direction:column;gap:8px}
+  .tu-cas{display:grid;grid-template-columns:170px minmax(0,1fr) 90px;gap:10px;align-items:center;font-size:13px}
+  .tu-cas span{color:var(--ink2)}
+  .tu-cas em{font-style:normal;text-align:right;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+  .tu-cas-carril{height:14px;background:var(--surface);border:1px solid var(--border);border-radius:99px;position:relative;overflow:hidden}
+  .tu-cas-carril i{position:absolute;top:0;bottom:0;border-radius:99px;background:var(--ink4)}
+  .tu-cas.base i{background:var(--ink)}
+  .tu-cas.menos i{background:#f59e0b}
+  .tu-cas.queda i{background:var(--green)}
+  .tu-cas.queda span, .tu-cas.queda em{color:var(--green-dd);font-weight:800}
+
+  /* imagen ilustrativa */
+  .tu-foto{margin-top:18px;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--bg)}
+  .tu-foto img{display:block;width:100%;max-height:300px;object-fit:cover}
+
+  /* ── PLANES ─────────────────────────────────── */
+  .tu-planes{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:26px}
+  .tu-plan{border:1px solid var(--border);border-radius:var(--r-lg);padding:20px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+  .tu-plan.dest{border-color:var(--green);box-shadow:0 10px 30px rgba(34,197,94,.15)}
+  .tu-plan .nom{font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--ink3)}
+  .tu-plan .pre{font-family:'Nunito',sans-serif;font-weight:900;font-size:32px;color:var(--ink);letter-spacing:-1px}
+  .tu-plan .pre small{font-size:13px;font-weight:600;color:var(--ink3);letter-spacing:0}
+  .tu-plan .us{font-size:13.5px;font-weight:600;color:var(--green-dd)}
+  .tu-plan ul{list-style:none;display:flex;flex-direction:column;gap:6px;font-size:13.5px;color:var(--ink2)}
+  .tu-plan li{padding-left:20px;position:relative}
+  .tu-plan li::before{content:'✓';position:absolute;left:0;color:var(--green-d);font-weight:800}
+  .tu-plan .para{font-size:12.5px;color:var(--ink3);border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+
+  /* ── GLOSARIO Y PREGUNTAS ───────────────────── */
+  .tu-glosario{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 28px;margin-top:22px}
+  .tu-glosario div{padding:14px 0;border-bottom:1px solid var(--border)}
+  .tu-glosario dt{font-weight:700;color:var(--ink);font-size:15px}
+  .tu-glosario dd{font-size:14px;color:var(--ink2);margin-top:3px}
+  .tu-faq{margin-top:22px;display:flex;flex-direction:column;gap:10px;max-width:860px}
+  .tu-faq details{border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+  .tu-faq summary{
+    list-style:none;cursor:pointer;padding:16px 48px 16px 18px;font-weight:600;color:var(--ink);font-size:15px;position:relative;
+  }
+  .tu-faq summary::-webkit-details-marker{display:none}
+  .tu-faq summary::after{content:'+';position:absolute;right:18px;top:12px;font-size:22px;color:var(--green-d);font-weight:400}
+  .tu-faq details[open] summary::after{content:'−'}
+  .tu-faq details > div{padding:0 18px 16px;font-size:14.5px;color:var(--ink2)}
+
+  /* ── CIERRE ─────────────────────────────────── */
+  .tu-final{
+    max-width:var(--tu-ancho);margin:64px auto 80px;padding:0 24px;
+  }
+  .tu-final-caja{
+    border-radius:24px;padding:48px 32px;text-align:center;color:#fff;
+    background:radial-gradient(600px 240px at 50% 0, rgba(34,197,94,.35), transparent 70%), #0f172a;
+  }
+  .tu-final-caja h2{font-family:'Nunito',sans-serif;font-weight:900;font-size:clamp(26px,3.6vw,38px);letter-spacing:-1px;line-height:1.15}
+  .tu-final-caja p{color:rgba(255,255,255,.75);margin:12px auto 26px;max-width:560px}
+  .tu-final-caja .tu-btn-claro{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+  .tu-final-caja .tu-btn-claro:hover{border-color:#fff;color:#fff}
+
+  /* ── RESPONSIVO ─────────────────────────────── */
+  @media (max-width:1060px){
+    .tu-rutas, .tu-planes{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:960px){
+    .tu-layout{grid-template-columns:1fr;gap:18px;padding:40px 16px 24px}
+    .tu-indice-caja{position:static;max-height:none;overflow:visible;border:1px solid var(--border);border-radius:var(--r);background:var(--surface)}
+    .tu-indice-caja > summary{
+      display:flex;justify-content:space-between;align-items:center;list-style:none;cursor:pointer;
+      padding:14px 16px;font-weight:700;color:var(--ink);
+    }
+    .tu-indice-caja > summary::-webkit-details-marker{display:none}
+    .tu-indice-caja > summary::after{content:'▾';color:var(--ink3)}
+    .tu-indice-caja[open] > summary::after{content:'▴'}
+    .tu-indice-dentro{padding:0 12px 12px}
+    .tu-ideas, .tu-rejilla{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .tu-seccion{padding:52px 16px 8px}
+    .tu-final{padding:0 16px}
+  }
+  @media (max-width:680px){
+    .tu-hero{padding:100px 16px 48px}
+    .tu-ideas, .tu-rejilla, .tu-herr, .tu-rutas, .tu-planes, .tu-glosario{grid-template-columns:1fr}
+    .tu-cap{padding:22px 18px;border-radius:16px}
+    .tu-cap-cab{gap:12px}
+    .tu-cap-num{width:42px;height:42px;font-size:18px;border-radius:12px}
+    .tu-pasos > li{padding-left:44px}
+    .tu-mq-caja{grid-template-columns:1fr}
+    .tu-mq-prods{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .tu-folio-pagos{grid-template-columns:1fr}
+    .tu-cas{grid-template-columns:110px minmax(0,1fr) 72px;font-size:12px}
+    .tu-ecu-op{width:100%}
+    .tu-final-caja{padding:36px 20px}
+    .ui{white-space:normal}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{transition:none!important;scroll-behavior:auto!important}
+  }
+</style>
+</head>
+<body>
+
+<!-- Menú (lo pone shared.js) -->
+<div id="lf-nav-placeholder"></div>
+
+<!-- ═══════════════════ HERO ═══════════════════ -->
+<header class="tu-hero">
+  <span class="tu-eyebrow">Tutorial paso a paso</span>
+  <h1>Aprende Libertyfin <em>en una tarde</em></h1>
+  <p class="tu-hero-sub">
+    De crear tu cuenta a tu primer corte de caja. Cada capítulo te dice
+    qué hacer, dónde dar clic y qué vas a ver, con los nombres exactos que
+    aparecen en pantalla.
+  </p>
+  <div class="tu-hero-datos">
+    <span class="tu-dato"><b>12</b> capítulos cortos</span>
+    <span class="tu-dato"><b>~70 min</b> en total, o solo lo que necesites</span>
+    <span class="tu-dato">Tu avance <b><span data-avance-num>0</span> de 12</b></span>
+  </div>
+  <div class="tu-hero-ctas">
+    <a class="tu-btn tu-btn-verde" href="#ideas">Empezar el tutorial</a>
+    <a class="tu-btn tu-btn-claro" href="/registro">Crear mi cuenta gratis</a>
+  </div>
+</header>
+
+<!-- ═══════════════════ 6 IDEAS ═══════════════════ -->
+<section class="tu-seccion" id="ideas">
+  <span class="tu-eyebrow">Antes de empezar</span>
+  <h2 class="tu-sec-tit">6 ideas que explican <em>todo</em> Libertyfin</h2>
+  <p class="tu-sec-sub">Si entiendes esto, el resto se acomoda solo. Léelas una vez: te ahorran muchas dudas después.</p>
+
+  <div class="tu-ideas">
+    <article class="tu-idea">
+      <div class="tu-idea-num">1</div>
+      <h3>Cobrado no es lo mismo que vendido</h3>
+      <p>Si vendes $1,000 y te dejan $400, vendiste $1,000 pero cobraste $400. Libertyfin siempre te muestra las dos cifras, y tus reportes cuentan <b>lo que de verdad entró</b>.</p>
+    </article>
+    <article class="tu-idea">
+      <div class="tu-idea-num">2</div>
+      <h3>Una venta puede quedar con saldo</h3>
+      <p>El cliente puede pagar completo o dejar un anticipo. Lo que falta queda como <b>saldo</b> y se paga después en <b>abonos</b>, sin abrir otra venta.</p>
+    </article>
+    <article class="tu-idea">
+      <div class="tu-idea-num">3</div>
+      <h3>Cada pago tiene su propio folio</h3>
+      <p>La venta tiene un folio y cada cobro, un subfolio: <b>-01</b> el primero, <b>-02</b> el segundo… Así puedes referirte a un pago por teléfono y cuadrarlo contra tu banco.</p>
+    </article>
+    <article class="tu-idea">
+      <div class="tu-idea-num">4</div>
+      <h3>Nada se borra: se cancela</h3>
+      <p>Una venta o un pago equivocado se cancela con un motivo. Deja de contar en tus números, pero queda el rastro de quién lo hizo y cuándo.</p>
+    </article>
+    <article class="tu-idea">
+      <div class="tu-idea-num">5</div>
+      <h3>Cada quien ve lo suyo</h3>
+      <p>El <b>Administrador</b> ve todo. El <b>Cajero</b> cobra y cierra su caja, pero no ve comisiones ni ganancias. <b>Inventario</b> cuida el catálogo y no cobra.</p>
+    </article>
+    <article class="tu-idea">
+      <div class="tu-idea-num">6</div>
+      <h3>Enciendes solo lo que usas</h3>
+      <p>Agenda, cotizaciones, inventario, igualas… son herramientas que prendes según tu giro. Si no las necesitas, ni aparecen en tu menú.</p>
+    </article>
+  </div>
+</section>
+
+<!-- ═══════════════════ RUTAS ═══════════════════ -->
+<section class="tu-seccion" id="rutas">
+  <span class="tu-eyebrow">Por dónde empezar</span>
+  <h2 class="tu-sec-tit">Elige tu <em>ruta</em></h2>
+  <p class="tu-sec-sub">No tienes que leerlo todo. Toca los capítulos de tu perfil y ve directo a lo tuyo.</p>
+
+  <div class="tu-rutas">
+    <div class="tu-ruta-card">
+      <h3>Soy el dueño o el gerente</h3>
+      <p>Vas a configurar, cobrar y ver números. Léelo todo, en orden.</p>
+      <div class="tu-ruta-caps"><a href="#cap-1">Empieza en el 1</a></div>
+    </div>
+    <div class="tu-ruta-card">
+      <h3>Voy a cobrar en mostrador</h3>
+      <p>Lo tuyo es Caja, abonos, clientes y el corte del día.</p>
+      <div class="tu-ruta-caps"><a href="#cap-4">4</a><a href="#cap-6">6</a><a href="#cap-7">7</a><a href="#cap-8">8</a></div>
+    </div>
+    <div class="tu-ruta-card">
+      <h3>Llevo el inventario</h3>
+      <p>Catálogo, existencias y pedidos a proveedor.</p>
+      <div class="tu-ruta-caps"><a href="#cap-3">3</a><a href="#cap-10">10</a></div>
+    </div>
+    <div class="tu-ruta-card">
+      <h3>Tengo 15 minutos</h3>
+      <p>Lo mínimo para cobrar hoy y cuadrar en la noche.</p>
+      <div class="tu-ruta-caps"><a href="#cap-4">4</a><a href="#cap-8">8</a></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ ÍNDICE + CAPÍTULOS ═══════════════════ -->
+<div class="tu-layout">
+
+  <aside>
+    <details class="tu-indice-caja" open>
+      <summary>Índice del tutorial · <span><span data-avance-num>0</span> de 12</span></summary>
+      <div class="tu-indice-dentro">
+        <div class="tu-avance">
+          <div class="tu-avance-txt"><span>Tu avance</span><b><span data-avance-num>0</span> de 12</b></div>
+          <div class="tu-barra"><i data-avance-barra></i></div>
+        </div>
+        <nav class="tu-indice" aria-label="Capítulos">
+          <ol>
+            <li><a href="#cap-1"><span class="n">1</span>Crea tu cuenta</a></li>
+            <li><a href="#cap-2"><span class="n">2</span>La configuración inicial</a></li>
+            <li><a href="#cap-3"><span class="n">3</span>Productos, equipo y caja</a></li>
+            <li><a href="#cap-4"><span class="n">4</span>Tu primera venta</a></li>
+            <li><a href="#cap-5"><span class="n">5</span>Cobros en línea</a></li>
+            <li><a href="#cap-6"><span class="n">6</span>Ventas, abonos y saldos</a></li>
+            <li><a href="#cap-7"><span class="n">7</span>Clientes y cobranza</a></li>
+            <li><a href="#cap-8"><span class="n">8</span>El corte de caja</a></li>
+            <li><a href="#cap-9"><span class="n">9</span>¿Cuánto te queda?</a></li>
+            <li><a href="#cap-10"><span class="n">10</span>Herramientas para tu giro</a></li>
+            <li><a href="#cap-11"><span class="n">11</span>Factura tus ventas</a></li>
+            <li><a href="#cap-12"><span class="n">12</span>Equipo, plan y soporte</a></li>
+          </ol>
+          <ol class="tu-indice-extra">
+            <li><a href="#planes"><span class="n">$</span>¿Qué plan me conviene?</a></li>
+            <li><a href="#glosario"><span class="n">Aa</span>Glosario</a></li>
+            <li><a href="#preguntas"><span class="n">?</span>Preguntas frecuentes</a></li>
+          </ol>
+        </nav>
+      </div>
+    </details>
+  </aside>
+
+  <main class="tu-caps">
+
+    <!-- ───────────── 1 ───────────── -->
+    <article class="tu-cap" id="cap-1">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">1</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">5 min</span></div>
+          <h2>Crea tu cuenta</h2>
+          <p class="tu-para">Para tener tu Libertyfin listo, con tu propio usuario y tu información aparte de cualquier otro negocio.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde:</span>
+        <span class="tu-migas"><b>libertyfin.com.mx</b><i>›</i><b>Registra tu empresa</b></span>
+      </div>
+
+      <ol class="tu-pasos">
+        <li><strong>Llena el formulario de registro</strong>
+          Tu nombre, el de tu negocio, tu correo, un teléfono de 10 dígitos, tu giro y cuántas personas trabajan contigo.
+          Si un distribuidor te invitó, abre <span class="q">«¿Te invitó un distribuidor?»</span> y escribe su código.</li>
+        <li><strong>Envía tu solicitud</strong>
+          Da clic en <span class="ui verde">Crear mi cuenta gratis</span>. Verás <span class="q">«¡Listo!»</span>: tu solicitud ya está en revisión.</li>
+        <li><strong>Espera tu correo</strong>
+          Revisamos cada solicitud. En menos de un día hábil te llega <span class="q">«Tu cuenta de LibertyFin está lista»</span> con tu <b>usuario</b> y tu <b>contraseña</b>.</li>
+        <li><strong>Entra por primera vez</strong>
+          Usa el botón <span class="ui">Entrar a LibertyFin</span> del correo. En el campo <span class="q">«Correo»</span> puedes escribir tu correo <b>o</b> tu usuario. Luego, <span class="ui verde">Entrar al sistema</span>.</li>
+        <li><strong>Cambia tu contraseña</strong>
+          Ve a <span class="tu-migas"><b>Mi cuenta</b><i>›</i><b>Mi perfil</b></span> y usa <span class="q">«Cambiar mi contraseña»</span> (mínimo 8 caracteres). Al cambiarla, el sistema te pide entrar otra vez.</li>
+      </ol>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>Tu prueba gratis dura 15 días. Úsala para registrar ventas de verdad de un día normal: es la forma más rápida de saber si Libertyfin es para ti.</div></div>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>No hay "recuperar contraseña" por correo. Si eres cajero o de inventario, pídesela a tu administrador; si eres el administrador, escríbele a soporte. Y una cuenta abre una sola sesión a la vez: si entras desde otro equipo, el sistema te pregunta si cierras la anterior (<span class="ui">Cerrarla y entrar aquí</span>).</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> entraste y ves tu Panel.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 2 ───────────── -->
+    <article class="tu-cap" id="cap-2">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">2</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">5 min</span></div>
+          <h2>La configuración inicial</h2>
+          <p class="tu-para">Para que el sistema hable el idioma de tu negocio desde el primer día, sin tener que buscar ajustes.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde:</span>
+        <span>aparece sola la primera vez que entra el administrador.</span>
+      </div>
+
+      <p class="tu-txt">Son 9 preguntas rápidas. Ya vienen marcadas según el giro que elegiste al registrarte: toca la tarjeta que aplique y avanza sola. Mientras respondes, a la derecha ves <span class="q">«Así se verá tu menú»</span>.</p>
+
+      <div class="tu-rejilla">
+        <div class="tu-mini"><span class="k">Paso 1</span><h4>¿A qué se dedica tu negocio?</h4><p>Servicios profesionales, Salud y belleza, Tienda o comercio u Otro giro.</p></div>
+        <div class="tu-mini"><span class="k">Paso 2</span><h4>¿Qué vendes?</h4><p>Servicios, Productos o Las dos cosas. Con productos se enciende Inventario.</p></div>
+        <div class="tu-mini"><span class="k">Paso 3</span><h4>¿Cómo te pagan?</h4><p>«Todo al momento» o «Una parte y el resto después». Define cómo arranca el cobro en Caja.</p></div>
+        <div class="tu-mini"><span class="k">Paso 4</span><h4>¿Tus ventas llevan IVA?</h4><p>16%, 8% o «Casi nunca».</p></div>
+        <div class="tu-mini"><span class="k">Paso 5</span><h4>¿Pagas comisiones?</h4><p>Si dices que no, la sección ni aparece.</p></div>
+        <div class="tu-mini"><span class="k">Paso 6</span><h4>¿Qué más te ayudaría?</h4><p>Herramientas extra: agenda, cotizaciones, igualas…</p></div>
+        <div class="tu-mini"><span class="k">Paso 7</span><h4>¿Cómo ordenamos lo que vendes?</h4><p>Tus áreas: las categorías de tu catálogo.</p></div>
+        <div class="tu-mini"><span class="k">Paso 8</span><h4>Que se vea como tu negocio</h4><p>Tu logotipo (opcional) y el color de tu marca.</p></div>
+        <div class="tu-mini"><span class="k">Paso 9</span><h4>Así quedó tu Libertyfin</h4><p>Un resumen de todo. Da clic en «Entrar a Libertyfin».</p></div>
+      </div>
+
+      <h3>Lo que trae marcado cada giro</h3>
+      <div class="tu-tabla-env">
+        <table class="tu-tabla">
+          <thead><tr><th>Giro</th><th>Vende</th><th>Cobro</th><th>Comisiones</th><th>Herramientas sugeridas</th></tr></thead>
+          <tbody>
+            <tr><td>Servicios profesionales</td><td>Servicios</td><td>Anticipo y abonos</td><td>Sí</td><td>Cotizaciones, igualas, trabajos, expediente</td></tr>
+            <tr><td>Salud y belleza</td><td>Las dos cosas</td><td>Completo</td><td>Sí</td><td>Agenda, paquetes de sesiones, expediente</td></tr>
+            <tr><td>Tienda o comercio</td><td>Productos</td><td>Completo</td><td>No</td><td>Inventario y compras a proveedor</td></tr>
+            <tr><td>Otro giro</td><td>Servicios</td><td>Completo</td><td>No</td><td>Ninguna: las enciendes tú</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Después: la guía animada</h3>
+      <p class="tu-txt">Al terminar, una guía de menos de un minuto te señala cada sección de tu menú. Avanza con <kbd>→</kbd>, regresa con <kbd>←</kbd> o sal con <kbd>Esc</kbd>.</p>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>«Nada de esto es obligatorio». Puedes dar <span class="ui">Saltar por ahora</span> y ajustar todo después. Para repetir la configuración: <span class="tu-migas"><b>Ajustes</b><i>›</i><b>Empresa</b><i>›</i><b>Volver a hacerla</b></span>. Para volver a ver la guía: <span class="tu-migas"><b>Mi cuenta</b><i>›</i><b>Volver a ver la guía</b></span>.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> ves tu logo y tu color en el menú.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 3 ───────────── -->
+    <article class="tu-cap" id="cap-3">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">3</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">10 min</span></div>
+          <h2>Prepara tu negocio: productos, equipo y caja</h2>
+          <p class="tu-para">Para que, cuando llegue tu primer cliente, todo esté a un clic.</p>
+        </div>
+      </div>
+
+      <h3>A · Lo que vendes</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Productos</b><i>›</i><b>Dar de alta un producto</b></span></div>
+      <ol class="tu-pasos">
+        <li><strong>Lo básico</strong>
+          Escribe <span class="q">«Nombre»</span>, elige su <span class="q">«Área»</span> y pon el <span class="q">«Precio»</span>.</li>
+        <li><strong>Lo que ayuda (opcional)</strong>
+          <ul class="tu-sub">
+            <li><span class="q">«Código»</span>: para cobrarlo con lector de código de barras.</li>
+            <li><span class="q">«Costo»</span>: con él, <span class="q">«Utilidad %»</span> te calcula el precio, o al revés, y ves cuánto <span class="q">«Te queda por venta»</span>.</li>
+            <li>Si llevas existencias: marca <span class="q">«Lleva existencias»</span>, elige <span class="q">«Se cuenta por»</span> (pieza, kilo, litro…) y escribe la existencia inicial.</li>
+          </ul></li>
+        <li><strong>Guarda</strong>
+          Da clic en <span class="ui verde">Dar de alta</span>. Ya aparece en Caja.</li>
+      </ol>
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>¿Cada trabajo cuesta distinto? Deja el precio en <b>0</b>: el producto queda como <span class="q">«Precio libre»</span> y escribes el monto al vender.</div></div>
+
+      <h3>B · Las personas que atienden</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Ajustes</b><i>›</i><b>Áreas y colaboradores</b></span></div>
+      <p class="tu-txt">Aquí das de alta a tus <b>colaboradores</b>: quienes atienden al cliente y ganan comisión, con su <span class="q">«% usual»</span>. No necesitan usuario para entrar al sistema, así que no cuentan en el límite de tu plan.</p>
+
+      <h3>C · Quién entra al sistema</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Ajustes</b><i>›</i><b>Usuarios</b><i>›</i><b>Dar de alta un usuario</b></span></div>
+      <p class="tu-txt">Nombre, usuario, correo, <b>rol</b> (Administrador, Cajero o Inventario), sucursal y una contraseña de al menos 8 caracteres. Arriba ves cuántos lugares te quedan: <span class="q">«N de M usuarios de tu plan»</span>.</p>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>La contraseña del nuevo usuario se muestra <b>una sola vez</b>. Anótala y dísela en persona. Los usuarios no se borran: se desactivan con la <span class="ui">×</span> y sus ventas se quedan intactas.</div></div>
+
+      <h3>D · Cómo cobra tu caja</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Ajustes</b><i>›</i><b>Caja</b></span></div>
+      <p class="tu-txt">Decide si el anticipo empieza en <span class="q">«El total de la venta»</span> o <span class="q">«Vacío»</span>, si manejas IVA y con qué tasa (16% u 8%). Se guarda en cuanto eliges. ¿Tienes más de un local? En <span class="tu-migas"><b>Ajustes</b><i>›</i><b>Sucursales</b></span> los agregas; tu empresa empieza con <b>«Matriz»</b>.</p>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> tienes al menos 3 productos con precio.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 4 ───────────── -->
+    <article class="tu-cap" id="cap-4">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">4</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">8 min</span><span class="tu-pill">El más importante</span></div>
+          <h2>Tu primera venta en Caja</h2>
+          <p class="tu-para">Tu pantalla de todos los días. Cobras en segundos, completo o en partes.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Caja</b></span></div>
+
+      <div class="tu-nota info"><span class="ic">i</span><div><b class="t">Antes de cobrar: abre tu turno</b>En <span class="tu-migas"><b>Corte de caja</b><i>›</i><b>Abrir caja</b></span> escribe tu <span class="q">«Fondo inicial»</span> (el efectivo con el que empiezas). Si no lo abres, la venta se registra igual, pero no entra a tu corte y en la noche no te va a cuadrar.</div></div>
+
+      <figure class="tu-maqueta" aria-label="Ejemplo de la pantalla de Caja">
+        <div class="tu-mq-barra"><span></span><span></span><span></span><b>Caja · Venta nueva</b></div>
+        <div class="tu-mq-caja">
+          <div class="tu-mq-panel">
+            <div class="tu-mq-fila"><span class="mk">1</span><div class="tu-mq-busca">Nombre o código ( / )</div></div>
+            <div class="tu-mq-prods">
+              <div class="tu-mq-prod sel">Corte de cabello<b>$250.00</b></div>
+              <div class="tu-mq-prod">Tinte<b>$650.00</b></div>
+              <div class="tu-mq-prod sel">Shampoo 1 L<b>$400.00</b></div>
+              <div class="tu-mq-prod">Peinado<b>$300.00</b></div>
+              <div class="tu-mq-prod">Manicure<b>$220.00</b></div>
+              <div class="tu-mq-prod">Asesoría<b>Precio libre</b></div>
+            </div>
+          </div>
+          <div class="tu-mq-panel tu-mq-ticket">
+            <b>Ticket · 2 conceptos</b>
+            <div class="tu-mq-ln"><span>Corte de cabello</span><b>$250.00</b></div>
+            <div class="tu-mq-ln"><span>Shampoo 1 L</span><b>$400.00</b></div>
+            <div class="tu-mq-fila" style="margin:0"><span class="mk">2</span><div class="tu-mq-campo" style="flex:1">Cliente (opcional)</div></div>
+            <div class="tu-mq-fila" style="margin:0"><span class="mk">3</span><div class="tu-mq-campo" style="flex:1">Especialista</div></div>
+            <div class="tu-mq-fila" style="margin:0"><span class="mk">4</span><div class="tu-mq-pagos"><span class="on">Efectivo</span><span>Tarjeta</span><span>SPEI</span></div></div>
+            <div class="tu-mq-total"><span>Total</span><span>$650.00</span></div>
+            <div class="tu-mq-fila" style="margin:0"><span class="mk">5</span><div class="tu-mq-cobrar" style="flex:1">Cobrar $650.00</div></div>
+          </div>
+        </div>
+        <figcaption>A la izquierda, tu catálogo. A la derecha, el ticket y cómo paga. Los números son los pasos de abajo.</figcaption>
+      </figure>
+
+      <ol class="tu-pasos">
+        <li><strong>Agrega lo que se lleva</strong>
+          Toca los productos y se suman al <span class="q">«Ticket»</span>. Cambia la cantidad con <span class="ui">−</span> y <span class="ui">+</span>, o toca el precio para editarlo.
+          Atajos: <kbd>/</kbd> busca, <kbd>Enter</kbd> agrega el primero, <kbd>Esc</kbd> limpia. También funciona con lector de código de barras.</li>
+        <li><strong>¿Para quién es?</strong>
+          Escribe en <span class="q">«Cliente (opcional)»</span>: desde 2 letras te sugiere. Si es nuevo, se da de alta solo al cobrar. Sin cliente, la venta queda como <b>«Público general»</b>.</li>
+        <li><strong>¿Quién lo atendió?</strong>
+          Elige el <span class="q">«Especialista»</span> si quieres llevar sus comisiones.</li>
+        <li><strong>¿Cómo paga?</strong>
+          <ul class="tu-sub">
+            <li><b>Efectivo completo:</b> escribe <span class="q">«¿Con cuánto paga?»</span> y te dice el <b>Cambio</b>.</li>
+            <li><b>Solo una parte:</b> toca <span class="ui">Solo una parte</span> y escribe <span class="q">«¿Cuánto deja hoy?»</span> (atajos <span class="ui">50%</span> y <span class="ui">Completo</span>). El resto queda como saldo.</li>
+            <li><b>Tarjeta con tu terminal, o transferencia que ya recibiste:</b> elige Tarjeta o SPEI, marca <span class="q">«Ya me pagaron — no generar liga de pago»</span> y, si quieres, anota el banco y la referencia.</li>
+          </ul></li>
+        <li><strong>Revisa y confirma</strong>
+          Da clic en <span class="ui verde">Cobrar $650.00</span>. Se abre <span class="q">«Revisa antes de registrar»</span>: te avisa si falta el cliente, el especialista o si queda saldo. Si todo está bien, <span class="ui verde">Confirmar y registrar</span>.</li>
+        <li><strong>Entrega el ticket</strong>
+          Usa <span class="ui">Imprimir ticket</span> (formato de 80 mm) y luego <span class="ui">Siguiente venta</span>.</li>
+      </ol>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Tres trucos de cajero experto</b>
+        <ul class="tu-sub">
+          <li>El interruptor <span class="q">«IVA 16%»</span> <b>no cambia el total</b>: tus precios ya lo incluyen. Solo separa subtotal e IVA en el ticket.</li>
+          <li>¿El cliente regresa por algo más y todavía te debe? Usa <span class="q">«Agregar a una venta que ya existe»</span>: se suma a su cuenta en vez de abrir otra venta.</li>
+          <li>Las promociones se aplican solas. Si tienes cupones, aparece el campo <span class="q">«Código de promoción»</span>.</li>
+        </ul></div></div>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Una venta registrada no se elimina. Si hubo un error, el administrador la cancela con un motivo (lo ves en el capítulo 6).</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> imprimiste tu primer ticket.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 5 ───────────── -->
+    <article class="tu-cap" id="cap-5">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">5</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">5 min</span><span class="tu-pill op">Opcional</span></div>
+          <h2>Cobra en línea: tarjeta, SPEI y tienda</h2>
+          <p class="tu-para">Para que tu cliente pague a distancia y el sistema registre el pago solo, sin que tengas que revisar tu banco.</p>
+        </div>
+      </div>
+
+      <div class="tu-nota info"><span class="ic">i</span><div><b class="t">¿Cuándo lo tengo?</b>Cuando Libertyfin activa los cobros en línea en tu cuenta. Para eso, completa en <b>Mi cuenta</b> tus <span class="q">«Datos fiscales»</span>, <span class="q">«Cobrar con tarjeta»</span> y <span class="q">«Documentos»</span>.</div></div>
+
+      <h3>Desde Caja</h3>
+      <ol class="tu-pasos">
+        <li><strong>Elige la forma en línea</strong>
+          Tarjeta, SPEI o <span class="q">«Efectivo (tienda)»</span>, <b>sin</b> marcar «Ya me pagaron». El botón cambia a <span class="ui verde">Confirmar y generar liga</span>.</li>
+        <li><strong>Compártelo con tu cliente</strong>
+          <ul class="tu-sub">
+            <li><b>Tarjeta:</b> un código QR y una liga para <span class="ui">Copiar</span> o <span class="ui">Abrir la página</span>.</li>
+            <li><b>SPEI:</b> una CLABE para transferir el monto exacto.</li>
+            <li><b>Tienda:</b> una referencia para pagar en OXXO y tiendas participantes, con <span class="ui">Ver el comprobante</span>.</li>
+          </ul></li>
+        <li><strong>El sistema se entera solo</strong>
+          Cuando el cliente paga, verás <span class="q">«¡Pagado! El abono ya quedó aplicado.»</span> No tienes que hacer nada más.</li>
+      </ol>
+
+      <h3>Desde Ligas de pago</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Ligas de pago</b><i>›</i><b>Generar una liga de pago</b></span></div>
+      <p class="tu-txt">Para cobrar el saldo de una venta o un cobro suelto: elige <span class="q">«¿Para qué venta?»</span>, el <span class="q">«Monto»</span>, el <span class="q">«Concepto»</span>, cómo puede pagar y la <span class="q">«Vigencia»</span> (de 1 a 30 días). Da clic en <span class="ui verde">Generar</span>. Cada liga muestra su estado: <b>Esperando</b>, <b>Pagada</b>, <b>Por aprobar</b> o <b>Venció</b>.</p>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>¿Quieres revisar cada pago antes de que cuente? En <span class="tu-migas"><b>Ajustes</b><i>›</i><b>Empresa</b><i>›</i><b>Pagos en línea</b></span> elige <span class="q">«Requieren aprobación»</span>: los pagos esperan en <span class="q">«Pagos por aprobar»</span> hasta que des <span class="ui">Aprobar</span>.</div></div>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>En SPEI, pide que transfieran el <b>monto exacto</b>: una cantidad distinta no se asocia sola. Y en línea se cobra el total; si el cliente solo deja una parte, cóbrala en efectivo con «Solo una parte».</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> generaste una liga y la ves como «Esperando».</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 6 ───────────── -->
+    <article class="tu-cap" id="cap-6">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">6</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">6 min</span></div>
+          <h2>Ventas, abonos y saldos</h2>
+          <p class="tu-para">Para saber qué vendiste, qué ya te pagaron y qué te deben, venta por venta.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Ventas</b></span></div>
+
+      <figure class="tu-maqueta" aria-label="Cómo se numeran los pagos de una venta">
+        <div class="tu-mq-barra"><span></span><span></span><span></span><b>Así se numeran los pagos</b></div>
+        <div class="tu-folio">
+          <div class="tu-folio-venta"><code>20261016143022</code><span>Venta de $1,500 · el folio es la fecha y hora en que se registró</span></div>
+          <div class="tu-folio-pagos">
+            <div class="tu-folio-p"><code>-01</code>Anticipo $500<br>Debe $1,000</div>
+            <div class="tu-folio-p"><code>-02</code>Abono $500<br>Debe $500</div>
+            <div class="tu-folio-p fin"><code>-03</code>Abono $500<br><b>Liquidada</b></div>
+          </div>
+        </div>
+        <figcaption>Si se cancela un pago, su número no se vuelve a usar: el siguiente sigue la cuenta. Buscar el folio de la venta encuentra todos sus pagos.</figcaption>
+      </figure>
+
+      <ol class="tu-pasos">
+        <li><strong>Encuentra la venta</strong>
+          Filtra por fechas o por estado: <span class="q">«Liquidadas»</span>, <span class="q">«Con saldo»</span> o <span class="q">«Canceladas»</span>. Si buscas un nombre o un folio, se busca en todo tu historial.</li>
+        <li><strong>Ábrela</strong>
+          Toca la venta: ves lo <b>Cobrado</b>, el <b>Saldo</b> y la lista de pagos con su subfolio.</li>
+        <li><strong>Registra un abono</strong>
+          En el formulario de abono, el monto ya trae el saldo. Ajusta la fecha, el método, el banco y la referencia, y da clic en <span class="ui verde">Registrar</span>. Verás <span class="q">«Abono registrado. Queda un saldo de…»</span> o <span class="q">«…La venta queda liquidada.»</span></li>
+      </ol>
+
+      <h3>Si algo salió mal (solo el administrador)</h3>
+      <ul class="tu-sub">
+        <li><b>Cancelar un pago:</b> la <span class="ui">×</span> junto al pago, con un motivo. Las comisiones se recalculan solas.</li>
+        <li><b>Cancelar la venta:</b> <span class="ui">Cancelar venta</span>, con un motivo de al menos 5 letras. Se cancelan sus cobros y sus comisiones, y lo que se llevó regresa al inventario.</li>
+      </ul>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Cancelar una venta <b>no se puede deshacer</b>, y el sistema te recuerda devolverle al cliente lo que pagó. Tampoco se puede abonar más que el saldo.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> registraste un abono y viste su subfolio <b>-02</b>.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 7 ───────────── -->
+    <article class="tu-cap" id="cap-7">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">7</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">5 min</span></div>
+          <h2>Clientes y cobranza</h2>
+          <p class="tu-para">Para conocer a tus clientes y saber, cada mañana, a quién hay que llamarle.</p>
+        </div>
+      </div>
+
+      <h3>Tus clientes</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Clientes</b></span></div>
+      <p class="tu-txt">Da de alta con <span class="q">«Dar de alta un cliente»</span> (nombre, RFC, teléfono, correo…), aunque también se crean solos al cobrar en Caja. Toca un nombre para abrir su <b>ficha</b>: cuánto te ha comprado, cuánto <b>debe</b>, sus últimas compras y botones directos a <span class="ui">WhatsApp</span> y <span class="ui">Nueva venta</span>.</p>
+
+      <h3>La cobranza del día <span class="tu-pill" style="vertical-align:middle">Administrador</span></h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Cobranza</b></span></div>
+      <div class="tu-rejilla">
+        <div class="tu-mini"><span class="k">1 a 30 días</span><h4>Fresco</h4><p>Se cobra solo. No hace falta insistir.</p></div>
+        <div class="tu-mini"><span class="k">31 a 60 días</span><h4>Recuérdales</h4><p>Un mensaje amable a tiempo evita que se enfríe.</p></div>
+        <div class="tu-mini"><span class="k">Más de 60 días</span><h4>Háblales hoy</h4><p>Lo más viejo es lo más difícil de cobrar.</p></div>
+      </div>
+      <p class="tu-txt">Ordena por <span class="q">«Lo más viejo primero»</span> y ve de arriba hacia abajo. Para cobrar, abre la venta y registra el abono (capítulo 6).</p>
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Por qué funciona</b>Los días se cuentan <b>desde el último abono</b>, no desde la venta. Un cliente que abona seguido no sale urgente aunque deba mucho; uno que dejó de pagar, sí.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> sabes qué cliente tiene el saldo más viejo.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 8 ───────────── -->
+    <article class="tu-cap" id="cap-8">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">8</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">4 min</span></div>
+          <h2>Cierra el día: el corte de caja</h2>
+          <p class="tu-para">Para cuadrar el efectivo de tu cajón al final del turno y saber, sin dudas, si sobra o falta.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Corte de caja</b></span></div>
+
+      <figure class="tu-maqueta" aria-label="Cómo se calcula el corte">
+        <div class="tu-mq-barra"><span></span><span></span><span></span><b>La cuenta del cajón</b></div>
+        <div class="tu-ecu">
+          <div class="tu-ecu-c"><small>Fondo inicial</small><b>$500</b></div>
+          <div class="tu-ecu-op">+</div>
+          <div class="tu-ecu-c"><small>Efectivo cobrado</small><b>$3,200</b></div>
+          <div class="tu-ecu-op">=</div>
+          <div class="tu-ecu-c res"><small>Debe haber en el cajón</small><b>$3,700</b></div>
+        </div>
+        <figcaption>Tarjeta y transferencia se muestran aparte: no pasan por el cajón, así que no entran en esta cuenta.</figcaption>
+      </figure>
+
+      <ol class="tu-pasos">
+        <li><strong>Al empezar el turno</strong>
+          <span class="ui verde">Abrir caja</span> con tu <span class="q">«Fondo inicial»</span>.</li>
+        <li><strong>Durante el día</strong>
+          Cobra normal. En <span class="q">«Turno actual»</span> ves cuánto <span class="q">«Debe haber en el cajón»</span> y la lista de cobros del turno.</li>
+        <li><strong>Al cerrar</strong>
+          Cuenta tu efectivo y escríbelo en <span class="q">«Cuánto hay realmente»</span>. Te responde <span class="q">«Cuadra exacto.»</span> o cuánto sobra o falta.</li>
+        <li><strong>Explica la diferencia</strong>
+          Si no cuadra, escribe en <span class="q">«Nota»</span> a qué se debe (es obligatoria) y da clic en <span class="ui verde">Cerrar caja</span>.</li>
+      </ol>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>En la pestaña <span class="q">«Historial»</span> ves cuántos cortes cuadraron y los sobrantes y faltantes acumulados. Si siempre falta un poco, ahí lo vas a notar.</div></div>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Cada usuario tiene su propio turno, y no puede abrir uno nuevo mientras tenga uno abierto. Ciérralo siempre antes de irte.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> cerraste tu primer corte.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 9 ───────────── -->
+    <article class="tu-cap" id="cap-9">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">9</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">7 min</span><span class="tu-pill">Administrador</span></div>
+          <h2>¿Cuánto te queda? Gastos, comisiones y reportes</h2>
+          <p class="tu-para">La cifra que casi nadie tiene clara: lo que te queda después de pagar todo.</p>
+        </div>
+      </div>
+
+      <figure class="tu-maqueta" aria-label="De lo cobrado a lo que queda">
+        <div class="tu-mq-barra"><span></span><span></span><span></span><b>De lo cobrado a lo que queda (ejemplo de un mes)</b></div>
+        <div class="tu-cascada">
+          <div class="tu-cas base"><span>Cobrado</span><div class="tu-cas-carril"><i style="left:0;width:100%"></i></div><em>$50,000</em></div>
+          <div class="tu-cas menos"><span>− Gastos de operación</span><div class="tu-cas-carril"><i style="left:94%;width:6%"></i></div><em>$3,000</em></div>
+          <div class="tu-cas menos"><span>− Gastos generales</span><div class="tu-cas-carril"><i style="left:70%;width:24%"></i></div><em>$12,000</em></div>
+          <div class="tu-cas menos"><span>− Comisiones</span><div class="tu-cas-carril"><i style="left:58%;width:12%"></i></div><em>$6,000</em></div>
+          <div class="tu-cas menos"><span>− IVA</span><div class="tu-cas-carril"><i style="left:44.2%;width:13.8%"></i></div><em>$6,900</em></div>
+          <div class="tu-cas queda"><span>= Queda</span><div class="tu-cas-carril"><i style="left:0;width:44.2%"></i></div><em>$22,100</em></div>
+        </div>
+        <figcaption>Así se ve el bloque «De dónde a dónde» de Reportes. Las cifras son de ejemplo.</figcaption>
+      </figure>
+
+      <h3>Gastos</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Gastos</b><i>›</i><b>Registrar un gasto</b></span></div>
+      <p class="tu-txt">Concepto, categoría (renta, nómina, servicios, insumos…), monto, fecha y método. Hay dos tipos:</p>
+      <ul class="tu-sub">
+        <li><b>Generales</b> (renta, luz, nómina): bajan lo que te queda, pero no tocan comisiones.</li>
+        <li><b>De operación</b> (lo que gastaste para hacer una venta concreta): se capturan en Caja, en <span class="q">«Más datos»</span>, y se descuentan antes de calcular la comisión.</li>
+      </ul>
+
+      <h3>Comisiones</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Comisiones</b></span></div>
+      <p class="tu-txt">La regla de oro: <b>la comisión se libera conforme el cliente paga</b>. Si una venta va a medias, la comisión también. Se calcula sin IVA, sin costo y descontando los gastos de operación.</p>
+      <ul class="tu-sub">
+        <li>Asígnala desde la venta (<span class="q">«Asignar comisión»</span>) o a muchas a la vez con <span class="ui">Asignar en lote</span>.</li>
+        <li>Revisa <span class="q">«Comisiones sin dueño»</span>: son ventas a las que nadie tiene asignado su porcentaje.</li>
+      </ul>
+
+      <h3>Reportes</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Reportes</b></span></div>
+      <p class="tu-txt">Arriba, en grande: <span class="q">«Entraron $X y quedaron $Y»</span>. Abajo, el detalle por área, colaborador, producto, cliente, forma de pago y día por día. Para tu contador: <span class="ui">Excel completo</span> o <span class="ui">Imprimir…</span>.</p>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Los reportes cuentan <b>lo cobrado, no lo vendido</b>. Si vendiste mucho pero no has cobrado, aquí no se va a ver todavía, y así debe ser.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> viste tu cifra «Queda» del mes.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 10 ───────────── -->
+    <article class="tu-cap" id="cap-10">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">10</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">6 min</span><span class="tu-pill op">Opcional</span></div>
+          <h2>Herramientas para tu giro</h2>
+          <p class="tu-para">Enciende solo lo que tu negocio necesita. Lo demás no estorba porque ni aparece.</p>
+        </div>
+      </div>
+      <div class="tu-donde"><span>Dónde se encienden:</span><span class="tu-migas"><b>Ajustes</b><i>›</i><b>Módulos</b></span></div>
+      <p class="tu-txt">Las que tu plan no incluye salen con un candado y te dicen desde qué plan están.</p>
+
+      <div class="tu-herr">
+        <div class="tu-mini"><span class="k">Comercio</span><h4>Inventario</h4>
+          <p>Cuánto queda de cada producto en cada sucursal. Caja lo descuenta al cobrar.</p>
+          <ol><li><span class="q">«Registrar entrada, salida o conteo»</span>.</li><li>Elige qué pasó: llegó mercancía, salió sin venderse, lo conté o pasó a otra sucursal.</li><li>Vigila <span class="q">«Bajo su mínimo»</span> y <span class="q">«Agotados»</span>.</li></ol></div>
+        <div class="tu-mini"><span class="k">Comercio</span><h4>Compras a proveedor</h4>
+          <p>El pedido y la recepción, sin capturar dos veces.</p>
+          <ol><li><span class="q">«Nuevo pedido a proveedor»</span> y, si quieres, <span class="q">«Llenar con lo que está bajo su mínimo»</span>.</li><li>Cuando llegue: <span class="ui">Recibir mercancía</span>.</li><li>Entra sola al inventario y, si lo marcas, se registra como gasto.</li></ol></div>
+        <div class="tu-mini"><span class="k">Servicios</span><h4>Cotizaciones</h4>
+          <p>Presupuestos que se convierten en venta.</p>
+          <ol><li><span class="q">«Nueva cotización»</span> con productos de tu catálogo.</li><li><span class="ui">Imprimir / PDF</span> y envíala.</li><li>Si acepta: <span class="ui">Cobrar en Caja</span> y ya llega armada.</li></ol></div>
+        <div class="tu-mini"><span class="k">Servicios</span><h4>Igualas</h4>
+          <p>Lo que un cliente te paga cada mes, sin acordarte tú.</p>
+          <ol><li><span class="q">«Nueva iguala»</span>: cliente, monto al mes y día de cobro.</li><li>Cada mes, ese día, se genera sola la venta.</li><li>Aparece en Cobranza para darle seguimiento.</li></ol></div>
+        <div class="tu-mini"><span class="k">Servicios</span><h4>Trabajos</h4>
+          <p>En qué va cada encargo, en un tablero.</p>
+          <ol><li>Cada venta aparece como un trabajo <b>Pendiente</b>.</li><li>Muévelo a <b>En proceso</b>, <b>Listo para entregar</b> y <b>Entregado</b>.</li><li>Ponle responsable y fecha de entrega.</li></ol></div>
+        <div class="tu-mini"><span class="k">Salud y belleza</span><h4>Agenda de citas</h4>
+          <p>Las citas del día por especialista.</p>
+          <ol><li>Toca un espacio libre o usa <span class="q">«Agendar una cita»</span>.</li><li><span class="ui">Recordar</span> abre WhatsApp con el mensaje listo.</li><li><span class="ui">Cobrar</span> la lleva a Caja y queda atendida.</li></ol></div>
+        <div class="tu-mini"><span class="k">Salud y belleza</span><h4>Paquetes de sesiones</h4>
+          <p>Vende 10 sesiones hoy y descuéntalas en cada visita.</p>
+          <ol><li>En Productos marca <span class="q">«Es un paquete de sesiones»</span>.</li><li>Véndelo en Caja (con cliente).</li><li>En cada visita: <span class="q">«Usar sesión de su paquete»</span>.</li></ol></div>
+        <div class="tu-mini"><span class="k">Siempre disponible</span><h4>Importar tu Excel</h4>
+          <p>Trae las ventas que llevabas en hojas de cálculo.</p>
+          <ol><li><span class="ui">Descargar ejemplo</span> para ver el formato.</li><li>Sube tu hoja y da <span class="ui">Revisar</span>: corrige lo que marque.</li><li><span class="ui verde">Guardar</span>. Subirla dos veces no duplica nada.</li></ol></div>
+      </div>
+
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>Con <b>Expediente de clientes</b> encendido, la ficha de cada cliente guarda notas y archivos (fotos y PDF) que solo ve tu equipo. Ideal para consultorios y despachos.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> encendiste las herramientas de tu giro.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 11 ───────────── -->
+    <article class="tu-cap" id="cap-11">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">11</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">4 min</span><span class="tu-pill op">Opcional</span><span class="tu-pill">Administrador</span></div>
+          <h2>Factura tus ventas (CFDI)</h2>
+          <p class="tu-para">Timbra la factura de una venta sin salir de Libertyfin, con su PDF y su XML.</p>
+        </div>
+      </div>
+
+      <div class="tu-nota info"><span class="ic">i</span><div><b class="t">Antes de tu primera factura</b>
+        <ul class="tu-sub">
+          <li><span class="tu-migas"><b>Mi cuenta</b><i>›</i><b>Datos fiscales</b></span>: tipo de persona, RFC, CP fiscal, razón social y régimen. Tienen que coincidir <b>exactamente</b> con tu constancia de situación fiscal.</li>
+          <li><span class="tu-migas"><b>Mi cuenta</b><i>›</i><b>Documentos</b></span>: identificación (frente y reverso), estado de cuenta, comprobante de domicilio y constancia. Los revisamos en 24 a 72 horas.</li>
+        </ul></div></div>
+
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Facturación</b></span></div>
+      <ol class="tu-pasos">
+        <li><strong>Elige la venta</strong>
+          En <span class="q">«Ventas del periodo»</span> cada venta te dice cómo se factura: <b>PUE</b> si ya está pagada completa, <b>PPD</b> si todavía tiene saldo.</li>
+        <li><strong>Timbra</strong>
+          Da clic en <span class="ui verde">Timbrar</span> y descarga el <span class="ui">PDF</span> y el <span class="ui">XML</span>.</li>
+        <li><strong>Si fue PPD, timbra cada abono</strong>
+          Conforme te pagan, cada abono se timbra como complemento de pago en <span class="ui">Complementos</span>.</li>
+      </ol>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Para facturar, la venta necesita un cliente con RFC. Una venta de <b>«Público general»</b> aparece como «Sin cliente» y no se puede timbrar.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> timbraste tu primera factura.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+    <!-- ───────────── 12 ───────────── -->
+    <article class="tu-cap" id="cap-12">
+      <div class="tu-cap-cab">
+        <div class="tu-cap-num">12</div>
+        <div>
+          <div class="tu-cap-meta"><span class="tu-pill">5 min</span></div>
+          <h2>Tu equipo, tu plan y soporte</h2>
+          <p class="tu-para">Quién puede hacer qué, cómo renuevas y a dónde pedir ayuda cuando la necesites.</p>
+        </div>
+      </div>
+
+      <h3>Qué puede hacer cada rol</h3>
+      <div class="tu-tabla-env">
+        <table class="tu-tabla">
+          <thead><tr><th>Rol</th><th>Puede</th><th>No ve</th></tr></thead>
+          <tbody>
+            <tr><td>Administrador</td><td>Todo: configurar, cobrar, cancelar ventas y pagos, asignar comisiones, ver reportes, facturar y pagar el plan.</td><td>—</td></tr>
+            <tr><td>Cajero</td><td>Cobrar en Caja, abrir y cerrar su caja, registrar abonos, atender clientes, generar ligas de pago, cotizar y agendar.</td><td>Comisiones, gastos, reportes, cobranza, facturación y ajustes.</td></tr>
+            <tr><td>Inventario</td><td>Mantener productos y promociones, inventario y compras, y registrar gastos.</td><td>No cobra ni borra gastos.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Tu plan</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Mi cuenta</b><i>›</i><b>Plan</b></span></div>
+      <p class="tu-txt">Ves cuántos días te quedan. En <span class="q">«Elige tu plan»</span> escoges <b>Mensual</b> o <b>Anual (−20%)</b> y pagas con tarjeta, SPEI o en tienda. Sin permanencia: lo que pagues se suma a los días que te queden.</p>
+      <div class="tu-nota ojo"><span class="ic">!</span><div><b class="t">Ojo</b>Desde 15 días antes del vencimiento verás un aviso para renovar. Si se vence, el administrador solo puede entrar a <b>Mi cuenta › Plan</b> hasta renovar; el resto del equipo verá un aviso para pedírselo. Tu información no se pierde, y el acceso vuelve solo en cuanto se aprueba el pago.</div></div>
+
+      <h3>Cuando necesites ayuda</h3>
+      <div class="tu-donde"><span>Dónde:</span><span class="tu-migas"><b>Menú</b><i>›</i><b>Ayuda</b></span><span>o la burbuja <b>«Soporte»</b> en cualquier pantalla</span></div>
+      <ol class="tu-pasos">
+        <li><strong>Cuéntanos qué pasa</strong>
+          En <span class="q">«Reportar un problema»</span>: qué pasa, con qué tiene que ver y el detalle.</li>
+        <li><strong>Adjunta una captura</strong>
+          Cópiala y pégala con <kbd>Ctrl</kbd>+<kbd>V</kbd>, o arrástrala. Ahorra muchas preguntas.</li>
+        <li><strong>Envía y sigue la conversación</strong>
+          <span class="ui verde">Enviar reporte</span> te da un folio. Ve su estado: <b>Lo estamos viendo</b>, <b>Trabajando en ello</b>, <b>Esperamos tu respuesta</b> o <b>Resuelto</b>. Con <span class="ui">Avisarme cuando respondan</span> te llega un aviso aunque cierres Libertyfin.</li>
+      </ol>
+      <div class="tu-nota tip"><span class="ic">✓</span><div><b class="t">Consejo</b>Entre más concreto, más rápido se resuelve: qué hiciste, qué viste y qué esperabas ver. Si un número no cuadra, dinos cuál y cuánto debería ser.</div></div>
+
+      <div class="tu-cap-pie">
+        <div class="tu-listo"><span>🎯</span><span><b>Listo cuando:</b> sabes dónde pedir ayuda.</span></div>
+        <button type="button" class="tu-visto" data-visto aria-pressed="false"><span>Marcar como visto</span></button>
+      </div>
+    </article>
+
+  </main>
+</div>
+
+<!-- ═══════════════════ PLANES ═══════════════════ -->
+<section class="tu-seccion" id="planes">
+  <span class="tu-eyebrow">Planes</span>
+  <h2 class="tu-sec-tit">¿Qué plan <em>me conviene</em>?</h2>
+  <p class="tu-sec-sub">Todos traen Caja, ventas, clientes, cobranza, corte, gastos, productos, reportes, inventario y comisiones. Cambia cuántas personas entran y qué herramientas extra puedes encender. Precios por mes; en anual, 20% menos.</p>
+
+  <div class="tu-planes">
+    <div class="tu-plan">
+      <span class="nom">Básico</span>
+      <span class="pre">$299 <small>MXN/mes</small></span>
+      <span class="us">1 usuario</span>
+      <ul><li>Todo lo esencial</li><li>Cotizaciones</li><li>Expediente de clientes</li></ul>
+      <span class="para">Para quien atiende solo su negocio.</span>
+    </div>
+    <div class="tu-plan">
+      <span class="nom">Profesional</span>
+      <span class="pre">$599 <small>MXN/mes</small></span>
+      <span class="us">4 usuarios</span>
+      <ul><li>Todas las herramientas de tu giro</li><li>Agenda, igualas, compras y más</li></ul>
+      <span class="para">Para un equipo pequeño.</span>
+    </div>
+    <div class="tu-plan dest">
+      <span class="nom">Empresarial · Más popular</span>
+      <span class="pre">$999 <small>MXN/mes</small></span>
+      <span class="us">6 usuarios</span>
+      <ul><li>Todas las herramientas</li><li>Pasarela de pago y SPEI</li></ul>
+      <span class="para">Para cobrar en línea con tu equipo.</span>
+    </div>
+    <div class="tu-plan">
+      <span class="nom">Empresarial Plus</span>
+      <span class="pre">$1,499 <small>MXN/mes</small></span>
+      <span class="us">10 usuarios</span>
+      <ul><li>Todas las herramientas</li><li>Pasarela, SPEI y tarjeta de crédito</li><li>500 timbres CFDI</li></ul>
+      <span class="para">Para varias sucursales.</span>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════ GLOSARIO ═══════════════════ -->
+<section class="tu-seccion" id="glosario">
+  <span class="tu-eyebrow">Glosario</span>
+  <h2 class="tu-sec-tit">Las palabras que vas a <em>ver</em></h2>
+
+  <dl class="tu-glosario">
+    <div><dt>Anticipo</dt><dd>Lo que el cliente deja hoy cuando no paga completo.</dd></div>
+    <div><dt>Abono</dt><dd>Cada pago que llega después, hasta liquidar la venta.</dd></div>
+    <div><dt>Saldo</dt><dd>Lo que todavía te deben de una venta: total menos lo pagado.</dd></div>
+    <div><dt>Liquidada</dt><dd>Venta pagada por completo. Saldo en cero.</dd></div>
+    <div><dt>Folio y subfolio</dt><dd>El folio identifica la venta; el subfolio (-01, -02…) cada uno de sus pagos.</dd></div>
+    <div><dt>Público general</dt><dd>Una venta registrada sin cliente.</dd></div>
+    <div><dt>Precio libre</dt><dd>Producto con precio en 0: el monto se escribe al vender.</dd></div>
+    <div><dt>Especialista / colaborador</dt><dd>Quien atendió la venta y gana comisión. No necesita usuario.</dd></div>
+    <div><dt>Fondo inicial</dt><dd>El efectivo con el que abres tu caja al empezar el turno.</dd></div>
+    <div><dt>Corte de caja</dt><dd>El cierre del turno: comparar lo que debe haber en el cajón con lo que hay.</dd></div>
+    <div><dt>Liga de pago</dt><dd>Un enlace o QR para que el cliente pague con tarjeta desde su celular.</dd></div>
+    <div><dt>CLABE</dt><dd>Los 18 dígitos a los que tu cliente transfiere por SPEI.</dd></div>
+    <div><dt>Gasto de operación</dt><dd>Lo que gastaste para hacer una venta concreta. Se descuenta antes de la comisión.</dd></div>
+    <div><dt>Comisión devengada</dt><dd>La parte de la comisión que ya se ganó porque el cliente ya pagó esa parte.</dd></div>
+    <div><dt>PUE y PPD</dt><dd>Formas de facturar: PUE si se pagó en una sola exhibición; PPD si se paga en parcialidades.</dd></div>
+    <div><dt>Complemento de pago</dt><dd>El comprobante fiscal que se timbra por cada abono de una factura PPD.</dd></div>
+  </dl>
+</section>
+
+<!-- ═══════════════════ PREGUNTAS ═══════════════════ -->
+<section class="tu-seccion" id="preguntas">
+  <span class="tu-eyebrow">Preguntas frecuentes</span>
+  <h2 class="tu-sec-tit">Lo que todos <em>preguntan</em></h2>
+
+  <div class="tu-faq">
+    <details><summary>¿Necesito instalar algo?</summary>
+      <div>No. Libertyfin funciona en el navegador de tu computadora, tablet o celular. En el celular, abajo tienes una barra con tus secciones principales y el botón «Más».</div></details>
+    <details><summary>¿Cuánto dura la prueba y qué pasa al terminar?</summary>
+      <div>Tu prueba gratis dura 15 días. Antes de que venza, el sistema te avisa; para seguir, eliges un plan en Mi cuenta › Plan. Tu información se queda tal cual.</div></details>
+    <details><summary>¿Mi información está separada de otros negocios?</summary>
+      <div>Sí. Cada empresa tiene su propia base de datos, y dentro de tu empresa cada rol ve solo lo que le toca.</div></details>
+    <details><summary>¿Puedo traer lo que llevaba en Excel?</summary>
+      <div>Sí, con Importar. Descarga el ejemplo, sube tu hoja, corrige lo que el sistema marque y guarda. Si subes el mismo archivo dos veces, no se duplica nada.</div></details>
+    <details><summary>¿Qué pasa si me equivoco en una venta?</summary>
+      <div>No se borra: el administrador la cancela con un motivo, sus cobros y comisiones se cancelan y lo vendido regresa al inventario. Queda registrado quién lo hizo y cuándo.</div></details>
+    <details><summary>¿Mis cajeros ven cuánto gano?</summary>
+      <div>No. El cajero cobra, registra abonos y cierra su caja, pero no ve comisiones, gastos ni reportes.</div></details>
+    <details><summary>¿Puedo cobrar una parte hoy y el resto después?</summary>
+      <div>Sí. En Caja usa «Solo una parte». El saldo queda en la venta, lo ves en Ventas y en Cobranza, y cada abono que registres tiene su propio folio.</div></details>
+    <details><summary>¿Puedo cobrar con tarjeta?</summary>
+      <div>Con tu terminal, sí: en Caja elige Tarjeta y marca «Ya me pagaron». Para cobrar en línea con liga, QR, SPEI o en tienda, Libertyfin activa los cobros en línea en tu cuenta cuando completas tus datos fiscales y tus documentos.</div></details>
+    <details><summary>Olvidé mi contraseña, ¿qué hago?</summary>
+      <div>Si eres cajero o de inventario, pídele a tu administrador que te la restablezca. Si eres el administrador, escríbele a soporte.</div></details>
+    <details><summary>¿Cuántas personas pueden usarlo?</summary>
+      <div>Depende de tu plan: 1, 4, 6 o 10 usuarios. Los colaboradores que solo ganan comisión no cuentan, porque no necesitan entrar al sistema.</div></details>
+  </div>
+</section>
+
+<!-- ═══════════════════ CIERRE ═══════════════════ -->
+<section class="tu-final">
+  <div class="tu-final-caja">
+    <h2>¿Listo para tu primera venta?</h2>
+    <p>Crea tu cuenta, sigue los capítulos 1 a 4 y hoy mismo cobras con Libertyfin.</p>
+    <div class="tu-hero-ctas">
+      <a class="tu-btn tu-btn-verde" href="/registro">Crear mi cuenta gratis</a>
+      <a class="tu-btn tu-btn-claro" href="/login">Ya tengo cuenta: entrar</a>
+    </div>
+  </div>
+</section>
+
+<!-- Pie (lo pone shared.js) -->
+<div id="lf-footer-placeholder"></div>
+
+<script src="/assets/js/shared.js"></script>
+<script>
+/* El avance: qué capítulos marcó como vistos este navegador.
+   Es una comodidad: si el navegador no deja guardar, todo funciona igual. */
+(function () {
+  var CLAVE = 'lf-tutorial-visto';
+  var caps = [].slice.call(document.querySelectorAll('.tu-cap'));
+  var total = caps.length;
+
+  function leer() {
+    try { var v = JSON.parse(localStorage.getItem(CLAVE) || '[]'); return Array.isArray(v) ? v : []; }
+    catch (e) { return []; }
+  }
+  function guardar(v) { try { localStorage.setItem(CLAVE, JSON.stringify(v)); } catch (e) {} }
+
+  function pintar() {
+    var vistos = leer(), n = 0;
+    caps.forEach(function (c) {
+      var hecho = vistos.indexOf(c.id) !== -1;
+      if (hecho) n++;
+      c.classList.toggle('visto', hecho);
+      var b = c.querySelector('[data-visto]');
+      if (b) {
+        b.setAttribute('aria-pressed', hecho ? 'true' : 'false');
+        b.querySelector('span').textContent = hecho ? 'Visto' : 'Marcar como visto';
+      }
+      var a = document.querySelector('.tu-indice a[href="#' + c.id + '"]');
+      if (a) a.classList.toggle('visto', hecho);
+    });
+    document.querySelectorAll('[data-avance-num]').forEach(function (e) { e.textContent = n; });
+    document.querySelectorAll('[data-avance-barra]').forEach(function (e) {
+      e.style.width = (total ? n / total * 100 : 0) + '%';
+    });
+  }
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-visto]');
+    if (!b) return;
+    var id = b.closest('.tu-cap').id, v = leer(), i = v.indexOf(id);
+    if (i === -1) v.push(id); else v.splice(i, 1);
+    guardar(v);
+    pintar();
+  });
+  pintar();
+
+  /* El índice marca el capítulo que se está leyendo. */
+  var enlaces = {};
+  document.querySelectorAll('.tu-indice a').forEach(function (a) {
+    enlaces[a.getAttribute('href').slice(1)] = a;
+  });
+  if ('IntersectionObserver' in window) {
+    var obs = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (!e.isIntersecting) return;
+        Object.keys(enlaces).forEach(function (k) { enlaces[k].classList.toggle('actual', k === e.target.id); });
+      });
+    }, { rootMargin: '-30% 0px -60% 0px' });
+    caps.forEach(function (c) { obs.observe(c); });
+  }
+
+  /* En el celular el índice empieza cerrado y se cierra al elegir capítulo. */
+  var caja = document.querySelector('.tu-indice-caja');
+  var chico = window.matchMedia('(max-width: 960px)');
+  if (caja && chico.matches) caja.open = false;
+  document.querySelectorAll('.tu-indice a').forEach(function (a) {
+    a.addEventListener('click', function () { if (caja && chico.matches) caja.open = false; });
+  });
+})();
+</script>
+</body>
+</html>

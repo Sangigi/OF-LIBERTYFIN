@@ -67,6 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         '/inicio'         => '/panel',
         '/dashboard'      => '/panel',
         '/pages/registro' => '/registro',
+        '/tutoriales'     => '/tutorial',
     ];
     $minusculas = strtolower($rutaActual);
     if (isset($alias[$minusculas]) && $rutaActual !== $alias[$minusculas]) {
@@ -74,8 +75,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
         exit;
     }
 
-    if ($rutaActual === '/') {
-        $archivo = $raiz . '/src/Vista/plantillas/index.html';
+    // Las páginas públicas del sitio: la landing y el tutorial para
+    // prospectos. HTML fijo, con el menú y el pie que pone shared.js.
+    $paginas = ['/' => 'index.html', '/tutorial' => 'tutorial.html'];
+    if (isset($paginas[$rutaActual])) {
+        $archivo = $raiz . '/src/Vista/plantillas/' . $paginas[$rutaActual];
         if (!is_file($archivo)) {
             // Sin landing, al menos que se pueda entrar al sistema.
             header('Location: /login', true, 302);
