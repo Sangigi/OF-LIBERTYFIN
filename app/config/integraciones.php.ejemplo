@@ -176,6 +176,35 @@ return [
         //   php app/bin/revisar-pagos.php
         //   php app/bin/revisar-pagos.php --probar
         //
+        // ── CREDENCIALES POR FORMA DE PAGO (opcional) ──────────
+        //
+        // Paga de Todo da de alta cada forma de pago por convenio, y el
+        // sistema anterior tenía un juego DISTINTO para cada una:
+        //
+        //   SPEI_*        → tarjeta / CLABE   (liga y clabe)
+        //   REFERENCIA_*  → efectivo en tienda (referencia)
+        //
+        // Si a ti te dieron usuario, clave, IntegrationID o BusinessID
+        // distintos para alguna, ponlos aquí. Vacío = usa los generales
+        // de arriba. Si pones `usuario_X`, pon también `clave_X`: van
+        // siempre como pareja.
+        //
+        // X es: liga (tarjeta) · clabe (SPEI) · referencia (tienda)
+        //
+        //   'usuario_referencia'        => '',  // REFERENCIA_USER
+        //   'clave_referencia'          => '',  // REFERENCIA_PASSWORD
+        //   'integracion_id_referencia' => '',  // REFERENCIA_INTEGRATION_ID
+        //   'negocio_id_referencia'     => '',  // REFERENCIA_INTEGRATION_BUSINESS_ID
+        //
+        //   'usuario_clabe'        => '',       // SPEI_USER
+        //   'clave_clabe'          => '',       // SPEI_PASSWORD
+        //   'integracion_id_clabe' => '',       // SPEI_INTEGRATION_ID
+        //   'negocio_id_clabe'     => '',       // SPEI_BUSINESS_ID
+        //
+        // (mismos nombres con _liga para la tarjeta)
+        //
+        // Para ver qué usa cada una:  php app/bin/revisar-pagos.php
+
         'host'            => 'https://pagadetodo.mx/Pagadetodo',
         'url_liga'        => '',
         'url_clabe'       => '',

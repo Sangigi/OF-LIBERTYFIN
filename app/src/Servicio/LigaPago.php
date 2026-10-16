@@ -123,12 +123,18 @@ final class LigaPago
     /** Lo último que contestó el proveedor, para diagnosticar. */
     public function respuesta() { return $this->ultimaRespuesta; }
 
-    public function listo()
+    /**
+     * ¿Hay con qué llamar al proveedor?
+     *
+     * Con `$servicio` revisa las credenciales que ESE servicio va a usar
+     * (las suyas si las tiene, o las generales). Sin él, revisa las
+     * generales, que es lo que pide la pantalla de Ligas.
+     */
+    public function listo($servicio = '')
     {
-        foreach (['usuario','clave','integracion_id'] as $c) {
-            if (trim((string)($this->cfg[$c] ?? '')) === '') return false;
-        }
-        return true;
+        list($u, $c) = $this->credenciales($servicio);
+        if (trim((string)$u) === '' || trim((string)$c) === '') return false;
+        return trim((string)$this->integracion($servicio)) !== '';
     }
 
     public function enPruebas() { return !empty($this->cfg['sandbox']); }
@@ -217,19 +223,39 @@ final class LigaPago
         return 15;
     }
 
-    /** El identificador del comercio. BusinessID en Paga de Todo. */
-    private function negocio()
+    /**
+     * Un dato de configuración, con su versión POR SERVICIO.
+     *
+     * En el sistema anterior cada forma de pago tenía su propio juego de
+     * credenciales (SPEI_*, REFERENCIA_*, DOMICILIACION_*): usuario,
+     * clave, IntegrationID y BusinessID DISTINTOS. Paga de Todo los da de
+     * alta por convenio, y el de tarjeta no es el de CLABE ni el de
+     * tienda. Con un solo juego, un servicio funciona y los otros rebotan.
+     *
+     * Se busca `<campo>_<servicio>` (p.ej. `negocio_id_referencia`) y, si
+     * está vacío, `<campo>` general.
+     */
+    private function dato($campo, $servicio = '')
     {
-        $b = trim((string)($this->cfg['negocio_id'] ?? ''));
+        if ($servicio !== '') {
+            $propio = trim((string)($this->cfg[$campo . '_' . $servicio] ?? ''));
+            if ($propio !== '') return $propio;
+        }
+        return trim((string)($this->cfg[$campo] ?? ''));
+    }
+
+    /** El identificador del comercio. BusinessID en Paga de Todo. */
+    private function negocio($servicio = '')
+    {
+        $b = $this->dato('negocio_id', $servicio);
         // `escuela_id` queda como respaldo para quien venía de Paga la
         // Escuela y todavía no mueve su configuración.
         return $b !== '' ? $b : trim((string)($this->cfg['escuela_id'] ?? ''));
     }
 
-        private function integracion($servicio)
+    private function integracion($servicio = '')
     {
-        $propio = trim((string)($this->cfg['integracion_id_' . $servicio] ?? ''));
-        return $propio !== '' ? $propio : (string)($this->cfg['integracion_id'] ?? '');
+        return $this->dato('integracion_id', $servicio);
     }
 
     /**
@@ -337,16 +363,27 @@ final class LigaPago
      *
      * @return array [usuario, clave]
      */
-    private function credenciales()
+    private function credenciales($servicio = '')
     {
-        if ($this->enPruebas() && trim((string)($this->cfg['usuario_prueba'] ?? '')) !== '') {
-            return [(string)$this->cfg['usuario_prueba'], (string)($this->cfg['clave_prueba'] ?? '')];
+        if ($this->enPruebas()) {
+            foreach (($servicio !== '' ? ['_' . $servicio, ''] : ['']) as $suf) {
+                $u = trim((string)($this->cfg['usuario_prueba' . $suf] ?? ''));
+                if ($u !== '') return [(string)$this->cfg['usuario_prueba' . $suf],
+                                       (string)($this->cfg['clave_prueba' . $suf] ?? '')];
+            }
+        }
+        // Las propias del servicio, SIEMPRE como pareja: si hay
+        // `usuario_referencia`, la clave que va con él es `clave_referencia`,
+        // nunca la general.
+        if ($servicio !== '' && trim((string)($this->cfg['usuario_' . $servicio] ?? '')) !== '') {
+            return [(string)$this->cfg['usuario_' . $servicio],
+                    (string)($this->cfg['clave_' . $servicio] ?? '')];
         }
         return [(string)($this->cfg['usuario'] ?? ''), (string)($this->cfg['clave'] ?? '')];
     }
 
-    private function usuario() { list($u, ) = $this->credenciales(); return $u; }
-    private function clave()   { list( , $c) = $this->credenciales(); return $c; }
+    private function usuario($servicio = '') { list($u, ) = $this->credenciales($servicio); return $u; }
+    private function clave($servicio = '')   { list( , $c) = $this->credenciales($servicio); return $c; }
 
     /**
      * Genera el cobro.
@@ -357,17 +394,22 @@ final class LigaPago
     public function generar(array $d)
     {
         $this->ultimoError = '';
-        if (!$this->listo()) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
-        if ($this->negocio() === '') {
-            $this->ultimoError = 'Falta `negocio_id` (BusinessID) en config/integraciones.php';
+        $metodo   = self::normalizar($d['metodo'] ?? 'tarjeta');
+        $servicio = self::servicioDe($metodo);
+        if (!$this->listo($servicio)) {
+            $this->ultimoError = 'Paga de Todo sin credenciales para ' . $servicio
+                . ' (usuario, clave o integracion_id) en config/integraciones.php';
+            return null;
+        }
+        if ($this->negocio($servicio) === '') {
+            $this->ultimoError = 'Falta `negocio_id` (BusinessID) para ' . $servicio
+                . ' en config/integraciones.php';
             return null;
         }
 
         $monto = round((float)($d['monto'] ?? 0), 2);
         if ($monto <= 0) { $this->ultimoError = 'El monto tiene que ser mayor a cero'; return null; }
 
-        $metodo   = self::normalizar($d['metodo'] ?? 'tarjeta');
-        $servicio = self::servicioDe($metodo);
         list($ruta, $campos, $devuelve) = self::SERVICIOS[$servicio];
 
         // El proveedor rechaza fuera de rango con el código 18. Se avisa
@@ -392,13 +434,13 @@ final class LigaPago
 
         // Credenciales: las pide siempre, las tres.
         $cuerpo = [
-            'User'          => $this->usuario(),
-            'Password'      => $this->clave(),
+            'User'          => $this->usuario($servicio),
+            'Password'      => $this->clave($servicio),
             'IntegrationID' => $this->integracion($servicio),
         ];
 
         $posibles = [
-            'BusinessID'     => $this->negocio(),
+            'BusinessID'     => $this->negocio($servicio),
             'PaymentTypes'   => $this->contado(),
             // `Id` es Numérico(10) en la documentación. Mandarle los 15
             // de la referencia devuelve el código 15, "El formato del ID
@@ -492,13 +534,13 @@ final class LigaPago
                 : 'El pago en tienda no se consulta: la tienda avisa cuando cobra.';
             return null;
         }
-        if (!$this->listo()) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
+        if (!$this->listo($servicio)) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
 
-            $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
-            'User'          => $this->usuario(),
-            'Password'      => $this->clave(),
+        $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
+            'User'          => $this->usuario($servicio),
+            'Password'      => $this->clave($servicio),
             'IntegrationID' => $this->integracion($servicio),
-            'BusinessID'    => $this->negocio(),
+            'BusinessID'    => $this->negocio($servicio),
             'Reference'     => (string)$referencia,
         ]);
         if ($j === null) return null;

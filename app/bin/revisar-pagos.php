@@ -150,6 +150,29 @@ if (trim((string)$negocio) === '') {
           ? c('  ← sale de `escuela_id`, que es de Paga la Escuela', 'a') : ''));
 }
 echo '  integración  ' . ($cfg['integracion_id'] ?: c('(vacía)', 'r')) . "\n";
+
+// Cada forma de pago puede traer SUS credenciales (usuario_clabe,
+// negocio_id_referencia, integracion_id_liga…). Aquí se ve cuáles usa
+// de verdad cada una, que es donde rebota cuando solo una funciona.
+$mInt = $r->getMethod('integracion'); $mInt->setAccessible(true);
+echo "\n  Lo que usa cada servicio:\n";
+foreach (['liga' => 'tarjeta', 'clabe' => 'SPEI', 'referencia' => 'tienda'] as $svc => $rotulo) {
+    list($uS, $cS) = $mCre->invoke($api, $svc);
+    $nS = $mNeg->invoke($api, $svc);
+    $iS = $mInt->invoke($api, $svc);
+    $propias = [];
+    foreach (['usuario','clave','negocio_id','integracion_id'] as $campo) {
+        if (trim((string)($cfg[$campo . '_' . $svc] ?? '')) !== '') $propias[] = $campo . '_' . $svc;
+    }
+    echo '  · ' . str_pad($rotulo, 8) . ' usuario ' . $tapa($uS)
+       . ' · clave ' . $tapa($cS)
+       . ' · negocio ' . ($nS !== '' ? $nS : c('(vacío)', 'r'))
+       . ' · integración ' . ($iS !== '' ? $iS : c('(vacía)', 'r')) . "\n";
+    nota($propias ? 'propias: ' . implode(', ', $propias) : 'usa las generales');
+    if (trim((string)$uS) === '' || trim((string)$cS) === '' || $nS === '' || $iS === '') {
+        $problemas++; mal($rotulo . ': le falta usuario, clave, negocio o integración');
+    }
+}
 echo '  referencia   ' . $mRef->invoke($api) . " dígitos\n";
 echo '  contado      ' . $mPag->invoke($api)
    . c('   (41 producción · 401 Sandbox)', 'd') . "\n";
