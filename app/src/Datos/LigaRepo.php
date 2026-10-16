@@ -31,6 +31,7 @@ final class LigaRepo extends Repo
                     liga VARCHAR(500) NULL,
                     clabe VARCHAR(30) NULL,
                     barras VARCHAR(80) NULL,
+                    remota VARCHAR(40) NULL,
                     imagen VARCHAR(500) NULL,
                     formato VARCHAR(500) NULL,
                     estado VARCHAR(16) NOT NULL DEFAULT 'pendiente',
@@ -49,7 +50,8 @@ final class LigaRepo extends Repo
                     UNIQUE KEY ix_lp_ref (referencia),
                     KEY ix_lp_estado (estado, vence),
                     KEY ix_lp_venta (venta_id),
-                    KEY ix_lp_trans (transaccion)
+                    KEY ix_lp_trans (transaccion),
+                    KEY ix_lp_remota (remota)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
             // Migración: agrega usuario_correo si falta (instalaciones viejas)
@@ -65,6 +67,24 @@ final class LigaRepo extends Repo
                     ALTER TABLE lf_ligas_pago
                     ADD COLUMN usuario_correo VARCHAR(160) DEFAULT NULL AFTER usuario_nombre");
             }
+
+            // Migración: la referencia que genera EL PROVEEDOR (22 dígitos
+            // en la liga de tarjeta, ~30 en tienda). El aviso de tarjeta
+            // (pago-liga) llega con esa, no con la nuestra: sin guardarla
+            // no casaba con ningún cobro y el pago nunca se aplicaba.
+            $col = $this->db->query("
+                SELECT COUNT(*) FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'lf_ligas_pago'
+                  AND COLUMN_NAME = 'remota'
+            ")->fetchColumn();
+
+            if ((int)$col === 0) {
+                $this->db->exec("
+                    ALTER TABLE lf_ligas_pago
+                    ADD COLUMN remota VARCHAR(40) DEFAULT NULL AFTER barras,
+                    ADD INDEX ix_lp_remota (remota)");
+            }
         } catch (\Throwable $e) {
             error_log('[LibertyFin] lf_ligas_pago: ' . $e->getMessage());
         }
@@ -76,13 +96,14 @@ final class LigaRepo extends Repo
         $this->db->prepare("
             INSERT INTO lf_ligas_pago
                 (referencia, venta_id, cliente_nombre, monto, metodo, descripcion,
-                 liga, clabe, barras, imagen, formato, estado, vence, pruebas,
+                 liga, clabe, barras, remota, imagen, formato, estado, vence, pruebas,
                  usuario_id, usuario_nombre, usuario_correo, creado_en)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?,?, NOW())
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?, 'pendiente', ?,?,?,?,?, NOW())
         ")->execute([
             $d['referencia'], $d['venta_id'] ?? null, $d['cliente'] ?? null,
             $d['monto'], $d['metodo'], mb_substr((string)($d['descripcion'] ?? ''), 0, 80),
             $d['liga'] ?? null, $d['clabe'] ?? null, $d['barras'] ?? null,
+            (preg_replace('/\D/', '', (string)($d['remota'] ?? '')) ?: null),
             $d['imagen'] ?? null, $d['formato'] ?? null,
             $d['vence'] ?? null, !empty($d['pruebas']) ? 1 : 0,
             $d['usuario_id'] ?? null, $d['usuario_nombre'] ?? null,
@@ -106,19 +127,30 @@ final class LigaRepo extends Repo
     /**
      * El cobro que corresponde a lo que mandó el proveedor.
      *
-     * Busca por referencia y, si no, por CLABE o por código de barras: el
-     * mismo número viaja en campos distintos según el servicio, y exigir
-     * que coincida el nombre del campo dejaba pagos sin casar.
+     * Busca por referencia y, si no, por CLABE, código de barras o la
+     * referencia remota: el mismo número viaja en campos distintos según
+     * el servicio, y exigir que coincida el nombre del campo dejaba pagos
+     * sin casar.
+     *
+     * Último recurso: la referencia del proveedor LLEVA DENTRO la nuestra
+     * (p.ej. 000005·00·<nuestra>·1). Sirve para ligas generadas antes de
+     * que se guardara `remota`. Solo con valores más largos que la
+     * nuestra, para no casar un número corto con cualquier cosa.
      */
     public function porCualquiera($valor)
     {
         $valor = trim((string)$valor);
         if ($valor === '') return null;
         $this->asegurar();
+        $l = $this->uno("
+            SELECT * FROM lf_ligas_pago
+            WHERE referencia = ? OR clabe = ? OR barras = ? OR remota = ?
+            ORDER BY id DESC LIMIT 1", [$valor, $valor, $valor, $valor]);
+        if ($l || strlen($valor) <= 15) return $l;
         return $this->uno("
             SELECT * FROM lf_ligas_pago
-            WHERE referencia = ? OR clabe = ? OR barras = ?
-            ORDER BY id DESC LIMIT 1", [$valor, $valor, $valor]);
+            WHERE CHAR_LENGTH(referencia) >= 13 AND LOCATE(referencia, ?) > 0
+            ORDER BY id DESC LIMIT 1", [$valor]);
     }
 
     /**
@@ -136,6 +168,21 @@ final class LigaRepo extends Repo
             SELECT * FROM lf_ligas_pago
             WHERE referencia = ? AND transaccion = ? AND estado = 'pagada'",
             [(string)$referencia, (string)$transaccion]);
+    }
+
+    /**
+     * El abono vigente que ya dejó esa transacción del proveedor en la
+     * venta. Funciona con pagos parciales, donde la liga sigue abierta y
+     * `yaEntro` no lo ve.
+     */
+    public function abonoDeTransaccion($ventaId, $transaccion)
+    {
+        $t = preg_replace('/[^0-9A-Za-z-]/', '', (string)$transaccion);
+        if ($t === '' || (int)$ventaId <= 0) return null;
+        return $this->uno("
+            SELECT * FROM venta_pagos
+            WHERE venta_id = ? AND cancelado = 0 AND referencia LIKE ?
+            ORDER BY id DESC LIMIT 1", [(int)$ventaId, '% · trx ' . $t]);
     }
 
     /** Deja constancia de la transacción y la autorización del aviso. */

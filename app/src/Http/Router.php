@@ -31,7 +31,12 @@ final class Router
         $nombres = [];
         $patron = preg_replace_callback('/\{(\w+)\}/', function ($m) use (&$nombres) {
             $nombres[] = $m[1];
-            return '(\d+)';
+            // `{k}` es el secreto de los avisos de Paga de Todo
+            // (/pagadetodo/{k}/pago-referencia). Se genera con bin2hex,
+            // así que trae letras: con solo dígitos la ruta nunca
+            // coincidía, el aviso recibía un 404 y el proveedor revertía
+            // el cobro. Es el único parámetro que no es un id.
+            return $m[1] === 'k' ? '([A-Za-z0-9_-]+)' : '(\d+)';
         }, $ruta);
         $this->rutas[] = [
             'metodo'  => $metodo,
@@ -52,7 +57,9 @@ final class Router
             if (preg_match($r['patron'], $ruta, $m)) {
                 array_shift($m);
                 return ['destino' => $r['destino'],
-                        'args'    => array_map('intval', $m),
+                        'args'    => array_map(function ($v) {
+                            return ctype_digit($v) ? (int)$v : $v;
+                        }, $m),
                         'patron'  => $r['ruta']];
             }
         }

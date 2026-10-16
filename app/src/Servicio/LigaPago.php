@@ -175,23 +175,37 @@ final class LigaPago
         return isset(self::CONSULTA[self::servicioDe($metodo)]);
     }
 
-        public static function semilla($ventaId = 0, $prefijo = '9')
+    /**
+     * La semilla de la referencia: 15 dígitos, ÚNICA en cada intento.
+     *
+     *   P IIII R TTTTTT ZZZ
+     *   │ │    │ │      └ al azar
+     *   │ │    │ └ segundos (time() % 10^6)
+     *   │ │    └ al azar, 1-9: el Id nunca empieza en cero
+     *   │ └ últimos 4 dígitos de la venta / pago, para reconocerla
+     *   └ 9 una venta, 8 un pago de plan
+     *
+     * ANTES SALÍAN 9 DÍGITOS CASI FIJOS: prefijo + id + el año. Todos
+     * los intentos de la misma venta —y la venta 123 de TODAS las
+     * empresas, que comparten convenio— daban el mismo Id, y la
+     * Reference/Account solo cambiaba en el dígito de relleno: diez
+     * valores posibles. El proveedor rebotaba con 12 o 23 («ya se
+     * usó») y la tabla de ligas, que tiene la referencia UNIQUE, con un
+     * duplicado. Sin venta era peor: la misma semilla durante diez
+     * minutos para todas.
+     *
+     * Los últimos 10 dígitos (R TTTTTT ZZZ) son el `Id` que se manda a
+     * la liga de tarjeta: `generar()` recorta ahí.
+     */
+    public static function semilla($ventaId = 0, $prefijo = '9')
     {
         $ventaId = (int)$ventaId;
-        // El prefijo dice DE QUÉ es el cobro: 9 una venta, 8 un pago de
-        // plan (UsuariosControlador). Antes el 8 se pasaba pero aquí no se
-        // leía: la venta 12 y el pago de plan 12 sacaban la misma semilla.
         $prefijo = preg_match('/^[1-9]$/', (string)$prefijo) ? (string)$prefijo : '9';
-        if ($ventaId > 0) {
-            // El prefijo va delante para que la referencia empiece con un
-            // dígito distinto al de las que se generan por tiempo:
-            // facilita reconocerlas en el panel del proveedor.
-            return substr(
-                $prefijo . str_pad((string)$ventaId, 6, '0', STR_PAD_LEFT) . date('ymdHi'),
-                0, 9
-            );
-        }
-        return substr(date('ymdHis') . random_int(100000, 999999), 0, 9);
+        return $prefijo
+             . str_pad((string)($ventaId % 10000), 4, '0', STR_PAD_LEFT)
+             . random_int(1, 9)
+             . str_pad((string)(time() % 1000000), 6, '0', STR_PAD_LEFT)
+             . str_pad((string)random_int(0, 999), 3, '0', STR_PAD_LEFT);
     }
 
     /**
@@ -523,7 +537,7 @@ final class LigaPago
      * @param string $referencia
      * @param string $metodo  tarjeta | spei | efectivo
      */
-    public function estado($referencia, $metodo = 'tarjeta')
+    public function estado($referencia, $metodo = 'tarjeta', $remota = '')
     {
         $this->ultimoError = '';
         $servicio = self::servicioDe($metodo);
@@ -536,13 +550,22 @@ final class LigaPago
         }
         if (!$this->listo($servicio)) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
 
-        $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
-            'User'          => $this->usuario($servicio),
-            'Password'      => $this->clave($servicio),
-            'IntegrationID' => $this->integracion($servicio),
-            'BusinessID'    => $this->negocio($servicio),
-            'Reference'     => (string)$referencia,
-        ]);
+        // La doc de ConsultarEstatusLigaIndi pide "Reference Numérico(15)
+        // formada por el EMISOR", pero su ejemplo manda la de 22 que
+        // genera el proveedor. Se pregunta con la nuestra y, si contesta
+        // 11 ("la referencia no existe"), con la suya.
+        $j = null;
+        foreach (array_unique(array_filter([(string)$referencia, (string)$remota])) as $ref) {
+            $j = $this->pegar($this->url('estado', self::CONSULTA[$servicio]), [
+                'User'          => $this->usuario($servicio),
+                'Password'      => $this->clave($servicio),
+                'IntegrationID' => $this->integracion($servicio),
+                'BusinessID'    => $this->negocio($servicio),
+                'Reference'     => $ref,
+            ]);
+            if ($j === null) return null;
+            if ((string)(self::campo($j, ['code','Code']) ?: '') !== '11') break;
+        }
         if ($j === null) return null;
 
         // LA RESPUESTA VIENE ANIDADA, y antes se buscaba un campo

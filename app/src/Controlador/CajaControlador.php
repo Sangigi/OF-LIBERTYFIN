@@ -702,15 +702,17 @@ final class CajaControlador
                 'cliente' => $venta['cliente'] ?: 'Público general', 'monto' => $saldo,
                 'metodo' => $forma, 'descripcion' => 'Venta ' . $venta['codigo_venta'],
                 'liga' => $g['liga'], 'clabe' => $g['clabe'], 'barras' => $g['barras'],
+                'remota' => $g['remota'] ?? null,
                 'imagen' => $g['imagen'] ?? null, 'formato' => $g['formato'] ?? null,
                 'vence' => $g['vence'], 'pruebas' => $g['pruebas'],
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
             ]);
-            // Se apunta en qué base vive esta referencia. El aviso del
-            // proveedor llega sin sesión y sin empresa: sin el directorio
-            // habría que abrir todas las bases para encontrarla.
-            \LibertyFin\Servicio\Cobros::apuntar($g['referencia'], $forma);
+            // Se apunta en qué base vive este cobro, con todos los números
+            // con que el proveedor puede avisar. El aviso llega sin sesión
+            // y sin empresa: sin el directorio habría que abrir todas las
+            // bases para encontrarlo.
+            \LibertyFin\Servicio\Cobros::apuntarCobro($g, $forma);
             // Se vuelve a CAJA, no a Ligas. El cajero tiene al cliente
             // enfrente: mandarlo a otra pantalla lo obliga a volver a
             // empezar para la siguiente venta.
@@ -851,7 +853,7 @@ final class CajaControlador
             if ($cfg) {
                 ob_start();
                 $api = new \LibertyFin\Servicio\LigaPago($cfg);
-                $r = $api->estado($l['referencia'], $l['metodo']);
+                $r = $api->estado($l['referencia'], $l['metodo'], $l['remota'] ?? '');
                 ob_end_clean();
 
                 $repo = new \LibertyFin\Datos\LigaRepo($db);

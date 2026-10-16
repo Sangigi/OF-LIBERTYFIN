@@ -179,6 +179,16 @@ final class PagosEntrantesControlador
         // IDEMPOTENCIA. El proveedor reintenta cuando no le contestamos a
         // tiempo, y si no se revisara esto la venta quedaría abonada dos
         // veces con un solo pago del cliente.
+        //
+        // En una venta se busca la transacción EN SUS ABONOS, no en el
+        // estado de la liga: con pagos parciales la liga sigue abierta y
+        // `yaEntro` (que exige `pagada`) no veía el abono anterior.
+        if (!empty($l['venta_id'])
+            && ($abono = $repo->abonoDeTransaccion((int)$l['venta_id'], $transaccion))) {
+            $this->pagoJson(self::OK, (string)($l['autorizacion'] ?? ''),
+                'Operación exitosa', $transaccion,
+                date('Y-m-d', strtotime($abono['fecha_pago'])));
+        }
         if ($ya = $repo->yaEntro($l['referencia'], $transaccion)) {
             // Antes de responder OK hay que asegurarse de que el pago del
             // plan también quedó aprobado en la vuelta anterior. Si por lo
@@ -232,17 +242,33 @@ final class PagosEntrantesControlador
             }
 
             $pagoId = null;
+            $resta  = 0.0;
             if (!empty($l['venta_id'])) {
                 $res = (new RegistrarPago($db))->abonar((int)$l['venta_id'], [
                     'monto'      => $monto,
                     'metodo'     => $l['metodo'] === 'tarjeta' ? 'tarjeta' : 'transferencia',
-                    'referencia' => $this->rotulo($l) . ' ' . $l['referencia'],
+                    // La transacción va en el abono: es lo que reconoce un
+                    // reintento del proveedor (ver abonoDeTransaccion).
+                    'referencia' => $this->rotulo($l) . ' ' . $l['referencia']
+                                  . ($transaccion !== '' ? ' · trx ' . $transaccion : ''),
                     'fecha'      => date('Y-m-d'),
                     'usuario_id' => null,   // lo registró el proveedor, no una persona
                 ]);
                 $pagoId = $res['pago_id'] ?? null;
+                $resta  = (float)($res['saldo'] ?? 0);
             }
-            $repo->marcarPagada($l['id'], $pagoId);
+
+            // UN PAGO PARCIAL NO CIERRA LA LIGA. El abono ya descontó lo
+            // pagado; la liga sigue `pendiente` para aceptar el resto con
+            // la misma CLABE o referencia. Antes se marcaba `pagada` con
+            // cualquier monto: la Caja decía "pagado" con saldo pendiente
+            // y el siguiente depósito rebotaba con "Referencia sin adeudo".
+            if ($resta > 0.01) {
+                error_log('[LibertyFin] pago entrante parcial ' . $l['referencia']
+                    . ' · abonado ' . $monto . ' · resta ' . $resta);
+            } else {
+                $repo->marcarPagada($l['id'], $pagoId);
+            }
 
             // ─────────────────────────────────────────────────────
             // SI ERA UN PAGO DE PLAN, APROBARLO TAMBIÉN.
@@ -317,6 +343,29 @@ final class PagosEntrantesControlador
         if (!$hallado) $this->json(['codigo' => self::NO_RECONOCIDA,
                                     'mensaje' => 'Operación no encontrada']);
         list($db, $l) = $hallado;
+
+        // UN ABONO PARCIAL deja la liga abierta, así que no se puede mirar
+        // solo su estado: se busca el abono de esa transacción en la venta.
+        if ($l['estado'] !== 'pagada' && !empty($l['venta_id']) && $transaccion !== '') {
+            $repo  = new LigaRepo($db);
+            $abono = $repo->abonoDeTransaccion((int)$l['venta_id'], $transaccion);
+            if ($abono) {
+                if (date('Y-m-d', strtotime($abono['fecha_pago'])) !== date('Y-m-d')) {
+                    $this->json(['codigo' => self::FUERA_PERIODO,
+                                 'mensaje' => 'Cancelación fuera de periodo']);
+                }
+                try {
+                    (new RegistrarPago($db))->cancelar((int)$abono['id'],
+                        'Cancelado por el proveedor de pago', null);
+                    Auditoria::anota('pago.cancelar',
+                        $this->rotulo($l) . ' ' . $l['referencia'],
+                        Dinero::pesos($abono['monto']), 'cancelado por el proveedor', $db);
+                } catch (\Throwable $e) {
+                    error_log('[LibertyFin] cancelar entrante parcial: ' . $e->getMessage());
+                    $this->json(['codigo' => self::ERROR_SISTEMA, 'mensaje' => 'Error de sistema']);
+                }
+            }
+        }
 
         // YA CANCELADO TAMBIÉN RESPONDE 0. Lo pide la documentación, y
         // tiene sentido: el proveedor reintenta y lo que quiere saber es

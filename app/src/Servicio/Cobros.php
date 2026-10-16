@@ -39,4 +39,25 @@ final class Cobros
             return false;
         }
     }
+
+    /**
+     * Apunta TODOS los números con los que el proveedor puede avisar.
+     *
+     * Paga de Todo no avisa con nuestra referencia: SPEI llega con la
+     * CLABE, tienda con su referencia de ~30 dígitos y tarjeta con la suya
+     * de 22. Apuntando solo la nuestra, el aviso caía siempre al recorrido
+     * de todas las bases.
+     *
+     * @param array $g  lo que devolvió LigaPago::generar()
+     */
+    public static function apuntarCobro(array $g, $metodo = null)
+    {
+        $hechos = [];
+        foreach (['referencia', 'remota', 'clabe', 'barras'] as $campo) {
+            $v = preg_replace('/\D/', '', (string)($g[$campo] ?? ''));
+            if ($v === '' || isset($hechos[$v])) continue;
+            $hechos[$v] = self::apuntar($v, $metodo);
+        }
+        return in_array(true, $hechos, true);
+    }
 }

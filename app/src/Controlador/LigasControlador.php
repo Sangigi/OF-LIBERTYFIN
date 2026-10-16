@@ -98,11 +98,9 @@ final class LigasControlador
 
         // ⟵ AJUSTE: la semilla sale de LigaPago::semilla().
         //
-        // Aquí ya se usaba el formato bueno —9 dígitos, para que el
-        // recorte a 10 que hace `generar()` sobre el Id sea inocuo— y
-        // por eso desde esta pantalla la liga de tarjeta SÍ se genera.
-        // Ahora los dos lados usan la misma función, para que el
-        // arreglo de Caja no dependa de copiar bien una línea.
+        // Caja, Ligas y Plan usan la misma función. Da 15 dígitos únicos
+        // en cada intento (ver su comentario): reintentar el cobro de una
+        // venta ya no choca con la referencia del intento anterior.
         $semilla = \LibertyFin\Servicio\LigaPago::semilla($ventaId);
 
         $r = $api->generar([
@@ -118,15 +116,16 @@ final class LigasControlador
                 'referencia' => $r['referencia'], 'venta_id' => $ventaId ?: null,
                 'cliente' => $cliente, 'monto' => $monto, 'metodo' => $metodo,
                 'descripcion' => $desc, 'liga' => $r['liga'], 'clabe' => $r['clabe'],
-                'barras' => $r['barras'], 'imagen' => $r['imagen'] ?? null,
+                'barras' => $r['barras'], 'remota' => $r['remota'] ?? null,
+                'imagen' => $r['imagen'] ?? null,
                 'formato' => $r['formato'] ?? null,
                 'vence' => $r['vence'], 'pruebas' => $r['pruebas'],
                 'usuario_id' => $_SESSION['usuario_id'] ?? null,
                 'usuario_nombre' => $_SESSION['usuario_nombre'] ?? null,
             ]);
-            // En qué base vive esta referencia, para que el aviso del
-            // proveedor la encuentre sin recorrer todas.
-            \LibertyFin\Servicio\Cobros::apuntar($r['referencia'], $metodo);
+            // En qué base vive este cobro, con todos los números con que
+            // el proveedor puede avisar, para no recorrer todas las bases.
+            \LibertyFin\Servicio\Cobros::apuntarCobro($r, $metodo);
             Auditoria::anota('pago.registrar', 'liga de pago · ' . $desc,
                 null, Dinero::pesos($monto) . ' · ' . $metodo);
             $_SESSION['lf_liga'] = $repo->porId($id);
@@ -168,7 +167,7 @@ final class LigasControlador
             // consultar" de cobros que estaban perfectamente bien.
             if (!LigaPago::consultable($l['metodo'])) { $avisan++; continue; }
 
-            $r = $api->estado($l['referencia'], $l['metodo']);
+            $r = $api->estado($l['referencia'], $l['metodo'], $l['remota'] ?? '');
             $revisadas++;
             if ($r === null) { $fallos++; continue; }
 

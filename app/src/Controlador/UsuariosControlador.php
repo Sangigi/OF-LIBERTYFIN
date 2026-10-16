@@ -449,6 +449,7 @@ final class UsuariosControlador
                 'liga'           => $g['liga']     ?? null,
                 'clabe'          => $g['clabe']    ?? null,
                 'barras'         => $g['barras']   ?? null,
+                'remota'         => $g['remota']   ?? null,
                 'imagen'         => $g['imagen']   ?? null,
                 'formato'        => $g['formato']  ?? null,
                 'vence'          => $g['vence']    ?? null,
@@ -459,9 +460,11 @@ final class UsuariosControlador
             ]);
 
             // Sin esto, el aviso del proveedor ("ya pagó") llega sin
-            // sesión y sin empresa: no sabría en qué base buscar la
-            // referencia para marcar el plan como pagado.
-            \LibertyFin\Servicio\Cobros::apuntar($g['referencia'] ?? $semilla, $forma);
+            // sesión y sin empresa: no sabría en qué base buscar el cobro
+            // para marcar el plan como pagado. Van todos los números con
+            // que puede avisar (CLABE, su referencia, la nuestra).
+            \LibertyFin\Servicio\Cobros::apuntarCobro(
+                $g + ['referencia' => $semilla], $forma);
 
             // Se devuelve el id para que solicitarPlan() lo meta en la
             // sesión y la vista pueda armar el enlace al comprobante.
@@ -546,7 +549,7 @@ final class UsuariosControlador
             $cfg = \LibertyFin\Servicio\Integraciones::de('spei');
             if ($cfg) {
                 $api = new \LibertyFin\Servicio\LigaPago($cfg);
-                $r = $api->estado($l['referencia'], $l['metodo']);
+                $r = $api->estado($l['referencia'], $l['metodo'], $l['remota'] ?? '');
 
                 if ($r && !empty($r['pagado'])) {
                     // ─────────────────────────────────────────────

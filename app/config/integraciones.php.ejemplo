@@ -229,20 +229,24 @@ return [
         'secreto_webhook' => '',
 
         // Y da de alta ESTAS direcciones en el panel del Sandbox, en la
-        // pestaña EndPoint, con tu secreto pegado al final:
+        // pestaña EndPoint, con tu secreto DENTRO DE LA RUTA (no como
+        // ?k=: el proveedor le añade «/?r=REFERENCIA» al final y detrás
+        // de un ?k= rompe el secreto y la referencia):
         //
         //   Comercios (efectivo en tienda)
-        //     Consultar referencia  https://TU-DOMINIO/pagadetodo/consulta-referencia?k=SECRETO
-        //     Pagar referencia      https://TU-DOMINIO/pagadetodo/pago-referencia?k=SECRETO
-        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+        //     Consultar referencia  https://TU-DOMINIO/pagadetodo/SECRETO/consulta-referencia
+        //     Pagar referencia      https://TU-DOMINIO/pagadetodo/SECRETO/pago-referencia
+        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/SECRETO/cancela-pago
         //
         //   Pago por SPEI
-        //     Consultar clabe       https://TU-DOMINIO/pagadetodo/consulta-clabe?k=SECRETO
-        //     Pagar clabe           https://TU-DOMINIO/pagadetodo/pago-clabe?k=SECRETO
-        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/cancela-pago?k=SECRETO
+        //     Consultar clabe       https://TU-DOMINIO/pagadetodo/SECRETO/consulta-clabe
+        //     Pagar clabe           https://TU-DOMINIO/pagadetodo/SECRETO/pago-clabe
+        //     Cancelar pago         https://TU-DOMINIO/pagadetodo/SECRETO/cancela-pago
         //
         //   Pago en línea (tarjeta)
-        //     Pagar liga            https://TU-DOMINIO/pagadetodo/pago-liga?k=SECRETO
+        //     Pagar liga            https://TU-DOMINIO/pagadetodo/SECRETO/pago-liga
+        //
+        // `php app/bin/revisar-pagos.php` te las imprime con tu dominio.
         //
         // En producción tienen que ser HTTPS. El proveedor lo exige.
 
