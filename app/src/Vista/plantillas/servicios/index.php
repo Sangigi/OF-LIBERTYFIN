@@ -310,36 +310,6 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     <div class="stat-meta">en los últimos 60 días</div></div>
 </div>
 
-<div class="lf-split">
-  <?php if ($top): ?>
-  <section class="card">
-    <header class="card-header">
-      <div><span>Productos que más facturan</span>
-        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-          Del periodo filtrado</p></div>
-    </header>
-    <div class="card-body">
-      <?php W::barrasH(array_map(function($t){
-        return ['rotulo'=>$t['nombre'],'monto'=>$t['monto']]; }, $top)); ?>
-    </div>
-  </section>
-  <?php endif; ?>
-
-  <?php if ($areas): ?>
-  <section class="card">
-    <header class="card-header" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
-      <div><span>Cobrado por área</span>
-        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-          Cobrado, no facturado</p></div>
-    </header>
-    <div class="card-body">
-      <?php W::dona(array_map(function($a){
-        return ['rotulo'=>$a['area'],'monto'=>$a['monto']]; }, $areas),
-        D::corto($tot), 'cobrado'); ?>
-    </div>
-  </section>
-  <?php endif; ?>
-</div>
 
 <section class="card">
   <header class="card-header">Catálogo</header>
@@ -356,7 +326,14 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
           No hay productos que coincidan.</td></tr>
       <?php endif; ?>
       <?php foreach ($catalogo as $s): ?>
-        <tr>
+        <?php /* TOCAR EL RENGLÓN EDITA.
+             El lápiz mide veinte píxeles y en un teléfono se falla más de
+             lo que se acierta; además nadie espera que tocar un producto
+             no haga nada. La fila entera lleva a editarlo, y el lápiz se
+             queda para quien lo busque ahí. */ ?>
+        <tr class="lf-fila-editar" tabindex="0" role="link"
+            data-editar="<?= P::e($qs(['editar'=>$s['id']])) ?>"
+            aria-label="Editar <?= P::e($s['nombre']) ?>">
           <td data-label="Producto">
             <span style="display:flex;align-items:center;gap:10px">
               <span class="lf-mini-img"
@@ -395,6 +372,42 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
   </div>
 </section>
 
+<?php /* LOS REPORTES VAN DEBAJO DEL CATÁLOGO.
+     Estaban arriba, así que al entrar a Productos lo primero que se
+     veía eran dos gráficas y había que bajar para llegar a la lista.
+     A esta pantalla se entra a buscar un producto o a editarlo; lo
+     que más facturó es interesante, pero después. */ ?>
+<div class="lf-split">
+  <?php if ($top): ?>
+  <section class="card">
+    <header class="card-header">
+      <div><span>Productos que más facturan</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Del periodo filtrado</p></div>
+    </header>
+    <div class="card-body">
+      <?php W::barrasH(array_map(function($t){
+        return ['rotulo'=>$t['nombre'],'monto'=>$t['monto']]; }, $top)); ?>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <?php if ($areas): ?>
+  <section class="card">
+    <header class="card-header" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">
+      <div><span>Cobrado por área</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Cobrado, no facturado</p></div>
+    </header>
+    <div class="card-body">
+      <?php W::dona(array_map(function($a){
+        return ['rotulo'=>$a['area'],'monto'=>$a['monto']]; }, $areas),
+        D::corto($tot), 'cobrado'); ?>
+    </div>
+  </section>
+  <?php endif; ?>
+</div>
+
 <form method="post" action="/servicios/alternar" id="formAlternar" hidden>
   <input type="hidden" name="token" value="<?= P::e($token) ?>">
   <input type="hidden" name="id" id="altId">
@@ -419,6 +432,36 @@ document.querySelectorAll('.lf-alternar').forEach(function(b){
     if (!f) return;
     p.style.backgroundImage = "url('" + URL.createObjectURL(f) + "')";
     p.textContent = '';
+  });
+})();
+</script>
+
+<script>
+/* Tocar un renglón del catálogo lo abre para editar.
+   Se ignora cuando el toque fue en un botón, un enlace o un campo: ahí
+   la persona quiso hacer OTRA cosa, y robarle el clic para editar es
+   la clase de detalle que hace que una pantalla se sienta traicionera. */
+(function () {
+  function abrir(fila, nueva) {
+    var u = fila.getAttribute('data-editar');
+    if (!u) return;
+    if (nueva) window.open(u, '_blank', 'noopener'); else location.href = u;
+  }
+  document.addEventListener('click', function (e) {
+    var fila = e.target.closest('.lf-fila-editar');
+    if (!fila) return;
+    if (e.target.closest('a,button,input,select,textarea,label,[role=button]')) return;
+    if (window.getSelection && String(window.getSelection())) return;  /* estaba copiando */
+    e.preventDefault();
+    abrir(fila, e.ctrlKey || e.metaKey);
+  });
+  /* Con teclado: Enter o espacio, como cualquier enlace. */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    var fila = e.target.closest && e.target.closest('.lf-fila-editar');
+    if (!fila || e.target !== fila) return;
+    e.preventDefault();
+    abrir(fila, false);
   });
 })();
 </script>

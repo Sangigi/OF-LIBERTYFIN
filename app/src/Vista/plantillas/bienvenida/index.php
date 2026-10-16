@@ -84,6 +84,20 @@ $MC = \LibertyFin\Servicio\Modulos::CATALOGO;
           <div class="lf-aviso err" role="alert"><?= W::icono('alerta', '17px') ?><span><?= P::e($error) ?></span></div>
         <?php endif; ?>
 
+        <?php /* NADA DE ESTO ES OBLIGATORIO, Y CONVIENE DECIRLO AQUÍ.
+             Una pantalla de ocho preguntas antes de poder usar el
+             sistema se siente como un trámite, y quien tiene prisa la
+             contesta a lo loco con tal de pasar — que es peor que no
+             contestarla—. Si se sabe desde el principio que se puede
+             saltar y cambiar luego, se contesta lo que se sabe y ya. */ ?>
+        <p class="lf-bv-opcional">
+          <?= W::icono('alerta', '15px') ?>
+          <span><b>Nada de esto es obligatorio.</b> Puedes saltarte lo que no
+          tengas claro y seguir derecho a la aplicación: todo esto vive en
+          <b>Ajustes</b> y se cambia cuando quieras, las veces que quieras.
+          Nada de lo que elijas aquí se queda fijo.</span>
+        </p>
+
         <?php /* ── 1 · El giro ── */ ?>
         <section class="paso on" data-paso="0" data-campo="perfil">
           <p class="eyebrow"><?= $repite ? 'Configuración inicial' : ($quien !== '' ? 'Hola, ' . P::e($quien) : 'Hola') ?></p>

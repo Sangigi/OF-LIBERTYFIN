@@ -89,6 +89,10 @@ $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\S
 <script src="/assets/js/lf-chat.js?v=<?= is_file($chatJs) ? filemtime($chatJs) : '1' ?>" defer></script>
 </head>
 <body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>"
+      <?php /* De quién es esta sesión. La caja lo usa para que su ticket
+               a medias no se le aparezca a la siguiente cuenta que entre
+               en este mismo navegador. */ ?>
+      data-usuario="<?= (int)($_SESSION['usuario_id'] ?? 0) ?>"
       data-lf-soporte="<?= $lfSoporte ? '1' : '0' ?>" data-lf-yo="<?= P::e($_SESSION['usuario_nombre'] ?? '') ?>"
       data-lf-quien="<?= P::e($lfQuien) ?>">
 <?php if ($estreno !== ''):

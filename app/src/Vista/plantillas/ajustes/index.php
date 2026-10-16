@@ -747,3 +747,29 @@ document.querySelectorAll('.lf-alt').forEach(function(b){
   });
 });
 </script>
+
+<script>
+/* ══════════════════════════════════════════════════════
+   UN MÓDULO SE ENCIENDE TOCÁNDOLO
+   El interruptor mide veinte píxeles; en un teléfono se falla más de
+   lo que se acierta. La tarjeta entera es el blanco. El interruptor
+   sigue ahí —y sigue siendo el que manda— para quien use teclado o
+   lector de pantalla.
+   ══════════════════════════════════════════════════════ */
+(function () {
+  document.addEventListener('click', function (e) {
+    var tarjeta = e.target.closest('.lf-mod');
+    if (!tarjeta || tarjeta.classList.contains('candado')) return;
+    /* Si tocaron el propio interruptor, su etiqueta o el enlace de
+       planes, ya hacen lo suyo: duplicarlo lo apagaría y encendería
+       en el mismo gesto. */
+    if (e.target.closest('input,a,button,label')) return;
+    var sw = tarjeta.querySelector('input[type=checkbox]');
+    if (!sw || sw.disabled) return;
+    sw.checked = !sw.checked;
+    /* Se avisa como si lo hubiera tocado una persona: de ahí cuelga el
+       guardado sin recargar del layout. */
+    sw.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+})();
+</script>

@@ -131,6 +131,9 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
                 data-u="<?= P::e(\LibertyFin\Servicio\Inventario::abrev($s['unidad_medida'] ?? '')) ?>"
                 <?= $frac ? 'data-frac="1"' : '' ?>
                 data-precio="<?= (float)$s['precio'] ?>">
+          <?php /* Cuántas llevas de esta. Lo pinta el JS al cambiar el
+                   ticket; nace vacío para que no parpadee un 0. */ ?>
+          <span class="lf-cuantas" aria-hidden="true"></span>
           <?php if ($hay !== null): ?>
             <span class="lf-serv-hay<?= $hay <= 0 ? ' agotado' : ($hay <= (float)$ex['minimo'] ? ' bajo' : '') ?>">
               <?= $hay > 0 ? P::e(\LibertyFin\Servicio\Inventario::conUnidad($hay, $s['unidad_medida'] ?? '')) : 'Agotado' ?></span>
@@ -542,7 +545,29 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
   var pesos = function(n){ return '$' + (Math.round(n*100)/100).toLocaleString('es-MX',
                      {minimumFractionDigits:2, maximumFractionDigits:2}); };
 
+  /* CUÁNTAS LLEVAS DE CADA COSA.
+     Tocar un servicio tres veces no daba ninguna señal en la tarjeta:
+     había que bajar al ticket a contar. El número va en su esquina,
+     que es donde está mirando el dedo. Se repinta junto con el ticket
+     para que no puedan decir cosas distintas. */
+  function marcarTarjetas(){
+    var cuenta = {};
+    lineas.forEach(function(l){ cuenta[l.id] = (cuenta[l.id] || 0) + (+l.cantidad || 0); });
+    document.querySelectorAll('.lf-serv').forEach(function(b){
+      var n = cuenta[b.dataset.id] || 0;
+      var sello = b.querySelector('.lf-cuantas');
+      b.classList.toggle('lleva', n > 0);
+      if (!sello) return;
+      /* Las fraccionarias llevan decimal: «1.5» en medio kilo, pero
+         «3» y no «3.0» en lo que se cuenta por pieza. */
+      sello.textContent = n > 0 ? (n % 1 ? (Math.round(n * 100) / 100) : n) : '';
+      b.setAttribute('aria-label',
+        (b.dataset.nombre || '') + (n > 0 ? ' · llevas ' + sello.textContent : ''));
+    });
+  }
+
   function pintar(){
+    marcarTarjetas();
     var lista = $('lista'); lista.innerHTML = '';
     lineas.forEach(function(l, i){
       var d = document.createElement('div');
@@ -1406,7 +1431,13 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
      que algo cambia y se restaura al cargar. Se borra al cobrar con
      éxito, para que la siguiente venta empiece limpia.
      ══════════════════════════════════════════════════════ */
-  var CLAVE_TICKET = 'lf-caja-ticket';
+  /* EL TICKET ES DE ESTA CUENTA.
+     La clave era fija, así que al cerrar sesión y entrar con otra
+     cuenta en el mismo navegador aparecía el ticket a medias de la
+     anterior: conceptos de otra empresa listos para cobrar. Con el
+     usuario dentro de la clave, cada quien ve el suyo y nadie hereda
+     el de nadie. Al salir se borran todos, de todas formas. */
+  var CLAVE_TICKET = 'lf-caja-ticket-' + (document.body.dataset.usuario || '0');
   var ticketListo = false;     // no se guarda nada antes de restaurar
   var ticketCerrado = false;   // ya se cobró: no se vuelve a guardar
 

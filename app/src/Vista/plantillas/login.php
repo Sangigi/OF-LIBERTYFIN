@@ -135,6 +135,29 @@ $token = $_SESSION['lf_token'];
 </main>
 
 <script>
+/* ══════════════════════════════════════════════════════
+   LO QUE QUEDÓ DE LA SESIÓN ANTERIOR, FUERA
+   Estar en el login significa que nadie ha entrado. Lo que el
+   navegador guardó de la cuenta de antes —el ticket a medio hacer,
+   las ventanas abiertas, los filtros— no tiene por qué seguir ahí, y
+   si la siguiente cuenta es de otra empresa es peor que inútil: son
+   conceptos ajenos listos para cobrar.
+   Se borra en el login y no al pulsar «Salir» porque también hay que
+   limpiar cuando la sesión caduca sola o alguien llega por un enlace.
+   ══════════════════════════════════════════════════════ */
+(function(){
+  try {
+    [sessionStorage, localStorage].forEach(function (d) {
+      for (var i = d.length - 1; i >= 0; i--) {
+        var k = d.key(i);
+        /* El tema y el tamaño de letra SÍ se quedan: son de este
+           aparato, no de la cuenta, y resetearlos en cada login sería
+           pelearse con quien eligió modo oscuro. */
+        if (k && k.indexOf('lf-') === 0 && k !== 'lf-tema' && k !== 'lf-letra') d.removeItem(k);
+      }
+    });
+  } catch (e) { /* modo privado: no había nada guardado de todas formas */ }
+})();
 (function(){
   var o = document.getElementById('ojo'), c = document.getElementById('clave');
   if (o && c) o.addEventListener('click', function(){

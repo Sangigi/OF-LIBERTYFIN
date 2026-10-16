@@ -135,6 +135,24 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
     <h3 class="card-title"><?= count($vivas) ?> <?= count($vivas) === 1 ? 'cita' : 'citas' ?></h3>
     <small class="lf-inv-sub">Toca una cita para verla, confirmarla o cobrarla<?= $puedeEditar ? '; toca un espacio libre para agendar ahí' : '' ?>.</small>
   </span></div>
+  <?php /* UNA PERSONA A LA VEZ EN EL TELÉFONO.
+       Cada especialista es una columna de 150px y las horas se llevan
+       56 más: en una pantalla de 360 no caben dos, así que había que
+       arrastrar de lado para ver a la segunda —y peor, no había nada
+       que dijera que la segunda existía—. Aquí se eligen por nombre y
+       la columna ocupa el ancho entero.
+       En pantalla grande este selector no aparece: ahí caben todas y
+       verlas juntas es justo para lo que sirve una agenda. */ ?>
+  <?php if (count($columnas) > 1): ?>
+  <div class="lf-ag-quien" role="tablist" aria-label="De quién ves la agenda">
+    <?php $primera = true; foreach ($columnas as $cid => $cnom): ?>
+      <button type="button" class="lf-pill<?= $primera ? ' active' : '' ?>"
+              role="tab" aria-selected="<?= $primera ? 'true' : 'false' ?>"
+              data-col="<?= (int)$cid ?>"><?= P::e($cnom) ?></button>
+    <?php $primera = false; endforeach; ?>
+    <button type="button" class="lf-pill lf-ag-todas" data-col="todas">Todas</button>
+  </div>
+  <?php endif; ?>
   <div class="lf-ag-scroll">
     <div class="lf-ag-grid" style="--cols:<?= count($columnas) ?>;--alto:<?= ($fin - $ini) * $PX ?>px">
       <div class="lf-ag-horas">
@@ -146,7 +164,7 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
         </div>
       </div>
       <?php foreach ($columnas as $cid => $cnom): ?>
-      <div class="lf-ag-col">
+      <div class="lf-ag-col" data-col="<?= (int)$cid ?>">
         <div class="lf-ag-colcab"><?= P::e($cnom) ?></div>
         <div class="lf-ag-cuerpo">
           <?php if ($puedeEditar): for ($m = $ini; $m < $fin; $m += $paso): ?>
@@ -402,6 +420,57 @@ $vivas = array_filter($citas, function ($c) { return !in_array($c['estado'], A::
       fila.scrollIntoView({behavior: 'smooth', block: 'center'});
       fila.classList.remove('foco'); void fila.offsetWidth; fila.classList.add('foco');
     }
+  });
+})();
+</script>
+
+<script>
+/* De quién se ve la agenda en el teléfono. */
+(function () {
+  var sel = document.querySelector('.lf-ag-quien');
+  if (!sel) return;
+  var grid = document.querySelector('.lf-ag-grid');
+  if (!grid) return;
+  var CLAVE = 'lf-agenda-col';
+
+  function mostrar(col) {
+    var cols = grid.querySelectorAll('.lf-ag-col'), vistas = 0;
+    cols.forEach(function (c) {
+      var suya = (col === 'todas') || c.dataset.col === col;
+      c.classList.toggle('lf-ag-oculta', !suya);
+      if (suya) vistas++;
+    });
+    /* La rejilla reparte el ancho entre las columnas que SIGUEN
+       puestas: si no se le dice, deja el hueco de las escondidas. */
+    grid.style.setProperty('--cols', vistas || 1);
+    sel.querySelectorAll('[data-col]').forEach(function (b) {
+      var on = b.dataset.col === col;
+      b.classList.toggle('active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    try { sessionStorage.setItem(CLAVE, col); } catch (e) {}
+  }
+
+  sel.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-col]');
+    if (b) mostrar(b.dataset.col);
+  });
+
+  /* Se recuerda a quién estabas viendo: en un día de trabajo se vuelve
+     a la agenda veinte veces y volver a elegir cada vez cansa. */
+  var guardada = null;
+  try { guardada = sessionStorage.getItem(CLAVE); } catch (e) {}
+  var existe = guardada && (guardada === 'todas'
+    || grid.querySelector('.lf-ag-col[data-col="' + guardada.replace(/"/g, '') + '"]'));
+  /* Solo manda en pantalla chica. En grande caben todas y esconder
+     gente sería esconder trabajo. */
+  var chica = window.matchMedia('(max-width: 760px)').matches;
+  if (chica) mostrar(existe ? guardada : (sel.querySelector('[data-col]') || {}).dataset.col);
+  else mostrar('todas');
+
+  window.matchMedia('(max-width: 760px)').addEventListener('change', function (ev) {
+    if (!ev.matches) mostrar('todas');
+    else mostrar(existe ? guardada : (sel.querySelector('[data-col]') || {}).dataset.col);
   });
 })();
 </script>
