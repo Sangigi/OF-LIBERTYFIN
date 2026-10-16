@@ -240,17 +240,11 @@ return [
         //   php -r "echo bin2hex(random_bytes(24)), PHP_EOL;"
         'secreto_webhook' => '',
 
-        // EL DEL SANDBOX, DISTINTO AL DE ARRIBA.
-        //
-        // Las mismas direcciones de abajo, pero con ESTE secreto, van en
-        // el panel del Sandbox; las de `secreto_webhook`, en el de
-        // producción. Así el sistema sabe de dónde viene cada aviso:
-        // una liga hecha en Sandbox solo acepta avisos del Sandbox, y una
-        // real solo de producción. El simulador no puede pagar una venta
-        // real, y un depósito real a una liga de prueba se rechaza (el
-        // proveedor se lo devuelve al cliente).
-        //
-        // Vacío: las ligas de prueba rechazan todos los avisos.
+        // OPCIONAL: un segundo secreto que se acepta igual que el de
+        // arriba. Sirve si registraste algunas direcciones del panel con
+        // otro secreto. NO separa ambientes: Paga de Todo manda los pagos
+        // reales y los del emulador a las mismas direcciones, así que
+        // rechazar por ambiente rebotaba depósitos reales.
         'secreto_webhook_prueba' => '',
 
         // Y da de alta ESTAS direcciones en el panel del Sandbox, en la

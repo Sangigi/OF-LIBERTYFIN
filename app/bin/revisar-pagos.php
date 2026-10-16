@@ -255,21 +255,11 @@ if ($secreto === '') {
     nota('OJO: el secreto va DENTRO de la ruta, no como ?k=. El proveedor');
     nota('añade «/?r=REFERENCIA» al final y detrás de un ?k= lo rompe todo.');
 
-    // El panel del Sandbox lleva las MISMAS rutas con OTRO secreto: así
-    // un aviso del emulador nunca toca una liga real, ni un pago real una
-    // liga de prueba (ver PagosEntrantesControlador::mismoAmbiente).
+    // `secreto_webhook_prueba` es opcional: se acepta igual que el
+    // principal, para quien ya registró las direcciones con él.
     $secretoPrueba = trim((string)($cfg['secreto_webhook_prueba'] ?? ''));
     if ($secretoPrueba !== '' && $secretoPrueba !== $secreto) {
-        echo "\n  En el panel del SANDBOX (pagadetodo.mx/Sandbox, pestaña EndPoint) van\n"
-           . "  las mismas, pero con `secreto_webhook_prueba`:\n\n";
-        echo '    ' . $muestra . '/pagadetodo/' . c(substr($secretoPrueba, 0, 4) . '…', 'd')
-           . "/consulta-clabe   (y así las demás)\n";
-    } elseif ($secretoPrueba !== '') {
-        $problemas++;
-        mal('`secreto_webhook_prueba` es igual a `secreto_webhook`: así no se separa nada');
-    } elseif (!empty($cfg['sandbox'])) {
-        $problemas++;
-        mal('en Sandbox falta `secreto_webhook_prueba`: las ligas de prueba rechazan todos los avisos');
+        nota('también se acepta `secreto_webhook_prueba` (' . c(substr($secretoPrueba, 0, 4) . '…', 'd') . ')');
     }
 
     if ($dominio === '') {

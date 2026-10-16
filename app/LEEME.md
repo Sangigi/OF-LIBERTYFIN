@@ -823,13 +823,12 @@ prueba o de verdad son las credenciales. Por eso:
 - **En tarjeta, Sandbox manda `PaymentTypes` 401** (`payment_types_prueba`) y
   producción 41 (`payment_types`). La documentación dice que 401 solo existe
   en el Sandbox.
-- **Cada ambiente tiene su secreto de avisos.** En el panel del Sandbox
-  (`pagadetodo.mx/Sandbox`, pestaña EndPoint) van las direcciones con
-  `secreto_webhook_prueba`; en producción, con `secreto_webhook`. Una liga
-  hecha en Sandbox (`lf_ligas_pago.pruebas = 1`) solo acepta avisos del
-  Sandbox, y una real solo de producción. El emulador no puede pagar ni
-  cancelar una venta real, y un depósito real a una liga de prueba se
-  rechaza: el proveedor se lo devuelve al cliente.
+- **Los avisos NO se rechazan por ambiente.** Se intentó (un secreto por
+  ambiente y comparar con `lf_ligas_pago.pruebas`) y rebotó depósitos
+  reales: Paga de Todo registra un solo juego de direcciones por cuenta
+  (pestaña EndPoint), así que pagos reales y del emulador llegan por la
+  misma puerta. `secreto_webhook_prueba` quedó solo como un segundo
+  secreto aceptado.
 
 `php app/bin/revisar-pagos.php` avisa si algo de esto quedó a medias.
 

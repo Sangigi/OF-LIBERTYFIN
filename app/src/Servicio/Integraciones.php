@@ -141,13 +141,9 @@ final class Integraciones
         }
 
         // En Sandbox no se cobra de verdad: sin credenciales propias no se
-        // genera nada, y sin su propio secreto no entra ningún aviso.
+        // genera nada.
         $bloqueo = (new \LibertyFin\Servicio\LigaPago($c))->bloqueoSandbox();
         if ($bloqueo !== '') return $bloqueo;
-        if (!empty($c['sandbox']) && trim((string)($c['secreto_webhook_prueba'] ?? '')) === '') {
-            return 'En Sandbox falta `secreto_webhook_prueba`: las ligas de prueba van a '
-                 . 'rechazar todos los avisos. Ponlo y regístralo en el panel del Sandbox.';
-        }
         if (trim((string)($c['negocio_id'] ?? '')) === ''
             && trim((string)($c['escuela_id'] ?? '')) !== '') {
             return 'Estás usando `escuela_id` (Paga la Escuela) como BusinessID. '

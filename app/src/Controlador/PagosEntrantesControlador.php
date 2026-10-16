@@ -79,9 +79,15 @@ final class PagosEntrantesControlador
     const FUERA_PERIODO = 60;   // la cancelación llegó tarde
 
     /**
-     * ¿El aviso vino del Sandbox? Lo dice el secreto con el que llegó:
-     * `secreto_webhook_prueba` es el del panel del Sandbox y
-     * `secreto_webhook` el de producción. Ver mismoAmbiente().
+     * ¿El aviso llegó con `secreto_webhook_prueba`? Solo se anota en el
+     * registro.
+     *
+     * NO SE RECHAZA NINGÚN AVISO POR AMBIENTE. Se probó: el proveedor
+     * registra UN juego de direcciones por cuenta (la pestaña EndPoint del
+     * panel), así que pagos reales y del emulador llegan por la misma
+     * puerta y con el mismo secreto. Rechazar por "ambiente" rebotaba
+     * depósitos reales. La separación de verdad está en las credenciales
+     * con que se genera el cobro (LigaPago::bloqueoSandbox).
      */
     private $avisoDePrueba = false;
 
@@ -112,10 +118,6 @@ final class PagosEntrantesControlador
                 'Adquiriente inválido', 0, $limpio, '', $campo);
         }
         list($db, $l) = $hallado;
-        if (!$this->mismoAmbiente($l)) {
-            $this->consultaJson(self::NO_RECONOCIDA,
-                'Adquiriente inválido', 0, $limpio, '', $campo);
-        }
 
         if ($l['estado'] === 'pagada') {
             $this->consultaJson(self::SIN_ADEUDO,
@@ -185,9 +187,6 @@ final class PagosEntrantesControlador
             $this->pagoJson(self::NO_RECONOCIDA, '', 'Adquiriente inválido', $transaccion);
         }
         list($db, $l) = $hallado;
-        if (!$this->mismoAmbiente($l)) {
-            $this->pagoJson(self::NO_RECONOCIDA, '', 'Adquiriente inválido', $transaccion);
-        }
         $repo = new LigaRepo($db);
 
         // IDEMPOTENCIA. El proveedor reintenta cuando no le contestamos a
@@ -357,9 +356,6 @@ final class PagosEntrantesControlador
         if (!$hallado) $this->json(['codigo' => self::NO_RECONOCIDA,
                                     'mensaje' => 'Operación no encontrada']);
         list($db, $l) = $hallado;
-        // El simulador del Sandbox tampoco puede deshacer un pago real.
-        if (!$this->mismoAmbiente($l)) $this->json(['codigo' => self::NO_RECONOCIDA,
-                                                    'mensaje' => 'Operación no encontrada']);
 
         // UN ABONO PARCIAL deja la liga abierta, así que no se puede mirar
         // solo su estado: se busca el abono de esa transacción en la venta.
@@ -465,9 +461,6 @@ public function pagoLiga()
         $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
     }
     list($db, $l) = $hallado;
-    if (!$this->mismoAmbiente($l)) {
-        $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
-    }
 
     error_log(sprintf(
         '[LibertyFin] pagoLiga · ubicada id=%s estado=%s venta_id=%s monto_liga=%s',
@@ -766,37 +759,7 @@ public function pagoLiga()
         }
 
         error_log('[LibertyFin] pagadetodo ABRE ' . $este
-            . ($this->avisoDePrueba ? ' · Sandbox' : ' · producción'));
-    }
-
-    /**
-     * ¿El aviso viene del mismo ambiente que la liga?
-     *
-     * SANDBOX Y PRODUCCIÓN NO SE MEZCLAN.
-     *
-     * Los dos entraban por la misma puerta, con el mismo secreto, y nadie
-     * miraba la columna `pruebas` de la liga. El simulador del Sandbox
-     * podía marcar como pagada una venta real sin que entrara un peso, y
-     * un SPEI real se aplicaba a una liga de prueba.
-     *
-     * Ahora una liga hecha en Sandbox solo acepta avisos del Sandbox, y
-     * una de producción solo de producción. Rechazar un depósito real en
-     * una liga de prueba hace que el proveedor se lo devuelva al cliente:
-     * en Sandbox no entra dinero de verdad.
-     */
-    private function mismoAmbiente(array $l)
-    {
-        $deLiga = !empty($l['pruebas']);
-        if ($deLiga === $this->avisoDePrueba) return true;
-
-        error_log('[LibertyFin] pagadetodo RECHAZA ' . ($l['referencia'] ?? '?') . ' · '
-            . ($deLiga
-                ? 'la liga es de Sandbox y el aviso llegó con el secreto de producción: '
-                  . 'no se acepta dinero real en una liga de prueba. Si era el simulador, '
-                  . 'pon `secreto_webhook_prueba` y regístralo en el panel del Sandbox.'
-                : 'la liga es de producción y el aviso llegó del Sandbox: '
-                  . 'el simulador no puede pagar ni cancelar una venta real.'));
-        return false;
+            . ($this->avisoDePrueba ? ' · con secreto_webhook_prueba' : ''));
     }
 
     /**
