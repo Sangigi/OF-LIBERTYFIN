@@ -18,11 +18,14 @@ $token = $_SESSION['lf_token'];
      */
     $logo = __DIR__ . '/../../../public/assets/img/logo-blanco.png';
     ?>
+    <?php /* El logo lleva a la landing, como en cualquier sitio. */ ?>
+    <a href="/" aria-label="Volver al inicio">
     <?php if (is_file($logo)): ?>
       <img src="/assets/img/logo-blanco.png?v=<?= filemtime($logo) ?>" alt="LibertyFin">
     <?php else: ?>
       <span class="lf-logo-texto">Libertyfin</span>
     <?php endif; ?>
+    </a>
   </div>
 
   <div class="lf-tarjeta">
@@ -128,6 +131,8 @@ $token = $_SESSION['lf_token'];
     <p class="lf-registrate">¿Tu negocio aún no usa Libertyfin? <a href="/registro">Regístralo gratis</a></p>
   <?php endif; ?>
   </div>
+
+  <a class="lf-volver" href="/">← Volver al inicio</a>
 
   <p class="lf-pie-entrada">
     © <?= date('Y') ?> Libertyfin · Todos los derechos reservados

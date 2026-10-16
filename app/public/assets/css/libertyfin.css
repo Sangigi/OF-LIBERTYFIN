@@ -1808,6 +1808,12 @@ body.lf-centro{
    —después, y con color blanco— los pintaba invisibles sobre el fondo
    claro del menú. Un nombre repetido en una hoja de estilos no da error:
    simplemente gana el último, y el síntoma aparece en otra pantalla. */
+/* De regreso a la landing */
+.lf-logo a{display:inline-block}
+.lf-volver{margin-top:20px;font-size:12.5px;font-weight:600;text-decoration:none;
+  color:color-mix(in srgb,#fff 78%,transparent)}
+.lf-volver:hover,.lf-volver:focus-visible{color:#fff;text-decoration:underline;text-underline-offset:2px}
+
 .lf-pie-entrada{margin-top:22px;font-size:11px;text-align:center;
   color:color-mix(in srgb,#fff 52%,transparent)}
 .lf-pie-entrada a{color:inherit;text-decoration:underline}
