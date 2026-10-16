@@ -22,7 +22,7 @@ use LibertyFin\Datos\ConfigRepo;
 // su ficha, que sí dice de quién son los números.
 $deEmpresa = [
   ['grupo' => 'Operación'],
-  ['ruta' => '/',           'icono' => 'panel',   'texto' => 'Panel',         'p' => 'ver.panel'],
+  ['ruta' => '/panel',           'icono' => 'panel',   'texto' => 'Panel',         'p' => 'ver.panel'],
   ['ruta' => '/caja',       'icono' => 'caja',    'texto' => 'Caja',          'p' => 'cobrar'],
   // Los módulos (Servicio\Modulos): solo si la empresa los tiene activos.
   ['ruta' => '/agenda',     'icono' => 'agenda',   'texto' => 'Agenda',        'p' => 'ver.agenda',       'mod' => 'agenda'],
@@ -62,7 +62,7 @@ $deEmpresa = [
 
 $dePlataforma = [
   ['grupo' => 'Soporte'],
-  ['ruta' => '/',             'icono' => 'panel',   'texto' => 'Panel',          'p' => 'ver.soporte'],
+  ['ruta' => '/panel',             'icono' => 'panel',   'texto' => 'Panel',          'p' => 'ver.soporte'],
   ['ruta' => '/tickets',      'icono' => 'alerta',  'texto' => 'Tickets',        'p' => 'ver.tickets'],
   ['ruta' => '/soporte',      'icono' => 'cliente', 'texto' => 'Empresas',       'p' => 'ver.empresas'],
   ['ruta' => '/conocimiento', 'icono' => 'serv',    'texto' => 'Conocimiento',   'p' => 'ver.conocimiento'],

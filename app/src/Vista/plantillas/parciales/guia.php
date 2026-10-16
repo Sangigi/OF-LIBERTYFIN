@@ -28,7 +28,7 @@ $pasos = [
    'texto'  => 'En menos de un minuto te mostramos dónde está cada cosa. '
              . 'Puedes salirte cuando quieras y volver a verla desde Mi cuenta.'],
 
-  ['ruta' => '/', 'p' => 'ver.panel', 'icono' => 'panel',
+  ['ruta' => '/panel', 'p' => 'ver.panel', 'icono' => 'panel',
    'titulo' => 'Tu panorama',
    'texto'  => 'De un vistazo: cuánto entró hoy, qué falta por cobrar y cómo va el mes.'],
 
@@ -134,7 +134,7 @@ if (!empty($_SESSION['plataforma'])) $pasos = [
    'texto'  => 'En menos de un minuto te mostramos dónde está cada cosa. '
              . 'Puedes salirte cuando quieras y volver a verla desde Mi cuenta.'],
 
-  ['ruta' => '/', 'p' => 'ver.soporte', 'icono' => 'cola',
+  ['ruta' => '/panel', 'p' => 'ver.soporte', 'icono' => 'cola',
    'titulo' => 'Lo que está esperando',
    'texto'  => 'Tu panel junta lo pendiente: tickets sin dueño, documentos por revisar '
              . 'y empresas por dar de alta. Es lo que hay que vaciar antes de irte.'],

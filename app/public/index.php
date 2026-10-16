@@ -48,6 +48,17 @@ session_set_cookie_params([
 ]);
 session_start();
 
+$rutaActual = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
+if ($_SERVER['REQUEST_METHOD'] === 'GET' && $rutaActual === '/') {
+    $archivo = $raiz . '/src/Vista/plantillas/index.html';
+    if (!is_file($archivo)) {
+        http_response_code(404);
+        exit('No se encontró la página principal.');
+    }
+    header('Content-Type: text/html; charset=utf-8');
+    readfile($archivo);
+    exit;
+}
 // ── Rutas ──
 $r = new Router();
 
@@ -123,9 +134,9 @@ $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
 // plataforma en el panel de empresa vería las ventas de quien le prestó
 // la sesión, y las leería como del cliente que llamó.
 if (\LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '')) {
-    $r->get('/',    ['LibertyFin\Controlador\SoporteControlador', 'panel']);
+    $r->get('/panel', ['LibertyFin\Controlador\SoporteControlador', 'panel']);
 } else {
-    $r->get('/',    ['LibertyFin\Controlador\PanelControlador',  'index']);
+    $r->get('/panel', ['LibertyFin\Controlador\PanelControlador', 'index']);
 }
 $r->get('/ventas',  ['LibertyFin\Controlador\VentasControlador', 'index']);
 // Traer a LibertyFin la hoja de ventas que se llevaba en Excel.
