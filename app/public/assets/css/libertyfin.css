@@ -5009,11 +5009,19 @@ button.lf-pill{font-family:inherit;cursor:pointer}
    propia tarjeta, que es donde está mirando el dedo.
    ══════════════════════════════════════════════════════ */
 .lf-serv{position:relative}
-.lf-serv .lf-cuantas{position:absolute;top:-7px;right:-7px;z-index:2;
-  min-width:22px;height:22px;padding:0 6px;border-radius:999px;
+/* DENTRO DE LA TARJETA, NO ASOMADO POR FUERA.
+   Estaba en -7px para que sobresaliera, pero la cuadrícula recorta lo
+   que se sale —es un carrusel con páginas— y del sello solo se veía
+   un cuarto de círculo pegado al borde. Un contador cortado no cuenta
+   nada. Se mete dentro, donde nada lo puede recortar. */
+.lf-serv .lf-cuantas{position:absolute;top:7px;right:7px;z-index:2;
+  min-width:23px;height:23px;padding:0 6px;border-radius:999px;
   display:none;align-items:center;justify-content:center;
   background:var(--lf-brand);color:#fff;font-size:11.5px;font-weight:700;
-  line-height:1;box-shadow:0 2px 6px rgba(0,0,0,.22);
+  line-height:1;
+  /* Un aro del color de la tarjeta lo despega de la imagen de fondo:
+     sin él, sobre un cuadro claro el número se pierde. */
+  box-shadow:0 0 0 2px var(--lf-sup), 0 2px 5px rgba(0,0,0,.2);
   animation:lf-cuantas .2s cubic-bezier(.3,1.4,.5,1)}
 .lf-serv.lleva .lf-cuantas{display:flex}
 /* La tarjeta también se marca: el número solo no se ve de reojo. */
@@ -5044,9 +5052,16 @@ button.lf-pill{font-family:inherit;cursor:pointer}
    precio, ámbar el que hay que capturar a mano. Sin esto había que
    leer renglón por renglón para cazar el que se quedó en cero. */
 .lf-linea{border-left:3px solid transparent}
-.lf-linea.con-precio{border-left-color:var(--lf-azul,#3b82f6)}
+.lf-linea.con-precio{border-left-color:var(--lf-azul,#3b82f6);
+  background:color-mix(in srgb, var(--lf-azul,#3b82f6) 7%, transparent)}
 .lf-linea.sin-precio{border-left-color:var(--lf-amb);
   background:color-mix(in srgb, var(--lf-amb) 7%, transparent)}
+/* Donde no hay color-mix —navegadores de hace tres años— al menos se
+   queda la barra lateral, que es la que carga la información. */
+@supports not (background: color-mix(in srgb, red 7%, transparent)){
+  .lf-linea.con-precio{background:rgba(59,130,246,.07)}
+  .lf-linea.sin-precio{background:rgba(245,158,11,.07)}
+}
 
 
 /* ══════════════════════════════════════════════════════
