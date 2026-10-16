@@ -478,14 +478,30 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
       <?php if ($ec): ?><input type="hidden" name="id" value="<?= (int)$ec['id'] ?>"><?php endif; ?>
       <div style="flex:2;min-width:180px"><label class="form-label">Colaborador</label>
         <input class="form-control" name="nombre" value="<?= P::e($ec['nombre'] ?? '') ?>" required></div>
-      <div style="flex:1;min-width:150px"><label class="form-label">Área</label>
-        <select class="form-select" name="area_id" required>
+      <?php /* SE ESCRIBE, NO SE ELIGE DE UNA LISTA QUE PUEDE ESTAR VACÍA.
+           Con un desplegable, quien daba de alta a su primer colaborador
+           se encontraba la lista en blanco y tenía que irse a crear el
+           área antes de poder seguir. Aquí se escribe: si el área existe
+           se usa esa —el desplegable de abajo la sugiere— y si no, se
+           crea al guardar. */
+      $areaActual = '';
+      if (isset($ec['area_id'])) {
+          foreach ($areas as $a) {
+              if ((int)$a['id'] === (int)$ec['area_id']) { $areaActual = $a['nombre']; break; }
+          }
+      } ?>
+      <div style="flex:1;min-width:150px"><label class="form-label" for="colArea">Área</label>
+        <input class="form-control" name="area_nombre" id="colArea" list="lfAreasColab"
+               value="<?= P::e($areaActual) ?>" required autocomplete="off"
+               placeholder="<?= $areas ? P::e($areas[0]['nombre']) : 'Legal, Contabilidad…' ?>">
+        <datalist id="lfAreasColab">
           <?php foreach ($areas as $a): ?>
-            <option value="<?= (int)$a['id'] ?>"
-              <?= (isset($ec['area_id']) && (int)$ec['area_id']===(int)$a['id'])?'selected':'' ?>>
-              <?= P::e($a['nombre']) ?></option>
+            <option value="<?= P::e($a['nombre']) ?>"></option>
           <?php endforeach; ?>
-        </select></div>
+        </datalist>
+        <small class="lf-pista-area"><?= $areas
+          ? 'Si escribes una que no existe, se crea.'
+          : 'Todavía no hay áreas: la que escribas se crea sola.' ?></small></div>
       <button class="btn btn-primary" type="submit"><?= $ec?'Guardar':'Agregar' ?></button>
     </form>
 

@@ -5031,13 +5031,22 @@ button.lf-pill{font-family:inherit;cursor:pointer}
    al salto de la cuadrícula al ticket, que es donde se revisa antes
    de cobrar.
    ══════════════════════════════════════════════════════ */
-.lf-ticket-cab,#tituloTicket{color:var(--lf-brand-2)}
-.card > .card-header:has(#tituloTicket){
-  border-bottom:2px solid var(--lf-brand);
-  background:linear-gradient(0deg,var(--lf-brand-glow),transparent)}
-.lf-tk-linea{border-left:3px solid var(--lf-azul,#3b82f6);padding-left:9px}
-.lf-tk-linea.sin-precio{border-left-color:var(--lf-amb)}
-.lf-tk-linea.sin-precio .m{color:var(--lf-amb)}
+/* LA CABECERA ENTERA, no una rayita debajo. El ticket es lo que se
+   revisa antes de cobrar: que se distinga del catálogo de al lado
+   ahorra el segundo de «¿dónde estoy mirando?». */
+.lf-tk-cab{display:flex;justify-content:space-between;align-items:center;gap:10px;
+  background:var(--lf-brand);color:#fff;border-bottom:none}
+.lf-tk-cab #tituloTicket{color:#fff;font-weight:700}
+.lf-tk-cab .badge{background:rgba(255,255,255,.22)!important;color:#fff!important;
+  border-color:transparent!important}
+
+/* Cada renglón con el color que ya tenía su tarjeta: azul el que trae
+   precio, ámbar el que hay que capturar a mano. Sin esto había que
+   leer renglón por renglón para cazar el que se quedó en cero. */
+.lf-linea{border-left:3px solid transparent}
+.lf-linea.con-precio{border-left-color:var(--lf-azul,#3b82f6)}
+.lf-linea.sin-precio{border-left-color:var(--lf-amb);
+  background:color-mix(in srgb, var(--lf-amb) 7%, transparent)}
 
 
 /* ══════════════════════════════════════════════════════
@@ -5094,3 +5103,7 @@ button.lf-pill{font-family:inherit;cursor:pointer}
   .lf-ag-colcab{font-size:11.5px;padding-left:4px;padding-right:4px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
+
+/* El aviso de que el área se crea sola al escribirla */
+.lf-pista-area{display:block;margin-top:4px;font-size:11px;color:var(--lf-tinta-4);
+  line-height:1.4}

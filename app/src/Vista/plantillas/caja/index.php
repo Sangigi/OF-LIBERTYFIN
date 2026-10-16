@@ -179,7 +179,10 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
              encendido, 0 apagado. El cajero ya no teclea un número. */ ?>
     <input type="hidden" name="iva_pct" id="ivaPct" value="<?= $ivaOn ? P::e($tasaIva) : '0' ?>">
 
-    <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+    <?php /* La cabecera entera va del color elegido en Ajustes: el
+             ticket es lo que se revisa antes de cobrar y conviene que
+             se distinga de un vistazo del catálogo de al lado. */ ?>
+    <header class="card-header lf-tk-cab">
       <span id="tituloTicket">Ticket</span>
       <span class="badge bg-secondary" id="conteo">0 conceptos</span>
     </header>
@@ -571,7 +574,13 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     var lista = $('lista'); lista.innerHTML = '';
     lineas.forEach(function(l, i){
       var d = document.createElement('div');
-      d.className = 'lf-linea';
+      /* EL MISMO COLOR QUE EN LA CUADRÍCULA.
+         Lo que trae precio de catálogo va en azul y lo que se captura a
+         mano en ámbar, igual que su tarjeta. Así la referencia visual
+         sobrevive al salto de la cuadrícula al ticket, que es donde se
+         revisa antes de cobrar —y donde importa cazar el renglón que
+         se quedó en cero—. */
+      d.className = 'lf-linea' + (+l.precio > 0 ? ' con-precio' : ' sin-precio');
       // El precio es editable: muchos servicios se cotizan por caso y el
       // catálogo los tiene en cero a propósito.
       // − y + para la cantidad: antes, para pasar de 3 a 2, había que

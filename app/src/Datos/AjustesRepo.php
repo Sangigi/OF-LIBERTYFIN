@@ -116,9 +116,32 @@ final class AjustesRepo extends Repo
     {
         $nombre = trim($d['nombre'] ?? '');
         if ($nombre === '') throw new \InvalidArgumentException('El nombre es obligatorio');
+        // EL ÁREA SE PUEDE ESCRIBIR, NO SOLO ELEGIR.
+        //
+        // Antes era un desplegable y punto: quien iba a dar de alta a su
+        // primer colaborador se topaba con una lista vacía, tenía que
+        // salirse a crear el área, volver y empezar otra vez. Lo que
+        // estaba haciendo —dar de alta a una persona— quedaba a medias
+        // por un dato que se escribe en tres segundos.
+        //
+        // Ahora se escribe el nombre. Si ya existe se usa esa; si no, se
+        // crea. Es lo mismo que ya hacía la ficha de cliente con su
+        // campo de área, así que además deja de haber dos formas de
+        // hacer lo mismo según la pantalla.
         $area = (int)($d['area_id'] ?? 0);
+        $nombreArea = trim((string)($d['area_nombre'] ?? ''));
+
+        if ($nombreArea !== '') {
+            $yaEsta = $this->valor(
+                "SELECT id FROM comision_areas WHERE LOWER(nombre) = LOWER(?) LIMIT 1",
+                [$nombreArea]);
+            // Se compara sin distinguir mayúsculas: «Legal» y «LEGAL» son
+            // la misma área, y tener las dos parte los reportes en dos.
+            $area = $yaEsta ? (int)$yaEsta : $this->guardarArea(null, ['nombre' => $nombreArea]);
+        }
+
         if (!$area || !$this->valor("SELECT id FROM comision_areas WHERE id = ?", [$area])) {
-            throw new \InvalidArgumentException('Elige un área válida');
+            throw new \InvalidArgumentException('Escribe a qué área pertenece');
         }
         $sql = "SELECT id FROM comision_colaboradores WHERE nombre = ? AND area_id = ?";
         $p = [$nombre, $area];
