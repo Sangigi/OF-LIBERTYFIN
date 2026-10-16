@@ -104,45 +104,6 @@ $ant = $antiguedad;
     <div class="stat-meta">dos o más compras</div></div>
 </div>
 
-<div class="lf-split">
-  <?php if ($top): ?>
-  <section class="card">
-    <header class="card-header">Clientes que más facturan</header>
-    <div class="card-body">
-      <?php W::barrasH(array_map(function($t){
-        return ['rotulo'=>$t['nombre'],'monto'=>$t['monto']]; }, $top)); ?>
-    </div>
-  </section>
-  <?php endif; ?>
-
-  <section class="card">
-    <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-      <div><span>Antigüedad del saldo</span>
-        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
-          Desde el último abono</p></div>
-      <span class="badge bg-warning"><?= D::pesos($ant['total'] ?? 0) ?></span>
-    </header>
-    <div class="card-body">
-      <?php if ((float)($ant['total'] ?? 0) <= 0): ?>
-        <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:14px 0">
-          Nadie debe nada. Todo liquidado.</p>
-      <?php else:
-        W::segmentos([
-          ['rotulo'=>'1 a 30 días',   'monto'=>$ant['t30']    ?? 0, 'color'=>'var(--lf-brand)'],
-          ['rotulo'=>'31 a 60 días',  'monto'=>$ant['t60']    ?? 0, 'color'=>'var(--lf-amb)'],
-          ['rotulo'=>'Más de 60 días','monto'=>$ant['t60mas'] ?? 0, 'color'=>'var(--lf-rojo)'],
-        ]);
-        if ((float)($ant['t60mas'] ?? 0) > 0): ?>
-          <p style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lf-linea);
-                    font-size:12.5px;color:var(--lf-tinta-3)">
-            <?= D::pesos($ant['t60mas']) ?> en <?= (int)$ant['n60mas'] ?>
-            venta<?= $ant['n60mas']==1?'':'s' ?> llevan más de 60 días sin un solo abono.
-            Son a los que hay que llamar primero.</p>
-        <?php endif;
-      endif; ?>
-    </div>
-  </section>
-</div>
 
 <section class="card">
   <header class="card-header">Directorio</header>
@@ -200,3 +161,49 @@ $ant = $antiguedad;
       ]); ?>
   </div>
 </section>
+
+<?php /* LAS GRÁFICAS, DEBAJO DEL DIRECTORIO.
+     Estaban arriba, así que al entrar a Clientes lo primero eran dos
+     gráficas y había que bajar para llegar a la lista. A esta
+     pantalla se entra a buscar a alguien o a darlo de alta; quién
+     factura más es interesante, pero después. Igual que en
+     Productos. */ ?>
+<div class="lf-split">
+  <?php if ($top): ?>
+  <section class="card">
+    <header class="card-header">Clientes que más facturan</header>
+    <div class="card-body">
+      <?php W::barrasH(array_map(function($t){
+        return ['rotulo'=>$t['nombre'],'monto'=>$t['monto']]; }, $top)); ?>
+    </div>
+  </section>
+  <?php endif; ?>
+
+  <section class="card">
+    <header class="card-header" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+      <div><span>Antigüedad del saldo</span>
+        <p style="font-size:12px;color:var(--lf-tinta-4);margin-top:2px;font-weight:400">
+          Desde el último abono</p></div>
+      <span class="badge bg-warning"><?= D::pesos($ant['total'] ?? 0) ?></span>
+    </header>
+    <div class="card-body">
+      <?php if ((float)($ant['total'] ?? 0) <= 0): ?>
+        <p style="text-align:center;color:var(--lf-tinta-4);font-size:13px;padding:14px 0">
+          Nadie debe nada. Todo liquidado.</p>
+      <?php else:
+        W::segmentos([
+          ['rotulo'=>'1 a 30 días',   'monto'=>$ant['t30']    ?? 0, 'color'=>'var(--lf-brand)'],
+          ['rotulo'=>'31 a 60 días',  'monto'=>$ant['t60']    ?? 0, 'color'=>'var(--lf-amb)'],
+          ['rotulo'=>'Más de 60 días','monto'=>$ant['t60mas'] ?? 0, 'color'=>'var(--lf-rojo)'],
+        ]);
+        if ((float)($ant['t60mas'] ?? 0) > 0): ?>
+          <p style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lf-linea);
+                    font-size:12.5px;color:var(--lf-tinta-3)">
+            <?= D::pesos($ant['t60mas']) ?> en <?= (int)$ant['n60mas'] ?>
+            venta<?= $ant['n60mas']==1?'':'s' ?> llevan más de 60 días sin un solo abono.
+            Son a los que hay que llamar primero.</p>
+        <?php endif;
+      endif; ?>
+    </div>
+  </section>
+</div>

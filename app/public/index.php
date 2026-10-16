@@ -80,8 +80,34 @@ $r->post('/registro', ['LibertyFin\Controlador\RegistroControlador', 'enviar']);
 //
 // Las direcciones que hay que dar de alta en el panel del Sandbox son
 // estas mismas con el secreto pegado. Ver LEEME.md.
-if (\LibertyFin\Servicio\Integraciones::activa('spei')) {
+//
+// SE REGISTRAN SIEMPRE, aunque la integración esté apagada.
+//
+// Antes colgaban de `activa('spei')`: con una credencial de menos en
+// config/integraciones.php las rutas NI EXISTÍAN, el proveedor recibía
+// un 404 de la página de error genérica y no se escribía una sola
+// línea en el registro. Desde fuera parecía que el proveedor no estaba
+// llamando. Y como no recibía un 200, daba cada cobro por no
+// autorizado y lo revertía: al cliente le regresaba su dinero sin que
+// nadie supiera por qué.
+//
+// Ahora la ruta siempre responde. Si falta configuración lo dice en el
+// registro, con el nombre de lo que falta.
+{
     $pdt = 'LibertyFin\\Controlador\\PagosEntrantesControlador';
+    // CON EL SECRETO EN LA RUTA. Es la forma recomendada: el proveedor
+    // AÑADE «/?r=REFERENCIA» a la URL que se le da de alta, y pegado
+    // detrás de un «?k=SECRETO» rompe el secreto y la referencia a la
+    // vez. En la ruta no estorba.
+    $r->get   ('/pagadetodo/{k}/consulta-referencia', [$pdt, 'consultaReferencia']);
+    $r->post  ('/pagadetodo/{k}/pago-referencia',     [$pdt, 'pagoReferencia']);
+    $r->get   ('/pagadetodo/{k}/consulta-clabe',      [$pdt, 'consultaClabe']);
+    $r->post  ('/pagadetodo/{k}/pago-clabe',          [$pdt, 'pagoClabe']);
+    $r->post  ('/pagadetodo/{k}/pago-liga',           [$pdt, 'pagoLiga']);
+    $r->post  ('/pagadetodo/{k}/cancela-pago',        [$pdt, 'cancelaPago']);
+    $r->delete('/pagadetodo/{k}/cancela-pago',        [$pdt, 'cancelaPago']);
+
+    // Y las de siempre, para lo que ya esté dado de alta con ?k=
     $r->get ('/pagadetodo/consulta-referencia', [$pdt, 'consultaReferencia']);
     $r->post('/pagadetodo/pago-referencia',     [$pdt, 'pagoReferencia']);
     $r->get ('/pagadetodo/consulta-clabe',      [$pdt, 'consultaClabe']);
@@ -468,9 +494,15 @@ $publicas = ['/login', '/login/confirmar', '/salir', '/registro', '/ayuda-acceso
 ];
 $ruta     = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
 
+// Los avisos del proveedor NUNCA piden sesión, lleven el secreto en la
+// ruta o en `?k=`. Comparar la ruta exacta dejaba fuera la forma nueva
+// —/pagadetodo/SECRETO/pago-referencia— y la mandaba al login: el
+// proveedor recibía una redirección, no un 200, y revertía el cobro.
+$esAviso = strncmp($ruta, '/pagadetodo/', 12) === 0;
+
 // El portero: una sola línea decide quién pasa, en vez de repetir la
 // comprobación al inicio de cada archivo como hacía el sistema anterior.
-if (!in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
+if (!$esAviso && !in_array($ruta, $publicas, true) && !Autenticar::sesionValida()) {
     header('Location: /login'); exit;
 }
 

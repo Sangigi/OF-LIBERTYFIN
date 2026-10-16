@@ -631,23 +631,143 @@ public function pagoLiga()
      */
     private function abrirPuerta()
     {
+        // ── ANTES QUE NADA, QUEDA ESCRITO QUE LLAMARON ──
+        //
+        // Esto es lo primero de lo primero, y va antes de cualquier
+        // comprobación a propósito. El rechazo salía MUDO: si el
+        // secreto no cuadraba se contestaba 403 y no se escribía una
+        // sola línea. Visto desde fuera era idéntico a que el
+        // proveedor no estuviera llamando —«no me aparecen los logs»—
+        // cuando en realidad llamaba y se le cerraba la puerta en la
+        // cara.
+        //
+        // Y eso no es un detalle de registro: cuando el proveedor no
+        // recibe un 200 da el cobro por no autorizado y LO REVIERTE.
+        // El cliente ve que le regresan su dinero y nadie sabe por qué.
+        // Un aviso de pago que se rechaza tiene que dejar rastro
+        // SIEMPRE, aunque se rechace.
+        $este = $this->huella();
+        error_log('[LibertyFin] pagadetodo ENTRA ' . $este);
+
+        if (!Integraciones::activa('spei')) {
+            // La integración apagada no debería ni llegar aquí —las
+            // rutas se registran igual para poder decirlo—.
+            error_log('[LibertyFin] pagadetodo RECHAZA ' . $este
+                . ' · la integración `spei` está apagada o le faltan credenciales. '
+                . 'Revisa config/integraciones.php.');
+            http_response_code(503);
+            $this->json(['codigo' => self::ERROR_SISTEMA, 'mensaje' => 'Servicio no configurado']);
+        }
+
         $cfg = Integraciones::de('spei') ?: [];
         $esperado = trim((string)($cfg['secreto_webhook'] ?? ''));
 
         if ($esperado === '') {
             // Sin secreto configurado NO se abre. Dejarlo pasar sería
             // publicar un botón de "marcar como pagada" en internet.
-            error_log('[LibertyFin] webhook sin `secreto_webhook` en config/integraciones.php');
+            error_log('[LibertyFin] pagadetodo RECHAZA ' . $este
+                . ' · falta `secreto_webhook` en config/integraciones.php. '
+                . 'Genéralo con: php -r "echo bin2hex(random_bytes(24));" '
+                . 'y pégalo también al final de las URLs del panel del proveedor.');
             http_response_code(503);
             $this->json(['codigo' => self::ERROR_SISTEMA,
                          'mensaje' => 'Servicio no configurado']);
         }
 
-        $dado = (string)($_GET['k'] ?? $_SERVER['HTTP_X_LF_SECRETO'] ?? '');
+        $dado = $this->secretoDeLaLlamada();
         if (!hash_equals($esperado, $dado)) {
+            // Se dice QUÉ pasó sin escribir ninguno de los dos secretos
+            // en un archivo de registro que cualquiera puede leer.
+            $porque = $dado === ''
+                ? 'la llamada vino SIN `?k=`: la URL del panel del proveedor '
+                  . 'no lleva el secreto pegado al final'
+                : 'el `?k=` no coincide con `secreto_webhook` ('
+                  . strlen($dado) . ' caracteres recibidos, '
+                  . strlen($esperado) . ' esperados)';
+            error_log('[LibertyFin] pagadetodo RECHAZA ' . $este . ' · ' . $porque
+                . '. Mientras no cuadre, el proveedor revierte cada cobro.');
             http_response_code(403);
             $this->json(['codigo' => self::NO_RECONOCIDA, 'mensaje' => 'No autorizado']);
         }
+
+        error_log('[LibertyFin] pagadetodo ABRE ' . $este);
+    }
+
+    /**
+     * De dónde sale el secreto, y por qué de tres sitios.
+     *
+     * ESTE ERA EL FALLO QUE REVERTÍA LOS COBROS.
+     *
+     * La documentación del proveedor dice, literalmente, que
+     * «Cobroscontarjeta.com le agregará [/?r=REFERENCIA] a su url».
+     * AGREGA. Así que si en su panel está registrado
+     *
+     *     https://midominio.com/pagadetodo/consulta-referencia?k=SECRETO
+     *
+     * lo que acaba llamando es
+     *
+     *     https://midominio.com/pagadetodo/consulta-referencia?k=SECRETO/?r=000123
+     *
+     * y PHP lee `k` = «SECRETO/?r=000123» y `r` NO EXISTE. Se rompen
+     * las dos cosas a la vez: el secreto no cuadra —sobra media URL
+     * pegada— y la referencia se pierde. El proveedor no recibe un 200,
+     * da el cobro por no autorizado y lo revierte. El cliente ve que le
+     * regresan su dinero.
+     *
+     * Se arregla por los dos lados:
+     *
+     *   · El secreto puede ir en la RUTA, que es lo recomendado ahora:
+     *     /pagadetodo/SECRETO/consulta-referencia. Ahí el proveedor
+     *     puede pegar lo que quiera al final sin romper nada.
+     *
+     *   · Y si ya quedó registrado con `?k=`, se recupera: se corta el
+     *     secreto en la primera barra y se rescata la referencia que
+     *     venía pegada. Así lo que ya está dado de alta funciona sin
+     *     tener que volver a tocar el panel del proveedor.
+     */
+    private function secretoDeLaLlamada()
+    {
+        // 1 · En la ruta: /pagadetodo/<secreto>/<lo-que-sea>
+        $camino = trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH), '/');
+        $trozos = explode('/', $camino);
+        if (count($trozos) >= 3 && $trozos[0] === 'pagadetodo') {
+            return $trozos[1];
+        }
+
+        // 2 · En la cabecera, para quien pueda mandarla.
+        if (!empty($_SERVER['HTTP_X_LF_SECRETO'])) return (string)$_SERVER['HTTP_X_LF_SECRETO'];
+
+        // 3 · En `?k=`, rescatando lo que el proveedor le pegó detrás.
+        $k = (string)($_GET['k'] ?? '');
+        if ($k !== '' && strpos($k, '/') !== false) {
+            list($limpio, $cola) = explode('/', $k, 2);
+            // La referencia venía dentro: se devuelve a su sitio para
+            // que el resto del controlador la encuentre donde espera.
+            if (preg_match('/[?&]r=([^&]+)/', $cola, $m) && !isset($_GET['r'])) {
+                $_GET['r'] = urldecode($m[1]);
+                error_log('[LibertyFin] pagadetodo · la referencia venía pegada al secreto '
+                    . '(el proveedor añade /?r=). Rescatada: ' . $_GET['r']
+                    . '. Cambia la URL del panel a /pagadetodo/SECRETO/... para evitarlo.');
+            }
+            return $limpio;
+        }
+        return $k;
+    }
+
+    /**
+     * Cómo identificar esta llamada en el registro.
+     *
+     * Sin el secreto dentro: el log lo lee cualquiera con acceso al
+     * servidor, y ahí no pinta nada una credencial.
+     */
+    private function huella()
+    {
+        $q = $_GET;
+        if (isset($q['k'])) $q['k'] = '(secreto de ' . strlen((string)$q['k']) . ' car.)';
+        return ($_SERVER['REQUEST_METHOD'] ?? '?') . ' '
+             . (parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH) ?: '?')
+             . ($q ? '?' . http_build_query($q) : '')
+             . ' desde ' . ($_SERVER['REMOTE_ADDR'] ?? '?');
     }
 
     /**

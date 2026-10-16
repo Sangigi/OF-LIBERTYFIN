@@ -30,6 +30,30 @@ use LibertyFin\Servicio\Integraciones;
 use LibertyFin\Servicio\LigaPago;
 
 $probar = in_array('--probar', $argv, true);
+
+/**
+ * El dominio de esta instalación.
+ *
+ * El script imprimía «TU-DOMINIO» y quien lee tenía que sustituirlo a
+ * mano al pasar las direcciones al panel del proveedor. Es justo el
+ * paso donde se cuela el error —se copia la URL sin el `?k=`, o con el
+ * dominio de otra instalación— y ese error no se ve hasta que un
+ * cliente paga y le revierten el dinero.
+ *
+ * Se deduce de la carpeta, que en este hosting es el propio dominio.
+ * Se puede mandar a mano:  --dominio=https://midominio.com
+ */
+$dominio = '';
+foreach ($argv as $a) {
+    if (strncmp($a, '--dominio=', 10) === 0) $dominio = rtrim(substr($a, 10), '/');
+}
+if ($dominio === '') {
+    $carpeta = basename(dirname($raiz));
+    if (strpos($carpeta, '.') !== false && strpos($carpeta, ' ') === false) {
+        $dominio = 'https://' . $carpeta;
+    }
+}
+$probarAvisos = in_array('--probar-avisos', $argv, true);
 $color  = (function_exists('posix_isatty') && @posix_isatty(STDOUT)) || getenv('FORCE_COLOR');
 function c($t, $x) { global $color; if (!$color) return $t;
     $m = ['v' => '32', 'r' => '31', 'a' => '33', 'g' => '1', 'd' => '90'];
@@ -186,8 +210,12 @@ if ($secreto === '') {
     nota('es lo único que protege esas direcciones; que tenga 32 o más');
 } else {
     bien('`secreto_webhook` puesto (' . strlen($secreto) . ' caracteres)');
-    $dominio = 'https://TU-DOMINIO';
-    echo "\n  Da de alta esto en el Sandbox, pestaña EndPoint:\n\n";
+    // El dominio real, deducido arriba. Antes aquí se pisaba con el
+    // literal «TU-DOMINIO» y había que sustituirlo a mano al copiar las
+    // direcciones al panel: justo donde se cuela el error que hace que
+    // el proveedor revierta los cobros.
+    $muestra = $dominio !== '' ? $dominio : 'https://TU-DOMINIO';
+    echo "\n  Da de alta EXACTAMENTE esto en el panel, pestaña EndPoint:\n\n";
     foreach ([
         'Comercios · Consultar referencia' => 'consulta-referencia',
         'Comercios · Pagar referencia'     => 'pago-referencia',
@@ -197,13 +225,100 @@ if ($secreto === '') {
         'SPEI · Cancelar pago'             => 'cancela-pago',
         'Pago en línea · Pagar liga'       => 'pago-liga',
     ] as $rotulo => $r_) {
-        echo '    ' . str_pad($rotulo, 34) . $dominio . '/pagadetodo/' . $r_
-           . '?k=' . c(substr($secreto, 0, 4) . '…', 'd') . "\n";
+        // EL SECRETO VA EN LA RUTA, no en `?k=`.
+        // El proveedor AÑADE «/?r=REFERENCIA» a lo que se registre, y
+        // pegado detrás de un «?k=SECRETO» rompe el secreto y la
+        // referencia de un golpe. En la ruta no estorba.
+        echo '    ' . str_pad($rotulo, 34) . $muestra . '/pagadetodo/'
+           . c(substr($secreto, 0, 4) . '…', 'd') . '/' . $r_ . "\n";
     }
-    nota('(el secreto va completo, aquí se recorta nada más para no imprimirlo)');
+    nota('(el secreto va completo; aquí se recorta para no dejarlo escrito)');
+    nota('OJO: el secreto va DENTRO de la ruta, no como ?k=. El proveedor');
+    nota('añade «/?r=REFERENCIA» al final y detrás de un ?k= lo rompe todo.');
+    if ($dominio === '') {
+        ojo('No pude deducir tu dominio: sustituye TU-DOMINIO a mano');
+        nota('o vuelve a correr esto con  --dominio=https://midominio.com');
+    }
+    nota('para ver el secreto entero:  grep secreto_webhook app/config/integraciones.php');
 }
 
-// ── Llamadas de verdad ──────────────────────────────────────
+// ── ¿Responden NUESTRAS direcciones? ────────────────────────
+//
+// Esta es la prueba que de verdad contesta «¿por qué me revierten los
+// cobros?». Las otras miran la configuración; esta llama a las mismas
+// direcciones que llama el proveedor, con el mismo secreto, desde
+// fuera. Si aquí contestan y al proveedor no, lo que está mal es lo
+// que se dio de alta en su panel.
+if ($probarAvisos) {
+    titulo('Llamando a TUS avisos, como haría el proveedor');
+    if ($secreto === '') {
+        mal('sin `secreto_webhook` no hay nada que probar');
+    } elseif ($dominio === '') {
+        mal('no sé cuál es tu dominio: añade --dominio=https://midominio.com');
+    } else {
+        foreach ([
+            ['GET',  'consulta-referencia?r=000000000000001', 'Consultar referencia'],
+            ['GET',  'consulta-clabe?r=646180000000000001',   'Consultar clabe'],
+            ['POST', 'pago-referencia',                       'Pagar referencia'],
+            ['POST', 'pago-clabe',                            'Pagar clabe'],
+            ['POST', 'cancela-pago',                          'Cancelar pago'],
+            ['POST', 'pago-liga',                             'Pagar liga'],
+        ] as $e) {
+            list($metodo, $cola, $rotulo) = $e;
+            $url = $dominio . '/pagadetodo/' . rawurlencode($secreto) . '/' . $cola;
+
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_CUSTOMREQUEST  => $metodo,
+                // Un cuerpo que NO existe a propósito: se quiere saber si
+                // la dirección responde, no mover dinero de nadie.
+                CURLOPT_POSTFIELDS => $metodo === 'POST'
+                    ? '{"referencia":"000000000000001","monto":"0","transaccion":"prueba"}' : null,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 8,
+                CURLOPT_SSL_VERIFYPEER => true, CURLOPT_SSL_VERIFYHOST => 2,
+            ]);
+            $resp = curl_exec($ch);
+            $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            $err  = curl_error($ch);
+            curl_close($ch);
+
+            if ($resp === false) {
+                $problemas++;
+                mal(str_pad($rotulo, 22) . $err);
+                continue;
+            }
+            $j = json_decode((string)$resp, true);
+            if ($http === 404) {
+                $problemas++;
+                mal(str_pad($rotulo, 22) . 'HTTP 404 · esa dirección no existe');
+                nota('revisa que el .htaccess mande todo a public/index.php');
+            } elseif ($http === 403) {
+                $problemas++;
+                mal(str_pad($rotulo, 22) . 'HTTP 403 · el secreto no cuadra');
+            } elseif (!is_array($j)) {
+                $problemas++;
+                mal(str_pad($rotulo, 22) . 'HTTP ' . $http . ' · no contestó JSON');
+                nota(mb_substr(trim(strip_tags((string)$resp)), 0, 110));
+            } else {
+                // Un 200 con JSON es lo correcto AUNQUE diga que no
+                // reconoce la referencia: la de prueba no existe. Lo que
+                // importa es que conteste, y que conteste 200: un código
+                // distinto hace que el proveedor revierta el cobro.
+                bien(str_pad($rotulo, 22) . 'HTTP ' . $http . ' · '
+                   . json_encode($j, JSON_UNESCAPED_UNICODE));
+            }
+        }
+        nota('Un 200 con «Adquiriente inválido» está BIEN: la referencia de');
+        nota('prueba no existe. Lo que importa es que conteste 200 y JSON.');
+    }
+} else {
+    nota("\n  (--probar-avisos llama a tus propias direcciones, que es lo que");
+    nota('   dice si el proveedor puede alcanzarlas)');
+}
+
+// ── Llamadas de verdad al proveedor ─────────────────────────
 if ($probar) {
     titulo('Llamando al proveedor');
     foreach ($destinos as $rotulo => $url) {
