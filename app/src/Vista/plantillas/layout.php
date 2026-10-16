@@ -469,7 +469,7 @@ window.lfAvisar = function (texto, tipo) {
   t.className = 'lf-toast' + (tipo === 'error' ? ' mal' : '');
   t.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
   var s = document.createElement('span'); s.textContent = texto;
-  var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.setAttribute('aria-label', 'Cerrar'); x.innerHTML = '&times;';
+  var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.setAttribute('aria-label', 'Cerrar'); x.innerHTML = '<span class="lf-signo">&times;</span>';
   t.appendChild(s); t.appendChild(x);
   document.body.appendChild(t);
   var fuera = function () { t.classList.add('va'); setTimeout(function () { t.remove(); }, 450); };
@@ -644,7 +644,7 @@ window.lfAvisar = function (texto, tipo) {
           '<button type="button" class="libre" title="Abrir como ventana que se mueve">' +
             'Ventana libre</button>' +
           '<a class="abrir" href="#" target="_blank" rel="noopener">Abrir completo</a>' +
-          '<button type="button" class="cerrar" data-cerrar aria-label="Cerrar">&times;</button>' +
+          '<button type="button" class="cerrar" data-cerrar aria-label="Cerrar"><span class="lf-signo">&times;</span></button>' +
         '</header>' +
         '<div class="cuerpo"><div class="cargando">Cargando…</div></div>' +
       '</div>';

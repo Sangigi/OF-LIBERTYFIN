@@ -187,7 +187,7 @@ $nDel = count($ventas) - $nAnt;
             <?php endif; ?>
           </select>
         </label>
-        <button type="button" class="lf-lote-quitar" data-quitar aria-label="Quitar este colaborador" hidden>&times;</button>
+        <button type="button" class="lf-lote-quitar" data-quitar aria-label="Quitar este colaborador" hidden><span class="lf-signo">&times;</span></button>
        </div>
        <div class="pie">
          <span data-cuenta>Elige a alguien para ver en cuántas ventas va</span>
@@ -198,7 +198,7 @@ $nDel = count($ventas) - $nAnt;
       </div>
     </div>
     <div class="lf-lote-mas">
-      <button type="button" class="btn btn-secondary btn-sm" id="loteMas">+ Agregar colaborador</button>
+      <button type="button" class="btn btn-secondary btn-sm" id="loteMas"><span class="lf-signo">+</span> Agregar colaborador</button>
       <span id="loteSuma"></span>
     </div>
   </section>
@@ -332,7 +332,7 @@ $nDel = count($ventas) - $nAnt;
         <h2 id="loteConfT">¿Asignar estas comisiones?</h2>
         <p>Se asignan una por una con las mismas reglas que desde la venta. Si alguna no se puede, las demás sí quedan.</p>
       </div>
-      <button type="button" class="cerrar" data-lote-cerrar aria-label="Cerrar">&times;</button>
+      <button type="button" class="cerrar" data-lote-cerrar aria-label="Cerrar"><span class="lf-signo">&times;</span></button>
     </header>
     <div class="cuerpo"><dl class="lf-conf-datos" id="loteConfD"></dl></div>
     <footer>

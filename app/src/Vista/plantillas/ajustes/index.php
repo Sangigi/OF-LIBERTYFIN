@@ -456,7 +456,7 @@ $e = $buscar_ed($sucursales); ?>
                title="Editar"><?= W::icono('serv','15px') ?></a>
             <button type="button" class="lf-btn-ghost lf-alt" data-que="sucursal"
                     data-id="<?= (int)$s['id'] ?>" data-nombre="<?= P::e($s['nombre']) ?>"
-                    data-activo="<?= $a?1:0 ?>"><?= $a?'&times;':'✓' ?></button>
+                    data-activo="<?= $a?1:0 ?>"><?= $a?'<span class="lf-signo">&times;</span>':'✓' ?></button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -543,7 +543,7 @@ $ea = $buscar_ed($areas); $ec = $buscar_ed($colaboradores); ?>
                    title="Editar"><?= W::icono('cliente','15px') ?></a>
                 <button type="button" class="lf-btn-ghost lf-alt" data-que="colaborador"
                         data-id="<?= (int)$c['id'] ?>" data-nombre="<?= P::e($c['nombre']) ?>"
-                        data-activo="<?= $a?1:0 ?>"><?= $a?'&times;':'✓' ?></button>
+                        data-activo="<?= $a?1:0 ?>"><?= $a?'<span class="lf-signo">&times;</span>':'✓' ?></button>
               <?php endif; ?>
             </td>
           </tr>

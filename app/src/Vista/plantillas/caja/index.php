@@ -221,7 +221,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         <small id="detalleAmpliar"></small>
       </div>
       <button type="button" class="lf-btn-ghost" id="quitarAmpliar"
-              title="Hacer una venta nueva" aria-label="Hacer una venta nueva">&times;</button>
+              title="Hacer una venta nueva" aria-label="Hacer una venta nueva"><span class="lf-signo">&times;</span></button>
     </div>
 
     <?php /* A quién y quién lo atiende. Cliente y especialista van arriba y a
@@ -601,7 +601,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         + cant + pistaExistencia(l) + opcionPaquete(l, i) + '</div>'
         + '<input class="lf-precio lf-mono" type="number" step="0.01" min="0" '
         +   'data-i="' + i + '" value="' + l.precio.toFixed(2) + '" aria-label="Precio"' + (l.paquete ? ' readonly' : '') + '>'
-        + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar">&times;</button>'
+        + '<button type="button" class="lf-quitar" data-i="' + i + '" aria-label="Quitar"><span class="lf-signo">&times;</span></button>'
         // La promoción va abajo, a todo lo ancho: junto al precio no cabía.
         + '<div class="lf-promo-l" data-promo-i="' + i + '"></div>';
       lista.appendChild(d);
@@ -1013,7 +1013,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
     t.setAttribute('role', clase === 'mal' ? 'alert' : 'status');
     var ico = clase === 'mal' ? ICO_ALERTA : (clase === 'info' ? ICO_INFO : ICO_PROMO);
     t.innerHTML = '<span class="ico">' + ico + '</span><div class="txt">' + html
-      + '</div><button type="button" class="x" aria-label="Cerrar">&times;</button>';
+      + '</div><button type="button" class="x" aria-label="Cerrar"><span class="lf-signo">&times;</span></button>';
     document.body.appendChild(t);
     var fuera = function(){ t.classList.add('va'); setTimeout(function(){ t.remove(); }, 350); };
     t.querySelector('.x').addEventListener('click', fuera);
@@ -1602,7 +1602,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         <h2 id="cTitulo">Revisa antes de registrar</h2>
         <p>Una vez registrada, la venta no puede eliminarse. Cualquier cancelación requiere un proceso adicional.</p>
       </div>
-      <button type="button" class="cerrar" id="cCerrar" aria-label="Cerrar">&times;</button>
+      <button type="button" class="cerrar" id="cCerrar" aria-label="Cerrar"><span class="lf-signo">&times;</span></button>
     </header>
     <div class="cuerpo" id="cCuerpo"></div>
     <footer>
@@ -1620,7 +1620,7 @@ $pcTodo  = array_values(array_filter(array_map(function ($id) use ($pc) {
         <h2 id="mTitulo">Cobro</h2>
         <p id="mSub"></p>
       </div>
-      <button type="button" class="cerrar" id="mCerrar" aria-label="Cerrar">&times;</button>
+      <button type="button" class="cerrar" id="mCerrar" aria-label="Cerrar"><span class="lf-signo">&times;</span></button>
     </header>
     <div class="cuerpo" id="mCuerpo"></div>
     <footer id="mPie"></footer>

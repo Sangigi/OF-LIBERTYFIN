@@ -308,7 +308,9 @@ final class Widget
             'chat'   => '<path d="M20 11.5a8 8 0 0 1-11.7 7.1L4 20l1.4-4.1A8 8 0 1 1 20 11.5z"/>',
         ];
         $d = isset($p[$n]) ? $p[$n] : $p['panel'];
-        return '<svg viewBox="0 0 24 24" style="width:' . $tam . ';height:' . $tam . ';fill:none;stroke:currentColor;'
+        // El "+" va en rojo, igual que las "×" (ver .lf-signo en libertyfin.css).
+        $trazo = $n === 'mas' ? 'var(--lf-rojo,#cf4436)' : 'currentColor';
+        return '<svg viewBox="0 0 24 24" style="width:' . $tam . ';height:' . $tam . ';fill:none;stroke:' . $trazo . ';'
              . 'stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;display:block">' . $d . '</svg>';
     }
 }

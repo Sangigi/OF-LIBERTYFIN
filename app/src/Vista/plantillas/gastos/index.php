@@ -218,7 +218,7 @@ $pe = $prov_editando; ?>
                title="Editar"><?= W::icono('cliente','15px') ?></a>
             <button type="button" class="lf-btn-ghost lf-alt-prov"
                     data-id="<?= (int)$pv['id'] ?>" data-nombre="<?= P::e($pv['nombre']) ?>"
-                    data-activo="<?= $a?1:0 ?>"><?= $a?'&times;':'✓' ?></button>
+                    data-activo="<?= $a?1:0 ?>"><?= $a?'<span class="lf-signo">&times;</span>':'✓' ?></button>
           </td>
         </tr>
       <?php endforeach; ?>
@@ -324,7 +324,7 @@ document.querySelectorAll('.lf-alt-prov').forEach(function(b){
               <?php if ($esAdmin): ?>
                 <button type="button" class="lf-btn-ghost lf-borrar-gasto"
                         data-id="<?= (int)$g['id'] ?>" data-con="<?= P::e($g['concepto']) ?>"
-                        title="Eliminar">&times;</button>
+                        title="Eliminar"><span class="lf-signo">&times;</span></button>
               <?php endif; ?>
             </td>
           </tr>

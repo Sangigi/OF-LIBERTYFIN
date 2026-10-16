@@ -263,7 +263,7 @@ $vigencia = function (array $p) {
                     title="<?= (int)$p['activo'] ? 'Pausar' : 'Reanudar' ?>"><?= (int)$p['activo'] ? '❚❚' : '▶' ?></button>
             <?php if ((int)$p['usos'] === 0): ?>
               <button type="button" class="lf-btn-ghost lf-promo-acc" data-accion="borrar" data-id="<?= (int)$p['id'] ?>"
-                      data-nombre="<?= P::e($p['nombre']) ?>" title="Borrar">&times;</button>
+                      data-nombre="<?= P::e($p['nombre']) ?>" title="Borrar"><span class="lf-signo">&times;</span></button>
             <?php endif; ?>
           </td>
           <?php endif; ?>

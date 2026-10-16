@@ -106,7 +106,7 @@ $yo = (int)($_SESSION['usuario_id'] ?? 0);
             <?php if (!$esYo): ?>
               <button type="button" class="lf-btn-ghost lf-al-p"
                       data-id="<?= (int)$u['id'] ?>" data-n="<?= P::e($u['nombre']) ?>"
-                      data-a="<?= $u['activo'] ? 1 : 0 ?>"><?= $u['activo'] ? '&times;' : '✓' ?></button>
+                      data-a="<?= $u['activo'] ? 1 : 0 ?>"><?= $u['activo'] ? '<span class="lf-signo">&times;</span>' : '✓' ?></button>
             <?php endif; ?>
           </td>
         </tr>

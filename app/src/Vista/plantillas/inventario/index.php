@@ -197,7 +197,7 @@ $estados = [0 => ['Agotado', 'bg-danger'], 1 => ['Bajo su mínimo', 'bg-warning'
           <td data-label="Estado"><span class="badge <?= $e[1] ?>"><?= $e[0] ?></span></td>
           <?php if ($puedeEditar): ?>
           <td class="lf-inv-acc">
-            <a class="btn btn-secondary btn-sm" href="/inventario?s=<?= (int)$sucursal ?>&amp;mover=entrada&amp;producto=<?= (int)$p['id'] ?>#invMover">+ Entrada</a>
+            <a class="btn btn-secondary btn-sm" href="/inventario?s=<?= (int)$sucursal ?>&amp;mover=entrada&amp;producto=<?= (int)$p['id'] ?>#invMover"><span class="lf-signo">+</span> Entrada</a>
             <a class="btn btn-secondary btn-sm" href="/inventario?s=<?= (int)$sucursal ?>&amp;mover=conteo&amp;producto=<?= (int)$p['id'] ?>#invMover">Contar</a>
           </td>
           <?php endif; ?>

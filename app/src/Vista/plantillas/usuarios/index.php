@@ -156,7 +156,7 @@ $cuenta = $cupo['max'] > 0
               <button type="button" class="lf-btn-ghost lf-alt-usuario"
                       data-id="<?= (int)$u['id'] ?>" data-nombre="<?= P::e($u['nombre']) ?>"
                       data-activo="<?= $act ? 1 : 0 ?>"
-                      title="<?= $act ? 'Desactivar' : 'Activar' ?>"><?= $act ? '&times;' : '✓' ?></button>
+                      title="<?= $act ? 'Desactivar' : 'Activar' ?>"><?= $act ? '<span class="lf-signo">&times;</span>' : '✓' ?></button>
             <?php endif; ?>
           </td>
         </tr>

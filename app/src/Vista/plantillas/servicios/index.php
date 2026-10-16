@@ -358,7 +358,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
                title="Editar"><?= W::icono('serv','15px') ?></a>
             <button type="button" class="lf-btn-ghost lf-alternar"
                     data-id="<?= (int)$s['id'] ?>" data-nombre="<?= P::e($s['nombre']) ?>"
-                    title="Desactivar">&times;</button>
+                    title="Desactivar"><span class="lf-signo">&times;</span></button>
           </td>
         </tr>
       <?php endforeach; ?>

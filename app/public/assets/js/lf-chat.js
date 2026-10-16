@@ -430,7 +430,7 @@
     tam.setAttribute('data-peso', peso(archivo.size));
     txt.appendChild(tam);
     v.appendChild(txt);
-    var x = boton('x', '×', 'Quitar el adjunto');
+    var x = boton('x lf-signo', '×', 'Quitar el adjunto');
     x.addEventListener('click', function () { quitarAdjunto(form); });
     v.appendChild(x);
     v.classList.remove('lista');
@@ -1275,7 +1275,7 @@
     } else {
       caja.classList.add('largo');
     }
-    var x = boton('x', '×', 'Cerrar aviso');
+    var x = boton('x lf-signo', '×', 'Cerrar aviso');
     x.addEventListener('click', function () { despedir(caja, 200); });
     caja.appendChild(x);
     document.body.appendChild(caja);
@@ -1406,7 +1406,7 @@
     cab.appendChild(tit);
     var irA = crear('a', 'bt ir', '↗'); irA.title = 'Ver el reporte completo';
     var min = boton('bt min', null, 'Minimizar');
-    var x = boton('bt', '×', 'Cerrar');
+    var x = boton('bt lf-signo', '×', 'Cerrar');
     var p = panel;
     p._lfMin = min;
     // stopPropagation: el ícono se cambia aquí mismo, y el clic llegaba a

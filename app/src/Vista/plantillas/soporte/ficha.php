@@ -251,7 +251,7 @@ $malas = array_filter($f['senales'], function ($s) { return (int)$s['valor'] > 0
             <button type="button" class="lf-btn-ghost lf-blq"
                     title="<?= $u['activo'] ? 'Bloquear' : 'Desbloquear' ?>"
                     data-id="<?= (int)$u['id'] ?>" data-n="<?= P::e($u['nombre']) ?>"
-                    data-a="<?= $u['activo'] ? 1 : 0 ?>"><?= $u['activo'] ? '&times;' : '✓' ?></button>
+                    data-a="<?= $u['activo'] ? 1 : 0 ?>"><?= $u['activo'] ? '<span class="lf-signo">&times;</span>' : '✓' ?></button>
           </td>
         </tr>
       <?php endforeach; ?>

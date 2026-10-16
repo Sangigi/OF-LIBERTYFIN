@@ -5128,3 +5128,11 @@ button.lf-pill{font-family:inherit;cursor:pointer}
 /* El aviso de que el área se crea sola al escribirla */
 .lf-pista-area{display:block;margin-top:4px;font-size:11px;color:var(--lf-tinta-4);
   line-height:1.4}
+
+/* El "+" y la "×" de los botones, en rojo. El "+" del ícono se pinta en
+   Widget::icono(). !important porque varios botones de cerrar ya fijan su
+   color (.lf-toast .x, .lf-toast-chat .x…) con más especificidad.
+   pointer-events:none en el <span>: el clic sobre el signo cuenta como
+   clic en su botón, que es lo que leen los manejadores con e.target. */
+.lf-signo{color:var(--lf-rojo)!important}
+span.lf-signo{pointer-events:none}

@@ -143,7 +143,7 @@ foreach ($menu as $m) {
 <div class="lf-velo" id="lfVelo" hidden></div>
 
 <aside class="lf-side" id="lfSide">
-  <button type="button" class="lf-cerrar-menu" id="lfCerrarMenu" aria-label="Cerrar menú">&times;</button>
+  <button type="button" class="lf-cerrar-menu" id="lfCerrarMenu" aria-label="Cerrar menú"><span class="lf-signo">&times;</span></button>
 
   <div class="lf-marca">
     <?php $logo = $_SESSION['lf_marca_logo'] ?? ''; ?>

@@ -540,7 +540,7 @@ if (!empty($catalogo)):
         <h2 id="lfPagadoTit">¡Pago confirmado!</h2>
         <p>Tu plan ya está activo.</p>
       </div>
-      <button type="button" class="cerrar" data-cerrar-pagado aria-label="Cerrar">×</button>
+      <button type="button" class="cerrar" data-cerrar-pagado aria-label="Cerrar"><span class="lf-signo">×</span></button>
     </header>
     <div class="cuerpo" style="text-align:center;padding:8px 4px 4px">
       <div style="width:64px;height:64px;border-radius:50%;margin:0 auto 16px;
@@ -746,7 +746,7 @@ $pe = function ($n) { return D::pesos($n); };
           <h2 id="lfModalTit">¿Cómo vas a pagar?</h2>
           <p>Elige el método para continuar con tu plan.</p>
         </div>
-        <button type="button" class="cerrar" data-cerrar aria-label="Cerrar">×</button>
+        <button type="button" class="cerrar" data-cerrar aria-label="Cerrar"><span class="lf-signo">×</span></button>
       </header>
       <div class="cuerpo">
         <div class="lf-metodos" style="padding:0">
@@ -776,7 +776,7 @@ $pe = function ($n) { return D::pesos($n); };
           <h2>Confirmar cambio de plan</h2>
           <p>Revisa los datos antes de continuar.</p>
         </div>
-        <button type="button" class="cerrar" data-cerrar aria-label="Cerrar">×</button>
+        <button type="button" class="cerrar" data-cerrar aria-label="Cerrar"><span class="lf-signo">×</span></button>
       </header>
       <div class="cuerpo">
         <div id="confAvisos" class="lf-conf-av"></div>

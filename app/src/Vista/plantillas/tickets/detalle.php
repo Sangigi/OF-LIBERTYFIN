@@ -155,7 +155,7 @@ document.addEventListener('click', function(ev){
 
   <div>
     <?php /* Solo en el celular, donde esta columna es un panel aparte. */ ?>
-    <button type="button" class="lf-cerrar-detalles" data-lf-detalles-cerrar aria-label="Cerrar los detalles">×</button>
+    <button type="button" class="lf-cerrar-detalles" data-lf-detalles-cerrar aria-label="Cerrar los detalles"><span class="lf-signo">×</span></button>
     <?php /* Solo en el celular: lo que en la computadora está arriba del chat. */
     if ($t['empresa_id'] || $t['email_admin']): ?>
     <section class="card lf-solo-movil">
