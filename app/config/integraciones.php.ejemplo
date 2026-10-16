@@ -255,6 +255,18 @@ return [
         // separadas por coma. El registro dice cuál se rechazó.
         'ips_proveedor' => '',
 
+        // ── PAGOS EN LIGAS DE PRUEBA ───────────────────────────
+        //
+        // El Sandbox de Paga de Todo genera CLABEs que ACEPTAN
+        // transferencias reales, y su aviso es idéntico al del emulador.
+        // Por eso, en una liga creada con 'sandbox' => true se rechaza
+        // TODO pago: si era dinero real, el proveedor se lo regresa al
+        // cliente. Las ligas de producción no se tocan.
+        //
+        // Para probar con el emulador ponlo en true, y de vuelta a false
+        // al terminar.
+        'aceptar_pagos_prueba' => false,
+
         // Y da de alta ESTAS direcciones en el panel del Sandbox, en la
         // pestaña EndPoint, con tu secreto DENTRO DE LA RUTA (no como
         // ?k=: el proveedor le añade «/?r=REFERENCIA» al final y detrás

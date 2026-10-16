@@ -123,6 +123,36 @@ final class PagosEntrantesControlador
         '52.173.141.231', '52.176.61.128',  '52.242.208.16',
     ];
 
+    /**
+     * ¿Se rechaza este pago porque la liga se creó en modo Sandbox?
+     *
+     * EN SANDBOX NO ENTRA DINERO REAL.
+     *
+     * El Sandbox de Paga de Todo genera CLABEs que aceptan transferencias
+     * reales, y su aviso es idéntico al del emulador: misma IP, misma
+     * dirección, mismos campos. No hay forma de distinguirlos. Lo que sí
+     * se sabe es cómo se creó la liga (`pruebas`, que se guarda al
+     * generarla), así que en una liga de prueba se rechaza TODO pago. En
+     * SPEI eso hace que el proveedor cancele la transferencia y el
+     * cliente reciba su dinero de vuelta.
+     *
+     * Para probar con el emulador: `aceptar_pagos_prueba` => true en
+     * config/integraciones.php, y de vuelta a false al terminar. Las
+     * ligas de producción (`pruebas` = 0) nunca pasan por aquí.
+     */
+    private function rechazaPrueba(array $l)
+    {
+        if (empty($l['pruebas'])) return false;
+        $cfg = Integraciones::de('spei') ?: [];
+        if (!empty($cfg['aceptar_pagos_prueba'])) return false;
+
+        error_log('[LibertyFin] pagadetodo RECHAZA ' . ($l['referencia'] ?? '?')
+            . ' · la liga se creó en modo Sandbox y no se aceptan pagos en ligas de prueba: '
+            . 'si era una transferencia real, el proveedor se la regresa al cliente. Para '
+            . 'probar con el emulador pon `aceptar_pagos_prueba` => true en config/integraciones.php.');
+        return true;
+    }
+
     public static function esRutaAnterior($ruta)
     {
         return in_array('/' . trim((string)$ruta, '/'), self::RUTAS_ANTERIORES, true);
@@ -163,6 +193,10 @@ final class PagosEntrantesControlador
                 'Adquiriente inválido', 0, $limpio, '', $campo);
         }
         list($db, $l) = $hallado;
+        if ($this->rechazaPrueba($l)) {
+            $this->consultaJson(self::NO_RECONOCIDA,
+                'Adquiriente inválido', 0, $limpio, '', $campo);
+        }
 
         if ($l['estado'] === 'pagada') {
             $this->consultaJson(self::SIN_ADEUDO,
@@ -232,6 +266,9 @@ final class PagosEntrantesControlador
             $this->pagoJson(self::NO_RECONOCIDA, '', 'Adquiriente inválido', $transaccion);
         }
         list($db, $l) = $hallado;
+        if ($this->rechazaPrueba($l)) {
+            $this->pagoJson(self::NO_RECONOCIDA, '', 'Adquiriente inválido', $transaccion);
+        }
         $repo = new LigaRepo($db);
 
         // IDEMPOTENCIA. El proveedor reintenta cuando no le contestamos a
@@ -506,6 +543,9 @@ public function pagoLiga()
         $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
     }
     list($db, $l) = $hallado;
+    if ($this->rechazaPrueba($l)) {
+        $this->json(['code' => '99', 'message' => 'Referencia no encontrada.']);
+    }
 
     error_log(sprintf(
         '[LibertyFin] pagoLiga · ubicada id=%s estado=%s venta_id=%s monto_liga=%s',

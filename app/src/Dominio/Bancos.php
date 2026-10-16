@@ -12,7 +12,7 @@ namespace LibertyFin\Dominio;
 final class Bancos
 {
     const SUGERIDOS = [
-        'BBVA', 'Santander', 'Banorte', 'Citibanamex', 'HSBC', 'Scotiabank',
+        'BBVA', 'Banxico', 'Santander', 'Banorte', 'Citibanamex', 'HSBC', 'Scotiabank',
         'Inbursa', 'Banco Azteca', 'BanCoppel', 'Banregio', 'Afirme', 'BanBajío',
         'Banjército', 'Bansí', 'Multiva', 'Hey Banco', 'Nu', 'Mercado Pago',
         'Spin by OXXO', 'Klar', 'Stori', 'Ualá', 'Openbank', 'Albo', 'Fondeadora',

@@ -829,6 +829,12 @@ prueba o de verdad son las credenciales. Por eso:
   (pestaña EndPoint), así que pagos reales y del emulador llegan por la
   misma puerta. `secreto_webhook_prueba` quedó solo como un segundo
   secreto aceptado.
+- **En una liga de prueba no entra ningún pago.** El Sandbox del proveedor
+  genera CLABEs que aceptan transferencias reales, con un aviso idéntico al
+  del emulador. Como no se distinguen, en una liga con
+  `lf_ligas_pago.pruebas = 1` se rechaza todo pago (código 40) y el
+  proveedor le regresa el dinero al cliente. Para probar con el emulador:
+  `aceptar_pagos_prueba => true`, y de vuelta a `false` al terminar.
 
 ### Las direcciones del sistema anterior
 
