@@ -12,12 +12,12 @@ preg_match_all('/\$r->(?:get|post)\(\x27([^\x27]+)\x27/', $i, $r);
 
 // Estas no llevan permiso a propósito:
 //   · las públicas, que se usan sin sesión
-//   · la raíz, que bifurca según el nivel del rol
+//   · el panel, que bifurca según el nivel del rol
 //   · la cuenta propia y la guía, que cualquiera con sesión puede usar
 //     sobre SÍ MISMO: pedir permiso ahí dejaría a un cajero sin poder
 //     cambiar su contraseña.
 $aproposito = [
-    '/login', '/salir', '/registro', '/ayuda-acceso', '/',
+    '/login', '/salir', '/registro', '/ayuda-acceso', '/panel',
     '/cuenta', '/cuenta/clave', '/cuenta/foto', '/cuenta/fiscales',
     '/cuenta/comercio', '/cuenta/documento', '/guia', '/guia/vista',
 ];

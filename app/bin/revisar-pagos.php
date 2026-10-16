@@ -126,19 +126,15 @@ $tapa = function ($v) { $v = (string)$v;
 echo '  usuario  ' . $tapa($usuario) . "\n";
 echo '  clave    ' . $tapa($clave) . "\n";
 
-$usandoPrueba = !empty($cfg['sandbox']) && trim((string)($cfg['usuario_prueba'] ?? '')) !== '';
-nota($usandoPrueba ? 'son las de Sandbox (usuario_prueba / clave_prueba)'
-                   : 'son las principales (usuario / clave)');
+nota(!empty($cfg['sandbox']) ? 'son las de Sandbox (usuario_prueba / clave_prueba)'
+                              : 'son las de producción (usuario / clave)');
 
-if (trim((string)$usuario) === '' || trim((string)$clave) === '') {
+// En Sandbox nunca se usan las de producción: sin las de prueba, o con
+// las mismas de producción, no se genera ningún cobro.
+if (($bloqueo = $api->bloqueoSandbox()) !== '') {
+    $problemas++; mal($bloqueo);
+} elseif (trim((string)$usuario) === '' || trim((string)$clave) === '') {
     $problemas++; mal('falta usuario o clave');
-}
-// La mezcla que da el error 1.
-if (!empty($cfg['sandbox'])
-    && trim((string)($cfg['usuario_prueba'] ?? '')) === ''
-    && trim((string)($cfg['clave_prueba'] ?? '')) !== '') {
-    ojo('`clave_prueba` está llena pero `usuario_prueba` vacía');
-    nota('se usan las principales completas, que es lo correcto; llena las dos o ninguna');
 }
 
 $negocio = $mNeg->invoke($api);
@@ -258,6 +254,24 @@ if ($secreto === '') {
     nota('(el secreto va completo; aquí se recorta para no dejarlo escrito)');
     nota('OJO: el secreto va DENTRO de la ruta, no como ?k=. El proveedor');
     nota('añade «/?r=REFERENCIA» al final y detrás de un ?k= lo rompe todo.');
+
+    // El panel del Sandbox lleva las MISMAS rutas con OTRO secreto: así
+    // un aviso del emulador nunca toca una liga real, ni un pago real una
+    // liga de prueba (ver PagosEntrantesControlador::mismoAmbiente).
+    $secretoPrueba = trim((string)($cfg['secreto_webhook_prueba'] ?? ''));
+    if ($secretoPrueba !== '' && $secretoPrueba !== $secreto) {
+        echo "\n  En el panel del SANDBOX (pagadetodo.mx/Sandbox, pestaña EndPoint) van\n"
+           . "  las mismas, pero con `secreto_webhook_prueba`:\n\n";
+        echo '    ' . $muestra . '/pagadetodo/' . c(substr($secretoPrueba, 0, 4) . '…', 'd')
+           . "/consulta-clabe   (y así las demás)\n";
+    } elseif ($secretoPrueba !== '') {
+        $problemas++;
+        mal('`secreto_webhook_prueba` es igual a `secreto_webhook`: así no se separa nada');
+    } elseif (!empty($cfg['sandbox'])) {
+        $problemas++;
+        mal('en Sandbox falta `secreto_webhook_prueba`: las ligas de prueba rechazan todos los avisos');
+    }
+
     if ($dominio === '') {
         ojo('No pude deducir tu dominio: sustituye TU-DOMINIO a mano');
         nota('o vuelve a correr esto con  --dominio=https://midominio.com');

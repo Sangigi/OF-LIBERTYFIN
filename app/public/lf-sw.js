@@ -37,7 +37,7 @@ function ventanas() {
   return self.clients.matchAll({ type: 'window', includeUncontrolled: true });
 }
 
-var GENERICO = { titulo: 'LibertyFin', cuerpo: 'Tienes un aviso nuevo.', url: '/', tag: 'lf-aviso' };
+var GENERICO = { titulo: 'LibertyFin', cuerpo: 'Tienes un aviso nuevo.', url: '/panel', tag: 'lf-aviso' };
 
 self.addEventListener('push', function (e) {
   e.waitUntil(self.registration.pushManager.getSubscription().then(function (s) {
@@ -62,7 +62,7 @@ self.addEventListener('push', function (e) {
         body: a.cuerpo || '',
         tag: a.tag || GENERICO.tag,
         renotify: true,
-        data: { url: a.url || '/' }
+        data: { url: a.url || '/panel' }
       });
     });
   }));
@@ -72,7 +72,7 @@ self.addEventListener('push', function (e) {
    nueva. Si no hay sesión, la página pide entrar. */
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
-  var url = (e.notification.data && e.notification.data.url) || '/';
+  var url = (e.notification.data && e.notification.data.url) || '/panel';
   e.waitUntil(ventanas().then(function (vs) {
     for (var i = 0; i < vs.length; i++) {
       var v = vs[i];

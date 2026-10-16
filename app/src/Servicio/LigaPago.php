@@ -139,6 +139,39 @@ final class LigaPago
 
     public function enPruebas() { return !empty($this->cfg['sandbox']); }
 
+    /**
+     * Por qué no se puede cobrar en Sandbox. Vacío = sí se puede.
+     *
+     * EN SANDBOX NUNCA SE MANDAN LAS CREDENCIALES DE PRODUCCIÓN.
+     *
+     * Paga de Todo usa la MISMA dirección para los dos ambientes
+     * (pagadetodo.mx/Pagadetodo/Service/...): lo que hace que un cobro
+     * sea de prueba o de verdad son las credenciales con que se pide.
+     * Antes, con `usuario_prueba` vacío el Sandbox caía a `usuario` y
+     * `clave` —las de producción— y generaba CLABEs reales con la
+     * pantalla diciendo "Modo de pruebas".
+     *
+     * Ahora en Sandbox solo se usan `usuario_prueba` / `clave_prueba`. Si
+     * faltan, o son las mismas de producción, no se genera nada.
+     */
+    public function bloqueoSandbox($servicio = '')
+    {
+        if (!$this->enPruebas()) return '';
+        list($u, $c) = $this->credenciales($servicio);
+        if (trim((string)$u) === '' || trim((string)$c) === '') {
+            return 'Modo Sandbox sin `usuario_prueba` y `clave_prueba` en config/integraciones.php: '
+                 . 'no se usan las de producción porque esas cobran de verdad. Pon las del '
+                 . 'Sandbox de Paga de Todo, o `sandbox` en false para cobrar de verdad.';
+        }
+        $deProduccion = [trim((string)($this->cfg['usuario'] ?? ''))];
+        if ($servicio !== '') $deProduccion[] = trim((string)($this->cfg['usuario_' . $servicio] ?? ''));
+        if (in_array(trim((string)$u), $deProduccion, true)) {
+            return '`usuario_prueba` es el mismo usuario de producción: así el Sandbox cobra de '
+                 . 'verdad. Pon el usuario del Sandbox de Paga de Todo.';
+        }
+        return '';
+    }
+
     /** Qué servicio atiende una forma de pago. */
     public static function servicioDe($metodo)
     {
@@ -214,11 +247,16 @@ final class LigaPago
      *   401  Sandbox
      *    41  producción
      *
+     * La documentación dice que 401 "solo es para el ambiente de
+     * Sandbox": `payment_types` es el de producción y en Sandbox manda
+     * `payment_types_prueba` (vacío = 401).
+     *
      * Solo lo usa la liga de tarjeta.
      */
     private function contado()
     {
-        $propio = trim((string)($this->cfg['payment_types'] ?? ''));
+        $campo  = $this->enPruebas() ? 'payment_types_prueba' : 'payment_types';
+        $propio = trim((string)($this->cfg[$campo] ?? ''));
         if ($propio !== '') return $propio;
         return $this->enPruebas() ? '401' : '41';
     }
@@ -251,6 +289,12 @@ final class LigaPago
      */
     private function dato($campo, $servicio = '')
     {
+        // En Sandbox manda `<campo>_prueba` si está puesto: el Sandbox
+        // puede tener su propio IntegrationID y BusinessID.
+        if ($this->enPruebas()) {
+            $prueba = trim((string)($this->cfg[$campo . '_prueba'] ?? ''));
+            if ($prueba !== '') return $prueba;
+        }
         if ($servicio !== '') {
             $propio = trim((string)($this->cfg[$campo . '_' . $servicio] ?? ''));
             if ($propio !== '') return $propio;
@@ -385,6 +429,9 @@ final class LigaPago
                 if ($u !== '') return [(string)$this->cfg['usuario_prueba' . $suf],
                                        (string)($this->cfg['clave_prueba' . $suf] ?? '')];
             }
+            // En Sandbox NUNCA se cae a las de producción: con ellas el
+            // cobro es de verdad. Ver bloqueoSandbox().
+            return ['', ''];
         }
         // Las propias del servicio, SIEMPRE como pareja: si hay
         // `usuario_referencia`, la clave que va con él es `clave_referencia`,
@@ -410,6 +457,10 @@ final class LigaPago
         $this->ultimoError = '';
         $metodo   = self::normalizar($d['metodo'] ?? 'tarjeta');
         $servicio = self::servicioDe($metodo);
+        if (($bloqueo = $this->bloqueoSandbox($servicio)) !== '') {
+            $this->ultimoError = $bloqueo;
+            return null;
+        }
         if (!$this->listo($servicio)) {
             $this->ultimoError = 'Paga de Todo sin credenciales para ' . $servicio
                 . ' (usuario, clave o integracion_id) en config/integraciones.php';
@@ -548,6 +599,7 @@ final class LigaPago
                 : 'El pago en tienda no se consulta: la tienda avisa cuando cobra.';
             return null;
         }
+        if (($bloqueo = $this->bloqueoSandbox($servicio)) !== '') { $this->ultimoError = $bloqueo; return null; }
         if (!$this->listo($servicio)) { $this->ultimoError = 'Paga de Todo sin configurar'; return null; }
 
         // La doc de ConsultarEstatusLigaIndi pide "Reference Numérico(15)

@@ -809,6 +809,30 @@ rechazan**, porque esas direcciones no pueden pedir usuario y contraseña
 —quien llama es un servidor del proveedor, sin sesión— y lo único que las
 separa de cualquiera con un navegador es ese secreto.
 
+### Sandbox y producción no se mezclan
+
+Paga de Todo usa **la misma dirección** para los dos ambientes
+(`pagadetodo.mx/Pagadetodo/Service/...`): lo que hace que un cobro sea de
+prueba o de verdad son las credenciales. Por eso:
+
+- **Con `'sandbox' => true` solo se usan `usuario_prueba` / `clave_prueba`**
+  (y `integracion_id_prueba` / `negocio_id_prueba` si existen). Si faltan, o
+  son las mismas de producción, no se genera ningún cobro. Antes caía a las
+  de producción y generaba CLABEs reales con la pantalla diciendo "Modo de
+  pruebas".
+- **En tarjeta, Sandbox manda `PaymentTypes` 401** (`payment_types_prueba`) y
+  producción 41 (`payment_types`). La documentación dice que 401 solo existe
+  en el Sandbox.
+- **Cada ambiente tiene su secreto de avisos.** En el panel del Sandbox
+  (`pagadetodo.mx/Sandbox`, pestaña EndPoint) van las direcciones con
+  `secreto_webhook_prueba`; en producción, con `secreto_webhook`. Una liga
+  hecha en Sandbox (`lf_ligas_pago.pruebas = 1`) solo acepta avisos del
+  Sandbox, y una real solo de producción. El emulador no puede pagar ni
+  cancelar una venta real, y un depósito real a una liga de prueba se
+  rechaza: el proveedor se lo devuelve al cliente.
+
+`php app/bin/revisar-pagos.php` avisa si algo de esto quedó a medias.
+
 ### Tres reglas que no se negocian en los avisos
 
 1. **Responder siempre HTTP 200** con el JSON que la documentación pide. Un

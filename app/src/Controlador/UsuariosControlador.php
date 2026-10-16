@@ -891,7 +891,7 @@ final class UsuariosControlador
     public function verGuia()
     {
         $_SESSION['lf_mostrar_guia'] = true;
-        header('Location: /'); exit;
+        header('Location: /panel'); exit;
     }
 
     /**

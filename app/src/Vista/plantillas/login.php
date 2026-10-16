@@ -326,7 +326,7 @@ $token = $_SESSION['lf_token'];
         return r.text().then(function (t) { return { url: r.url, html: t, ok: r.ok }; });
       })
       .then(function (res) {
-        var destino = res.url || '/';
+        var destino = res.url || '/panel';
         var siguePidiendo = /\/login\/?($|\?)/.test(destino);
 
         if (!siguePidiendo) { abrir(function () { location.replace(destino); }); return; }

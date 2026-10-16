@@ -48,16 +48,43 @@ session_set_cookie_params([
 ]);
 session_start();
 
+// ── La landing y las puertas de entrada ──
+//
+// libertyfin.com.mx abre la página pública, con sesión o sin ella. El
+// sistema vive en /panel, y ahí cae quien inicia sesión.
+//
+// Los botones de la landing y los enlaces del sistema anterior apuntan a
+// /Login, /Inicio, pages/registro…: se mandan a su lugar en vez de
+// terminar en un 404 o, peor, otra vez en la landing.
 $rutaActual = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH), '/');
-if ($_SERVER['REQUEST_METHOD'] === 'GET' && $rutaActual === '/') {
-    $archivo = $raiz . '/src/Vista/plantillas/index.html';
-    if (!is_file($archivo)) {
-        http_response_code(404);
-        exit('No se encontró la página principal.');
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    $alias = [
+        '/login'          => '/login',
+        '/ingresar'       => '/login',
+        '/entrar'         => '/login',
+        '/iniciar'        => '/login',
+        '/iniciar-sesion' => '/login',
+        '/inicio'         => '/panel',
+        '/dashboard'      => '/panel',
+        '/pages/registro' => '/registro',
+    ];
+    $minusculas = strtolower($rutaActual);
+    if (isset($alias[$minusculas]) && $rutaActual !== $alias[$minusculas]) {
+        header('Location: ' . $alias[$minusculas], true, 302);
+        exit;
     }
-    header('Content-Type: text/html; charset=utf-8');
-    readfile($archivo);
-    exit;
+
+    if ($rutaActual === '/') {
+        $archivo = $raiz . '/src/Vista/plantillas/index.html';
+        if (!is_file($archivo)) {
+            // Sin landing, al menos que se pueda entrar al sistema.
+            header('Location: /login', true, 302);
+            exit;
+        }
+        header('Content-Type: text/html; charset=utf-8');
+        readfile($archivo);
+        exit;
+    }
 }
 // ── Rutas ──
 $r = new Router();

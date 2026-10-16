@@ -1,5 +1,12 @@
-# Todo a index.php salvo archivos reales (css, js, imágenes)
 RewriteEngine On
+
+# Las páginas de la landing se enlazan sin extensión (pages/precios):
+# si existe el .html, se sirve ese. Si no existe, no hace nada.
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME}.html -f
+RewriteRule ^(.+)$ $1.html [L]
+
+# Todo a index.php salvo archivos reales (css, js, imágenes)
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ index.php [QSA,L]

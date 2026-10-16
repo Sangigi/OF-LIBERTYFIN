@@ -266,7 +266,7 @@ final class Push
         return self::enviar([$cuenta], [
             'titulo' => 'Aviso de prueba de LibertyFin',
             'cuerpo' => 'Si ves esto, los avisos de escritorio funcionan en este navegador.',
-            'url'    => '/',
+            'url'    => '/panel',
             'tag'    => 'lf-prueba',
             'forzar' => true,
         ], $disp);

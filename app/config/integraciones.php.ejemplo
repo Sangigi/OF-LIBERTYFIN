@@ -124,11 +124,23 @@ return [
         // ── CREDENCIALES ───────────────────────────────────────
         'usuario'        => '',
         'clave'          => '',
-        // Las de Sandbox, si te dieron un par distinto. Vacías = se usan
-        // las de arriba.
+        // ── LAS DEL SANDBOX ────────────────────────────────────
+        //
+        // Paga de Todo usa la MISMA dirección para pruebas y para cobrar
+        // de verdad: lo que decide si un cobro es real son las
+        // credenciales. Con 'sandbox' => true se usan SOLO estas; si
+        // están vacías, o son las mismas de arriba, no se genera nada.
+        // Nunca se usan las de producción en Sandbox.
+        //
+        // Son las del panel https://pagadetodo.mx/Sandbox/Login.aspx: el
+        // par que funciona en su "Emulador SPEI" es el de pruebas.
         'usuario_prueba' => '',
         'clave_prueba'   => '',
         'integracion_id' => '',
+        // El IntegrationID y BusinessID del Sandbox, si son distintos (la
+        // documentación los manda "por correo"). Vacíos = los de producción.
+        'integracion_id_prueba' => '',
+        'negocio_id_prueba'     => '',
 
         // ── EL IDENTIFICADOR DEL COMERCIO ──────────────────────
         //
@@ -228,6 +240,19 @@ return [
         //   php -r "echo bin2hex(random_bytes(24)), PHP_EOL;"
         'secreto_webhook' => '',
 
+        // EL DEL SANDBOX, DISTINTO AL DE ARRIBA.
+        //
+        // Las mismas direcciones de abajo, pero con ESTE secreto, van en
+        // el panel del Sandbox; las de `secreto_webhook`, en el de
+        // producción. Así el sistema sabe de dónde viene cada aviso:
+        // una liga hecha en Sandbox solo acepta avisos del Sandbox, y una
+        // real solo de producción. El simulador no puede pagar una venta
+        // real, y un depósito real a una liga de prueba se rechaza (el
+        // proveedor se lo devuelve al cliente).
+        //
+        // Vacío: las ligas de prueba rechazan todos los avisos.
+        'secreto_webhook_prueba' => '',
+
         // Y da de alta ESTAS direcciones en el panel del Sandbox, en la
         // pestaña EndPoint, con tu secreto DENTRO DE LA RUTA (no como
         // ?k=: el proveedor le añade «/?r=REFERENCIA» al final y detrás
@@ -255,6 +280,10 @@ return [
         // `41` en producción y `401` en el Sandbox. Son LA MISMA cosa: el
         // proveedor lo confirmó por correo. NO sirven para elegir método
         // de pago, y solo los recibe la liga de tarjeta.
+        //
+        // `payment_types` es el de producción. En Sandbox se usa
+        // `payment_types_prueba` (vacío = 401): la documentación dice que
+        // 401 solo existe en el Sandbox.
         //
         // Vacío = se elige solo según `sandbox`.
         'payment_types' => '',

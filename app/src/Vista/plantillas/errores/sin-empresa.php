@@ -17,7 +17,7 @@ use LibertyFin\Dominio\Permisos; ?>
     </p>
     <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
       <a class="btn btn-primary" href="/soporte">Ir a Empresas</a>
-      <a class="btn btn-secondary" href="/">Volver al panel</a>
+      <a class="btn btn-secondary" href="/panel">Volver al panel</a>
     </div>
   </div>
 </div>

@@ -9,7 +9,9 @@ final class LoginControlador
 {
     public function mostrar()
     {
-        if (Autenticar::sesionValida()) { header('Location: /'); exit; }
+        // Ya tiene sesión: el botón "Iniciar sesión" de la landing lo
+        // manda directo al sistema. `/` es la landing, no el panel.
+        if (Autenticar::sesionValida()) { header('Location: /panel'); exit; }
         if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 
         // "Cancelar" en la pregunta de la otra sesión: se vuelve al formulario.
@@ -58,7 +60,7 @@ final class LoginControlador
             // La cuenta está abierta en otro dispositivo: la pantalla de
             // entrar pregunta si se cierra (ver confirmar()).
             if ($r === 'confirmar') { header('Location: /login'); exit; }
-            header('Location: /'); exit;
+            header('Location: /panel'); exit;
         } catch (\RuntimeException $e) {
             return $this->fallo($e->getMessage(), $id);
         } catch (\Throwable $e) {
@@ -76,7 +78,7 @@ final class LoginControlador
         }
         try {
             (new Autenticar(Conexion::de($GLOBALS['lf_bd_principal'])))->confirmar();
-            header('Location: /'); exit;
+            header('Location: /panel'); exit;
         } catch (\RuntimeException $e) {
             return $this->fallo($e->getMessage(), '');
         } catch (\Throwable $e) {

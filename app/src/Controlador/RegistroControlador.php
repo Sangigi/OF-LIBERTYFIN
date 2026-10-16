@@ -23,7 +23,7 @@ final class RegistroControlador
 
     public function formulario()
     {
-        if (!empty($_SESSION['logged_in'])) { header('Location: /'); exit; }
+        if (!empty($_SESSION['logged_in'])) { header('Location: /panel'); exit; }
         if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
 
         $datos = $_SESSION['lf_registro'] ?? [];

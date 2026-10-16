@@ -22,7 +22,7 @@ final class BienvenidaControlador
         // Fuera de su momento no se ve: ni otra vez sola ni para quien no toca.
         if (!$arr->pendiente() && !$repite) {
             unset($_SESSION['lf_bienvenida']);
-            header('Location: /'); exit;
+            header('Location: /panel'); exit;
         }
         if (empty($_SESSION['lf_token'])) $_SESSION['lf_token'] = bin2hex(random_bytes(16));
         $cfg = new ConfigRepo($db);
@@ -91,7 +91,7 @@ final class BienvenidaControlador
     {
         unset($_SESSION['lf_bienvenida']);
         $_SESSION['lf_entrada'] = $configuro ? 'configurado' : 'saltado';
-        header('Location: /'); exit;
+        header('Location: /panel'); exit;
     }
 
     private function volver($mensaje)

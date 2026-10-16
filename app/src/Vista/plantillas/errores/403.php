@@ -13,7 +13,7 @@ use LibertyFin\Dominio\Permisos; ?>
       Si lo necesitas para tu trabajo, pídeselo a un administrador.
     </p>
     <div style="display:flex;gap:9px;justify-content:center;flex-wrap:wrap">
-      <a class="btn btn-primary" href="/">Volver al panel</a>
+      <a class="btn btn-primary" href="/panel">Volver al panel</a>
       <?php if (\LibertyFin\Dominio\Permisos::puede('abrir.ticket')): ?>
         <a class="btn btn-secondary" href="/ayuda">Reportarlo a soporte</a>
       <?php endif; ?>
