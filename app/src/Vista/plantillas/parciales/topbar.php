@@ -3,27 +3,12 @@ use LibertyFin\Vista\Widget as W;
 use LibertyFin\Vista\Plantilla as P;
 
 /**
- * Acciones por sección.
+ * La barra de arriba: título, campana y tema.
  *
- * Antes salían "Exportar" y "Nueva venta" en todas partes. El de exportar
- * no hacía nada, y el de nueva venta no tiene sentido estando ya en la
- * caja. Aquí cada sección declara lo suyo, y donde no hay nada útil no
- * aparece nada.
+ * Aquí iba un botón por sección ("Nueva venta", "Nuevo cliente", "Nuevo
+ * gasto", "Nuevo producto"). Se quitó por redundante: lo mismo está en el
+ * menú lateral, y en cada pantalla su propio botón de alta.
  */
-$acciones = [
-  'panel'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
-  'venta'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
-  'cliente' => [['/clientes?nuevo=1', 'mas', 'Nuevo cliente', 'primary']],
-  'reloj'   => [['/caja', 'mas', 'Nueva venta', 'primary']],
-  'baja'    => [['/gastos?nuevo=1', 'mas', 'Nuevo gasto', 'primary']],
-  'serv'    => [['/servicios?nuevo=1', 'mas', 'Nuevo producto', 'primary']],
-  // Reportes no lleva botón aquí: su Excel está en «Reportes del periodo»,
-  // junto a «Imprimir…». Había tres botones que bajaban el mismo archivo.
-];
-// Un rol de plataforma no vende ni da de alta clientes: esas acciones
-// operarían sobre la empresa de la sesión, que no es la suya.
-$aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '')
-      ? [] : ($acciones[$icono] ?? []);
 ?>
 <header class="lf-top">
   <div class="lf-top-tit">
@@ -32,11 +17,6 @@ $aqui = \LibertyFin\Dominio\Permisos::esPlataforma($_SESSION['usuario_rol'] ?? '
   </div>
 
   <div class="lf-acc">
-    <?php foreach ($aqui as $a): ?>
-      <a class="btn btn-<?= $a[3] ?>" href="<?= P::e($a[0]) ?>">
-        <?= W::icono($a[1], '15px') ?><?= P::e($a[2]) ?></a>
-    <?php endforeach; ?>
-
     <?php /* La campana de soporte: mensajes de clientes que no has leído.
              La llena assets/js/lf-chat.js; aquí solo va el lugar. */
     if (\LibertyFin\Dominio\Permisos::puede('ver.tickets')): ?>
