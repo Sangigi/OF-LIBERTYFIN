@@ -47,7 +47,20 @@ foreach ([
 }
 ?>
 <style>
-  .tu{container-type:inline-size;--tu-verde-osc:#26512e}
+  /* El tutorial va SIEMPRE con el verde de LibertyFin, aunque la empresa
+     haya elegido otro color: el layout lo cambia en :root, y los tonos
+     derivados se calculan ahí, así que se vuelven a declarar todos aquí. */
+  .tu{container-type:inline-size;--tu-verde-osc:#26512e;--tu-ease:cubic-bezier(.2,.8,.2,1);
+    --lf-brand:#4baa5c;
+    --lf-brand-2:color-mix(in srgb, var(--lf-brand) 82%, #000);
+    --lf-brand-d:color-mix(in srgb, var(--lf-brand) 82%, #000);
+    --lf-brand-3:color-mix(in srgb, var(--lf-brand) 65%, #fff);
+    --lf-brand-soft:color-mix(in srgb, var(--lf-brand) 11%, #fff);
+    --lf-brand-glow:color-mix(in srgb, var(--lf-brand) 10%, transparent);
+    --lf-brand-ring:color-mix(in srgb, var(--lf-brand) 22%, transparent)}
+  :root[data-theme="dark"] .tu{
+    --lf-brand-soft:color-mix(in srgb, var(--lf-brand) 18%, #0c110f);
+    --lf-brand-2:color-mix(in srgb, var(--lf-brand) 58%, #fff)}
   .tu [hidden]{display:none!important}
   .tu svg{flex:none}
 
@@ -71,14 +84,50 @@ foreach ([
   .tu-mini-barra{height:26px;background:var(--lf-sup);display:flex;gap:5px;align-items:center;padding:0 10px;border-bottom:1px solid var(--lf-linea)}
   .tu-mini-barra i{width:7px;height:7px;border-radius:50%;background:var(--lf-linea-f)}
   .tu-mini-cuerpo{display:grid;grid-template-columns:88px 1fr;height:220px}
-  .tu-mini-nav{padding:12px 8px;display:flex;flex-direction:column;gap:6px}
+  .tu-mini-nav{padding:12px 8px;display:flex;flex-direction:column;gap:6px;position:relative}
   .tu-mini-nav i{height:8px;border-radius:4px;background:var(--lf-linea-f)}
-  .tu-mini-nav i.on{background:var(--lf-brand);opacity:.55}
+  .tu-mini-nav::before{content:'';position:absolute;left:8px;right:8px;top:12px;height:8px;border-radius:4px;background:var(--lf-brand);opacity:.6;
+    transform:translateY(14px);animation:tu-mini-ind 10s var(--tu-ease) infinite}
+  @keyframes tu-mini-ind{0%,18%{transform:translateY(14px)}25%,43%{transform:translateY(42px)}50%,68%{transform:translateY(0)}75%,93%{transform:translateY(70px)}100%{transform:translateY(14px)}}
   .tu-mini-main{background:var(--lf-panel);border-radius:12px 0 0 0;border:1px solid var(--lf-linea);border-width:1px 0 0 1px;margin-top:8px;padding:14px;
     display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:auto 1fr;gap:8px}
   .tu-mini-main b{display:block;height:46px;border-radius:9px;background:var(--lf-sup);border:1px solid var(--lf-linea)}
   .tu-mini-main b:first-child{background:var(--lf-brand-soft)}
   .tu-mini-main em{grid-column:1/-1;border-radius:9px;background:var(--lf-sup);border:1px solid var(--lf-linea)}
+
+  /* Debajo de la portada: cómo funciona y el temario */
+  .tu-inicio{display:flex;flex-direction:column;gap:18px}
+  .tu-bloque-tit{font-size:15px;font-weight:700;letter-spacing:-.3px;margin:0;color:var(--lf-tinta)}
+  .tu-como{background:var(--lf-sup);border:1px solid var(--lf-linea);border-radius:var(--lf-r-panel);padding:22px 26px;box-shadow:var(--lf-s1)}
+  .tu-pasos3{list-style:none;margin:16px 0 0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px}
+  .tu-pasos3 li{display:flex;gap:12px;align-items:flex-start}
+  .tu-pasos3 .n{flex:none;width:28px;height:28px;border-radius:50%;background:var(--lf-brand-soft);color:var(--lf-brand-2);display:grid;place-items:center;font-weight:700;font-size:13px}
+  .tu-pasos3 b{display:block;font-size:13.5px;font-weight:600;color:var(--lf-tinta);margin:4px 0 3px}
+  .tu-pasos3 p{margin:0;font-size:12.5px;color:var(--lf-tinta-3);line-height:1.5}
+  .tu-como-ayuda{margin:18px 0 0;padding-top:14px;border-top:1px solid var(--lf-linea);font-size:12.5px;color:var(--lf-tinta-3)}
+  .tu-como-ayuda a{font-weight:600}
+  .tu-bloque-cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:6px 2px 12px}
+  .tu-avance{font-size:12.5px;color:var(--lf-tinta-3);font-weight:600}
+  .tu-temario{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+  .tu-tema{display:flex;flex-direction:column;gap:9px;text-align:left;padding:16px 16px 14px;background:var(--lf-sup);border:1px solid var(--lf-linea);
+    border-radius:var(--lf-r-lg);cursor:pointer;font-family:var(--lf-font);color:var(--lf-tinta-2);min-height:118px;
+    transition:transform .22s var(--tu-ease),box-shadow .22s,border-color .22s}
+  .tu-tema:hover{transform:translateY(-3px);box-shadow:var(--lf-s2);border-color:color-mix(in srgb,var(--lf-brand) 45%,var(--lf-linea))}
+  .tu-tema:active{transform:translateY(-1px) scale(.99)}
+  .tu-tema-cab{display:flex;align-items:center;gap:10px}
+  .tu-tema .n{flex:none;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;background:var(--lf-vidrio);color:var(--lf-tinta-3);
+    transition:background .2s,color .2s}
+  .tu-tema b{font-size:14px;font-weight:600;color:var(--lf-tinta);line-height:1.3}
+  .tu-tema small{font-size:12.5px;color:var(--lf-tinta-3);line-height:1.45}
+  .tu-tema-pie{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11.5px;color:var(--lf-tinta-4)}
+  .tu-tema-pie em{font-style:normal;font-weight:600;color:var(--lf-brand-2);opacity:0;transform:translateX(-5px);transition:opacity .2s,transform .2s var(--tu-ease)}
+  .tu-tema:hover .tu-tema-pie em, .tu-tema:focus-visible .tu-tema-pie em, .tu-tema.actual .tu-tema-pie em{opacity:1;transform:none}
+  .tu-tema:hover .n{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+  .tu-tema.hecha .n{background:var(--lf-brand);color:#fff}
+  .tu-tema.hecha .estado{color:var(--lf-brand-2);font-weight:600}
+  .tu-tema.actual{border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-ring)}
+  .tu-tema.actual .n{background:var(--lf-brand-soft);color:var(--lf-brand-2)}
+  .tu-tema.actual .estado{color:var(--lf-brand-2);font-weight:600}
 
   /* ── INGRESO ─────────────────────────────────────────── */
   .tu-entrada{min-height:560px;border-radius:var(--lf-r-panel);background:var(--lf-brand);display:flex;align-items:center;justify-content:center;padding:40px 20px;
@@ -115,13 +164,19 @@ foreach ([
   .tu-v-marca .g{width:30px;height:30px;border-radius:50%;background:var(--lf-brand);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px}
   .tu-v-marca b{font-size:14px;font-weight:700;letter-spacing:-.2px;display:block;line-height:1.1}
   .tu-v-marca small{font-size:9.5px;color:var(--lf-tinta-4);font-weight:600;letter-spacing:.6px;text-transform:uppercase}
-  .tu-v-nav{display:flex;flex-direction:column;gap:2px;padding:4px 10px}
+  .tu-v-nav{display:flex;flex-direction:column;gap:2px;padding:4px 10px;position:relative}
+  .tu-v-nav > *{position:relative;z-index:1}
+  .tu-v-nav > .tu-v-ind{position:absolute;left:0;top:0;z-index:0;border-radius:var(--lf-r);background:var(--lf-brand-soft);pointer-events:none;
+    transition:transform .34s var(--tu-ease),width .34s var(--tu-ease),height .34s var(--tu-ease),opacity .2s}
+  .tu-v-nav > .tu-v-ind.quieto{transition:none}
   .tu-v-nav .sec{font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--lf-tinta-4);padding:12px 10px 5px}
   .tu-v-nav button{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--lf-r);border:0;background:none;cursor:pointer;
     color:var(--lf-tinta-2);font-size:13px;font-weight:500;font-family:var(--lf-font);text-align:left;position:relative;transition:background .15s,color .15s}
   .tu-v-nav button:hover{background:var(--lf-brand-glow);color:var(--lf-tinta)}
   .tu-v-nav button.on{background:var(--lf-brand-soft);color:var(--lf-brand-2);font-weight:600}
-  .tu-v-nav button.nuevo{animation:tu-brilla 1.6s ease 2}
+  .tu-v-nav.con-ind button.on{background:transparent}
+  .tu-v-nav button.nuevo{animation:tu-nav-nuevo .5s var(--tu-ease) both, tu-brilla 1.6s ease .4s 2}
+  @keyframes tu-nav-nuevo{from{opacity:0;transform:translateX(-10px)}}
   .tu-v-nav button .pista{position:absolute;right:9px;top:50%;width:8px;height:8px;margin-top:-4px;border-radius:50%;background:var(--lf-brand);
     box-shadow:0 0 0 0 var(--lf-brand-ring);animation:tu-pulso 1.6s ease infinite}
   @keyframes tu-pulso{0%{box-shadow:0 0 0 0 var(--lf-brand-ring)}70%{box-shadow:0 0 0 7px transparent}100%{box-shadow:0 0 0 0 transparent}}
@@ -214,7 +269,9 @@ foreach ([
   .tu-pago .m{margin-left:auto;font-family:var(--lf-mono);color:var(--lf-tinta);font-weight:600;white-space:nowrap}
   .tu-pago.cancelado{opacity:.55}
   .tu-pago.cancelado .f, .tu-pago.cancelado .m{text-decoration:line-through}
-  .tu-pago.nuevo{animation:tu-brilla 1.4s ease 1}
+  tr.tu-fila-nueva{animation:tu-sube .4s var(--tu-ease) both}
+  tr.tu-fila-nueva > td{animation:tu-resalta 1.8s ease both}
+  .tu-pago.nuevo{animation:tu-sube .4s var(--tu-ease) both, tu-resalta 1.6s ease both}
   .tu-liga{display:flex;gap:16px;align-items:center;flex-wrap:wrap;background:var(--lf-sup-2);border:1px solid var(--lf-linea);border-radius:var(--lf-r);padding:14px;margin-top:12px}
   .tu-qr{width:96px;height:96px;display:grid;grid-template-columns:repeat(11,1fr);gap:1px;padding:6px;background:#fff;border-radius:8px;border:1px solid var(--lf-linea)}
   .tu-qr i{background:#1b2420;border-radius:1px}
@@ -249,7 +306,7 @@ foreach ([
   .tu-guia .card-body{padding:18px}
   .tu-g-n{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:600;color:var(--lf-tinta-3);margin-bottom:8px}
   .tu-g-prog{height:4px;border-radius:99px;background:var(--lf-linea);overflow:hidden;margin-bottom:14px}
-  .tu-g-prog i{display:block;height:100%;background:var(--lf-brand);border-radius:99px;transition:width .3s}
+  .tu-g-prog i{display:block;height:100%;background:var(--lf-brand);border-radius:99px;transition:width .7s var(--tu-ease)}
   .tu-guia h4{font-size:17px;letter-spacing:-.4px;margin:0 0 6px;line-height:1.25}
   .tu-guia .d{font-size:13px;color:var(--lf-tinta-2);margin:0 0 14px;line-height:1.5}
   .tu-pasos{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
@@ -278,6 +335,126 @@ foreach ([
   .tu-g-lista .n{flex:none;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:10.5px;font-weight:700;background:var(--lf-vidrio);color:var(--lf-tinta-3)}
   .tu-g-lista .hecha .n{background:var(--lf-brand);color:#fff}
 
+  /* ── MOVIMIENTO ──────────────────────────────────────────
+     Tres momentos: al cambiar de vista (portada, ingreso, entorno), al
+     cambiar de pantalla dentro del entorno (.tu-entra) y la respuesta a
+     cada acción (línea nueva, pago nuevo, paso cumplido). Lo que se
+     vuelve a pintar SIN cambiar de pantalla no repite la entrada. */
+  @keyframes tu-sube{from{opacity:0;transform:translateY(10px)}}
+  @keyframes tu-baja{from{opacity:0;transform:translateY(-8px)}}
+  @keyframes tu-aparece{from{opacity:0}}
+  @keyframes tu-desde-der{from{opacity:0;transform:translateX(22px)}}
+  @keyframes tu-desde-izq{from{opacity:0;transform:translateX(-14px)}}
+  @keyframes tu-escala{from{opacity:0;transform:translateY(14px) scale(.975)}}
+  @keyframes tu-sale{to{opacity:0;transform:translateY(-10px) scale(1.02)}}
+  @keyframes tu-sale-linea{to{opacity:0;transform:translateX(14px)}}
+  @keyframes tu-pop{0%{transform:scale(.4)}60%{transform:scale(1.18)}100%{transform:scale(1)}}
+  @keyframes tu-pop-seg{from{transform:scale(.9)}}
+  @keyframes tu-traza{from{stroke-dashoffset:24}}
+  @keyframes tu-imprime{from{clip-path:inset(0 0 100% 0);transform:translateY(-12px)}to{clip-path:inset(0 0 -20px 0)}}
+  @keyframes tu-crece{from{transform:scaleX(0)}}
+  @keyframes tu-salta{40%{transform:scale(1.07)}}
+  @keyframes tu-latido{0%{box-shadow:0 0 0 0 var(--lf-brand-ring)}100%{box-shadow:0 0 0 12px transparent}}
+  @keyframes tu-gira{to{transform:rotate(360deg)}}
+  @keyframes tu-flota{50%{transform:rotate(-1.5deg) translateY(-7px)}}
+  @keyframes tu-resalta{from{background:var(--lf-brand-soft)}}
+
+  /* Portada */
+  .tu-mini-app{animation:tu-flota 6s ease-in-out infinite}
+  .tu-vista-entra .tu-portada .tu-portada-txt > *{animation:tu-sube .55s var(--tu-ease) both}
+  .tu-vista-entra .tu-portada .tu-portada-txt > :nth-child(2){animation-delay:.06s}
+  .tu-vista-entra .tu-portada .tu-portada-txt > :nth-child(3){animation-delay:.12s}
+  .tu-vista-entra .tu-portada .tu-portada-txt > :nth-child(4){animation:none}
+  .tu-vista-entra .tu-portada .tu-portada-txt > :nth-child(5){animation-delay:.4s}
+  .tu-vista-entra .tu-portada .tu-incluye li{animation:tu-sube .5s var(--tu-ease) both}
+  .tu-vista-entra .tu-portada .tu-incluye li:nth-child(1){animation-delay:.2s}
+  .tu-vista-entra .tu-portada .tu-incluye li:nth-child(2){animation-delay:.27s}
+  .tu-vista-entra .tu-portada .tu-incluye li:nth-child(3){animation-delay:.34s}
+  .tu-vista-entra .tu-portada .tu-portada-arte{animation:tu-aparece .6s ease both}
+  .tu-vista-entra .tu-portada .tu-mini-app{animation:tu-escala .8s var(--tu-ease) .15s both}
+  .tu-vista-entra .tu-como{animation:tu-sube .55s var(--tu-ease) .3s both}
+  .tu-vista-entra .tu-temario-sec .tu-bloque-cab{animation:tu-sube .5s var(--tu-ease) .4s both}
+  .tu-vista-entra .tu-tema{animation:tu-sube .5s var(--tu-ease) both;animation-delay:calc(.44s + var(--i,0) * 40ms)}
+
+  /* Ingreso */
+  .tu-vista-entra.tu-entrada{animation:tu-aparece .45s ease both}
+  .tu-vista-entra .tu-login-marca{animation:tu-baja .6s var(--tu-ease) .1s both}
+  .tu-vista-entra .tu-login-tarjeta{animation:tu-escala .65s var(--tu-ease) .18s both}
+  .tu-vista-entra .tu-login-volver{animation:tu-aparece .5s ease .45s both}
+  .tu-login.sale{animation:tu-sale .38s ease both}
+  .tu-login-boton:disabled{cursor:progress;filter:none}
+
+  /* Entorno: la ventana sube, la guía entra por la derecha, el menú en cascada */
+  .tu-v-main{--tu-d:0s}
+  .tu-vista-entra .tu-v{animation:tu-escala .6s var(--tu-ease) both}
+  .tu-vista-entra .tu-guia{animation:tu-desde-der .6s var(--tu-ease) .12s both}
+  .tu-vista-entra .tu-v-marca{animation:tu-aparece .5s ease .15s both}
+  .tu-vista-entra .tu-v-nav > :not(.tu-v-ind){animation:tu-desde-izq .45s var(--tu-ease) both;animation-delay:calc(.18s + var(--i,0) * 26ms)}
+  .tu-vista-entra .tu-v-nav > .tu-v-ind{animation:tu-aparece .4s ease .5s both}
+  .tu-vista-entra .tu-v-main{--tu-d:.28s}
+
+  /* Al cambiar de pantalla */
+  .tu-entra .tu-v-top > *{animation:tu-aparece .4s ease both;animation-delay:var(--tu-d)}
+  .tu-entra .tu-v-cont > *{animation:tu-sube .45s var(--tu-ease) both;animation-delay:calc(var(--tu-d) + .05s)}
+  .tu-entra .tu-v-cont > :nth-child(2){animation-delay:calc(var(--tu-d) + .11s)}
+  .tu-entra .tu-v-cont > :nth-child(3){animation-delay:calc(var(--tu-d) + .17s)}
+  .tu-entra .tu-v-cont > :nth-child(n+4){animation-delay:calc(var(--tu-d) + .23s)}
+  .tu-entra .tu-v-cont > .tu-cifras, .tu-entra .tu-v-cont > .tu-caja, .tu-entra .tu-v-cont > .tu-dos{animation:none}
+  .tu-entra .tu-cifras > *, .tu-entra .tu-caja > *, .tu-entra .tu-dos > *{animation:tu-sube .45s var(--tu-ease) both;animation-delay:calc(var(--tu-d) + .05s)}
+  .tu-entra .tu-cifras > :nth-child(2), .tu-entra .tu-caja > :nth-child(2), .tu-entra .tu-dos > :nth-child(2){animation-delay:calc(var(--tu-d) + .1s)}
+  .tu-entra .tu-cifras > :nth-child(3){animation-delay:calc(var(--tu-d) + .15s)}
+  .tu-entra .tu-cifras > :nth-child(4){animation-delay:calc(var(--tu-d) + .2s)}
+  .tu-entra tbody tr, .tu-reordena tbody tr, .tu-entra .tu-pago, .tu-entra .tu-prod{animation:tu-sube .4s var(--tu-ease) both;animation-delay:calc(var(--tu-d) + .2s)}
+  .tu-entra tbody tr:nth-child(2), .tu-reordena tbody tr:nth-child(2), .tu-entra .tu-pago:nth-child(2), .tu-entra .tu-prod:nth-child(2){animation-delay:calc(var(--tu-d) + .24s)}
+  .tu-entra tbody tr:nth-child(3), .tu-reordena tbody tr:nth-child(3), .tu-entra .tu-pago:nth-child(3), .tu-entra .tu-prod:nth-child(3){animation-delay:calc(var(--tu-d) + .28s)}
+  .tu-entra tbody tr:nth-child(4), .tu-reordena tbody tr:nth-child(4), .tu-entra .tu-pago:nth-child(4), .tu-entra .tu-prod:nth-child(4){animation-delay:calc(var(--tu-d) + .32s)}
+  .tu-entra tbody tr:nth-child(5), .tu-reordena tbody tr:nth-child(5), .tu-entra .tu-pago:nth-child(5), .tu-entra .tu-prod:nth-child(5){animation-delay:calc(var(--tu-d) + .36s)}
+  .tu-entra tbody tr:nth-child(n+6), .tu-reordena tbody tr:nth-child(n+6), .tu-entra .tu-pago:nth-child(n+6), .tu-entra .tu-prod:nth-child(n+6){animation-delay:calc(var(--tu-d) + .4s)}
+  .tu-reordena tbody tr{animation-delay:0s}
+  .tu-reordena tbody tr:nth-child(2){animation-delay:.04s} .tu-reordena tbody tr:nth-child(3){animation-delay:.08s}
+  .tu-reordena tbody tr:nth-child(4){animation-delay:.12s} .tu-reordena tbody tr:nth-child(n+5){animation-delay:.16s}
+  .tu-entra .tu-v-cont > .tu-revisa{animation:tu-escala .45s var(--tu-ease) both}
+  .tu-entra .tu-v-cont > .tu-recibo{animation:tu-imprime .85s cubic-bezier(.3,.7,.2,1) both}
+  .tu-entra .tu-carril i{animation:tu-crece .7s var(--tu-ease) both;transform-origin:left center}
+  .tu-entra .tu-cas.menos .tu-carril i{transform-origin:right center}
+  .tu-entra .tu-cas:nth-child(1) i{animation-delay:calc(var(--tu-d) + .2s)}
+  .tu-entra .tu-cas:nth-child(2) i{animation-delay:calc(var(--tu-d) + .4s)}
+  .tu-entra .tu-cas:nth-child(3) i{animation-delay:calc(var(--tu-d) + .55s)}
+  .tu-entra .tu-cas:nth-child(4) i{animation-delay:calc(var(--tu-d) + .7s)}
+  .tu-entra .tu-cas:nth-child(5) i{animation-delay:calc(var(--tu-d) + .9s)}
+
+  /* Respuesta a cada acción */
+  .tu-prod{transition:border-color .15s,box-shadow .15s,transform .12s}
+  .tu-prod:active{transform:scale(.96)}
+  .tu-linea.nueva{animation:tu-sube .35s var(--tu-ease) both, tu-resalta 1.2s ease both}
+  .tu-linea.sale{animation:tu-sale-linea .2s ease both}
+  .tu-salta{display:inline-block;animation:tu-salta .32s ease}
+  .tu-seg button{transition:background .2s,color .2s,box-shadow .2s}
+  .tu-seg button.on.pop{animation:tu-pop-seg .3s var(--tu-ease)}
+  .tu-msj:not(:empty){animation:tu-baja .3s var(--tu-ease)}
+  .tu-liga.entra, .tu-resultado{animation:tu-escala .45s var(--tu-ease) both}
+  .tu-gira{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;
+    animation:tu-gira .7s linear infinite;vertical-align:-2px;margin-right:8px}
+  .tu [aria-busy="true"]{cursor:progress}
+
+  /* Guía */
+  .tu-g-card.der{animation:tu-desde-der .45s var(--tu-ease) both}
+  .tu-g-card.izq{animation:tu-desde-izq .45s var(--tu-ease) both}
+  .tu-g-card.der .tu-pasos li, .tu-g-card.izq .tu-pasos li{animation:tu-sube .4s var(--tu-ease) both;animation-delay:.12s}
+  .tu-g-card.der .tu-pasos li:nth-child(2), .tu-g-card.izq .tu-pasos li:nth-child(2){animation-delay:.18s}
+  .tu-g-card.der .tu-pasos li:nth-child(3), .tu-g-card.izq .tu-pasos li:nth-child(3){animation-delay:.24s}
+  .tu-g-card.der .tu-pasos li:nth-child(4), .tu-g-card.izq .tu-pasos li:nth-child(4){animation-delay:.3s}
+  .tu-pasos li{transition:color .3s}
+  .tu-pasos .ck{transition:background .3s,border-color .3s,box-shadow .3s}
+  .tu-pasos li.recien .ck{animation:tu-pop .45s var(--tu-ease) both}
+  .tu-pasos li.recien .ck path{stroke-dasharray:24;animation:tu-traza .4s ease .15s both}
+  .tu-g-hecha.entra{animation:tu-sube .45s var(--tu-ease) .25s both}
+  .tu-g-nav .btn.tu-latido{animation:tu-latido 1.2s ease .45s 2}
+
+  @media (prefers-reduced-motion: reduce){
+    .tu *, .tu *::before, .tu *::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:1ms!important}
+  }
+
   /* ── ANCHO DISPONIBLE ────────────────────────────────── */
   @container (max-width: 1080px){
     .tu-entorno{grid-template-columns:minmax(0,1fr)}
@@ -295,9 +472,16 @@ foreach ([
     .tu-v-main{margin-top:0;border-radius:0;border-left:0}
     .tu-caja, .tu-dos{grid-template-columns:minmax(0,1fr)}
     .tu-guia{grid-template-columns:minmax(0,1fr)}
+    .tu-temario{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @container (max-width: 700px){
+    .tu-pasos3{grid-template-columns:minmax(0,1fr);gap:14px}
   }
   @container (max-width: 560px){
     .tu-portada-txt{padding:28px 22px}
+    .tu-como{padding:20px 18px}
+    .tu-temario{grid-template-columns:minmax(0,1fr)}
+    .tu-tema{min-height:0}
     .tu-v-cont, .tu-v-top{padding-left:14px;padding-right:14px}
     .tu-cas{grid-template-columns:96px minmax(0,1fr) 84px;font-size:11.5px}
     .tu-v-barra .tu-v-puntos{display:none}
@@ -309,7 +493,8 @@ foreach ([
 <div class="tu">
 
   <!-- ═══ PORTADA ═══ -->
-  <section class="tu-portada" data-vista="portada">
+  <div class="tu-inicio" data-vista="portada">
+  <section class="tu-portada">
     <div class="tu-portada-txt">
       <span class="tu-eti">Entorno de práctica</span>
       <h2>Aprende LibertyFin usándolo</h2>
@@ -323,8 +508,8 @@ foreach ([
           <span><b>Sin riesgo</b>: puedes reiniciar los datos de práctica cuando quieras.</span></li>
       </ul>
       <div class="tu-portada-acc">
-        <button type="button" class="btn btn-primary btn-lg" data-a="ir-entrada">Ingresar al entorno de práctica</button>
-        <small>Unos 40 minutos en total</small>
+        <button type="button" class="btn btn-primary btn-lg" data-a="ir-entrada" data-boton-inicio>Ingresar al entorno de práctica</button>
+        <small data-tiempo>Unos 40 minutos en total</small>
       </div>
     </div>
     <div class="tu-portada-arte" aria-hidden="true">
@@ -337,6 +522,25 @@ foreach ([
       </div>
     </div>
   </section>
+
+  <section class="tu-como" aria-labelledby="tu-como-tit">
+    <h3 id="tu-como-tit" class="tu-bloque-tit">Cómo funciona</h3>
+    <ol class="tu-pasos3">
+      <li><span class="n">1</span><div><b>Entra al entorno</b><p>Una copia de LibertyFin con una estética ficticia, separada de la información de tu negocio.</p></div></li>
+      <li><span class="n">2</span><div><b>Sigue la guía</b><p>Cada lección te dice qué hacer y marca los pasos conforme los cumples. Lo que hagas en una sigue en la siguiente.</p></div></li>
+      <li><span class="n">3</span><div><b>Hazlo en tu sistema</b><p>Al final de cada lección, un enlace te lleva a la misma sección en tu LibertyFin.</p></div></li>
+    </ol>
+    <p class="tu-como-ayuda">¿Te quedó una duda? <a href="/ayuda" data-parcial>Escríbenos desde Ayuda →</a></p>
+  </section>
+
+  <section class="tu-temario-sec" aria-labelledby="tu-temario-tit">
+    <div class="tu-bloque-cab">
+      <h3 id="tu-temario-tit" class="tu-bloque-tit">Lo que vas a aprender</h3>
+      <span class="tu-avance" data-avance></span>
+    </div>
+    <div class="tu-temario" data-temario></div>
+  </section>
+  </div>
 
   <!-- ═══ INGRESO ═══ -->
   <section class="tu-entrada" data-vista="entrada" hidden>
@@ -412,6 +616,41 @@ foreach ([
   function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
   function r2(n) { return Math.round(n * 100) / 100; }
   function dos(n) { return (n < 10 ? '0' : '') + n; }
+
+  /* ── Movimiento ── */
+  var MOV = !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  /* Una cifra que llega a su valor en lugar de aparecer de golpe. */
+  function contar(el, desde, hasta, ms, esDinero) {
+    var f = function (n) { return esDinero ? dinero(n) : String(Math.round(n)); };
+    if (!MOV || desde === hasta) { el.textContent = f(hasta); return; }
+    var t0 = performance.now();
+    el.textContent = f(desde);
+    (function paso(t) {
+      var k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = f(desde + (hasta - desde) * e);
+      if (k < 1 && el.isConnected) requestAnimationFrame(paso); else el.textContent = f(hasta);
+    })(t0);
+  }
+  /* Vuelve a correr una animación de una sola vez (la clase se quita y se pone). */
+  function reanimar(el, clase) {
+    if (!el || !MOV) return;
+    el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase);
+  }
+  /* El botón muestra que algo está pasando y, al rato, sigue. Un cobro o
+     una transferencia que se aplican sin espera se sienten falsos. */
+  function ocupado(b, texto, ms, fn) {
+    if (!b || b.getAttribute('aria-busy') === 'true') return;
+    if (!MOV) { fn(); return; }
+    b.setAttribute('aria-busy', 'true'); b.disabled = true;
+    b.innerHTML = '<span class="tu-gira" aria-hidden="true"></span>' + esc(texto);
+    setTimeout(fn, ms);
+  }
+  /* Algo que se va sale primero de la vista y luego del estado. */
+  function despedir(el, fn, ms) {
+    if (!MOV || !el) { fn(); return; }
+    if (el.classList.contains('sale')) return;
+    el.classList.add('sale'); setTimeout(fn, ms || 190);
+  }
   var ICO = {
     panel: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
     caja: '<rect x="2" y="5" width="20" height="14" rx="2.5"/><path d="M2 10h20M6 15h4"/>',
@@ -492,45 +731,45 @@ foreach ([
 
   /* ═══ LECCIONES ═══ */
   var LECCIONES = [
-    { t: 'Da de alta un producto', d: 'Lo que vendes vive en Productos. Con el costo, el sistema te dice cuánto te queda en cada venta.', real: 'productos',
+    { t: 'Da de alta un producto', r: 'Precio, costo y precio libre.', min: 4, d: 'Lo que vendes vive en Productos. Con el costo, el sistema te dice cuánto te queda en cada venta.', real: 'productos',
       pasos: [['ir-productos', 'Abre <b>Productos</b> en el menú lateral', 'productos'],
               ['prod-costo', 'Da de alta un producto con precio y costo'],
               ['prod-libre', 'Da de alta otro con precio en 0: queda como <b>precio libre</b> y el monto se escribe al cobrar']],
       nota: 'Lo que des de alta aquí aparece en la Caja de las siguientes lecciones.' },
-    { t: 'Cobra una venta', d: 'Caja es la pantalla del día a día: armas el ticket, eliges cómo paga el cliente y confirmas.', real: 'caja',
+    { t: 'Cobra una venta', r: 'Ticket, forma de pago y cambio.', min: 6, d: 'Caja es la pantalla del día a día: armas el ticket, eliges cómo paga el cliente y confirmas.', real: 'caja',
       pasos: [['ir-caja', 'Abre <b>Caja</b>', 'caja'],
               ['caja-dos', 'Agrega dos productos distintos al ticket'],
               ['caja-cliente', 'Escribe el nombre del cliente'],
               ['caja-cambio', 'Cobra en efectivo indicando con cuánto paga, y confirma']],
       nota: 'En tu sistema, abre tu turno en Corte de caja antes de cobrar; si no, la venta no entra a tu corte.' },
-    { t: 'Deja un saldo pendiente', d: 'Si el cliente paga una parte, el resto queda como saldo en la misma venta y se cobra después en abonos.', real: 'caja',
+    { t: 'Deja un saldo pendiente', r: 'Pagos parciales y saldo por cobrar.', min: 4, d: 'Si el cliente paga una parte, el resto queda como saldo en la misma venta y se cobra después en abonos.', real: 'caja',
       pasos: [['caja-parte', 'En Caja, agrega un producto, elige <b>Solo una parte</b> y escribe cuánto deja hoy', 'caja'],
               ['caja-saldo', 'Confirma la venta con su saldo pendiente']],
       nota: 'La comisión de esa venta se libera conforme el cliente paga.' },
-    { t: 'Registra un abono', d: 'Cada pago tiene su subfolio: -01 el primero, -02 el segundo. Así cuadras cada depósito contra tu banco.', real: 'ventas',
+    { t: 'Registra un abono', r: 'Subfolios y cuadre contra tu banco.', min: 5, d: 'Cada pago tiene su subfolio: -01 el primero, -02 el segundo. Así cuadras cada depósito contra tu banco.', real: 'ventas',
       pasos: [['ir-ventas', 'Abre <b>Ventas</b> y filtra las que tienen saldo', 'ventas'],
               ['venta-abrir', 'Abre una venta con saldo'],
               ['abono', 'Registra un abono y observa su subfolio']],
       nota: 'No se puede abonar más que el saldo. Un pago cancelado conserva su número: el siguiente no lo reutiliza.' },
-    { t: 'Organiza tu cobranza', d: 'Cobranza te dice a quién llamar. Los días se cuentan desde el último abono, no desde la fecha de la venta.', real: 'cobranza',
+    { t: 'Organiza tu cobranza', r: 'A quién cobrarle primero.', min: 4, d: 'Cobranza te dice a quién llamar. Los días se cuentan desde el último abono, no desde la fecha de la venta.', real: 'cobranza',
       pasos: [['ir-cobranza', 'Abre <b>Cobranza</b>', 'cobranza'],
               ['cob-viejo', 'Ordena por <b>Lo más viejo primero</b>'],
               ['cob-abrir', 'Abre la venta del cliente que lleva más días sin abonar']],
       nota: 'Un cliente que abona seguido no aparece como urgente aunque deba mucho.' },
-    { t: 'Cobra en línea', d: 'Con los cobros en línea activos, generas una liga de tarjeta, una CLABE o una referencia de tienda, y el pago se aplica solo.', real: 'ligas',
+    { t: 'Cobra en línea', r: 'Liga de tarjeta, CLABE y referencia de tienda.', min: 5, d: 'Con los cobros en línea activos, generas una liga de tarjeta, una CLABE o una referencia de tienda, y el pago se aplica solo.', real: 'ligas',
       pasos: [['liga-generar', 'En una venta con saldo, usa <b>Cobrar en línea</b> y genera la CLABE de SPEI', 'ventas'],
               ['liga-pago', 'Simula la transferencia y comprueba que el abono se registró solo']],
       nota: 'Si transfiere de menos, entra como abono y queda saldo. Si transfiere de más, se rechaza y el banco le regresa su dinero.' },
-    { t: 'Cierra tu turno', d: 'Al final del día cuentas tu efectivo y el sistema te dice si cuadra. Tarjeta y transferencia no pasan por el cajón.', real: 'corte',
+    { t: 'Cierra tu turno', r: 'Cuadrar el efectivo del día.', min: 4, d: 'Al final del día cuentas tu efectivo y el sistema te dice si cuadra. Tarjeta y transferencia no pasan por el cajón.', real: 'corte',
       pasos: [['ir-corte', 'Abre <b>Corte de caja</b>', 'corte'],
               ['corte-cerrar', 'Escribe cuánto hay realmente y cierra la caja; si hay diferencia, explica a qué se debe']],
       nota: 'Cada usuario tiene su propio turno.' },
-    { t: 'Revisa cuánto te queda', d: 'Reportes parte de lo cobrado y descuenta gastos, comisiones e IVA para decirte lo que realmente queda.', real: 'reportes',
+    { t: 'Revisa cuánto te queda', r: 'Lo cobrado menos gastos, comisiones e IVA.', min: 5, d: 'Reportes parte de lo cobrado y descuenta gastos, comisiones e IVA para decirte lo que realmente queda.', real: 'reportes',
       pasos: [['ir-reportes', 'Abre <b>Reportes</b> y ubica la cifra que queda', 'reportes'],
               ['gasto', 'Registra un gasto en <b>Gastos</b>', 'gastos'],
               ['reportes-ver', 'Vuelve a Reportes y observa cómo cambió', 'reportes']],
       nota: 'Los gastos de operación de una venta se capturan en Caja y bajan la comisión de esa venta.' },
-    { t: 'Ajusta el sistema a tu negocio', d: 'Las herramientas opcionales se encienden en Ajustes y aparecen en el menú solo si las usas.', real: 'ajustes',
+    { t: 'Ajusta el sistema a tu negocio', r: 'Herramientas que se encienden según tu negocio.', min: 3, d: 'Las herramientas opcionales se encienden en Ajustes y aparecen en el menú solo si las usas.', real: 'ajustes',
       pasos: [['ir-ajustes', 'Abre <b>Ajustes</b>', 'ajustes'],
               ['mod-on', 'Enciende una herramienta y observa el menú lateral']],
       nota: 'Las que tu plan no incluye aparecen con candado.' }
@@ -549,7 +788,23 @@ foreach ([
   }
 
   /* ═══ VISTAS ═══ */
-  function vista(nombre) { $$('[data-vista]', raiz()).forEach(function (v) { v.hidden = v.dataset.vista !== nombre; }); }
+  /* La entrada se marca solo cuando la vista CAMBIA y se quita al
+     terminar: si se quedara, el menú repetiría su cascada cada vez que
+     se vuelve a pintar (por ejemplo, al encender un módulo). */
+  function vista(nombre) {
+    var cambia = P.vista !== nombre;
+    P.vista = nombre;
+    $$('[data-vista]', raiz()).forEach(function (v) {
+      v.hidden = v.dataset.vista !== nombre;
+      /* El ingreso se queda desvanecido al entrar; al volver, aparece entero. */
+      if (!v.hidden) $$('.sale', v).forEach(function (x) { x.classList.remove('sale'); });
+      if (!v.hidden && cambia && MOV) {
+        reanimar(v, 'tu-vista-entra');
+        clearTimeout(v._tuFin);
+        v._tuFin = setTimeout(function () { v.classList.remove('tu-vista-entra'); }, 2000);
+      }
+    });
+  }
   function aplicarHash() {
     var h = location.hash, m = /^#leccion-(\d+)$/.exec(h);
     if (m) {
@@ -558,7 +813,7 @@ foreach ([
       guardar(); vista('entorno'); pintarTodo();
     } else if (h === '#entrar') vista('entrada');
     else if (P.s.entro && h !== '#inicio') irLeccion(P.s.leccion, true);
-    else vista('portada');
+    else { pintarPortada(); vista('portada'); }
   }
   function irLeccion(n, reemplazar) {
     var h = '#leccion-' + n;
@@ -567,58 +822,138 @@ foreach ([
     else location.hash = h;
   }
 
+  /* ═══ PORTADA: temario y avance ═══ */
+  function pintarPortada() {
+    var r = raiz(), t = $('[data-temario]', r); if (!t) return;
+    var hechas = 0, falta = 0, empezado = Object.keys(P.s.hechos).length > 0;
+    t.innerHTML = LECCIONES.map(function (l, k) {
+      var ok = completa(k), actual = empezado && !ok && P.s.leccion === k + 1;
+      if (ok) hechas++; else falta += l.min;
+      return '<button type="button" class="tu-tema' + (ok ? ' hecha' : '') + (actual ? ' actual' : '') + '" data-a="empezar" data-v="' + (k + 1) + '" style="--i:' + k + '">'
+        + '<span class="tu-tema-cab"><span class="n">' + (ok ? ico('ok', 13) : (k + 1)) + '</span><b>' + l.t + '</b></span>'
+        + '<small>' + l.r + '</small>'
+        + '<span class="tu-tema-pie"><span class="estado">' + (ok ? 'Completada' : actual ? 'Aquí te quedaste' : l.min + ' min') + '</span>'
+        + '<em>' + (ok ? 'Repasar' : actual ? 'Continuar' : 'Empezar') + ' →</em></span></button>';
+    }).join('');
+    var av = $('[data-avance]', r);
+    if (av) av.textContent = hechas ? hechas + ' de ' + LECCIONES.length + (hechas === 1 ? ' completada' : ' completadas') : LECCIONES.length + ' lecciones';
+    /* Si ya avanzó, el botón principal lo regresa a donde se quedó. */
+    var b = $('[data-boton-inicio]', r), tm = $('[data-tiempo]', r);
+    if (b) b.textContent = empezado && hechas < LECCIONES.length ? 'Continuar en la lección ' + P.s.leccion : 'Ingresar al entorno de práctica';
+    if (tm) tm.textContent = !empezado ? 'Unos 40 minutos en total' : hechas === LECCIONES.length ? 'Completaste todas las lecciones' : 'Te faltan unos ' + falta + ' minutos';
+  }
+
   /* ═══ MENÚ ═══ */
   var NOMBRES = { panel: 'Panel', caja: 'Caja', ventas: 'Ventas', cobranza: 'Cobranza', corte: 'Corte de caja', agenda: 'Agenda',
                   cotizaciones: 'Cotizaciones', productos: 'Productos', inventario: 'Inventario', gastos: 'Gastos', reportes: 'Reportes', ajustes: 'Ajustes' };
+  /* Los botones se crean solo cuando cambia la lista (un módulo que se
+     enciende); lo demás es mover la marca de la sección activa, que se
+     desliza de una a otra en lugar de saltar. */
   function pintarNav(nuevo) {
     var nav = $('[data-nav]', raiz()); if (!nav) return;
     var m = P.s.mods, dest = destinoPendiente();
     var grupos = [['Operación', ['panel', 'caja'].concat(m.agenda ? ['agenda'] : [], ['ventas'], m.cotizaciones ? ['cotizaciones'] : [], ['cobranza', 'corte'])],
                   ['Administración', ['gastos', 'productos'].concat(m.inventario ? ['inventario'] : [], ['reportes', 'ajustes'])]];
-    nav.innerHTML = grupos.map(function (g) {
-      return '<div class="sec">' + g[0] + '</div>' + g[1].map(function (k) {
-        return '<button type="button" data-a="pantalla" data-v="' + k + '" class="' + (P.s.pantalla === k ? 'on' : '') + (nuevo === k ? ' nuevo' : '') + '">'
-             + ico(k) + NOMBRES[k] + (dest === k && P.s.pantalla !== k ? '<span class="pista" aria-label="Siguiente paso"></span>' : '') + '</button>';
+    var firma = JSON.stringify(grupos), nueva = nav.dataset.firma !== firma, n = 0;
+    if (nueva) {
+      nav.innerHTML = '<i class="tu-v-ind quieto" aria-hidden="true"></i>' + grupos.map(function (g) {
+        return '<div class="sec" style="--i:' + (n++) + '">' + g[0] + '</div>' + g[1].map(function (k) {
+          return '<button type="button" data-a="pantalla" data-v="' + k + '" style="--i:' + (n++) + '"' + (nuevo === k ? ' class="nuevo"' : '') + '>' + ico(k) + NOMBRES[k] + '</button>';
+        }).join('');
       }).join('');
-    }).join('');
+      nav.dataset.firma = firma;
+      nav.classList.add('con-ind');
+    }
+    $$('button[data-v]', nav).forEach(function (b) {
+      var k = b.dataset.v, p = $('.pista', b), quiere = dest === k && P.s.pantalla !== k;
+      b.classList.toggle('on', P.s.pantalla === k);
+      if (quiere && !p) b.insertAdjacentHTML('beforeend', '<span class="pista" aria-label="Siguiente paso"></span>');
+      if (!quiere && p) p.remove();
+    });
+    moverMarca(nav, nueva);
+  }
+  function moverMarca(nav, sinTransicion) {
+    var ind = $('.tu-v-ind', nav), b = $('button.on', nav);
+    if (!ind) return;
+    if (!b || !b.offsetWidth) { ind.style.opacity = '0'; return; }
+    if (sinTransicion) ind.classList.add('quieto');
+    ind.style.opacity = '1';
+    ind.style.width = b.offsetWidth + 'px';
+    ind.style.height = b.offsetHeight + 'px';
+    ind.style.transform = 'translate(' + b.offsetLeft + 'px,' + b.offsetTop + 'px)';
+    void ind.offsetWidth;
+    ind.classList.remove('quieto');
+    /* En pantallas angostas el menú es una fila que se desplaza. */
+    if (nav.scrollWidth > nav.clientWidth + 2) {
+      var x = b.offsetLeft - (nav.clientWidth - b.offsetWidth) / 2;
+      try { nav.scrollTo({ left: Math.max(0, x), behavior: MOV ? 'smooth' : 'auto' }); } catch (e) { nav.scrollLeft = x; }
+    }
   }
 
   /* ═══ GUÍA ═══ */
+  /* Varias acciones piden pintar la guía en el mismo instante; se pinta
+     una sola vez por cuadro, para que lo recién cumplido se anime una vez
+     y no se pierda en un segundo pintado. */
   function pintarGuia() {
+    if (P.guiaPend) return;
+    P.guiaPend = true;
+    /* El cuadro siguiente o, si el navegador lo retrasa, un instante después. */
+    var listo = false, ya = function () { if (listo) return; listo = true; P.guiaPend = false; pintarGuiaYa(); };
+    requestAnimationFrame(ya); setTimeout(ya, 60);
+  }
+  function pintarGuiaYa() {
     var g = $('[data-guia]', raiz()); if (!g) return;
     var i = P.s.leccion - 1, l = LECCIONES[i], total = LECCIONES.length;
     var hechas = LECCIONES.filter(function (x, k) { return completa(k); }).length;
     var etqHechas = hechas === 1 ? '1 completada' : hechas + ' completadas';
+    var pct = hechas / total * 100;
+    /* Lo que cambió desde el último pintado de ESTA lección. */
+    var otra = P.guiaLeccion !== i, antes = otra ? null : (P.guiaHechos || {});
+    var dir = otra && P.guiaLeccion != null ? (i > P.guiaLeccion ? ' der' : ' izq') : '';
+    var recienCompleta = !!antes && completa(i) && !P.guiaCompleta;
+    var abierta = $('.tu-g-lista', g); abierta = !!(abierta && abierta.open);
     var primeraPend = -1;
     l.pasos.forEach(function (p, k) { if (primeraPend === -1 && !hecho(p[0])) primeraPend = k; });
     var real = ATAJOS[l.real];
-    g.innerHTML = '<div class="card"><div class="card-body">'
+    g.innerHTML = '<div class="card tu-g-card' + dir + '"><div class="card-body">'
       + '<div class="tu-g-n"><span>Lección ' + (i + 1) + ' de ' + total + '</span><span>' + etqHechas + '</span></div>'
-      + '<div class="tu-g-prog"><i style="width:' + (hechas / total * 100) + '%"></i></div>'
+      + '<div class="tu-g-prog"><i style="width:' + (P.guiaPct == null ? pct : P.guiaPct) + '%"></i></div>'
       + '<h4>' + l.t + '</h4><p class="d">' + l.d + '</p>'
       + '<ol class="tu-pasos">' + l.pasos.map(function (p, k) {
-          return '<li class="' + (hecho(p[0]) ? 'hecho' : (k === primeraPend ? 'actual' : '')) + '"><span class="ck">' + (hecho(p[0]) ? ico('ok', 13) : '') + '</span><span>' + p[1] + '</span></li>';
+          var h = hecho(p[0]), recien = h && antes && !antes[p[0]];
+          return '<li class="' + (h ? 'hecho' : (k === primeraPend ? 'actual' : '')) + (recien ? ' recien' : '') + '"><span class="ck">' + (h ? ico('ok', 13) : '') + '</span><span>' + p[1] + '</span></li>';
         }).join('') + '</ol>'
-      + (completa(i) ? '<div class="tu-g-hecha">' + ico('ok', 15) + 'Lección completada</div>' : '')
+      + (completa(i) ? '<div class="tu-g-hecha' + (recienCompleta ? ' entra' : '') + '">' + ico('ok', 15) + 'Lección completada</div>' : '')
       + '<div class="tu-g-nota">' + l.nota + '</div>'
       + (real ? '<a class="tu-g-real" href="' + esc(real.url) + '" data-parcial>Ir a ' + esc(real.txt) + ' en tu sistema →</a>' : '')
       + '<div class="tu-g-nav">'
       + (i > 0 ? '<button type="button" class="btn btn-secondary btn-sm" data-a="leccion" data-v="' + i + '">Anterior</button>' : '')
-      + (i < total - 1 ? '<button type="button" class="btn ' + (completa(i) ? 'btn-primary' : 'btn-secondary') + ' btn-sm" data-a="leccion" data-v="' + (i + 2) + '">Siguiente lección</button>'
-         : (hechas === total ? '<button type="button" class="btn btn-primary btn-sm" data-a="salir">Terminar</button>' : ''))
+      + (i < total - 1 ? '<button type="button" class="btn ' + (completa(i) ? 'btn-primary' : 'btn-secondary') + (recienCompleta ? ' tu-latido' : '') + ' btn-sm" data-a="leccion" data-v="' + (i + 2) + '">Siguiente lección</button>'
+         : (hechas === total ? '<button type="button" class="btn btn-primary' + (recienCompleta ? ' tu-latido' : '') + ' btn-sm" data-a="salir">Terminar</button>' : ''))
       + '</div></div></div>'
-      + '<div class="card"><div class="card-body"><details class="tu-g-lista"><summary>Todas las lecciones</summary><ol>'
+      + '<div class="card"><div class="card-body"><details class="tu-g-lista"' + (abierta ? ' open' : '') + '><summary>Todas las lecciones</summary><ol>'
       + LECCIONES.map(function (x, k) {
           return '<li><button type="button" data-a="leccion" data-v="' + (k + 1) + '" class="' + (k === i ? 'on' : '') + (completa(k) ? ' hecha' : '') + '">'
                + '<span class="n">' + (completa(k) ? ico('ok', 11) : (k + 1)) + '</span>' + x.t + '</button></li>';
         }).join('') + '</ol></details></div></div>';
+    /* La barra parte de donde estaba y avanza. */
+    var barra = $('.tu-g-prog i', g);
+    if (barra && P.guiaPct != null && P.guiaPct !== pct) { void barra.offsetWidth; barra.style.width = pct + '%'; }
+    P.guiaPct = pct; P.guiaLeccion = i; P.guiaCompleta = completa(i);
+    P.guiaHechos = {}; for (var k in P.s.hechos) P.guiaHechos[k] = true;
   }
 
   /* ═══ PANTALLAS ═══ */
   var PANT = {};
   function cabecera(t, sub) { $('[data-top]', raiz()).innerHTML = '<h3>' + ico(P.s.pantalla, 17) + esc(t) + '</h3>' + (sub ? '<p>' + esc(sub) + '</p>' : ''); }
+  /* Una cifra con data-n se anima: desde cero al entrar a la pantalla y
+     desde su valor anterior cuando cambia (un abono que baja el saldo). */
+  function cifra(n, esDinero, clave) {
+    return '<span data-n="' + n + '"' + (esDinero ? ' data-dinero' : '') + ' data-k="' + esc(clave) + '">' + (esDinero ? dinero(n) : n) + '</span>';
+  }
   function stat(valor, etq, meta) {
-    return '<div class="stat-card"><div class="stat-value">' + valor + '</div><div class="stat-label">' + etq + '</div>' + (meta ? '<div class="stat-meta">' + meta + '</div>' : '') + '</div>';
+    var v = typeof valor === 'number' ? cifra(valor, true, etq) : valor;
+    return '<div class="stat-card"><div class="stat-value">' + v + '</div><div class="stat-label">' + etq + '</div>' + (meta ? '<div class="stat-meta">' + meta + '</div>' : '') + '</div>';
   }
   function badgeVenta(v) {
     var s = saldo(v);
@@ -631,8 +966,8 @@ foreach ([
     var mov = [];
     P.s.ventas.forEach(function (v) { v.pagos.forEach(function (p) { if (!p.cancel) mov.push({ v: v, p: p }); }); });
     mov.sort(function (a, b) { return a.p.hace - b.p.hace || (b.v.f > a.v.f ? 1 : -1); });
-    return '<div class="tu-cifras">' + stat(dinero(cobrosHoy()), 'Entró hoy') + stat(dinero(cobrosHoy(['Efectivo'])), 'En efectivo')
-      + stat(dinero(porCobrar), 'Por cobrar') + stat(P.s.ventas.filter(function (v) { return v.pagos.some(function (p) { return p.hace === 0; }); }).length, 'Ventas con cobro hoy') + '</div>'
+    return '<div class="tu-cifras">' + stat(r2(cobrosHoy()), 'Entró hoy') + stat(r2(cobrosHoy(['Efectivo'])), 'En efectivo')
+      + stat(r2(porCobrar), 'Por cobrar') + stat(cifra(P.s.ventas.filter(function (v) { return v.pagos.some(function (p) { return p.hace === 0; }); }).length, false, 'hoy'), 'Ventas con cobro hoy') + '</div>'
       + '<div class="card"><div class="card-header">Últimos movimientos</div><div class="card-body" style="padding-top:4px;padding-bottom:4px">'
       + mov.slice(0, 6).map(function (x) {
           return '<div class="tu-pago"><span class="f">' + x.v.f + '<em>-' + dos(x.p.n) + '</em></span><span>' + esc(x.v.cli) + ' · ' + esc(x.p.met) + '</span>'
@@ -651,8 +986,8 @@ foreach ([
       + '<p class="tu-msj" data-queda></p><p class="tu-msj" data-msj></p></form></div></div>'
       + '<div class="card"><div class="card-header">Catálogo<span class="badge bg-secondary">' + P.s.productos.length + ' productos</span></div>'
       + '<div class="table-responsive"><table class="table"><thead><tr><th>Producto</th><th class="text-end">Precio</th><th class="text-end">Costo</th><th class="text-end">Te queda</th></tr></thead><tbody>'
-      + P.s.productos.map(function (p) {
-          return '<tr><td><strong>' + esc(p.n) + '</strong></td><td class="text-end tu-mono">' + (p.p > 0 ? dinero(p.p) : '<span class="badge bg-secondary">Precio libre</span>') + '</td>'
+      + P.s.productos.map(function (p, i) {
+          return '<tr' + (P.filaNueva === 'p' + i ? ' class="tu-fila-nueva"' : '') + '><td><strong>' + esc(p.n) + '</strong></td><td class="text-end tu-mono">' + (p.p > 0 ? dinero(p.p) : '<span class="badge bg-secondary">Precio libre</span>') + '</td>'
                + '<td class="text-end tu-mono">' + (p.c > 0 ? dinero(p.c) : '—') + '</td><td class="text-end tu-mono">' + (p.p > 0 && p.c > 0 ? dinero(p.p - p.c) : '—') + '</td></tr>';
         }).join('') + '</tbody></table></div></div>';
   };
@@ -672,7 +1007,7 @@ foreach ([
     if (c.fase === 'revisa') return revisaHtml();
     var k = cuentasCaja(), ef = c.metodo === 'efectivo';
     var lineas = c.lineas.length ? c.lineas.map(function (l, i) {
-      return '<div class="tu-linea"><span class="nom" title="' + esc(l.n) + '">' + esc(l.n) + '</span>'
+      return '<div class="tu-linea' + (P.lineaNueva === i ? ' nueva' : '') + '"><span class="nom" title="' + esc(l.n) + '">' + esc(l.n) + '</span>'
         + (l.libre ? '<input class="form-control form-control-sm" type="number" min="0" step="1" placeholder="Precio" data-in="libre" data-v="' + i + '" value="' + (l.p || '') + '">'
                    : '<span class="imp tu-mono">' + dinero(l.p * l.cant) + '</span>')
         + '<span class="tu-cant"><button type="button" data-a="menos" data-v="' + i + '" aria-label="Uno menos">−</button>' + l.cant + '<button type="button" data-a="mas" data-v="' + i + '" aria-label="Uno más">+</button>'
@@ -688,7 +1023,7 @@ foreach ([
       + '<div class="tu-lineas">' + lineas + '</div>'
       + '<div><label class="form-label">Cliente (opcional)</label><input class="form-control form-control-sm" data-in="cliente" value="' + esc(c.cliente) + '" placeholder="Nombre del cliente" autocomplete="off"></div>'
       + '<div><label class="form-label">¿Cómo paga?</label><div class="tu-seg">'
-      + ['efectivo', 'tarjeta', 'spei'].map(function (m) { return '<button type="button" data-a="metodo" data-v="' + m + '" class="' + (c.metodo === m ? 'on' : '') + '">' + { efectivo: 'Efectivo', tarjeta: 'Tarjeta', spei: 'SPEI' }[m] + '</button>'; }).join('')
+      + ['efectivo', 'tarjeta', 'spei'].map(function (m) { return '<button type="button" data-a="metodo" data-v="' + m + '" class="' + (c.metodo === m ? 'on' + popDe('metodo', m) : '') + '">' + { efectivo: 'Efectivo', tarjeta: 'Tarjeta', spei: 'SPEI' }[m] + '</button>'; }).join('')
       + '</div></div>'
       + (ef ? (c.parte
           ? '<div><label class="form-label">¿Cuánto deja hoy?</label><div class="tu-acc"><input class="form-control form-control-sm" style="flex:1" type="number" min="0" step="1" data-in="deja" value="' + esc(c.deja) + '">'
@@ -705,7 +1040,12 @@ foreach ([
   function textoCobrar(k) { return k.total <= 0 ? 'Cobrar' : (k.hoy > 0 ? 'Cobrar ' + dinero(k.hoy) : 'Registrar sin cobro'); }
   function refrescarCaja() {
     var r = raiz(), c = P.caja, k = cuentasCaja();
-    var t = $('[data-total]', r); if (t) t.textContent = dinero(k.total);
+    var t = $('[data-total]', r);
+    if (t) {
+      var antes = P.totalVisto == null ? k.total : P.totalVisto;
+      if (antes !== k.total) { contar(t, antes, k.total, 320, true); reanimar(t, 'tu-salta'); } else t.textContent = dinero(k.total);
+      P.totalVisto = k.total;
+    }
     var t2 = $('[data-total2]', r); if (t2) t2.textContent = dinero(k.total);
     var b = $('[data-a="cobrar"]', r); if (b) { b.disabled = k.total <= 0; b.textContent = textoCobrar(k); }
     var sc = $('[data-saldo-caja]', r); if (sc) sc.textContent = k.total > 0 && k.saldo > 0 ? 'Queda un saldo de ' + dinero(k.saldo) + '.' : '';
@@ -756,9 +1096,9 @@ foreach ([
       return f === 'todas' || (f === 'saldo' ? saldo(v) > 0 : saldo(v) <= 0);
     });
     var tot = P.s.ventas.reduce(function (t, v) { return t + v.tot; }, 0), cob = P.s.ventas.reduce(function (t, v) { return t + cobrado(v); }, 0);
-    return '<div class="tu-cifras">' + stat(dinero(cob), 'Cobrado') + stat(dinero(tot - cob), 'Por cobrar') + stat(dinero(tot), 'Vendido') + '</div>'
+    return '<div class="tu-cifras">' + stat(r2(cob), 'Cobrado') + stat(r2(tot - cob), 'Por cobrar') + stat(r2(tot), 'Vendido') + '</div>'
       + '<div class="card"><div class="card-header">Movimientos<div class="tu-seg">'
-      + [['todas', 'Todas'], ['saldo', 'Con saldo'], ['liq', 'Liquidadas']].map(function (x) { return '<button type="button" data-a="filtro" data-v="' + x[0] + '" class="' + (f === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('')
+      + [['todas', 'Todas'], ['saldo', 'Con saldo'], ['liq', 'Liquidadas']].map(function (x) { return '<button type="button" data-a="filtro" data-v="' + x[0] + '" class="' + (f === x[0] ? 'on' + popDe('filtro', x[0]) : '') + '">' + x[1] + '</button>'; }).join('')
       + '</div></div><div class="table-responsive"><table class="table"><thead><tr><th>Venta</th><th>Cliente</th><th class="text-end">Total</th><th>Estado</th><th></th></tr></thead><tbody>'
       + (lista.length ? lista.map(function (v) {
           return '<tr><td class="tu-mono">' + v.f + '</td><td><strong>' + esc(v.cli) + '</strong></td><td class="text-end tu-mono">' + dinero(v.tot) + '</td><td>' + badgeVenta(v) + '</td>'
@@ -780,13 +1120,13 @@ foreach ([
     var liga = '';
     if (s > 0) {
       liga = '<div class="card"><div class="card-header">Cobrar en línea</div><div class="card-body"><div class="tu-seg" style="margin-bottom:12px">'
-        + [['spei', 'SPEI'], ['tarjeta', 'Tarjeta'], ['tienda', 'Tienda']].map(function (x) { return '<button type="button" data-a="liga-met" data-v="' + x[0] + '" class="' + ((L.met || 'spei') === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('')
+        + [['spei', 'SPEI'], ['tarjeta', 'Tarjeta'], ['tienda', 'Tienda']].map(function (x) { return '<button type="button" data-a="liga-met" data-v="' + x[0] + '" class="' + ((L.met || 'spei') === x[0] ? 'on' + popDe('liga-met', x[0]) : '') + '">' + x[1] + '</button>'; }).join('')
         + '</div>';
       if (!L.generada || L.f !== v.f) {
         liga += '<p class="tu-sub-caja" style="margin:0 0 10px">Se cobra el saldo completo: ' + dinero(s) + '.</p><button type="button" class="btn btn-primary btn-sm" data-a="liga-generar">Generar</button>';
       } else {
         var met = L.met || 'spei';
-        liga += '<div class="tu-liga" style="margin-top:0">' + (met === 'tarjeta' ? qr() : '') + '<div style="flex:1;min-width:190px">'
+        liga += '<div class="tu-liga' + (P.ligaNueva ? ' entra' : '') + '" style="margin-top:0">' + (met === 'tarjeta' ? qr() : '') + '<div style="flex:1;min-width:190px">'
           + (met === 'spei' ? '<div class="tu-sub-caja">CLABE para transferir ' + dinero(L.monto) + ' exactos</div><div class="tu-clabe">646180 6330 0000 4003</div>'
              : met === 'tarjeta' ? '<div class="tu-sub-caja">Liga de pago por ' + dinero(L.monto) + '</div><div class="tu-clabe" style="font-size:14px">pago.libertyfin.mx/l/8F3K2Q</div>'
              : '<div class="tu-sub-caja">Referencia para pagar ' + dinero(L.monto) + ' en OXXO y tiendas participantes</div><div class="tu-clabe">905078183407627</div>')
@@ -798,7 +1138,7 @@ foreach ([
       liga += '<p class="tu-msj" data-msj-liga>' + (P.msjLiga || '') + '</p></div></div>';
     }
     return '<button type="button" class="btn btn-secondary btn-sm" data-a="volver-ventas" style="margin-bottom:12px">' + ico('atras', 14) + 'Volver al listado</button>'
-      + '<div class="tu-cifras">' + stat(dinero(v.tot), 'Total') + stat(dinero(cobrado(v)), 'Cobrado') + stat(s > 0 ? dinero(s) : 'Liquidada', 'Saldo') + '</div>'
+      + '<div class="tu-cifras">' + stat(r2(v.tot), 'Total') + stat(r2(cobrado(v)), 'Cobrado') + stat(s > 0 ? s : 'Liquidada', 'Saldo') + '</div>'
       + '<div class="card" style="margin-bottom:14px"><div class="card-header">Pagos de esta venta<span class="tu-sub-caja">' + v.pagos.length + (v.pagos.length === 1 ? ' pago' : ' pagos') + '</span></div><div class="card-body" style="padding-top:2px;padding-bottom:2px">' + (pagos || '<div class="tu-vacio" style="margin:10px 0">Sin pagos todavía.</div>') + '</div></div>'
       + '<div class="tu-dos"><div class="tu-pila">'
       + (s > 0 ? '<div class="card"><div class="card-header">Registrar un abono</div><div class="card-body"><div class="tu-form">'
@@ -828,10 +1168,10 @@ foreach ([
            : o === 'grande' ? function (a, b) { return saldo(b) - saldo(a); }
            : function (a, b) { return a.cli.localeCompare(b.cli); });
     var etq = [['bg-success', '1 a 30 días'], ['bg-warning', '31 a 60 días'], ['bg-danger', 'Más de 60 días']];
-    return '<div class="tu-cifras">' + stat(dinero(total), 'Por cobrar') + stat(dinero(sumas[0]), '1 a 30 días', 'Se cobra solo')
-      + stat(dinero(sumas[1]), '31 a 60 días', 'Hay que recordarles') + stat(dinero(sumas[2]), 'Más de 60 días', 'Háblales hoy') + '</div>'
+    return '<div class="tu-cifras">' + stat(r2(total), 'Por cobrar') + stat(r2(sumas[0]), '1 a 30 días', 'Se cobra solo')
+      + stat(r2(sumas[1]), '31 a 60 días', 'Hay que recordarles') + stat(r2(sumas[2]), 'Más de 60 días', 'Háblales hoy') + '</div>'
       + '<div class="card"><div class="card-header">Saldos abiertos<div class="tu-seg">'
-      + [['cliente', 'Por cliente'], ['grande', 'Lo más grande primero'], ['viejo', 'Lo más viejo primero']].map(function (x) { return '<button type="button" data-a="orden" data-v="' + x[0] + '" class="' + (o === x[0] ? 'on' : '') + '">' + x[1] + '</button>'; }).join('')
+      + [['cliente', 'Por cliente'], ['grande', 'Lo más grande primero'], ['viejo', 'Lo más viejo primero']].map(function (x) { return '<button type="button" data-a="orden" data-v="' + x[0] + '" class="' + (o === x[0] ? 'on' + popDe('orden', x[0]) : '') + '">' + x[1] + '</button>'; }).join('')
       + '</div></div><div class="table-responsive"><table class="table"><thead><tr><th>Cliente</th><th class="text-end">Saldo</th><th>Último abono</th><th>Antigüedad</th><th></th></tr></thead><tbody>'
       + con.map(function (v) {
           var d = diasSinAbono(v), t = etq[tramo(d)];
@@ -853,7 +1193,7 @@ foreach ([
         }).join('') + '</tbody></table></div></div>';
     var cierre;
     if (C.cerrado) {
-      cierre = '<div class="card"><div class="card-body"><p class="tu-msj ' + (C.cerrado.dif === 0 ? 'bien' : 'aviso') + '" style="margin:0 0 12px">'
+      cierre = '<div class="card tu-resultado"><div class="card-body"><p class="tu-msj ' + (C.cerrado.dif === 0 ? 'bien' : 'aviso') + '" style="margin:0 0 12px">'
         + (C.cerrado.dif === 0 ? 'Caja cerrada. Cuadró exacto.' : 'Caja cerrada con una diferencia de ' + dinero(Math.abs(C.cerrado.dif)) + (C.cerrado.dif > 0 ? ' (sobrante)' : ' (faltante)') + '. Nota: «' + esc(C.cerrado.nota) + '».')
         + '</p><button type="button" class="btn btn-secondary btn-sm" data-a="reabrir">Abrir otro turno</button></div></div>';
     } else {
@@ -862,7 +1202,7 @@ foreach ([
         + '<div style="grid-column:span 2"><label class="form-label">Nota</label><input class="form-control form-control-sm" data-in="nota" placeholder="Obligatoria si hay diferencia" autocomplete="off"></div></div>'
         + '<p class="tu-msj" data-dif></p><div class="tu-acc" style="margin-top:12px"><button type="button" class="btn btn-primary" data-a="cerrar">Cerrar caja</button></div><p class="tu-msj" data-msj-corte></p></div></div>';
     }
-    return '<div class="tu-cifras">' + stat(dinero(debe), 'Debe haber en el cajón') + stat(dinero(ef + tj + tr), 'Cobrado en el turno') + stat(dinero(tj), 'Tarjeta', 'No pasa por el cajón') + stat(dinero(tr), 'Transferencia', 'No pasa por el cajón') + '</div>' + tabla + cierre;
+    return '<div class="tu-cifras">' + stat(r2(debe), 'Debe haber en el cajón') + stat(r2(ef + tj + tr), 'Cobrado en el turno') + stat(r2(tj), 'Tarjeta', 'No pasa por el cajón') + stat(r2(tr), 'Transferencia', 'No pasa por el cajón') + '</div>' + tabla + cierre;
   };
 
   PANT.gastos = function () {
@@ -873,7 +1213,7 @@ foreach ([
       + '<div><label class="form-label">Monto</label><input class="form-control form-control-sm" name="m" type="number" min="1" step="1"></div>'
       + '<div><button class="btn btn-primary" type="submit" style="width:100%">Registrar</button></div></div><p class="tu-msj" data-msj></p></form></div></div>'
       + '<div class="card"><div class="card-header">Gastos del mes</div><div class="table-responsive"><table class="table"><thead><tr><th>Concepto</th><th>Categoría</th><th class="text-end">Monto</th></tr></thead><tbody>'
-      + P.s.gastos.map(function (g) { return '<tr><td><strong>' + esc(g.con) + '</strong></td><td>' + esc(g.cat) + '</td><td class="text-end tu-mono">' + dinero(g.m) + '</td></tr>'; }).join('')
+      + P.s.gastos.map(function (g, i) { return '<tr' + (P.filaNueva === 'g' + i ? ' class="tu-fila-nueva"' : '') + '><td><strong>' + esc(g.con) + '</strong></td><td>' + esc(g.cat) + '</td><td class="text-end tu-mono">' + dinero(g.m) + '</td></tr>'; }).join('')
       + '</tbody></table></div></div>';
   };
 
@@ -890,7 +1230,7 @@ foreach ([
     [['Gastos', gas], ['Comisiones', com], ['IVA', iva]].forEach(function (f) { izq -= f[1] / x * 100; h += fila('menos', '− ' + f[0], f[1], izq, f[1] / x * 100); });
     h += fila('queda', '= Queda', queda, 0, Math.max(0, queda) / x * 100);
     if (hecho('gasto')) cumplirLuego('reportes-ver');
-    return '<div class="tu-hero"><small>Este mes</small><div>Entraron <b>' + dinero(cob) + '</b> y quedaron <b>' + dinero(queda) + '</b></div></div>'
+    return '<div class="tu-hero"><small>Este mes</small><div>Entraron <b>' + cifra(cob, true, 'entraron') + '</b> y quedaron <b>' + cifra(queda, true, 'quedaron') + '</b></div></div>'
       + '<div class="card" style="margin-bottom:14px"><div class="card-header">De dónde a dónde</div><div class="card-body"><div class="tu-cascada">' + h + '</div></div></div>'
       + '<div class="card"><div class="card-header">Cómo cobran</div><div class="table-responsive"><table class="table"><thead><tr><th>Forma de pago</th><th class="text-end">Cobrado</th></tr></thead><tbody>'
       + Object.keys(porMet).map(function (k) { return '<tr><td>' + esc(k) + '</td><td class="text-end tu-mono">' + dinero(porMet[k]) + '</td></tr>'; }).join('') + '</tbody></table></div></div>';
@@ -917,37 +1257,79 @@ foreach ([
   /* ═══ PINTAR ═══ */
   var pendientes = [];
   function cumplirLuego(k) { pendientes.push(k); }
+  /* La entrada en cascada corre solo si cambió la pantalla (o la venta
+     abierta, o el paso de la caja). Si es la misma, se vuelve a pintar
+     quieta y solo se anima lo que cambió. */
   function pintarPantalla() {
     var c = $('[data-pantalla]', raiz()); if (!c) return;
     var p = P.s.pantalla; if (!PANT[p]) p = P.s.pantalla = 'panel';
+    var clave = p + '|' + (p === 'ventas' ? (P.s.venta || '') : '') + '|' + (p === 'caja' ? P.caja.fase : '');
+    var entra = MOV && clave !== P.clave, main = c.parentNode;
+    P.clave = clave;
+    main.classList.toggle('tu-entra', entra);
+    main.classList.toggle('tu-reordena', MOV && !entra && !!P.reordena);
     c.innerHTML = PANT[p]();
+    P.reordena = false; P.lineaNueva = null; P.filaNueva = null; P.segPop = null; P.ultimoPago = null; P.ligaNueva = false;
     if (p === 'caja') refrescarCaja();
+    animarCifras(c, entra);
     while (pendientes.length) cumplir(pendientes.shift());
   }
+  function animarCifras(c, entra) {
+    var vistos = P.cifras || (P.cifras = {});
+    $$('[data-n]', c).forEach(function (el) {
+      var k = P.clave + '|' + el.dataset.k, n = +el.dataset.n, din = el.hasAttribute('data-dinero');
+      var desde = entra ? 0 : (k in vistos ? vistos[k] : n);
+      if (desde !== n) { contar(el, desde, n, entra ? 800 : 450, din); if (!entra) reanimar(el, 'tu-salta'); }
+      vistos[k] = n;
+    });
+  }
+  function popDe(a, v) { return P.segPop === a + ':' + v ? ' pop' : ''; }
   function pintarTodo() { pintarNav(); pintarPantalla(); pintarGuia(); }
 
   /* ═══ ARRANQUE ═══ */
   P.iniciar = function () {
     if (!raiz()) return;
     P.s = cargar(); P.caja = nuevaCaja(); P.liga = null; P.msjAb = ''; P.msjLiga = ''; P.cancelando = null; P.ultimoPago = null;
+    /* Página recién abierta: todo entra de nuevo. */
+    P.vista = null; P.clave = null; P.totalVisto = null; P.guiaLeccion = null; P.guiaPct = null; P.guiaPend = false;
     aplicarHash();
   };
+  /* Un botón que no se vuelve a pintar (los de la barra, el de ingreso)
+     regresa a su estado normal. */
+  function soltar(b, texto) {
+    if (!b) return;
+    b.removeAttribute('aria-busy'); b.disabled = false; b.textContent = texto;
+  }
 
   if (!P.listo) {
     P.listo = true;
     window.addEventListener('hashchange', function () { if (raiz()) aplicarHash(); });
+    window.addEventListener('resize', function () {
+      var nav = raiz() && $('[data-nav]', raiz());
+      if (nav) moverMarca(nav, true);
+    });
 
     document.addEventListener('submit', function (ev) {
       var f = ev.target.closest('.tu form[data-form]'); if (!f || !P.s) return;
       ev.preventDefault();
       var tipo = f.dataset.form, m = $('[data-msj]', f);
-      if (tipo === 'entrar') { irLeccion(P.s.leccion || 1); return; }
+      if (tipo === 'entrar') {
+        var bt = $('.tu-login-boton', f);
+        ocupado(bt, 'Entrando…', 650, function () {
+          despedir(f, function () {
+            soltar(bt, 'Entrar al entorno');
+            irLeccion(P.s.leccion || 1);
+          }, 340);
+        });
+        return;
+      }
       if (tipo === 'producto') {
         var n = f.n.value.trim(), p = num(f.p.value), c = num(f.c.value);
         if (!n) { m.textContent = 'Escribe el nombre.'; m.className = 'tu-msj mal'; return; }
         if (f.p.value === '') { m.textContent = 'Escribe el precio (0 si es precio libre).'; m.className = 'tu-msj mal'; return; }
         if (p > 0 && c > p) { m.textContent = 'El costo no puede ser mayor que el precio.'; m.className = 'tu-msj mal'; return; }
         P.s.productos.push({ n: n.slice(0, 40), p: p, c: c });
+        P.filaNueva = 'p' + (P.s.productos.length - 1);
         if (p === 0) P.s.hechos['prod-libre'] = true; else if (c > 0) P.s.hechos['prod-costo'] = true;
         guardar(); pintarTodo();
         var m2 = $('[data-form="producto"] [data-msj]', raiz());
@@ -958,6 +1340,7 @@ foreach ([
         var con = f.con.value.trim(), monto = num(f.m.value);
         if (!con || monto <= 0) { m.textContent = 'Escribe el concepto y el monto.'; m.className = 'tu-msj mal'; return; }
         P.s.gastos.push({ con: con.slice(0, 50), cat: f.cat.value, m: monto });
+        P.filaNueva = 'g' + (P.s.gastos.length - 1);
         P.s.hechos.gasto = true; guardar(); pintarTodo();
         var m3 = $('[data-form="gasto"] [data-msj]', raiz());
         if (m3) { m3.textContent = 'Gasto registrado. Ya se descuenta en Reportes.'; m3.className = 'tu-msj bien'; }
@@ -991,19 +1374,24 @@ foreach ([
     });
 
     document.addEventListener('click', function (ev) {
-      var b = ev.target.closest('.tu [data-a]'); if (!b || !P.s) return;
+      var b = ev.target.closest('.tu [data-a]'); if (!b || !P.s || b.disabled) return;
       var a = b.dataset.a, v = b.dataset.v, c = P.caja, s = P.s, venta;
       switch (a) {
         case 'ir-entrada': location.hash = 'entrar'; break;
+        case 'empezar': s.leccion = +v; guardar(); location.hash = 'entrar'; break;
         case 'ir-portada': location.hash = 'inicio'; break;
         case 'salir': s.entro = false; guardar(); location.hash = 'inicio'; break;
         case 'reiniciar':
-          var l = s.leccion; P.s = semilla(); P.s.entro = true; P.s.leccion = l; P.caja = nuevaCaja(); P.liga = null; P.msjAb = ''; P.msjLiga = '';
-          guardar(); pintarTodo(); break;
+          ocupado(b, 'Reiniciando…', 450, function () {
+            var l = P.s.leccion; P.s = semilla(); P.s.entro = true; P.s.leccion = l; P.caja = nuevaCaja(); P.liga = null; P.msjAb = ''; P.msjLiga = '';
+            P.clave = null; P.totalVisto = null;
+            guardar(); soltar(b, 'Reiniciar datos'); pintarTodo();
+          });
+          break;
         case 'leccion': irLeccion(+v); break;
         case 'pantalla':
           s.pantalla = v; if (v === 'ventas') s.venta = null;
-          if (v === 'caja' && c.fase === 'recibo') P.caja = nuevaCaja();
+          if (v === 'caja' && c.fase === 'recibo') { P.caja = nuevaCaja(); P.totalVisto = 0; }
           P.cancelando = null; P.msjAb = ''; P.msjLiga = '';
           if (v === 'ventas' && s.filtro === 'saldo') P.s.hechos['ir-ventas'] = true;
           if (v !== 'ventas') P.s.hechos['ir-' + v] = true;
@@ -1011,14 +1399,17 @@ foreach ([
 
         /* Caja */
         case 'agregar':
-          var pr = s.productos[+v], ya = null;
-          c.lineas.forEach(function (x) { if (x.i === +v) ya = x; });
-          if (ya) ya.cant++; else c.lineas.push({ i: +v, n: pr.n, p: pr.p, cant: 1, libre: !(pr.p > 0) });
+          var pr = s.productos[+v], ya = -1;
+          c.lineas.forEach(function (x, i) { if (x.i === +v) ya = i; });
+          if (ya > -1) c.lineas[ya].cant++; else c.lineas.push({ i: +v, n: pr.n, p: pr.p, cant: 1, libre: !(pr.p > 0) });
+          P.lineaNueva = ya > -1 ? ya : c.lineas.length - 1;
           pintarPantalla(); if (c.lineas.length >= 2) cumplir('caja-dos'); break;
-        case 'mas': c.lineas[+v].cant++; pintarPantalla(); break;
-        case 'menos': if (c.lineas[+v].cant > 1) c.lineas[+v].cant--; else c.lineas.splice(+v, 1); pintarPantalla(); break;
-        case 'quitar': c.lineas.splice(+v, 1); pintarPantalla(); break;
-        case 'metodo': c.metodo = v; if (v !== 'efectivo') c.parte = false; pintarPantalla(); break;
+        case 'mas': c.lineas[+v].cant++; P.lineaNueva = +v; pintarPantalla(); break;
+        case 'menos':
+          if (c.lineas[+v].cant > 1) { c.lineas[+v].cant--; pintarPantalla(); break; }
+          despedir(b.closest('.tu-linea'), function () { c.lineas.splice(+v, 1); pintarPantalla(); }); break;
+        case 'quitar': despedir(b.closest('.tu-linea'), function () { c.lineas.splice(+v, 1); pintarPantalla(); }); break;
+        case 'metodo': c.metodo = v; if (v !== 'efectivo') c.parte = false; P.segPop = 'metodo:' + v; pintarPantalla(); break;
         case 'parte': c.parte = true; c.deja = ''; pintarPantalla(); var dj = $('[data-in="deja"]', raiz()); if (dj) dj.focus(); break;
         case 'deja':
           var t = cuentasCaja().total; c.deja = String(v === '50' ? Math.round(t / 2) : t); pintarPantalla();
@@ -1026,39 +1417,46 @@ foreach ([
         case 'cobrar': c.fase = 'revisa'; pintarPantalla(); break;
         case 'volver-ticket': c.fase = 'armar'; pintarPantalla(); break;
         case 'confirmar':
-          var k = cuentasCaja(), paga = num(c.paga), f = folioAhora(), met = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', spei: 'Transferencia' }[c.metodo];
-          var cambio = (c.metodo === 'efectivo' && c.paga !== '' && paga > k.hoy && k.hoy > 0) ? r2(paga - k.hoy) : 0;
-          s.ventas.push({ f: f, cli: c.cliente.trim() || 'Público general', tot: k.total,
-                          pagos: k.hoy > 0 ? [{ n: 1, m: k.hoy, met: met, hace: 0 }] : [] });
-          c.recibo = { f: f, cli: c.cliente.trim() || 'Público general', lineas: c.lineas.map(function (x) { return { n: x.n, p: num(x.p), cant: x.cant }; }),
-                       total: k.total, hoy: k.hoy, saldo: k.saldo, cambio: cambio };
-          c.fase = 'recibo';
-          if (c.cliente.trim().length >= 2) s.hechos['caja-cliente'] = true;
-          if (cambio > 0) s.hechos['caja-cambio'] = true;
-          if (k.saldo > 0) s.hechos['caja-saldo'] = true;
-          guardar(); pintarTodo(); break;
-        case 'siguiente-venta': P.caja = nuevaCaja(); pintarPantalla(); break;
+          ocupado(b, 'Registrando…', 550, function () {
+            var k = cuentasCaja(), paga = num(c.paga), f = folioAhora(), met = { efectivo: 'Efectivo', tarjeta: 'Tarjeta', spei: 'Transferencia' }[c.metodo];
+            var cambio = (c.metodo === 'efectivo' && c.paga !== '' && paga > k.hoy && k.hoy > 0) ? r2(paga - k.hoy) : 0;
+            s.ventas.push({ f: f, cli: c.cliente.trim() || 'Público general', tot: k.total,
+                            pagos: k.hoy > 0 ? [{ n: 1, m: k.hoy, met: met, hace: 0 }] : [] });
+            c.recibo = { f: f, cli: c.cliente.trim() || 'Público general', lineas: c.lineas.map(function (x) { return { n: x.n, p: num(x.p), cant: x.cant }; }),
+                         total: k.total, hoy: k.hoy, saldo: k.saldo, cambio: cambio };
+            c.fase = 'recibo';
+            if (c.cliente.trim().length >= 2) s.hechos['caja-cliente'] = true;
+            if (cambio > 0) s.hechos['caja-cambio'] = true;
+            if (k.saldo > 0) s.hechos['caja-saldo'] = true;
+            guardar(); pintarTodo();
+          });
+          break;
+        case 'siguiente-venta': P.caja = nuevaCaja(); P.totalVisto = 0; pintarPantalla(); break;
 
         /* Ventas */
-        case 'filtro': s.filtro = v; if (v === 'saldo') s.hechos['ir-ventas'] = true; guardar(); pintarPantalla(); pintarGuia(); break;
+        case 'filtro': s.filtro = v; if (v === 'saldo') s.hechos['ir-ventas'] = true; P.segPop = 'filtro:' + v; P.reordena = true; guardar(); pintarPantalla(); pintarGuia(); break;
         case 'abrir-venta':
           s.venta = v; s.pantalla = 'ventas'; P.cancelando = null; P.msjAb = ''; P.msjLiga = ''; P.ultimoPago = null;
           venta = ventaDe(v);
           if (venta && saldo(venta) > 0) s.hechos['venta-abrir'] = true;
           if (b.dataset.desde === 'cobranza' && masViejo() && masViejo().f === v) s.hechos['cob-abrir'] = true;
-          guardar(); pintarTodo(); window.scrollTo({ top: Math.max(0, raiz().getBoundingClientRect().top + window.scrollY - 12), behavior: 'smooth' }); break;
+          guardar(); pintarTodo();
+          if (raiz().getBoundingClientRect().top < 0) window.scrollTo({ top: Math.max(0, raiz().getBoundingClientRect().top + window.scrollY - 12), behavior: MOV ? 'smooth' : 'auto' });
+          break;
         case 'volver-ventas': s.venta = null; P.msjAb = ''; P.msjLiga = ''; guardar(); pintarPantalla(); break;
         case 'registrar':
           venta = ventaDe(s.venta); if (!venta) break;
-          var monto = num($('[data-in="abono"]', raiz()).value), sal = saldo(venta);
-          if (monto <= 0) { P.msjAb = ''; $('[data-msj-ab]', raiz()).textContent = 'Escribe cuánto abona.'; $('[data-msj-ab]', raiz()).className = 'tu-msj mal'; break; }
-          if (monto > sal) { var ma = $('[data-msj-ab]', raiz()); ma.textContent = 'El abono (' + dinero(monto) + ') supera el saldo (' + dinero(sal) + ').'; ma.className = 'tu-msj mal'; break; }
-          var nn = sigN(venta);
-          venta.pagos.push({ n: nn, m: monto, met: $('[data-in="metab"]', raiz()).value, hace: 0 });
-          P.ultimoPago = venta.f + '-' + nn;
-          P.msjAb = 'Abono registrado con el subfolio -' + dos(nn) + '. ' + (sal - monto > 0 ? 'Queda un saldo de ' + dinero(sal - monto) + '.' : 'La venta queda liquidada.');
-          s.hechos.abono = true; guardar(); pintarTodo();
-          var mab = $('[data-msj-ab]', raiz()); if (mab) mab.className = 'tu-msj bien';
+          var monto = num($('[data-in="abono"]', raiz()).value), sal = saldo(venta), metAb = $('[data-in="metab"]', raiz()).value, ma = $('[data-msj-ab]', raiz());
+          if (monto <= 0) { P.msjAb = ''; ma.textContent = 'Escribe cuánto abona.'; ma.className = 'tu-msj mal'; break; }
+          if (monto > sal) { ma.textContent = 'El abono (' + dinero(monto) + ') supera el saldo (' + dinero(sal) + ').'; ma.className = 'tu-msj mal'; break; }
+          ocupado(b, 'Registrando…', 450, function () {
+            var nn = sigN(venta);
+            venta.pagos.push({ n: nn, m: monto, met: metAb, hace: 0 });
+            P.ultimoPago = venta.f + '-' + nn;
+            P.msjAb = 'Abono registrado con el subfolio -' + dos(nn) + '. ' + (sal - monto > 0 ? 'Queda un saldo de ' + dinero(sal - monto) + '.' : 'La venta queda liquidada.');
+            s.hechos.abono = true; guardar(); pintarTodo();
+            var mab = $('[data-msj-ab]', raiz()); if (mab) mab.className = 'tu-msj bien';
+          });
           break;
         case 'cancelar': P.cancelando = +v; pintarPantalla(); break;
         case 'cancelar-no': P.cancelando = null; pintarPantalla(); break;
@@ -1067,30 +1465,39 @@ foreach ([
           venta.pagos[+v].cancel = true; P.cancelando = null;
           P.msjAb = 'Pago -' + dos(venta.pagos[+v].n) + ' cancelado. El siguiente abono tendrá un número nuevo.';
           guardar(); pintarTodo(); break;
-        case 'liga-met': P.liga = { met: v }; P.msjLiga = ''; pintarPantalla(); break;
+        case 'liga-met': P.liga = { met: v }; P.msjLiga = ''; P.segPop = 'liga-met:' + v; pintarPantalla(); break;
         case 'liga-generar':
           venta = ventaDe(s.venta); if (!venta) break;
-          P.liga = { met: (P.liga && P.liga.met) || 'spei', generada: true, f: venta.f, monto: saldo(venta) };
-          P.msjLiga = 'Esperando el pago…';
-          if (P.liga.met === 'spei') s.hechos['liga-generar'] = true;
-          guardar(); pintarTodo(); break;
+          ocupado(b, 'Generando…', 750, function () {
+            P.liga = { met: (P.liga && P.liga.met) || 'spei', generada: true, f: venta.f, monto: saldo(venta) };
+            P.msjLiga = 'Esperando el pago…'; P.ligaNueva = true;
+            if (P.liga.met === 'spei') s.hechos['liga-generar'] = true;
+            guardar(); pintarTodo();
+          });
+          break;
         case 'liga-pagar':
           venta = ventaDe(s.venta); if (!venta || !P.liga) break;
           var L = P.liga, pago = L.met === 'spei' ? num(($('[data-in="transfiere"]', raiz()) || {}).value) : L.monto, sv = saldo(venta);
-          if (pago > sv) { P.msjLiga = 'Rechazado: la transferencia es mayor que el saldo. El banco le regresa su dinero al cliente.'; pintarPantalla(); $('[data-msj-liga]', raiz()).className = 'tu-msj mal'; break; }
           if (pago <= 0) break;
-          var n3 = sigN(venta), metL = { spei: 'SPEI', tarjeta: 'Tarjeta', tienda: 'Tienda' }[L.met];
-          venta.pagos.push({ n: n3, m: pago, met: metL, hace: 0 });
-          P.ultimoPago = venta.f + '-' + n3; P.liga = { met: L.met };
-          P.msjLiga = 'Pago recibido. El abono quedó aplicado con el subfolio -' + dos(n3) + (sv - pago > 0 ? '. Queda un saldo de ' + dinero(sv - pago) + '.' : '.');
-          if (L.met === 'spei') s.hechos['liga-pago'] = true;
-          guardar(); pintarTodo();
-          var ml = $('[data-msj-liga]', raiz()); if (ml) ml.className = 'tu-msj bien';
-          if (!ml && P.msjAb === '') { P.msjAb = P.msjLiga; pintarPantalla(); }
+          ocupado(b, L.met === 'spei' ? 'Esperando al banco…' : 'Procesando el pago…', 1100, function () {
+            if (pago > sv) {
+              P.msjLiga = 'Rechazado: la transferencia es mayor que el saldo. El banco le regresa su dinero al cliente.';
+              pintarPantalla(); var mr = $('[data-msj-liga]', raiz()); if (mr) mr.className = 'tu-msj mal';
+              return;
+            }
+            var n3 = sigN(venta), metL = { spei: 'SPEI', tarjeta: 'Tarjeta', tienda: 'Tienda' }[L.met];
+            venta.pagos.push({ n: n3, m: pago, met: metL, hace: 0 });
+            P.ultimoPago = venta.f + '-' + n3; P.liga = { met: L.met };
+            P.msjLiga = 'Pago recibido. El abono quedó aplicado con el subfolio -' + dos(n3) + (sv - pago > 0 ? '. Queda un saldo de ' + dinero(sv - pago) + '.' : '.');
+            if (sv - pago <= 0) P.msjAb = P.msjLiga;
+            if (L.met === 'spei') s.hechos['liga-pago'] = true;
+            guardar(); pintarTodo();
+            var ml = $('[data-msj-liga]', raiz()); if (ml) ml.className = 'tu-msj bien';
+          });
           break;
 
         /* Cobranza */
-        case 'orden': s.orden = v; if (v === 'viejo') s.hechos['cob-viejo'] = true; guardar(); pintarPantalla(); pintarGuia(); break;
+        case 'orden': s.orden = v; if (v === 'viejo') s.hechos['cob-viejo'] = true; P.segPop = 'orden:' + v; P.reordena = true; guardar(); pintarPantalla(); pintarGuia(); break;
 
         /* Corte */
         case 'cerrar':
@@ -1098,13 +1505,19 @@ foreach ([
           if (hay.value === '') { mc.textContent = 'Escribe cuánto hay realmente en el cajón.'; mc.className = 'tu-msj mal'; break; }
           var dif = r2(num(hay.value) - (s.corte.fondo + cobrosHoy(['Efectivo'])));
           if (dif !== 0 && !nota.value.trim()) { mc.textContent = 'Hay una diferencia: escribe en la nota a qué se debe.'; mc.className = 'tu-msj mal'; nota.focus(); break; }
-          s.corte.cerrado = { dif: dif, nota: nota.value.trim() }; s.hechos['corte-cerrar'] = true; guardar(); pintarTodo(); break;
+          var textoNota = nota.value.trim();
+          ocupado(b, 'Cerrando…', 500, function () {
+            s.corte.cerrado = { dif: dif, nota: textoNota }; s.hechos['corte-cerrar'] = true; guardar(); pintarTodo();
+          });
+          break;
         case 'reabrir': s.corte.cerrado = null; guardar(); pintarPantalla(); break;
 
-        /* Ajustes */
+        /* Ajustes: el interruptor se desliza en su lugar; no se vuelve a
+           pintar la pantalla, solo el menú, que recibe la sección nueva. */
         case 'mod':
           s.mods[v] = !s.mods[v]; if (s.mods[v]) s.hechos['mod-on'] = true;
-          guardar(); pintarNav(s.mods[v] ? v : null); pintarPantalla(); pintarGuia(); break;
+          b.setAttribute('aria-pressed', String(!!s.mods[v]));
+          guardar(); pintarNav(s.mods[v] ? v : null); pintarGuia(); break;
       }
     });
   }
