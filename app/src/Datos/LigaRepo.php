@@ -225,6 +225,19 @@ final class LigaRepo extends Repo
         return $this->uno("SELECT * FROM lf_ligas_pago WHERE id = ?", [(int)$id]);
     }
 
+    /**
+     * Los cobros en línea abiertos de una venta: los que el cliente todavía
+     * puede pagar o que esperan aprobación. Los pagados ya son un abono en
+     * la propia venta; listarlos aquí sería contarlos dos veces.
+     */
+    public function deVenta($ventaId, $tope = 5)
+    {
+        $this->asegurar();
+        return $this->todos("SELECT * FROM lf_ligas_pago
+            WHERE venta_id = ? AND estado IN (pendiente,por_aprobar)
+            ORDER BY creado_en DESC LIMIT " . (int)$tope, [(int)$ventaId]);
+    }
+
     public function porReferencia($ref)
     {
         $this->asegurar();
