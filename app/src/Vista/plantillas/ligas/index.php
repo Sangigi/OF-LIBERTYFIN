@@ -108,9 +108,9 @@ $qs = function ($x = []) use ($estado, $q) {
       <label class="form-label">Concepto</label>
       <input class="form-control" name="descripcion" maxlength="40"
              placeholder="Lo que verá el cliente">
-      <small style="font-size:11px;color:var(--lf-tinta-4);display:block;margin-top:5px">
+      <!-- <small style="font-size:11px;color:var(--lf-tinta-4);display:block;margin-top:5px">
         Máximo 40 caracteres: es lo que cabe en el recibo del banco.
-      </small>
+      </small> -->
     </div>
 
     <div style="width:210px">
