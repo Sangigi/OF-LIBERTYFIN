@@ -233,11 +233,7 @@ final class LigasControlador
     private function a($texto, $tipo)
     {
         $_SESSION['lf_aviso'] = ['texto' => $texto, 'tipo' => $tipo];
-        // Quien pidió el cobro desde el detalle de una venta regresa a esa
-        // venta, no a la lista de ligas. Solo se acepta una ruta de venta
-        // propia: nada de redirigir a donde diga el formulario.
-        $vuelta = (string)($_POST['volver'] ?? '');
-        header('Location: ' . (preg_match('#^/ventas/\d+$#', $vuelta) ? $vuelta : '/ligas')); exit;
+        header('Location: /ligas'); exit;
     }
 
     /**

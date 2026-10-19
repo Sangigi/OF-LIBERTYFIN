@@ -110,27 +110,8 @@ final class VentasControlador
             // Con «Seguimiento de trabajos» encendido: en qué va el trabajo.
             'trabajo'    => $venta['estado'] !== 'cancelada' ? $this->trabajo($db, $id) : null,
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
-        ] + $this->cobroEnLinea($db, $id, $venta));
+        ]);
         unset($_SESSION['lf_aviso']);
-    }
-
-    /**
-     * Lo que necesita la tarjeta «Cobrar en línea» del detalle: si hay
-     * proveedor configurado, si esta persona puede cobrar y los cobros
-     * abiertos de la venta. Sin credenciales o sin saldo, la tarjeta no sale.
-     */
-    private function cobroEnLinea($db, $id, array $venta)
-    {
-        $vacio = ['enLinea' => false, 'ligasVenta' => [], 'enLineaPruebas' => false];
-        if ($venta['estado'] === 'cancelada' || (float)$venta['saldo'] <= 0.01) return $vacio;
-        if (!\LibertyFin\Dominio\Permisos::puede('cobrar')) return $vacio;
-        $cfg = \LibertyFin\Servicio\Integraciones::de('spei');
-        if (!$cfg || !(new \LibertyFin\Servicio\LigaPago($cfg))->listo()) return $vacio;
-        return [
-            'enLinea'        => true,
-            'ligasVenta'     => (new \LibertyFin\Datos\LigaRepo($db))->deVenta($id),
-            'enLineaPruebas' => !empty($cfg['sandbox']),
-        ];
     }
 
     /** El seguimiento de la venta y el equipo, o null con el módulo apagado. */
