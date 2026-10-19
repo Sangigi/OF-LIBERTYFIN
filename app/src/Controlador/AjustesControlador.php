@@ -27,7 +27,8 @@ final class AjustesControlador
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
         'categorias'   => 'Categorías',
-        'integraciones'=> 'Integraciones',
+        // 'integraciones' => 'Integraciones',  // oculta a propósito; la vista se conserva
+        // y vuelve con solo quitar el comentario.
     ];
 
     public function index($pestana = null)

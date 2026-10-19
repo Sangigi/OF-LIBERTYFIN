@@ -1090,7 +1090,7 @@ foreach ([
 
   /* Ventas */
   PANT.ventas = function () {
-    if (P.s.venta && ventaDe(P.s.venta)) return detalleVenta(ventaDe(P.s.venta));
+    if (P.s.venta && !P.s.desde && ventaDe(P.s.venta)) return detalleVenta(ventaDe(P.s.venta));
     cabecera('Ventas', 'Lo vendido y lo cobrado');
     var f = P.s.filtro, lista = P.s.ventas.slice().sort(function (a, b) { return a.f < b.f ? 1 : -1; }).filter(function (v) {
       return f === 'todas' || (f === 'saldo' ? saldo(v) > 0 : saldo(v) <= 0);
@@ -1137,7 +1137,7 @@ foreach ([
       }
       liga += '<p class="tu-msj" data-msj-liga>' + (P.msjLiga || '') + '</p></div></div>';
     }
-    return '<button type="button" class="btn btn-secondary btn-sm" data-a="volver-ventas" style="margin-bottom:12px">' + ico('atras', 14) + 'Volver al listado</button>'
+    return '<button type="button" class="btn btn-secondary btn-sm" data-a="volver-ventas" style="margin-bottom:12px">' + ico('atras', 14) + (P.s.desde === 'cobranza' ? 'Volver a Cobranza' : 'Volver al listado') + '</button>'
       + '<div class="tu-cifras">' + stat(r2(v.tot), 'Total') + stat(r2(cobrado(v)), 'Cobrado') + stat(s > 0 ? s : 'Liquidada', 'Saldo') + '</div>'
       + '<div class="card" style="margin-bottom:14px"><div class="card-header">Pagos de esta venta<span class="tu-sub-caja">' + v.pagos.length + (v.pagos.length === 1 ? ' pago' : ' pagos') + '</span></div><div class="card-body" style="padding-top:2px;padding-bottom:2px">' + (pagos || '<div class="tu-vacio" style="margin:10px 0">Sin pagos todavía.</div>') + '</div></div>'
       + '<div class="tu-dos"><div class="tu-pila">'
@@ -1160,6 +1160,8 @@ foreach ([
   }
 
   PANT.cobranza = function () {
+    /* La venta abierta desde Cobranza se ve DENTRO de Cobranza: el menú sigue ahí. */
+    if (P.s.venta && P.s.desde === 'cobranza' && ventaDe(P.s.venta)) return detalleVenta(ventaDe(P.s.venta));
     cabecera('Cobranza', 'A quién hay que cobrarle hoy');
     var con = P.s.ventas.filter(function (v) { return saldo(v) > 0; }), o = P.s.orden;
     var tramo = function (d) { return d <= 30 ? 0 : d <= 60 ? 1 : 2; }, sumas = [0, 0, 0], total = 0;
@@ -1263,7 +1265,7 @@ foreach ([
   function pintarPantalla() {
     var c = $('[data-pantalla]', raiz()); if (!c) return;
     var p = P.s.pantalla; if (!PANT[p]) p = P.s.pantalla = 'panel';
-    var clave = p + '|' + (p === 'ventas' ? (P.s.venta || '') : '') + '|' + (p === 'caja' ? P.caja.fase : '');
+    var clave = p + '|' + ((p === 'ventas' || p === 'cobranza') ? (P.s.venta || '') : '') + '|' + (p === 'caja' ? P.caja.fase : '');
     var entra = MOV && clave !== P.clave, main = c.parentNode;
     P.clave = clave;
     main.classList.toggle('tu-entra', entra);
@@ -1390,7 +1392,7 @@ foreach ([
           break;
         case 'leccion': irLeccion(+v); break;
         case 'pantalla':
-          s.pantalla = v; if (v === 'ventas') s.venta = null;
+          s.pantalla = v; s.venta = null; s.desde = null;
           if (v === 'caja' && c.fase === 'recibo') { P.caja = nuevaCaja(); P.totalVisto = 0; }
           P.cancelando = null; P.msjAb = ''; P.msjLiga = '';
           if (v === 'ventas' && s.filtro === 'saldo') P.s.hechos['ir-ventas'] = true;
@@ -1436,14 +1438,14 @@ foreach ([
         /* Ventas */
         case 'filtro': s.filtro = v; if (v === 'saldo') s.hechos['ir-ventas'] = true; P.segPop = 'filtro:' + v; P.reordena = true; guardar(); pintarPantalla(); pintarGuia(); break;
         case 'abrir-venta':
-          s.venta = v; s.pantalla = 'ventas'; P.cancelando = null; P.msjAb = ''; P.msjLiga = ''; P.ultimoPago = null;
+          s.desde = b.dataset.desde || null; s.venta = v; s.pantalla = s.desde || 'ventas'; P.cancelando = null; P.msjAb = ''; P.msjLiga = ''; P.ultimoPago = null;
           venta = ventaDe(v);
           if (venta && saldo(venta) > 0) s.hechos['venta-abrir'] = true;
           if (b.dataset.desde === 'cobranza' && masViejo() && masViejo().f === v) s.hechos['cob-abrir'] = true;
           guardar(); pintarTodo();
           if (raiz().getBoundingClientRect().top < 0) window.scrollTo({ top: Math.max(0, raiz().getBoundingClientRect().top + window.scrollY - 12), behavior: MOV ? 'smooth' : 'auto' });
           break;
-        case 'volver-ventas': s.venta = null; P.msjAb = ''; P.msjLiga = ''; guardar(); pintarPantalla(); break;
+        case 'volver-ventas': s.venta = null; s.desde = null; P.msjAb = ''; P.msjLiga = ''; guardar(); pintarPantalla(); break;
         case 'registrar':
           venta = ventaDe(s.venta); if (!venta) break;
           var monto = num($('[data-in="abono"]', raiz()).value), sal = saldo(venta), metAb = $('[data-in="metab"]', raiz()).value, ma = $('[data-msj-ab]', raiz());

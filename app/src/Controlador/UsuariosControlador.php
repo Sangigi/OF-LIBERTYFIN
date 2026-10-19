@@ -127,7 +127,7 @@ final class UsuariosControlador
         'perfil'    => 'Mi perfil',
         'plan'      => 'Plan',
         'fiscales'  => 'Datos fiscales',
-        'comercio'  => 'Cobrar con tarjeta',
+        'comercio'  => 'Formulario de alta',
         'documentos'=> 'Documentos',
     ];
 
