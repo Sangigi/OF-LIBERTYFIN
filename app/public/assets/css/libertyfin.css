@@ -5136,3 +5136,21 @@ button.lf-pill{font-family:inherit;cursor:pointer}
    clic en su botón, que es lo que leen los manejadores con e.target. */
 .lf-signo{color:var(--lf-rojo)!important}
 span.lf-signo{pointer-events:none}
+
+/* Rótulos de la gráfica de cobranza por mes (Ventas). Una columna por
+   barra, todas del mismo ancho que la suya: con flex, cada rótulo medía
+   lo que su texto, la fila se salía de la tarjeta en el celular y la
+   página entera quedaba más ancha que la pantalla. */
+.lf-meses-rot{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:16px;
+  padding-top:10px;text-align:center}
+.lf-meses-rot > div{min-width:0}
+.lf-meses-rot b{display:block;font-size:12px}
+.lf-meses-rot span{display:block;font-size:11px;color:var(--lf-tinta-4);white-space:nowrap;overflow:hidden}
+@media(max-width:560px){.lf-meses-rot span{font-size:10px;letter-spacing:-.2px}}
+
+/* En el celular nada puede hacer la página más ancha que la pantalla.
+   Cuando algo se salía (los rótulos de arriba, p. ej.) se podía arrastrar
+   la página de lado, y en esos arrastres la barra de abajo se escondía y
+   no volvía. clip, no hidden: hidden convierte .lf-main en contenedor de
+   desplazamiento y los encabezados pegajosos (sticky) dejan de pegarse. */
+@media(max-width:940px){.lf-main{overflow-x:clip}}

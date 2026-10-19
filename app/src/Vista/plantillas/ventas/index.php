@@ -133,12 +133,17 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros, $soloPeriodo) 
       <div class="card-body">
         <?php W::barras(array_map(function($m){
             return ['cobrado'=>$m['cobrado']]; }, $meses)); ?>
-        <div style="display:flex;gap:16px;padding-top:10px">
+        <?php /* Una columna por barra, del mismo ancho que ella. El monto va
+                 en micro ($181k): completo ($181,098) no cabía en el
+                 celular, se salía de la tarjeta y ensanchaba la página.
+                 El importe exacto queda en el title. El mes, en español:
+                 date('M') lo da en inglés. */
+        $nombreMes = ['', 'Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']; ?>
+        <div class="lf-meses-rot">
           <?php foreach ($meses as $m): ?>
-            <div style="flex:1;text-align:center">
-              <b style="display:block;font-size:12px"><?= P::e(date('M', strtotime($m['mes'].'-01'))) ?></b>
-              <span class="lf-mono" style="font-size:11px;color:var(--lf-tinta-4)">
-                <?= D::corto($m['cobrado']) ?></span>
+            <div title="<?= P::e(D::pesos($m['cobrado'])) ?>">
+              <b><?= $nombreMes[(int)substr($m['mes'], 5, 2)] ?? '' ?></b>
+              <span class="lf-mono"><?= D::micro($m['cobrado']) ?></span>
             </div>
           <?php endforeach; ?>
         </div>
