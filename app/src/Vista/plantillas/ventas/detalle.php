@@ -136,7 +136,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
         <?php $vivos = count(array_filter($pagos, function($p){ return !$p['cancelado']; })); ?>
         <span class="badge bg-secondary"><?= $vivos ?> pago<?= $vivos == 1 ? '' : 's' ?></span>
       </header>
-      <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+      <div class="table-responsive lf-cards lf-rejilla" style="padding:0 12px 6px">
         <table class="table table-hover">
           <thead><tr>
             <th>Fecha</th><th>Tipo</th><th>Método</th>
@@ -263,7 +263,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
     <?php if ($comisiones): ?>
     <section class="card">
       <header class="card-header">Comisiones</header>
-      <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+      <div class="table-responsive lf-cards lf-rejilla" style="padding:0 12px 6px">
         <table class="table">
           <thead><tr>
             <th>Colaborador</th><th>Área</th><th class="text-end">%</th>
