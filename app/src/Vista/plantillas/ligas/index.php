@@ -93,9 +93,9 @@ $qs = function ($x = []) use ($estado, $q) {
             <?= (int)$v['dias'] > 0 ? ' · ' . (int)$v['dias'] . ' días' : '' ?></option>
         <?php endforeach; ?>
       </select>
-      <small style="font-size:11px;color:var(--lf-tinta-4);display:block;margin-top:5px">
+      <!-- <small style="font-size:11px;color:var(--lf-tinta-4);display:block;margin-top:5px">
         Si eliges una venta, el monto sale de su saldo y no se puede cambiar.
-      </small>
+      </small> -->
     </div>
 
     <div style="width:170px" id="campoMonto">
