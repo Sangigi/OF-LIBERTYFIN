@@ -190,7 +190,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
               <td style="text-align:right">
                 <?php if (!$canc && $esAdmin): ?>
                   <button type="button" class="lf-btn-ghost lf-cancelar" data-pago="<?= (int)$p['id'] ?>"
-                          data-monto="<?= P::e(D::pesos($p['monto'])) ?>" title="Cancelar pago"><span class="lf-signo">&times;</span></button>
+                          data-monto="<?= P::e(D::pesos($p['monto'])) ?>" title="Cancelar pago"><span class="lf-signo">&times;</span><span class="lf-txt-card">Cancelar pago</span></button>
                 <?php endif; ?>
               </td>
             </tr>
@@ -296,7 +296,7 @@ $ini = function ($n) { $p = preg_split('/\s+/', trim($n));
                   <button type="button" class="lf-btn-ghost lf-quitar-com"
                           data-com="<?= (int)$c['id'] ?>"
                           data-quien="<?= P::e($c['colaborador_nombre']) ?>"
-                          title="Quitar esta comisión"><span class="lf-signo">&times;</span></button>
+                          title="Quitar esta comisión"><span class="lf-signo">&times;</span><span class="lf-txt-card">Quitar comisión</span></button>
                 <?php endif; ?>
               </td>
             </tr>

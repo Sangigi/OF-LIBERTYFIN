@@ -87,6 +87,7 @@ $lfSoporte = \LibertyFin\Dominio\Permisos::puede('ver.tickets');
 $lfQuien = \LibertyFin\Controlador\PushControlador::quien(\LibertyFin\Servicio\SesionUnica::cuentaDeSesion());
 ?>
 <script src="/assets/js/lf-chat.js?v=<?= is_file($chatJs) ? filemtime($chatJs) : '1' ?>" defer></script>
+<script src="/assets/js/lf-tablas.js?v=<?= (int)@filemtime(__DIR__ . '/../../../public/assets/js/lf-tablas.js') ?>" defer></script>
 </head>
 <body data-lf-token="<?= P::e($_SESSION['lf_token']) ?>" data-lf-ayuda="<?= $lfAyuda ? '1' : '0' ?>"
       <?php /* De quién es esta sesión. La caja lo usa para que su ticket

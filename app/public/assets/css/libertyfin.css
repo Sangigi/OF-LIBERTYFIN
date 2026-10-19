@@ -5154,3 +5154,39 @@ span.lf-signo{pointer-events:none}
    no volvía. clip, no hidden: hidden convierte .lf-main en contenedor de
    desplazamiento y los encabezados pegajosos (sticky) dejan de pegarse. */
 @media(max-width:940px){.lf-main{overflow-x:clip}}
+
+/* TABLAS QUE SE DESPLAZAN: QUE SE NOTE.
+   Quien no conoce el sistema no sabe que hay que deslizar para ver el
+   resto (la x de cancelar, los montos del final). Dos avisos, sin JS:
+   una sombra en el borde donde aún hay contenido, que desaparece al
+   llegar al final, y una línea de ayuda debajo (solo en pantallas donde
+   la tabla no pasó a tarjetas). */
+.table-responsive{
+  background:
+    linear-gradient(to right,var(--lf-sup) 30%,transparent) left center/40px 100% no-repeat local,
+    linear-gradient(to left,var(--lf-sup) 30%,transparent) right center/40px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%,rgba(27,36,32,.22),transparent) left center/14px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%,rgba(27,36,32,.22),transparent) right center/14px 100% no-repeat scroll}
+.lf-txt-card{display:none}
+.lf-desliza{display:none;align-items:center;gap:6px;justify-content:center;padding:6px 12px 10px;
+  font-size:11.5px;color:var(--lf-tinta-3)}
+@media(min-width:761px){.table-responsive.lf-cards.lf-desborda + .lf-desliza{display:flex}}
+@media(max-width:760px){
+  /* Tarjetas desde 760 y no desde 576: entre 577 y 760 la tabla ni se
+     desplazaba ni se acomodaba, y se cortaba. */
+  .table-responsive.lf-cards{background:none}
+  .table-responsive.lf-cards > table,.table-responsive.lf-cards thead,.table-responsive.lf-cards tbody,
+  .table-responsive.lf-cards th,.table-responsive.lf-cards td,.table-responsive.lf-cards tr{display:block;width:100%}
+  .table-responsive.lf-cards thead{display:none}
+  .table-responsive.lf-cards tbody tr{border:1px solid var(--lf-linea);border-radius:var(--lf-r);
+    margin-bottom:10px;padding:10px 12px;background:var(--lf-sup)}
+  .table-responsive.lf-cards td{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    text-align:right;padding:8px 0!important;border:none;border-bottom:1px solid var(--lf-vidrio);white-space:normal!important}
+  .table-responsive.lf-cards tr td:last-child{border-bottom:none}
+  .table-responsive.lf-cards td[data-label]::before{content:attr(data-label);font-size:10.5px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.4px;color:var(--lf-tinta-3);text-align:left;flex-shrink:0}
+  /* El botón de la última celda dice lo que hace, no solo "x". */
+  .lf-txt-card{display:inline;font-size:12.5px;font-weight:600;margin-left:6px;color:var(--lf-tinta-2)}
+  .table-responsive.lf-cards td .lf-btn-ghost:has(.lf-txt-card){width:auto;padding:0 10px;display:inline-flex;align-items:center;
+    border:1px solid var(--lf-linea);border-radius:var(--lf-r-pill);height:32px}
+}
