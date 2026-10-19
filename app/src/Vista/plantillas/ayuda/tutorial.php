@@ -740,7 +740,7 @@ foreach ([
       pasos: [['ir-caja', 'Abre <b>Caja</b>', 'caja'],
               ['caja-dos', 'Agrega dos productos distintos al ticket'],
               ['caja-cliente', 'Escribe el nombre del cliente'],
-              ['caja-cambio', 'Cobra en efectivo indicando con cuánto paga, y confirma']],
+              ['caja-cambio', 'Cobra en efectivo: escribe con cuánto paga el cliente (aunque sea lo exacto) y confirma']],
       nota: 'En tu sistema, abre tu turno en Corte de caja antes de cobrar; si no, la venta no entra a tu corte.' },
     { t: 'Deja un saldo pendiente', r: 'Pagos parciales y saldo por cobrar.', min: 4, d: 'Si el cliente paga una parte, el resto queda como saldo en la misma venta y se cobra después en abonos.', real: 'caja',
       pasos: [['caja-parte', 'En Caja, agrega un producto, elige <b>Solo una parte</b> y escribe cuánto deja hoy', 'caja'],
@@ -1426,7 +1426,7 @@ foreach ([
                          total: k.total, hoy: k.hoy, saldo: k.saldo, cambio: cambio };
             c.fase = 'recibo';
             if (c.cliente.trim().length >= 2) s.hechos['caja-cliente'] = true;
-            if (cambio > 0) s.hechos['caja-cambio'] = true;
+            if (c.metodo === 'efectivo' && c.paga !== '' && paga >= k.hoy && k.hoy > 0) s.hechos['caja-cambio'] = true;
             if (k.saldo > 0) s.hechos['caja-saldo'] = true;
             guardar(); pintarTodo();
           });
