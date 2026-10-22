@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 23;
+    const VERSION = 24;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -1133,6 +1133,31 @@ final class Migraciones
         error_log('[LibertyFin] migración 23: ' . $st->rowCount() . ' productos de Emida vueltos a encender');
     }
 
+    /**
+     * La API: cobros que no se aplican dos veces.
+     *
+     * Un sistema que manda un abono por la API y no recibe respuesta (se
+     * cortó la red, se venció el tiempo) lo vuelve a mandar. Sin esto, el
+     * mismo abono entraría dos veces. Con la cabecera Idempotency-Key, el
+     * segundo envío recibe la respuesta del primero. Ver src/Api.
+     */
+    private static function v24(PDO $db)
+    {
+        $db->exec("
+            CREATE TABLE IF NOT EXISTS lf_api_idempotencia (
+                id          INT AUTO_INCREMENT PRIMARY KEY,
+                llave_id    INT NOT NULL,
+                clave       VARCHAR(100) NOT NULL,
+                huella      CHAR(64) NOT NULL,
+                estado      VARCHAR(12) NOT NULL DEFAULT 'procesando',
+                http_estado SMALLINT NULL,
+                respuesta   MEDIUMTEXT NULL,
+                creado_en   DATETIME NOT NULL,
+                UNIQUE KEY ux_api_idem (llave_id, clave),
+                KEY ix_api_idem_creado (creado_en)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -1157,5 +1182,6 @@ final class Migraciones
         21 => 'Inventario: productos con existencias y bitácora de movimientos',
         22 => 'Módulos por giro: cancelar ventas, expediente, cotizaciones, igualas, seguimiento, compras, agenda y paquetes',
         23 => 'Recupera los productos de Emida que apagó la descarga automática del catálogo',
+        24 => 'API: cobros por la API que no se aplican dos veces (Idempotency-Key)',
     ];
 }

@@ -16,8 +16,12 @@ use LibertyFin\Http\Router;
 use LibertyFin\Servicio\Autenticar;
 use LibertyFin\Vista\Plantilla;
 
-$cfg = is_readable($raiz . '/config/config.php')
-     ? require $raiz . '/config/config.php'
+// LF_CONFIG permite apuntar a otro archivo: lo usan las pruebas para
+// levantar el sistema contra una base desechable. En el hosting no se
+// define y se lee config/config.php como siempre.
+$archivoCfg = getenv('LF_CONFIG') ?: $raiz . '/config/config.php';
+$cfg = is_readable($archivoCfg)
+     ? require $archivoCfg
      : ['bd' => ['host'=>'localhost','usuario'=>'','clave'=>'','principal'=>''], 'depurar' => true];
 
 if (!empty($cfg['depurar'])) { ini_set('display_errors','1'); error_reporting(E_ALL); }
@@ -36,6 +40,19 @@ Plantilla::base($raiz . '/src/Vista/plantillas');
 $GLOBALS['lf_bd_principal'] = $cfg['bd']['principal'] ?? '';
 // Landing, términos y privacidad (config.php → sitio), para el registro.
 $GLOBALS['lf_sitio'] = (array)($cfg['sitio'] ?? []);
+
+// ── La API ──
+// Todo lo que empieza con /api/ se atiende aquí y termina aquí: sin
+// sesión, sin cookie, sin redirigir al login. Se identifica con una llave
+// que el administrador crea en Ajustes → API. Ver src/Api/Puerta.php y
+// docs/api/README.md.
+$rutaApi = '/' . trim((string) parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
+if ($rutaApi === '/api' || strncmp($rutaApi, '/api/', 5) === 0) {
+    (new \LibertyFin\Api\Puerta((array)($cfg['api'] ?? [])))
+        ->atender($_SERVER['REQUEST_METHOD'] ?? 'GET', $_SERVER['REQUEST_URI'] ?? '/')
+        ->enviar();
+    exit;
+}
 
 // ── Cookie de sesión ──
 // httponly: el JavaScript no puede leerla, así que un XSS no se lleva la
@@ -348,6 +365,9 @@ $r->get('/ajustes',          ['LibertyFin\Controlador\AjustesControlador', 'inde
 $r->post('/ajustes/guardar', ['LibertyFin\Controlador\AjustesControlador', 'guardar']);
 $r->post('/ajustes/alternar',['LibertyFin\Controlador\AjustesControlador', 'alternar']);
 $r->post('/ajustes/aprobacion',['LibertyFin\Controlador\AjustesControlador', 'aprobacion']);
+// Las llaves de la API: Ajustes → API. La API misma vive en src/Api.
+$r->post('/ajustes/api/crear',  ['LibertyFin\Controlador\AjustesControlador', 'crearLlave']);
+$r->post('/ajustes/api/revocar',['LibertyFin\Controlador\AjustesControlador', 'revocarLlave']);
 $r->get('/usuarios',             ['LibertyFin\Controlador\UsuariosControlador', 'index']);
 $r->post('/usuarios/guardar',    ['LibertyFin\Controlador\UsuariosControlador', 'guardar']);
 $r->post('/usuarios/restablecer',['LibertyFin\Controlador\UsuariosControlador', 'restablecer']);
@@ -460,6 +480,8 @@ $permisos = [
   '/ajustes/guardar'        => 'editar.ajustes',
   '/ajustes/alternar'       => 'editar.ajustes',
   '/ajustes/aprobacion'     => 'editar.ajustes',
+  '/ajustes/api/crear'      => 'editar.ajustes',
+  '/ajustes/api/revocar'    => 'editar.ajustes',
   '/usuarios'               => 'ver.usuarios',
   '/usuarios/guardar'       => 'editar.usuarios',
   '/usuarios/restablecer'   => 'editar.usuarios',
@@ -472,6 +494,13 @@ $permisos = [
   '/ligas/confirmar'        => 'cobrar',
   '/facturacion'            => 'ver.facturacion',
   '/facturacion/{id}/timbrar' => 'timbrar',
+  // Estas cuatro no estaban en la tabla y quedaban abiertas a CUALQUIERA
+  // con sesión: un cajero podía timbrar un complemento de pago (cuesta un
+  // folio) o descargar CFDI. Lo encontró herramientas/revisar-rutas.php.
+  '/facturacion/{id}/descargar'                 => 'ver.facturacion',
+  '/facturacion/{id}/pagos'                     => 'ver.facturacion',
+  '/facturacion/{id}/complemento/{pagoId}'      => 'timbrar',
+  '/facturacion/complemento/{pagoId}/descargar' => 'ver.facturacion',
   '/recargas'               => 'ver.recargas',
   '/recargas/saldo'         => 'ver.recargas',
   '/recargas/catalogo'      => 'ver.recargas',
@@ -531,6 +560,9 @@ $permisos = [
   '/cuenta/documento' => 'editar.empresa',
   '/cuenta/plan'      => 'editar.empresa',
   '/cuenta/plan/comprobante' => 'editar.empresa',
+  // El pago del plan: las mismas personas que pueden pedirlo.
+  '/cuenta/plan/estado/{id}'          => 'editar.empresa',
+  '/cuenta/plan/liga/{id}/documento'  => 'editar.empresa',
 ];
 
 $publicas = ['/login', '/login/confirmar', '/salir', '/registro', '/ayuda-acceso',

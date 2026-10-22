@@ -208,19 +208,7 @@ final class CrearEmpresa
 
         // Cargar el esquema y ponerlo al día.
         $db = Conexion::de($base);
-        $sql = file_get_contents($esquema);
-        // Se quitan los comentarios de línea ANTES de partir por ";". Si no,
-        // el encabezado del archivo se pega a la primera sentencia
-        // (CREATE TABLE sucursales), esta empieza con "--" y se descartaba
-        // completa: sin sucursales fallaban también las tablas con llave
-        // foránea hacia ella y el alta terminaba con "1146 table doesn't exist".
-        $sql = preg_replace('/^[ \t]*--.*$/m', '', $sql);
-        foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $sent) {
-            if ($sent === '') continue;
-            try { $db->exec($sent); }
-            catch (\Throwable $e) { error_log('[LibertyFin] esquema: ' . $e->getMessage()); }
-        }
-        Migraciones::aplicar($db);
+        self::cargarEsquema($db, $esquema);
 
         // Sucursal matriz y administrador.
         $db->exec("INSERT INTO sucursales (nombre, es_matriz, activo, fecha_creacion)
@@ -266,6 +254,37 @@ final class CrearEmpresa
         return ['base' => $base, 'usuario' => $usuario, 'clave' => $clave,
                 'empresa_id' => $empresaId, 'email' => $s['email_admin'],
                 'contacto' => $s['nombre_contacto'], 'empresa' => $s['nombre_empresa']];
+    }
+
+    /**
+     * Carga config/esquema.sql en una base vacía y la pone al día.
+     *
+     * Aparte del alta para que las pruebas armen sus bases EXACTAMENTE
+     * como se arma la de una empresa nueva: si el esquema o una migración
+     * deja de cargar en MySQL, lo dice la prueba y no el primer cliente.
+     *
+     * @return string[] los errores de las sentencias que no entraron
+     */
+    public static function cargarEsquema(PDO $db, $archivo)
+    {
+        $sql = file_get_contents($archivo);
+        // Se quitan los comentarios de línea ANTES de partir por ";". Si no,
+        // el encabezado del archivo se pega a la primera sentencia
+        // (CREATE TABLE sucursales), esta empieza con "--" y se descartaba
+        // completa: sin sucursales fallaban también las tablas con llave
+        // foránea hacia ella y el alta terminaba con "1146 table doesn't exist".
+        $sql = preg_replace('/^[ \t]*--.*$/m', '', $sql);
+        $errores = [];
+        foreach (array_filter(array_map('trim', explode(";\n", $sql))) as $sent) {
+            if ($sent === '') continue;
+            try { $db->exec($sent); }
+            catch (\Throwable $e) {
+                $errores[] = $e->getMessage();
+                error_log('[LibertyFin] esquema: ' . $e->getMessage());
+            }
+        }
+        Migraciones::aplicar($db);
+        return $errores;
     }
 
     public function rechazar($id, $motivo, $revisorId)

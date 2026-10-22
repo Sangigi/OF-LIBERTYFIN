@@ -134,7 +134,7 @@ $qs = function (array $extra = []) use ($desde, $hasta, $filtros, $soloPeriodo) 
         <?php W::barras(array_map(function($m){
             return ['cobrado'=>$m['cobrado']]; }, $meses)); ?>
         <?php /* Una columna por barra, del mismo ancho que ella. El monto va
-                 en micro ($181k): completo ($181,098) no cabía en el
+                 en micro (181k): completo (181,098 pesos) no cabía en el
                  celular, se salía de la tarjeta y ensanchaba la página.
                  El importe exacto queda en el title. El mes, en español:
                  date('M') lo da en inglés. */

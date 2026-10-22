@@ -27,6 +27,7 @@ final class AjustesControlador
         'sucursales'   => 'Sucursales',
         'comisiones'   => 'Áreas y colaboradores',
         'categorias'   => 'Categorías',
+        'api'          => 'API',
         // 'integraciones' => 'Integraciones',  // oculta a propósito; la vista se conserva
         // y vuelve con solo quitar el comentario.
     ];
@@ -51,6 +52,7 @@ final class AjustesControlador
             'aviso'      => $_SESSION['lf_aviso'] ?? null,
             'sucursales' => [], 'areas' => [], 'colaboradores' => [], 'categorias' => [],
             'empresa' => null, 'integraciones' => [], 'caja' => [], 'inventario' => [],
+            'llaves' => [], 'llaveNueva' => null, 'rolesApi' => [],
         ];
         if ($p === 'integraciones') {
             $datos['integraciones'] = \LibertyFin\Servicio\Integraciones::estado();
@@ -89,6 +91,16 @@ final class AjustesControlador
             $datos['colaboradores'] = $repo->colaboradores();
         }
         if ($p === 'categorias') $datos['categorias'] = $repo->categorias();
+        if ($p === 'api') {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal']);
+            $datos['llaves'] = (new \LibertyFin\Api\LlaveRepo($principal))->deEmpresa($_SESSION['empresa_id'] ?? 0);
+            // La llave recién creada se enseña UNA vez: después solo queda su huella.
+            $datos['llaveNueva'] = $_SESSION['lf_api_llave_nueva'] ?? null;
+            unset($_SESSION['lf_api_llave_nueva']);
+            foreach (\LibertyFin\Api\LlaveRepo::ROLES as $rol) {
+                $datos['rolesApi'][$rol] = \LibertyFin\Dominio\Permisos::ROLES[$rol]['rotulo'];
+            }
+        }
 
         Plantilla::pagina('ajustes/index', $datos);
         unset($_SESSION['lf_aviso']);
@@ -292,6 +304,51 @@ final class AjustesControlador
         } catch (\Throwable $e) {
             error_log('[LibertyFin] ajustes/alternar: ' . $e->getMessage());
             $this->volver('sucursales', 'No se pudo cambiar el estado.', 'error');
+        }
+    }
+
+    /**
+     * Crea una llave de la API.
+     *
+     * La llave completa se guarda en la sesión solo para enseñarla en la
+     * siguiente pantalla, una vez. En la base queda su huella: si alguien
+     * la pierde, no se recupera, se revoca y se crea otra.
+     */
+    public function crearLlave()
+    {
+        $this->soloAdmin(); $this->token();
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal']);
+            $nombre = trim((string)($_POST['nombre'] ?? ''));
+            $rol = (string)($_POST['rol'] ?? '');
+            $n = (new \LibertyFin\Api\LlaveRepo($principal))->crear($_SESSION['empresa_id'] ?? 0, $nombre, $rol,
+                $_SESSION['usuario_id'] ?? null, $_SESSION['usuario_nombre'] ?? null);
+            $_SESSION['lf_api_llave_nueva'] = ['token' => $n['token'], 'nombre' => $nombre, 'rol' => $rol];
+            Auditoria::anota('ajustes.cambiar', 'Llave de la API «' . $nombre . '»', null,
+                'creada · rol ' . $rol . ' · ' . $n['prefijo'] . '…');
+            $this->volver('api', 'Llave creada. Cópiala ahora: no se vuelve a mostrar.', 'ok');
+        } catch (\InvalidArgumentException $e) {
+            $this->volver('api', $e->getMessage(), 'error');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] crear llave de la API: ' . $e->getMessage());
+            $this->volver('api', 'No se pudo crear la llave.', 'error');
+        }
+    }
+
+    /** Revoca una llave: deja de servir al instante. No se puede deshacer. */
+    public function revocarLlave()
+    {
+        $this->soloAdmin(); $this->token();
+        try {
+            $principal = Conexion::de($GLOBALS['lf_bd_principal']);
+            $ok = (new \LibertyFin\Api\LlaveRepo($principal))
+                ->revocar((int)($_POST['id'] ?? 0), $_SESSION['empresa_id'] ?? 0);
+            if (!$ok) $this->volver('api', 'Esa llave no existe o ya estaba revocada.', 'error');
+            Auditoria::anota('ajustes.cambiar', 'Llave de la API #' . (int)$_POST['id'], 'vigente', 'revocada');
+            $this->volver('api', 'Llave revocada. Los sistemas que la usaban ya no pueden entrar.', 'ok');
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] revocar llave de la API: ' . $e->getMessage());
+            $this->volver('api', 'No se pudo revocar la llave.', 'error');
         }
     }
 

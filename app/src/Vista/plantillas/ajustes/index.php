@@ -689,6 +689,106 @@ $listas = 0; foreach ($integraciones as $i) if ($i['activa']) $listas++;
 </section>
 
 
+<?php /* ═══════════════ API ═══════════════
+         Las llaves con las que otros sistemas (una tienda en línea, un
+         sistema contable, una app) entran a la API de esta empresa. Cada
+         llave tiene un rol y puede lo mismo que un usuario de ese rol. */
+elseif ($pestana === 'api'):
+$baseApi = (!empty($_SERVER['HTTPS']) ? 'https' : 'http') . '://' . ($_SERVER['HTTP_HOST'] ?? 'tu-dominio') . '/api/v1'; ?>
+
+<?php if ($llaveNueva): ?>
+<section class="card" style="border-color:var(--lf-brand);box-shadow:0 0 0 3px var(--lf-brand-ring)">
+  <header class="card-header">Llave nueva: «<?= P::e($llaveNueva['nombre']) ?>»</header>
+  <div class="card-body">
+    <p style="margin:0 0 12px;font-size:13px;color:var(--lf-tinta-2)">
+      <b>Cópiala ahora y guárdala en un lugar seguro.</b> Es la única vez que se muestra:
+      LibertyFin solo guarda una huella para reconocerla. Si se pierde, revócala y crea otra.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input class="form-control lf-mono" id="llaveNueva" readonly value="<?= P::e($llaveNueva['token']) ?>"
+             style="flex:1;min-width:260px;font-size:13px" onclick="this.select()">
+      <button type="button" class="btn btn-primary" id="copiarLlave">Copiar</button>
+    </div>
+    <p style="margin:12px 0 0;font-size:12px;color:var(--lf-tinta-3)">
+      Se usa en la cabecera <code>Authorization: Bearer …</code>. Prueba:
+      <code class="lf-mono">curl -H "Authorization: Bearer <?= P::e(substr($llaveNueva['token'], 0, 12)) ?>…" <?= P::e($baseApi) ?>/yo</code></p>
+  </div>
+  <script>
+  document.getElementById('copiarLlave').addEventListener('click', function () {
+    var i = document.getElementById('llaveNueva'), b = this;
+    i.select();
+    try { navigator.clipboard.writeText(i.value); } catch (e) { document.execCommand('copy'); }
+    b.textContent = 'Copiada'; setTimeout(function () { b.textContent = 'Copiar'; }, 1600);
+  });
+  </script>
+</section>
+<?php endif; ?>
+
+<details class="lf-alta" <?= ($abrir || !$llaves) ? 'open' : '' ?>>
+  <summary><?= W::icono('mas','16px') ?> Crear una llave</summary>
+  <form method="post" action="/ajustes/api/crear" class="lf-form">
+    <input type="hidden" name="token" value="<?= P::e($token) ?>">
+    <div style="flex:2;min-width:220px"><label class="form-label">Para qué sistema es</label>
+      <input class="form-control" name="nombre" maxlength="80" required
+             placeholder="Ej. Tienda en línea, Sistema contable"></div>
+    <div style="flex:1;min-width:180px"><label class="form-label">Puede lo mismo que un</label>
+      <select class="form-select" name="rol">
+        <?php foreach ($rolesApi as $k => $rot): ?>
+          <option value="<?= P::e($k) ?>" <?= $k === 'cajero' ? 'selected' : '' ?>><?= P::e($rot) ?></option>
+        <?php endforeach; ?>
+      </select></div>
+    <div><button class="btn btn-primary" type="submit">Crear llave</button></div>
+    <p style="width:100%;font-size:11.5px;color:var(--lf-tinta-4);margin:0;line-height:1.55">
+      Elige el rol más bajo que le alcance al sistema. Con <b>Cajero</b> puede ver ventas y
+      clientes y registrar abonos; con <b>Administrador</b>, además, cobranza y comisiones;
+      con <b>Inventario</b>, solo el catálogo. Cada movimiento queda en la Bitácora como
+      «API · nombre de la llave».</p>
+  </form>
+</details>
+
+<section class="card">
+  <header class="card-header">Llaves de la API</header>
+  <div class="table-responsive lf-cards" style="padding:0 12px 6px">
+    <table class="table">
+      <thead><tr><th>Sistema</th><th>Llave</th><th>Rol</th><th>Creada</th><th>Último uso</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+      <?php if (!$llaves): ?>
+        <tr><td colspan="7" style="text-align:center;color:var(--lf-tinta-4);padding:34px">
+          Todavía no hay llaves. Crea una arriba cuando un sistema necesite conectarse.</td></tr>
+      <?php endif; ?>
+      <?php foreach ($llaves as $l): $viva = empty($l['revocada_en']); ?>
+        <tr style="<?= $viva ? '' : 'opacity:.55' ?>">
+          <td data-label="Sistema"><b style="font-weight:600"><?= P::e($l['nombre']) ?></b></td>
+          <td data-label="Llave" class="lf-mono" style="font-size:12px"><?= P::e($l['prefijo']) ?>…</td>
+          <td data-label="Rol"><span class="badge bg-secondary"><?= P::e($rolesApi[$l['rol']] ?? $l['rol']) ?></span></td>
+          <td data-label="Creada" style="font-size:12.5px"><?= P::e(date('d/m/Y', strtotime($l['creada_en']))) ?>
+            <?php if ($l['creada_por_nombre']): ?>
+              <span style="display:block;color:var(--lf-tinta-4);font-size:11px"><?= P::e($l['creada_por_nombre']) ?></span>
+            <?php endif; ?></td>
+          <td data-label="Último uso" style="font-size:12.5px">
+            <?= $l['ultimo_uso'] ? P::e(date('d/m/Y H:i', strtotime($l['ultimo_uso']))) : '<span style="color:var(--lf-tinta-4)">Nunca</span>' ?></td>
+          <td data-label="Estado">
+            <span class="badge <?= $viva ? 'bg-success' : 'bg-danger' ?>"><?= $viva ? 'Vigente' : 'Revocada' ?></span></td>
+          <td style="text-align:right">
+            <?php if ($viva): ?>
+              <form method="post" action="/ajustes/api/revocar" style="margin:0"
+                    onsubmit="return confirm('¿Revocar la llave «<?= P::e(addslashes($l['nombre'])) ?>»? El sistema que la usa deja de poder entrar en ese momento. No se puede deshacer.')">
+                <input type="hidden" name="token" value="<?= P::e($token) ?>">
+                <input type="hidden" name="id" value="<?= (int)$l['id'] ?>">
+                <button class="btn btn-secondary btn-sm lf-btn-peligro" type="submit">Revocar</button>
+              </form>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <div class="card-footer">
+    <span>Dirección de la API: <code class="lf-mono"><?= P::e($baseApi) ?></code>.
+      La guía para quien integra está en <code>docs/api</code> del repositorio.</span>
+  </div>
+</section>
+
 <?php /* ═══════════════ CATEGORÍAS ═══════════════ */ else:
 $e = $buscar_ed($categorias); ?>
 <details class="lf-alta" <?= $abrir ? 'open' : '' ?>>

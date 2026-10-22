@@ -28,8 +28,11 @@ final class Conexion
         if (isset(self::$vivas[$base])) return self::$vivas[$base];
         if (self::$cfg === null) throw new \RuntimeException('Conexion::configurar() no se ha llamado');
         $c = self::$cfg;
+        // El puerto es opcional: el hosting usa el de siempre, y las
+        // pruebas levantan su propio MySQL en otro para no tocar nada.
+        $puerto = !empty($c['puerto']) ? ';port=' . (int)$c['puerto'] : '';
         $pdo = new PDO(
-            "mysql:host={$c['host']};dbname={$base};charset=utf8mb4",
+            "mysql:host={$c['host']}{$puerto};dbname={$base};charset=utf8mb4",
             $c['usuario'], $c['clave'],
             [
                 PDO::ATTR_ERRMODE                  => PDO::ERRMODE_EXCEPTION,

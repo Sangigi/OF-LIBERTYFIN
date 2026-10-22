@@ -653,56 +653,12 @@ CREATE TABLE IF NOT EXISTS `producto_precios_mayoreo` (
   CONSTRAINT `producto_precios_mayoreo_ibfk_1` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS `promociones` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `nombre` varchar(255) COLLATE utf8_unicode_ci NOT NULL,
-  `descripcion` text COLLATE utf8_unicode_ci,
-  `tipo_promocion` enum('descuento_porcentual','descuento_fijo','precio_especial','llevalo_paga','precio_volumen','combo') COLLATE utf8_unicode_ci NOT NULL DEFAULT 'descuento_porcentual',
-  `aplica_a` enum('producto','categoria','marca','venta_completa','combo') COLLATE utf8_unicode_ci NOT NULL DEFAULT 'producto',
-  `fecha_inicio` datetime NOT NULL,
-  `fecha_fin` datetime NOT NULL,
-  `dias_semana` varchar(20) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT '1=Lun,7=Dom;
-
-CREATE TABLE IF NOT EXISTS `promocion_productos` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `promocion_id` int(11) NOT NULL,
-  `producto_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_promo_prod` (`promocion_id`,`producto_id`),
-  KEY `producto_id` (`producto_id`),
-  CONSTRAINT `promocion_productos_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `promocion_productos_ibfk_2` FOREIGN KEY (`producto_id`) REFERENCES `productos` (`id`) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS `promociones_aplicables` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `promocion_id` int(11) NOT NULL,
-  `tipo` enum('producto','categoria','marca') COLLATE utf8_unicode_ci NOT NULL,
-  `referencia_id` int(11) DEFAULT NULL COMMENT 'producto_id o categoria_id',
-  `referencia_nombre` varchar(255) COLLATE utf8_unicode_ci DEFAULT NULL COMMENT 'texto libre (marca)',
-  PRIMARY KEY (`id`),
-  KEY `idx_pa_promo` (`promocion_id`),
-  KEY `idx_pa_ref` (`tipo`,`referencia_id`),
-  CONSTRAINT `promociones_aplicables_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS `promociones_combo` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `promocion_id` int(11) NOT NULL,
-  `producto_id` int(11) NOT NULL,
-  `cantidad` int(11) NOT NULL DEFAULT '1',
-  PRIMARY KEY (`id`),
-  KEY `idx_pc_promo` (`promocion_id`),
-  CONSTRAINT `promociones_combo_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE
-);
-
-CREATE TABLE IF NOT EXISTS `promociones_sucursales` (
-  `id` int(11) NOT NULL AUTO_INCREMENT,
-  `promocion_id` int(11) NOT NULL,
-  `sucursal_id` int(11) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uniq_promo_sucursal` (`promocion_id`,`sucursal_id`),
-  KEY `idx_ps_promo` (`promocion_id`),
-  CONSTRAINT `promociones_sucursales_ibfk_1` FOREIGN KEY (`promocion_id`) REFERENCES `promociones` (`id`) ON DELETE CASCADE
-);
+-- Las promociones del sistema anterior (promociones, promocion_productos,
+-- promociones_aplicables, promociones_combo, promociones_sucursales) ya no
+-- se crean aquí. La definición de `promociones` venía cortada a la mitad
+-- desde la extracción de registroEmpresa.php, así que ninguna empresa nueva
+-- llegó a tenerlas: la primera fallaba por sintaxis y las otras cuatro por su
+-- llave foránea hacia ella. Nada del sistema actual las lee; las promociones
+-- nuevas son lf_promociones y compañía (Servicio\Migraciones, v19). Las
+-- empresas que vienen del sistema anterior conservan las suyas.
 

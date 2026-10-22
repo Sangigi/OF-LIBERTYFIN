@@ -1,5 +1,11 @@
 RewriteEngine On
 
+# La API se identifica con «Authorization: Bearer lfk_…». Cuando PHP corre
+# como CGI/FastCGI (común en cPanel), Apache no le pasa esa cabecera; esta
+# regla la copia a una variable que PHP sí recibe.
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Las páginas de la landing se enlazan sin extensión (pages/precios):
 # si existe el .html, se sirve ese. Si no existe, no hace nada.
 RewriteCond %{REQUEST_FILENAME} !-f

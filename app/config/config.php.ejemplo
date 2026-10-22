@@ -7,6 +7,13 @@ return [
         'usuario' => '',
         'clave'   => '',
         'principal' => 'juanc141_ventas',
+        // 'puerto' => 3306,   // solo si MySQL no está en el puerto de siempre
+    ],
+
+    // La API (/api/v1). Las llaves se crean en Ajustes → API.
+    // Peticiones por minuto que acepta cada llave; pasado eso contesta 429.
+    'api' => [
+        'por_minuto' => 120,
     ],
     // Zona horaria. Tiene que ser la misma en PHP y en MySQL: si no, el
     // folio de la venta y su fecha quedan desfasados, y una venta de las
