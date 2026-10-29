@@ -55,6 +55,36 @@ final class Facturapi
         ];
     }
 
+    /**
+     * El cliente con la llave de config/integraciones.php (la de prueba en
+     * sandbox), o null si no hay llave.
+     */
+    public static function deConfig(): ?self
+    {
+        $fac = Integraciones::de('facturapi');
+        $clave = !empty($fac['sandbox']) ? trim((string) ($fac['llave_prueba'] ?? '')) : '';
+        if ($clave === '') $clave = trim((string) ($fac['llave'] ?? ''));
+        return $clave === '' ? null : new self($clave);
+    }
+
+    /**
+     * Busca en el catálogo del SAT (c_ClaveProdServ) por descripción.
+     *
+     * @return array<array{clave:string, descripcion:string}>
+     */
+    public function buscarClavesProducto(string $q, int $limite = 10): array
+    {
+        $res = $this->peticion('catalogs/products?' . http_build_query(['q' => $q, 'limit' => $limite]));
+        if ($res['error'] !== '' || $res['http'] !== 200) {
+            throw new \RuntimeException($res['error'] ?: 'HTTP ' . $res['http'] . ': ' . mb_substr($res['body'], 0, 200));
+        }
+        $r = [];
+        foreach ($res['json']['data'] ?? [] as $c) {
+            $r[] = ['clave' => (string) ($c['key'] ?? ''), 'descripcion' => (string) ($c['description'] ?? '')];
+        }
+        return $r;
+    }
+
     public function crearFactura(array $payload): array
     {
         return $this->peticion('invoices', 'POST', $payload);

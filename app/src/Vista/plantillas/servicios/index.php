@@ -31,18 +31,22 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
     <div style="flex:2;min-width:220px">
       <label class="form-label">Nombre</label>
-      <input class="form-control" name="nombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
+      <input class="form-control" name="nombre" id="pNombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
     </div>
     <div style="width:130px">
       <label class="form-label">Código</label>
       <input class="form-control" name="codigo" value="<?= P::e($e['codigo'] ?? '') ?>"
              style="text-transform:uppercase" required>
     </div>
-    <div style="width:150px">
+    <?php /* Al escribir el nombre (o una palabra aquí) salen las claves
+             del catálogo del SAT que le quedan, vía Facturapi. */ ?>
+    <div class="lf-sat" style="width:150px">
       <label class="form-label" for="pSat">Clave SAT <small>(opcional)</small></label>
       <input class="form-control lf-mono" name="clave_sat" id="pSat" value="<?= P::e($e['clave_sat'] ?? '') ?>"
-             inputmode="numeric" pattern="\d{8}" maxlength="8" placeholder="00000000"
-             title="Clave de producto o servicio del SAT: 8 dígitos">
+             pattern="\d{8}" placeholder="Busca o escribe" autocomplete="off"
+             role="combobox" aria-controls="pSatLista" aria-expanded="false"
+             title="Clave de producto o servicio del SAT: 8 dígitos. Escribe una palabra para buscarla.">
+      <ul class="lf-sat-lista" id="pSatLista" role="listbox" hidden></ul>
     </div>
     <div style="flex:1;min-width:150px">
       <label class="form-label">Área</label>
@@ -278,6 +282,72 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
       margen();
     });
     utilDesdePrecio(); margen();
+  })();
+  </script>
+  <script>
+  /* Clave SAT: al escribir el nombre (si aún no hay clave) o una palabra en
+     el campo, se buscan claves en el catálogo del SAT (Facturapi). Al
+     elegir una se queda solo el número. */
+  (function(){
+    var N = document.getElementById('pNombre'), S = document.getElementById('pSat'),
+        L = document.getElementById('pSatLista');
+    if (!N || !S || !L) return;
+    var t = null, pedido = 0, ultima = '', activa = -1;
+
+    function cerrar(){ L.hidden = true; L.innerHTML = ''; activa = -1; S.setAttribute('aria-expanded','false'); }
+    function nota(txt){ L.innerHTML = ''; var li = document.createElement('li'); li.className = 'nota';
+      li.textContent = txt; L.appendChild(li); L.hidden = false; }
+    function elegir(clave){ S.value = clave; cerrar(); S.focus(); }
+    function marcar(i){
+      var items = L.querySelectorAll('li[data-clave]');
+      if (!items.length) return;
+      activa = (i + items.length) % items.length;
+      items.forEach(function(li, k){ li.classList.toggle('activa', k === activa); });
+      items[activa].scrollIntoView({block:'nearest'});
+    }
+    function buscar(q){
+      q = q.trim();
+      if (q.length < 3) { cerrar(); return; }
+      if (q === ultima && !L.hidden) return;
+      ultima = q;
+      var mio = ++pedido;
+      nota('Buscando en el catálogo del SAT…');
+      fetch('/servicios/claves-sat?q=' + encodeURIComponent(q), {headers:{'Accept':'application/json'}})
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (mio !== pedido) return;                   /* llegó una búsqueda más nueva */
+          if (d.error) { nota(d.error); return; }
+          if (!d.claves || !d.claves.length) { nota('Sin claves para «' + q + '».'); return; }
+          L.innerHTML = ''; activa = -1;
+          d.claves.forEach(function(c){
+            var li = document.createElement('li'), b = document.createElement('b'), s = document.createElement('span');
+            li.setAttribute('role','option'); li.dataset.clave = c.clave;
+            b.textContent = c.clave; s.textContent = c.descripcion;
+            li.appendChild(b); li.appendChild(s);
+            li.addEventListener('mousedown', function(ev){ ev.preventDefault(); elegir(c.clave); });
+            L.appendChild(li);
+          });
+          L.hidden = false; S.setAttribute('aria-expanded','true');
+        })
+        .catch(function(){ if (mio === pedido) nota('No se pudo consultar el catálogo del SAT.'); });
+    }
+    function pronto(q){ clearTimeout(t); t = setTimeout(function(){ buscar(q); }, 400); }
+
+    N.addEventListener('input', function(){ if (!/^\d{8}$/.test(S.value.trim())) pronto(N.value); });
+    S.addEventListener('input', function(){
+      var v = S.value.trim();
+      if (/^\d*$/.test(v)) { clearTimeout(t); cerrar(); return; }   /* teclea el número directo */
+      pronto(v);
+    });
+    S.addEventListener('focus', function(){ if (S.value.trim() === '' && N.value.trim().length >= 3) buscar(N.value); });
+    S.addEventListener('keydown', function(e){
+      if (L.hidden) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); marcar(activa + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); marcar(activa - 1); }
+      else if (e.key === 'Enter' && activa >= 0) { e.preventDefault(); elegir(L.querySelectorAll('li[data-clave]')[activa].dataset.clave); }
+      else if (e.key === 'Escape') cerrar();
+    });
+    document.addEventListener('mousedown', function(e){ if (!e.target.closest('.lf-sat')) cerrar(); });
   })();
   </script>
 </details>

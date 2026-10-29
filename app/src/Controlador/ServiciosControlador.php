@@ -136,6 +136,26 @@ final class ServiciosControlador
     }
 
     /**
+     * Sugerencias de clave SAT para el formulario, desde el catálogo de
+     * Facturapi. Pasa por aquí porque la llave no puede llegar al navegador.
+     */
+    public function clavesSat()
+    {
+        header('Content-Type: application/json; charset=utf-8');
+        $q = trim(Peticion::texto('q'));
+        if (mb_strlen($q) < 3) { echo json_encode(['claves' => []]); return; }
+
+        $cli = \LibertyFin\Servicio\Facturapi::deConfig();
+        if (!$cli) { echo json_encode(['claves' => [], 'error' => 'Facturapi no está configurado.'], JSON_UNESCAPED_UNICODE); return; }
+        try {
+            echo json_encode(['claves' => $cli->buscarClavesProducto($q)], JSON_UNESCAPED_UNICODE);
+        } catch (\Throwable $e) {
+            error_log('[LibertyFin] claves SAT: ' . $e->getMessage());
+            echo json_encode(['claves' => [], 'error' => 'No se pudo consultar el catálogo del SAT.'], JSON_UNESCAPED_UNICODE);
+        }
+    }
+
+    /**
      * Sube, reemplaza o quita la imagen del servicio. Devuelve un texto
      * para añadir al aviso ('' si no hubo nada que hacer).
      */

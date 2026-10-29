@@ -237,6 +237,7 @@ $r->get('/servicios', ['LibertyFin\Controlador\ServiciosControlador', 'index']);
 $r->post('/clientes/guardar',   ['LibertyFin\Controlador\ClientesControlador',  'guardar']);
 $r->post('/servicios/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardar']);
 $r->post('/servicios/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternar']);
+$r->get('/servicios/claves-sat', ['LibertyFin\Controlador\ServiciosControlador', 'clavesSat']);
 $r->post('/servicios/promociones/guardar',  ['LibertyFin\Controlador\ServiciosControlador', 'guardarPromocion']);
 $r->post('/servicios/promociones/alternar', ['LibertyFin\Controlador\ServiciosControlador', 'alternarPromocion']);
 $r->post('/servicios/promociones/borrar',   ['LibertyFin\Controlador\ServiciosControlador', 'borrarPromocion']);
@@ -435,6 +436,7 @@ $permisos = [
   '/servicios'              => 'ver.servicios',
   '/servicios/guardar'      => 'editar.servicios',
   '/servicios/alternar'     => 'editar.servicios',
+  '/servicios/claves-sat'   => 'editar.servicios',
   '/servicios/promociones/guardar'  => 'editar.servicios',
   '/servicios/promociones/alternar' => 'editar.servicios',
   '/servicios/promociones/borrar'   => 'editar.servicios',

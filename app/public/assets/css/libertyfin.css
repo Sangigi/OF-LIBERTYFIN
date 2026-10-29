@@ -4338,6 +4338,17 @@ form[data-lf-ticket-cambio] .form-select{width:100%}
 .lf-margen.mal .t,.lf-margen.mal b{color:var(--lf-rojo)}
 .lf-form > .lf-prod-mas{flex:0 0 100%;margin:0}
 .lf-prod-mas textarea{width:100%;resize:vertical}
+/* Clave SAT: sugerencias del catálogo del SAT bajo el campo. */
+.lf-sat{position:relative}
+.lf-sat-lista{position:absolute;left:0;top:calc(100% + 4px);z-index:30;width:min(440px,calc(100vw - 32px));
+  max-height:280px;overflow-y:auto;margin:0;padding:4px;list-style:none;background:var(--lf-sup);
+  border:1px solid var(--lf-linea);border-radius:var(--lf-r);box-shadow:0 10px 28px rgba(0,0,0,.14)}
+.lf-sat-lista li{display:flex;gap:10px;align-items:baseline;padding:7px 9px;border-radius:6px;cursor:pointer;
+  font-size:12.5px;color:var(--lf-tinta-2)}
+.lf-sat-lista li b{font-family:var(--lf-mono);font-weight:600;color:var(--lf-tinta);flex:none}
+.lf-sat-lista li:hover,.lf-sat-lista li.activa{background:var(--lf-sup-2)}
+.lf-sat-lista li.nota{cursor:default;color:var(--lf-tinta-4)}
+.lf-sat-lista li.nota:hover{background:none}
 /* ══════════════════════════════════════════════════════
    INVENTARIO
    Existencias (lo que hay, lo que falta primero) y Movimientos (por qué
