@@ -31,15 +31,15 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     <?php if ($e): ?><input type="hidden" name="id" value="<?= (int)$e['id'] ?>"><?php endif; ?>
     <div style="flex:2;min-width:220px">
       <label class="form-label">Nombre</label>
-      <input class="form-control" name="nombre" id="pNombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
+      <input class="form-control" name="nombre" value="<?= P::e($e['nombre'] ?? '') ?>" required>
     </div>
     <div style="width:130px">
       <label class="form-label">Código</label>
       <input class="form-control" name="codigo" value="<?= P::e($e['codigo'] ?? '') ?>"
              style="text-transform:uppercase" required>
     </div>
-    <?php /* Al escribir el nombre (o una palabra aquí) salen las claves
-             del catálogo del SAT que le quedan, vía Facturapi. */ ?>
+    <?php /* Al escribir una palabra aquí salen las claves del catálogo
+             del SAT que le quedan, vía Facturapi. */ ?>
     <div class="lf-sat" style="width:150px">
       <label class="form-label" for="pSat">Clave SAT</label>
       <input class="form-control lf-mono" name="clave_sat" id="pSat" value="<?= P::e($e['clave_sat'] ?? '') ?>"
@@ -285,13 +285,11 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
   })();
   </script>
   <script>
-  /* Clave SAT: al escribir el nombre (si aún no hay clave) o una palabra en
-     el campo, se buscan claves en el catálogo del SAT (Facturapi). Al
-     elegir una se queda solo el número. */
+  /* Clave SAT: al escribir una palabra en el campo se buscan claves en el
+     catálogo del SAT (Facturapi). Al elegir una se queda solo el número. */
   (function(){
-    var N = document.getElementById('pNombre'), S = document.getElementById('pSat'),
-        L = document.getElementById('pSatLista');
-    if (!N || !S || !L) return;
+    var S = document.getElementById('pSat'), L = document.getElementById('pSatLista');
+    if (!S || !L) return;
     var t = null, pedido = 0, ultima = '', activa = -1;
 
     function cerrar(){ L.hidden = true; L.innerHTML = ''; activa = -1; S.setAttribute('aria-expanded','false'); }
@@ -333,13 +331,11 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     }
     function pronto(q){ clearTimeout(t); t = setTimeout(function(){ buscar(q); }, 400); }
 
-    N.addEventListener('input', function(){ if (!/^\d{8}$/.test(S.value.trim())) pronto(N.value); });
     S.addEventListener('input', function(){
       var v = S.value.trim();
       if (/^\d*$/.test(v)) { clearTimeout(t); cerrar(); return; }   /* teclea el número directo */
       pronto(v);
     });
-    S.addEventListener('focus', function(){ if (S.value.trim() === '' && N.value.trim().length >= 3) buscar(N.value); });
     S.addEventListener('keydown', function(e){
       if (L.hidden) return;
       if (e.key === 'ArrowDown') { e.preventDefault(); marcar(activa + 1); }
