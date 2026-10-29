@@ -236,7 +236,7 @@ final class FacturacionControlador
         foreach ($lineas as $ln) {
             $sumLineas += ((float) $ln['cantidad'] * (float) $ln['precio_unitario'])
                         - (float) $ln['descuento']
-                        - (float) $ln['descuento_promocion'];
+                        - (float) ($ln['descuento_promocion'] ?? 0);
         }
 
         if (abs($sumLineas - $total) <= self::TOLERANCIA) {
@@ -260,7 +260,8 @@ final class FacturacionControlador
             if ($cant <= 0) continue;
 
             $pu   = round(((float) $ln['precio_unitario']) / $divisor, 6);
-            $desc = round((((float) $ln['descuento']) + ((float) $ln['descuento_promocion'])) / $divisor, 6);
+            // `descuento_promocion` no existe en todas las bases: la promoción ya va en `descuento`.
+            $desc = round((((float) $ln['descuento']) + ((float) ($ln['descuento_promocion'] ?? 0))) / $divisor, 6);
 
             $descripcion = trim((string) ($ln['producto'] ?? ''));
             if ($descripcion === '') {
