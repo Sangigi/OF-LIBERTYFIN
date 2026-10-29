@@ -41,7 +41,7 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
     <?php /* Al escribir el nombre (o una palabra aquí) salen las claves
              del catálogo del SAT que le quedan, vía Facturapi. */ ?>
     <div class="lf-sat" style="width:150px">
-      <label class="form-label" for="pSat">Clave SAT <small>(opcional)</small></label>
+      <label class="form-label" for="pSat">Clave SAT</label>
       <input class="form-control lf-mono" name="clave_sat" id="pSat" value="<?= P::e($e['clave_sat'] ?? '') ?>"
              pattern="\d{8}" placeholder="Busca o escribe" autocomplete="off"
              role="combobox" aria-controls="pSatLista" aria-expanded="false"
