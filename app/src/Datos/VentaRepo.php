@@ -167,7 +167,8 @@ final class VentaRepo extends Repo
     {
     return $this->todos("
         SELECT vd.*, p.nombre AS producto, p.codigo,
-               COALESCE(p.unidad_medida, '') AS unidad_medida
+               COALESCE(p.unidad_medida, '') AS unidad_medida,
+               COALESCE(p.clave_sat, '') AS clave_sat
         FROM venta_detalles vd
         LEFT JOIN productos p ON p.id = vd.producto_id
         WHERE vd.venta_id = ?", [(int)$id]);

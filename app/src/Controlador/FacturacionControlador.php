@@ -45,7 +45,6 @@ final class FacturacionControlador
         'D10' => ['605','606','607','608','611','612','614','615','625'],
     ];
 
-    private const CLAVE_PROD_SERV = '43232804';
     private const TOLERANCIA      = 0.05;
 
     /**
@@ -268,11 +267,17 @@ final class FacturacionControlador
                 $descripcion = 'Producto ' . (string) ($ln['producto_id'] ?? '');
             }
 
+            $claveSat = trim((string) ($ln['clave_sat'] ?? ''));
+            if ($claveSat === '') {
+                $this->aviso('«' . $descripcion . '» no tiene clave SAT. '
+                           . 'Captúrala en Productos para poder facturar.', 'error');
+            }
+
             $item = [
                 'quantity' => $cant,
                 'product'  => [
                     'description'  => $descripcion,
-                    'product_key'  => self::CLAVE_PROD_SERV,
+                    'product_key'  => $claveSat,
                     'unit_key'     => $this->unidadSat($ln['unidad_medida'] ?? null),
                     'price'        => $pu,
                     'tax_included' => false,

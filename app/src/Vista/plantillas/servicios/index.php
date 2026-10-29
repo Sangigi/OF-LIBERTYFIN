@@ -38,6 +38,12 @@ $qs = function (array $x = []) use ($desde,$hasta,$buscar) {
       <input class="form-control" name="codigo" value="<?= P::e($e['codigo'] ?? '') ?>"
              style="text-transform:uppercase" required>
     </div>
+    <div style="width:150px">
+      <label class="form-label" for="pSat">Clave SAT <small>(opcional)</small></label>
+      <input class="form-control lf-mono" name="clave_sat" id="pSat" value="<?= P::e($e['clave_sat'] ?? '') ?>"
+             inputmode="numeric" pattern="\d{8}" maxlength="8" placeholder="00000000"
+             title="Clave de producto o servicio del SAT: 8 dígitos">
+    </div>
     <div style="flex:1;min-width:150px">
       <label class="form-label">Área</label>
       <select class="form-select" name="categoria_id">

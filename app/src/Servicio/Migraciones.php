@@ -30,7 +30,7 @@ use PDO;
 final class Migraciones
 {
     /** Súbelo al agregar una migración nueva. */
-    const VERSION = 24;
+    const VERSION = 25;
 
     /**
      * La versión vive en `lf_ajustes`, no en `sistema_config`.
@@ -1158,6 +1158,17 @@ final class Migraciones
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
+    /**
+     * La clave SAT del producto (catálogo c_ClaveProdServ, 8 dígitos).
+     * Opcional: sin ella el producto se vende igual.
+     */
+    private static function v25(PDO $db)
+    {
+        if (self::hayTabla($db, 'productos') && !self::hayColumna($db, 'productos', 'clave_sat')) {
+            $db->exec("ALTER TABLE productos ADD COLUMN clave_sat VARCHAR(8) NULL DEFAULT NULL");
+        }
+    }
+
     /** Lo que hace cada versión, para mostrarlo en Mantenimiento. */
     const DESCRIPCIONES = [
         1 => 'Tabla de ajustes propia (lf_ajustes)',
@@ -1183,5 +1194,6 @@ final class Migraciones
         22 => 'Módulos por giro: cancelar ventas, expediente, cotizaciones, igualas, seguimiento, compras, agenda y paquetes',
         23 => 'Recupera los productos de Emida que apagó la descarga automática del catálogo',
         24 => 'API: cobros por la API que no se aplican dos veces (Idempotency-Key)',
+        25 => 'Clave SAT del producto',
     ];
 }

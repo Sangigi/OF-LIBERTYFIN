@@ -141,8 +141,14 @@ final class ServicioRepo extends Repo
             throw new \InvalidArgumentException('Ya hay un servicio con el código ' . $codigo);
         }
 
+        // Clave SAT: opcional, pero si viene son los 8 dígitos del catálogo.
+        $sat = trim($d['clave_sat'] ?? '');
+        if ($sat !== '' && !preg_match('/^\d{8}$/', $sat)) {
+            throw new \InvalidArgumentException('La clave SAT son 8 dígitos');
+        }
+
         $cat = (int)($d['categoria_id'] ?? 0) ?: null;
-        return [$codigo, $nombre, trim($d['descripcion'] ?? '') ?: null, $precio, $costo, $cat];
+        return [$codigo, $nombre, trim($d['descripcion'] ?? '') ?: null, $precio, $costo, $cat, $sat ?: null];
     }
 
     public function guardarImagen($id, $ruta)
@@ -159,26 +165,26 @@ final class ServicioRepo extends Repo
 
     public function crear(array $d)
     {
-        list($codigo, $nombre, $desc, $precio, $costo, $cat) = $this->limpiar($d);
+        list($codigo, $nombre, $desc, $precio, $costo, $cat, $sat) = $this->limpiar($d);
         // `subprecio` es el precio de venta y `precio` queda de respaldo:
         // se guardan iguales para que ambas lecturas den lo mismo.
         $this->db->prepare("
             INSERT INTO productos (codigo, nombre, descripcion, precio, subprecio, costo,
-                                   categoria_id, stock, stock_minimo, activo)
-            VALUES (?,?,?,?,?,?,?,0,0,1)
-        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat]);
+                                   categoria_id, clave_sat, stock, stock_minimo, activo)
+            VALUES (?,?,?,?,?,?,?,?,0,0,1)
+        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat, $sat]);
         return (int)$this->db->lastInsertId();
     }
 
     public function actualizar($id, array $d)
     {
-        list($codigo, $nombre, $desc, $precio, $costo, $cat) = $this->limpiar($d, $id);
+        list($codigo, $nombre, $desc, $precio, $costo, $cat, $sat) = $this->limpiar($d, $id);
         $this->db->prepare("
             UPDATE productos SET codigo = ?, nombre = ?, descripcion = ?,
                    precio = ?, subprecio = ?, costo = ?, categoria_id = ?,
-                   fecha_actualizacion = NOW()
+                   clave_sat = ?, fecha_actualizacion = NOW()
             WHERE id = ?
-        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat, (int)$id]);
+        ")->execute([$codigo, $nombre, $desc, $precio, $precio, $costo, $cat, $sat, (int)$id]);
         return (int)$id;
     }
 
