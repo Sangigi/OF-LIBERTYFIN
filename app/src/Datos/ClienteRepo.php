@@ -147,6 +147,55 @@ final class ClienteRepo extends Repo
     // ALTA Y EDICION
     // ─────────────────────────────────────────────────────────────
 
+    /** Catálogo SAT c_RegimenFiscal. Se guarda la clave. */
+    const REGIMENES = [
+        '601' => 'General de Ley Personas Morales',
+        '603' => 'Personas Morales con Fines no Lucrativos',
+        '605' => 'Sueldos y Salarios e Ingresos Asimilados a Salarios',
+        '606' => 'Arrendamiento',
+        '607' => 'Régimen de Enajenación o Adquisición de Bienes',
+        '608' => 'Demás ingresos',
+        '610' => 'Residentes en el Extranjero sin Establecimiento Permanente en México',
+        '611' => 'Ingresos por Dividendos (socios y accionistas)',
+        '612' => 'Personas Físicas con Actividades Empresariales y Profesionales',
+        '614' => 'Ingresos por intereses',
+        '615' => 'Régimen de los ingresos por obtención de premios',
+        '616' => 'Sin obligaciones fiscales',
+        '620' => 'Sociedades Cooperativas de Producción que optan por diferir sus ingresos',
+        '621' => 'Incorporación Fiscal',
+        '622' => 'Actividades Agrícolas, Ganaderas, Silvícolas y Pesqueras',
+        '623' => 'Opcional para Grupos de Sociedades',
+        '624' => 'Coordinados',
+        '625' => 'Actividades Empresariales con ingresos a través de Plataformas Tecnológicas',
+        '626' => 'Régimen Simplificado de Confianza',
+    ];
+
+    /** Catálogo SAT c_UsoCFDI (sin pagos ni nómina: no son de venta). Se guarda la clave. */
+    const USOS_CFDI = [
+        'G01' => 'Adquisición de mercancías',
+        'G02' => 'Devoluciones, descuentos o bonificaciones',
+        'G03' => 'Gastos en general',
+        'I01' => 'Construcciones',
+        'I02' => 'Mobiliario y equipo de oficina por inversiones',
+        'I03' => 'Equipo de transporte',
+        'I04' => 'Equipo de cómputo y accesorios',
+        'I05' => 'Dados, troqueles, moldes, matrices y herramental',
+        'I06' => 'Comunicaciones telefónicas',
+        'I07' => 'Comunicaciones satelitales',
+        'I08' => 'Otra maquinaria y equipo',
+        'D01' => 'Honorarios médicos, dentales y gastos hospitalarios',
+        'D02' => 'Gastos médicos por incapacidad o discapacidad',
+        'D03' => 'Gastos funerales',
+        'D04' => 'Donativos',
+        'D05' => 'Intereses reales por créditos hipotecarios (casa habitación)',
+        'D06' => 'Aportaciones voluntarias al SAR',
+        'D07' => 'Primas por seguros de gastos médicos',
+        'D08' => 'Gastos de transportación escolar obligatoria',
+        'D09' => 'Depósitos en cuentas para el ahorro, primas de planes de pensiones',
+        'D10' => 'Pagos por servicios educativos (colegiaturas)',
+        'S01' => 'Sin efectos fiscales',
+    ];
+
     public function uno_($id)
     {
         return $this->uno("SELECT * FROM clientes WHERE id = ?", [(int)$id]);
@@ -173,6 +222,20 @@ final class ClienteRepo extends Repo
         // Del teléfono se guarda solo lo que sirve para marcar.
         $tel = preg_replace('/[^0-9+]/', '', (string)($d['telefono'] ?? ''));
 
+        // Lo fiscal es opcional; si viene, tiene que ser del catálogo del SAT.
+        $cp = trim($d['codigo_postal'] ?? '');
+        if ($cp !== '' && !preg_match('/^\d{5}$/', $cp)) {
+            throw new \InvalidArgumentException('El código postal son 5 dígitos');
+        }
+        $reg = trim($d['regimen_fiscal'] ?? '');
+        if ($reg !== '' && !isset(self::REGIMENES[$reg])) {
+            throw new \InvalidArgumentException('El régimen fiscal no es válido');
+        }
+        $uso = mb_strtoupper(trim($d['uso_cfdi'] ?? ''));
+        if ($uso !== '' && !isset(self::USOS_CFDI[$uso])) {
+            throw new \InvalidArgumentException('El uso de CFDI no es válido');
+        }
+
         // Mismo nombre dos veces es casi siempre captura duplicada, y fue
         // justo lo que llenó julio de basura.
         $sql = "SELECT id FROM clientes WHERE nombre = ?";
@@ -184,7 +247,8 @@ final class ClienteRepo extends Repo
 
         return [$nombre, $rfc ?: null, $email ?: null, $tel ?: null,
                 trim($d['direccion'] ?? '') ?: null,
-                trim($d['area'] ?? '') ?: null];
+                trim($d['area'] ?? '') ?: null,
+                $cp ?: null, $reg ?: null, $uso ?: null];
     }
 
     /**
@@ -209,34 +273,38 @@ final class ClienteRepo extends Repo
 
     public function crear(array $d)
     {
-        list($nombre, $rfc, $email, $tel, $dir, $area) = $this->limpiar($d);
+        list($nombre, $rfc, $email, $tel, $dir, $area, $cp, $reg, $uso) = $this->limpiar($d);
         if ($this->tieneArea()) {
             $this->db->prepare("
-                INSERT INTO clientes (nombre, rfc, area, email, telefono, direccion, activo, fecha_creacion)
-                VALUES (?,?,?,?,?,?,1,NOW())
-            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir]);
+                INSERT INTO clientes (nombre, rfc, area, email, telefono, direccion,
+                                      codigo_postal, regimen_fiscal, uso_cfdi, activo, fecha_creacion)
+                VALUES (?,?,?,?,?,?,?,?,?,1,NOW())
+            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir, $cp, $reg, $uso]);
         } else {
             $this->db->prepare("
-                INSERT INTO clientes (nombre, rfc, email, telefono, direccion, activo, fecha_creacion)
-                VALUES (?,?,?,?,?,1,NOW())
-            ")->execute([$nombre, $rfc, $email, $tel, $dir]);
+                INSERT INTO clientes (nombre, rfc, email, telefono, direccion,
+                                      codigo_postal, regimen_fiscal, uso_cfdi, activo, fecha_creacion)
+                VALUES (?,?,?,?,?,?,?,?,1,NOW())
+            ")->execute([$nombre, $rfc, $email, $tel, $dir, $cp, $reg, $uso]);
         }
         return (int)$this->db->lastInsertId();
     }
 
     public function actualizar($id, array $d)
     {
-        list($nombre, $rfc, $email, $tel, $dir, $area) = $this->limpiar($d, $id);
+        list($nombre, $rfc, $email, $tel, $dir, $area, $cp, $reg, $uso) = $this->limpiar($d, $id);
         if ($this->tieneArea()) {
             $this->db->prepare("
                 UPDATE clientes SET nombre = ?, rfc = ?, area = ?, email = ?,
-                       telefono = ?, direccion = ? WHERE id = ?
-            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir, (int)$id]);
+                       telefono = ?, direccion = ?,
+                       codigo_postal = ?, regimen_fiscal = ?, uso_cfdi = ? WHERE id = ?
+            ")->execute([$nombre, $rfc, $area, $email, $tel, $dir, $cp, $reg, $uso, (int)$id]);
         } else {
             $this->db->prepare("
-                UPDATE clientes SET nombre = ?, rfc = ?, email = ?, telefono = ?, direccion = ?
+                UPDATE clientes SET nombre = ?, rfc = ?, email = ?, telefono = ?, direccion = ?,
+                       codigo_postal = ?, regimen_fiscal = ?, uso_cfdi = ?
                 WHERE id = ?
-            ")->execute([$nombre, $rfc, $email, $tel, $dir, (int)$id]);
+            ")->execute([$nombre, $rfc, $email, $tel, $dir, $cp, $reg, $uso, (int)$id]);
         }
         return (int)$id;
     }

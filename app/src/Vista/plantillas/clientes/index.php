@@ -59,6 +59,32 @@ $ant = $antiguedad;
       <label class="form-label">Dirección</label>
       <input class="form-control" name="direccion" value="<?= P::e($e['direccion'] ?? '') ?>" placeholder="Opcional">
     </div>
+    <?php /* Lo fiscal: régimen y uso se guardan como la clave del SAT. */
+          $regE = (string)($e['regimen_fiscal'] ?? ''); $usoE = (string)($e['uso_cfdi'] ?? ''); ?>
+    <div style="width:110px">
+      <label class="form-label" for="cCp">C.P.</label>
+      <input class="form-control lf-mono" name="codigo_postal" id="cCp" value="<?= P::e($e['codigo_postal'] ?? '') ?>"
+             inputmode="numeric" pattern="\d{5}" maxlength="5" placeholder="Opcional"
+             title="Código postal fiscal: 5 dígitos">
+    </div>
+    <div style="flex:2;min-width:220px">
+      <label class="form-label" for="cRegimen">Régimen fiscal</label>
+      <select class="form-select" name="regimen_fiscal" id="cRegimen">
+        <option value="">Sin régimen</option>
+        <?php foreach (\LibertyFin\Datos\ClienteRepo::REGIMENES as $k => $v): ?>
+          <option value="<?= $k ?>" <?= $regE === (string)$k ? 'selected' : '' ?>><?= $k ?> · <?= P::e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div style="flex:2;min-width:220px">
+      <label class="form-label" for="cUso">Uso CFDI</label>
+      <select class="form-select" name="uso_cfdi" id="cUso">
+        <option value="">Sin uso</option>
+        <?php foreach (\LibertyFin\Datos\ClienteRepo::USOS_CFDI as $k => $v): ?>
+          <option value="<?= $k ?>" <?= $usoE === $k ? 'selected' : '' ?>><?= $k ?> · <?= P::e($v) ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
     <div style="display:flex;gap:8px">
       <button class="btn btn-primary" type="submit"><?= $e ? 'Guardar' : 'Dar de alta' ?></button>
       <?php if ($e): ?><a class="btn btn-secondary" href="/clientes">Cancelar</a><?php endif; ?>
